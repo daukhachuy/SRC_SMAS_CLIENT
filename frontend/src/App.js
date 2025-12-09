@@ -8,6 +8,7 @@ import BlogPage from './pages/BlogPage';
 import DashboardPage from './pages/DashboardPage';
 import ServicesPage from './pages/ServicesPage';
 import AboutPage from './pages/AboutPage';  // Add this import
+import ReservationPage from './pages/ReservationPage';
 
 function App() {
   return (
@@ -23,6 +24,8 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/about" element={<AboutPage />} />  {/* Add this route */}
+            <Route path="/dat-ban" element={<ReservationPage />} />
+
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/category/:category" element={<BlogPage />} />
           </Routes>
