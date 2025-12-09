@@ -1,55 +1,54 @@
+/* Header Base */
 .main-header {
-  background: transparent;
+  background-color: #fff; /* nền trắng */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   position: fixed;
   width: 100%;
   top: 0;
   z-index: 1000;
-  transition: var(--transition);
-  padding: 18px 0;
+  transition: all 0.3s ease;
 }
 
 .main-header.scrolled {
-  background: var(--light);
-  box-shadow: 0 10px 30px rgba(11,18,32,0.06);
+  box-shadow: 0 6px 25px rgba(0,0,0,0.12);
   padding: 10px 0;
 }
 
+/* Container */
 .main-header .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 28px;
-  max-width: var(--container-width);
+  padding: 20px 40px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
+/* Logo */
 .logo a {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
-  color: var(--primary);
+  color: #d4af37; /* vàng chủ đạo */
   text-decoration: none;
-  letter-spacing: 2px;
-  font-family: 'Playfair Display', serif;
+  letter-spacing: 1px;
 }
 
+/* Menu */
 .main-nav ul {
   display: flex;
   list-style: none;
-  gap: 30px;
+  gap: 35px;
   margin: 0;
   padding: 0;
 }
 
 .main-nav a {
-  color: rgba(255,255,255,0.95);
+  color: #333; /* chữ menu */
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 500;
   position: relative;
-  padding: 6px 0;
-  transition: var(--transition);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-size: 0.95rem;
+  padding: 5px 0;
+  transition: all 0.3s ease;
 }
 
 .main-nav a::after {
@@ -57,19 +56,18 @@
   position: absolute;
   width: 0;
   height: 2px;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(90deg, rgba(212,175,55,1), rgba(192,148,48,1));
-  transition: width 0.28s ease;
+  bottom: -3px;
+  left: 0;
+  background: linear-gradient(90deg, #d4af37, #c09430); /* gradient vàng */
+  transition: width 0.3s ease;
 }
 
 .main-nav a:hover::after {
-  width: 60%;
+  width: 100%;
 }
 
 .main-nav a:hover {
-  color: var(--primary);
+  color: #d4af37; /* hover vàng */
 }
 
 /* Login Button */
@@ -77,21 +75,19 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: transparent;
-  color: var(--light);
-  padding: 10px 20px;
-  border-radius: 30px;
+  background: linear-gradient(90deg, #d4af37, #c09430); /* gradient vàng */
+  color: #000; /* chữ đen khi scroll */
+  padding: 10px 25px;
+  border-radius: 50px;
   text-decoration: none;
   font-weight: 600;
-  transition: var(--transition);
-  border: 1px solid rgba(212,175,55,0.85);
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(212,175,55,0.3);
 }
 
-.main-header.scrolled .auth-buttons .login-button {
-  background: linear-gradient(90deg, rgba(212,175,55,1), rgba(192,148,48,1));
-  color: var(--accent);
-  border: none;
-  box-shadow: 0 10px 30px rgba(11,18,32,0.08);
+.auth-buttons .login-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(212,175,55,0.4);
 }
 
 .auth-buttons .icon {
@@ -103,7 +99,7 @@
 /* Responsive: Mobile */
 @media (max-width: 992px) {
   .main-nav {
-    display: none; /* Hide menu by default */
+    display: none;
   }
 }
 
@@ -125,7 +121,7 @@
   }
 }
 
-/* Hamburger Menu Button */
+/* Hamburger Menu */
 .hamburger {
   display: none;
   flex-direction: column;
@@ -134,11 +130,11 @@
 }
 
 .hamburger span {
-  width: 26px;
+  width: 25px;
   height: 3px;
-  background: var(--primary);
+  background: #d4af37; /* vàng */
   border-radius: 2px;
-  transition: var(--transition);
+  transition: all 0.3s ease;
 }
 
 @media (max-width: 992px) {
@@ -147,16 +143,16 @@
   }
 }
 
-/* Mobile Menu Active */
+/* Mobile Menu */
 .mobile-menu {
   display: none;
   position: absolute;
   top: 100%;
-  right: 16px;
-  width: 220px;
-  background: var(--light);
-  box-shadow: 0 12px 40px rgba(11,18,32,0.06);
-  border-radius: 12px;
+  right: 0;
+  width: 200px;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  border-radius: 8px;
   overflow: hidden;
   flex-direction: column;
   z-index: 999;
@@ -167,13 +163,13 @@
 }
 
 .mobile-menu a {
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(11,18,32,0.04);
-  color: var(--dark);
-  font-weight: 600;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #333;
+  font-weight: 500;
 }
 
 .mobile-menu a:hover {
-  background: rgba(212,175,55,0.06);
-  color: var(--primary);
+  background: #f9f9f9;
+  color: #d4af37; /* hover vàng */
 }

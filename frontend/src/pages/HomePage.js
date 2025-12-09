@@ -74,7 +74,7 @@ const HomePage = () => {
             <p>Hương vị biển cả tươi ngon nhất</p>
 
             <div className="hero-buttons">
-              <Link to="/reservation" className="btn btn-primary">
+              <Link to="/dat-ban" className="btn btn-primary">
                 Đặt bàn ngay
               </Link>
               <Link to="/menu" className="btn btn-outline">
@@ -87,58 +87,45 @@ const HomePage = () => {
 
 
 
-     {/* ABOUT SECTION */}
-<section className="about-section">
-  <div className="about-container">
+      {/* ABOUT SECTION */}
+      <section className="about-section">
 
-    {/* LEFT CONTENT */}
-    <div className="about-content">
-
-      <h5 className="about-subtitle">About Us</h5>
-
-      <h1 className="about-title">
-        Welcome to{" "}
-        <span className="brand-highlight">
-          <FaUtensils className="icon-utensils" /> Nhà Hàng Hải Sản
-        </span>
-      </h1>
-
-      <p className="about-text">
-        Chúng tôi cam kết mang đến những món hải sản tươi ngon, được lựa chọn
-        kỹ càng và chế biến bởi đội ngũ đầu bếp giàu kinh nghiệm.
-      </p>
-
-      <p className="about-text">
-        Không gian sang trọng, phục vụ tận tâm và trải nghiệm ẩm thực đẳng cấp
-        là lời hứa của chúng tôi dành cho quý khách.
-      </p>
-
-      {/* STATS */}
-      <div className="about-stats">
-        <div className="stat-item">
-          <h2 className="stat-number">15</h2>
-          <p className="stat-label">Years of Experience</p>
+        {/* WELCOME TITLE */}
+        <div className="about-top-title">
+          <h1>
+            Welcome to{" "}
+            <span className="brand-highlight">
+              <FaUtensils className="icon-utensils" /> Nhà Hàng Hải Sản
+            </span>
+          </h1>
         </div>
 
-        <div className="stat-item">
-          <h2 className="stat-number">50</h2>
-          <p className="stat-label">Popular Master Chefs</p>
+        {/* TWO COLUMNS */}
+        <div className="about-container">
+
+          {/* LEFT TEXT */}
+          <div className="about-left">
+            <p className="about-text">
+              Chúng tôi cam kết mang đến những món hải sản tươi ngon, được lựa chọn
+              kỹ càng và chế biến bởi đội ngũ đầu bếp giàu kinh nghiệm.
+            </p>
+            <p className="about-text">
+              Không gian sang trọng, phục vụ tận tâm và trải nghiệm ẩm thực đẳng cấp
+              là lời hứa của chúng tôi dành cho quý khách.
+            </p>
+            <Link to="/about" className="about-btn">
+              READ MORE
+            </Link>
+          </div>
+
+          {/* RIGHT IMAGE */}
+          <div className="about-right">
+            <img src={AboutImage} alt="Về chúng tôi" />
+          </div>
+
         </div>
-      </div>
 
-      <Link to="/about" className="btn-about">
-        READ MORE
-      </Link>
-
-    </div>
-
-    {/* RIGHT IMAGE */}
-    <div className="about-image">
-      <img src={AboutImage} alt="Về chúng tôi" />
-    </div>
-
-  </div>
-</section>
+      </section>
 
       {/* GALLERY */}
       <section className="gallery-section">
@@ -321,7 +308,7 @@ const HomePage = () => {
                   <div className="form-group">
                     <select required>
                       <option value="">Số người</option>
-                      {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                         <option key={n} value={n}>{n} người</option>
                       ))}
                     </select>

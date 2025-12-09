@@ -1,15 +1,16 @@
 chỉ cần kiểm tra lại thôi /* src/styles/HomePage.css */ 
 :root {
-  --primary-color: #e74c3c;
-  --secondary-color: #2c3e50;
-  --accent-color: #f39c12;
-  --text-color: #333;
-  --light-gray: #f8f9fa;
-  --dark-gray: #343a40;
+  --primary-color: #D4AF37; /* gold */
+  --primary-hover: #b78f2a;
+  --accent-color: #0b1220; /* deep navy */
+  --header-height: 78px;
+  --text-color: var(--dark, #0b1220);
+  --light-gray: #faf7f3;
+  --dark-gray: #2b3340;
   --white: #ffffff;
-  --transition: all 0.3s ease;
-  --box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  --border-radius: 8px;
+  --transition: all 0.28s ease;
+  --box-shadow: 0 12px 36px rgba(11,18,32,0.06);
+  --border-radius: 12px;
 }
 
 /* Base Styles */
@@ -171,21 +172,19 @@ section {
 
 /* Hero Section */
 .hero-section {
-  height: 100vh;
-  min-height: 700px;
-  max-height: 900px;
+  /* Hero fills viewport; body already reserves header space via padding-top */
+  height: calc(100vh - var(--header-height));
+  min-height: 520px;
   background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   color: white;
   text-align: center;
-  transition: all 0.5s ease;
-  padding: 0 20px;
+  transition: var(--transition);
+  padding: 40px 20px 40px;
   overflow: hidden;
 }
 
@@ -204,34 +203,34 @@ section {
 }
 
 .hero-content h1 {
-  font-size: 4.5rem;
-  margin: 0 0 1.5rem;
-  background: linear-gradient(90deg, #ffffff, #f8d56b);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  font-size: 4rem;
+  margin: 0 0 1.2rem;
   font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: 1px;
+  line-height: 1.08;
+  letter-spacing: 0.6px;
+  color: var(--white);
+  text-shadow: 0 10px 30px rgba(11,18,32,0.6);
+  background: linear-gradient(90deg, rgba(212,175,55,1), rgba(192,148,48,1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   opacity: 0;
-  transform: translateY(30px);
-  animation: fadeInUp 0.8s ease-out forwards;
-  animation-delay: 0.3s;
+  transform: translateY(24px);
+  animation: fadeInUp 0.9s ease-out forwards;
+  animation-delay: 0.25s;
 }
 
 
 .hero-content p {
-  font-size: 1.5rem;
-  margin: 0 0 3rem;
-  color: #ffffff;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+  font-size: 1.15rem;
+  margin: 0 0 1.8rem;
+  color: rgba(255,255,255,0.95);
   opacity: 0;
-  transform: translateY(30px);
-  animation: fadeInUp 0.8s ease-out forwards;
-  animation-delay: 0.5s;
-  max-width: 700px;
-  line-height: 1.6;
+  transform: translateY(20px);
+  animation: fadeInUp 0.9s ease-out forwards;
+  animation-delay: 0.45s;
+  max-width: 720px;
+  line-height: 1.7;
   margin-left: auto;
   margin-right: auto;
 }
@@ -239,14 +238,14 @@ section {
 
 .hero-buttons {
   display: flex;
-  gap: 20px;
+  gap: 18px;
   justify-content: center;
   flex-wrap: wrap;
   opacity: 0;
-  transform: translateY(30px);
-  animation: fadeInUp 0.8s ease-out forwards;
+  transform: translateY(18px);
+  animation: fadeInUp 0.9s ease-out forwards;
   animation-delay: 0.7s;
-  margin-top: 2rem;
+  margin-top: 1.6rem;
 }
 
 @keyframes fadeInUp {
@@ -289,29 +288,11 @@ section {
 }
 
 @media (max-width: 768px) {
-  .hero-section {
-    min-height: 600px;
-  }
-  
-  .hero-content h1 {
-    font-size: 2.8rem;
-    margin-bottom: 1rem;
-  }
-  
-  .hero-content p {
-    font-size: 1.1rem;
-    margin-bottom: 2rem;
-  }
-  
-  .hero-buttons {
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-  }
-  
-  .btn {
-    width: 200px;
-  }
+  .hero-section { min-height: 520px; }
+  .hero-content h1 { font-size: 2.4rem; }
+  .hero-content p { font-size: 1rem; }
+  .hero-buttons { flex-direction: column; gap: 12px; }
+  .btn { width: 100%; max-width: 280px; }
 }
 
 /* About Section */
@@ -324,10 +305,27 @@ section {
   padding: 80px 0;
   background-color: #fafafa;
   display: flex;
+  flex-direction: column; /* để welcome text trên + container dưới */
   align-items: center;
-  justify-content: center;
 }
 
+/* WELCOME TITLE */
+.about-top-title {
+  text-align: center;
+  margin-bottom: 50px;
+}
+.about-top-title h1 {
+  font-size: 52px;
+  font-weight: 900;
+  color: #2c3e50;
+  line-height: 1.2;
+}
+.brand-highlight {
+  color: #f2b425;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.2);
+}
+
+/* TWO COLUMNS LAYOUT */
 .about-container {
   width: 85%;
   max-width: 1400px;
@@ -335,97 +333,24 @@ section {
   grid-template-columns: 1fr 1fr;
   gap: 50px;
   align-items: center;
+  animation: fadeInUp 1s ease forwards;
+  opacity: 0;
+  transform: translateY(30px);
 }
 
-/* LEFT IMAGES */
-.about-images {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.about-images img {
-  width: 100%;
-  height: auto;
-  border-radius: 10px;
-  object-fit: cover;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* RIGHT TEXT CONTENT */
-.about-text {
-  padding: 10px 0;
-}
-
-.about-text .sub-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #ff9f1c;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.about-text .sub-title::after {
-  content: "";
-  width: 50px;
-  height: 3px;
-  background: #ff9f1c;
-  display: inline-block;
-}
-
-.about-text h1 {
-  font-size: 42px;
-  font-weight: 800;
-  color: #0a0a23;
-  margin-bottom: 25px;
-  line-height: 1.3;
-}
-
-.about-text p {
+/* LEFT TEXT */
+.about-left .about-text {
   font-size: 18px;
   line-height: 1.7;
-  color: #555;
-  margin-bottom: 20px;
-  max-width: 95%;
-}
-
-/* STATS BOXES */
-.about-stats {
-  display: flex;
-  align-items: center;
-  gap: 60px;
-  margin: 35px 0;
-}
-
-.about-stats .stat-item {
-  text-align: center;
-}
-
-.about-stats .stat-item h2 {
-  font-size: 48px;
-  color: #ff9f1c;
-  font-weight: 800;
-  margin-bottom: 5px;
-}
-
-.about-stats .stat-item p {
-  font-size: 16px;
-  letter-spacing: 0.5px;
   color: #333;
+  margin-bottom: 20px;
 }
 
-.about-stats .stat-item p span {
-  font-weight: 700;
-  color: #0a0a23;
-}
-
-/* BUTTON */
 .about-btn {
+  display: inline-block;
   padding: 15px 40px;
   font-size: 17px;
-  background: #ff9f1c;
+  background-color: #f2b425;
   color: white;
   border-radius: 6px;
   font-weight: 600;
@@ -435,8 +360,25 @@ section {
 }
 
 .about-btn:hover {
-  background: #e68900;
+  background-color: #c0392b;
   transform: translateY(-2px);
+}
+
+/* RIGHT IMAGE */
+.about-right img {
+  width: 100%;
+  max-width: 500px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* ANIMATION */
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* RESPONSIVE */
@@ -444,15 +386,14 @@ section {
   .about-container {
     grid-template-columns: 1fr;
   }
-
-  .about-stats {
-    justify-content: space-evenly;
+  .about-right img {
+    max-width: 100%;
   }
-
-  .about-text h1 {
-    font-size: 34px;
+  .about-top-title h1 {
+    font-size: 40px;
   }
 }
+
 
 /* About Section - Luxury Restaurant Style */
 /* Header - Phong cách nhà hàng cao cấp */
@@ -769,12 +710,12 @@ section {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
+  background: linear-gradient(180deg, rgba(11,18,32,0.64), rgba(11,18,32,0.36));
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.28s ease, transform 0.28s ease;
 }
 
 .gallery-item:hover .gallery-overlay {
@@ -790,7 +731,7 @@ section {
   color: white;
   padding: 20px;
   transform: translateY(20px);
-  transition: transform 0.3s ease;
+  transition: transform 0.28s ease;
 }
 
 .gallery-item:hover .gallery-content {
@@ -829,23 +770,24 @@ section {
   position: relative;
 }
 
+
+.testimonial-card {
+  background: white;
+  border-radius: var(--border-radius);
+  padding: 28px;
+  box-shadow: var(--box-shadow);
+  transition: var(--transition);
+  position: relative;
+}
 .testimonial-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-6px);
+  box-shadow: 0 18px 48px rgba(11,18,32,0.08);
 }
 
 .testimonial-rating {
-  color: #ffc107;
-  margin-bottom: 20px;
-  font-size: 1.2rem;
-}
-
-.testimonial-rating span {
-  margin-right: 3px;
-}
-
-.testimonial-rating span.active {
-  color: #ffc107;
+  color: var(--primary-color);
+  margin-bottom: 18px;
+  font-size: 1.15rem;
 }
 
 .testimonial-text {
@@ -861,22 +803,23 @@ section {
 }
 
 .author-avatar {
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background-color: var(--primary-color);
-  color: white;
+  background: linear-gradient(90deg, rgba(212,175,55,1), rgba(192,148,48,1));
+  color: var(--accent-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-right: 15px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-right: 16px;
+  box-shadow: 0 10px 24px rgba(11,18,32,0.08);
 }
 
 .author-info h4 {
   margin: 0 0 5px;
-  color: var(--secondary-color);
+  color: var(--accent-color);
 }
 
 .author-info span {
@@ -931,14 +874,15 @@ section {
   position: absolute;
   bottom: 15px;
   left: 15px;
-  background: rgba(231, 76, 60, 0.9);
-  color: white;
-  padding: 5px 15px;
-  border-radius: 20px;
+  background: linear-gradient(90deg, rgba(212,175,55,1), rgba(192,148,48,1));
+  color: var(--accent-color);
+  padding: 6px 14px;
+  border-radius: 22px;
   font-size: 0.9rem;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(11,18,32,0.06);
 }
 
 .blog-content {
@@ -1084,21 +1028,21 @@ section {
 }
 
 .social-link:hover {
-  background: var(--primary-color);
+  background: linear-gradient(90deg, rgba(212,175,55,1), rgba(192,148,48,1));
   transform: translateY(-3px);
 }
 
 .reservation-form {
-  background: white;
+  background: #fff;
   padding: 40px;
   border-radius: var(--border-radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 50px rgba(11,18,32,0.06);
 }
 
 .reservation-form h3 {
   font-size: 1.8rem;
   margin-bottom: 25px;
-  color: var(--secondary-color);
+  color: var(--accent-color);
   text-align: center;
 }
 
@@ -1122,6 +1066,7 @@ section {
 .form-group textarea:focus {
   outline: none;
   border-color: var(--primary-color);
+  box-shadow: 0 8px 24px rgba(212,175,55,0.08);
 }
 
 .form-group textarea {
@@ -1294,16 +1239,19 @@ section {
   width: 80px;
 }
 /**/
+/* SERVICES SECTION */
 .services-section {
-  padding: 80px 0;
+  padding: 40px 0 60px;
   text-align: center;
-  background-color: #f8f9fa; /* đồng bộ light gray với HomePage */
+  background-color: #f8f9fa;
+  animation: fadeIn 1s ease-in-out;
 }
 
+/* HEADER */
 .services-section .section-header h2 {
   font-size: 2.5rem;
   margin-bottom: 10px;
-  color: var(--secondary-color); /* đồng bộ với tiêu đề các section khác */
+  color: var(--secondary-color);
 }
 
 .services-section .section-header p {
@@ -1312,41 +1260,75 @@ section {
   margin-bottom: 50px;
 }
 
+/* GRID – 4 CỘT */
 .services-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 30px;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 4 dịch vụ 1 hàng */
+  gap: 35px;
+  justify-items: center;
 }
 
+/* SERVICE CARD */
 .service-item {
-  background: #ffffff; /* giữ trắng */
+  background: #ffffff;
   padding: 30px 20px;
-  border-radius: 12px;
-  flex: 1 1 220px;
-  max-width: 250px;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 290px;
+  border: 1px solid #eee;
   transition: transform 0.3s, box-shadow 0.3s;
-  border: 1px solid #eee; /* thêm border nhẹ */
+  animation: fadeUp 0.8s ease both;
 }
 
 .service-item:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 15px 30px rgba(231, 76, 60, 0.15); /* dùng primary color nhạt cho shadow */
+  transform: translateY(-12px);
+  box-shadow: 0 20px 35px rgba(231, 76, 60, 0.25); /* shadow mạnh hơn */
 }
 
+/* ICON */
 .service-icon {
   font-size: 3rem;
-  color: var(--primary-color); /* đồng bộ với giao diện HomePage */
+  color: var(--primary-color);
   margin-bottom: 20px;
+  transition: transform 0.3s ease;
 }
 
+.service-item:hover .service-icon {
+  transform: rotate(10deg) scale(1.1); /* xoay & phóng nhẹ */
+}
+
+/* TITLES */
 .service-item h5 {
   font-size: 1.2rem;
   margin-bottom: 15px;
-  color: var(--secondary-color); /* tiêu đề đồng bộ */
+  color: var(--secondary-color);
 }
 
 .service-item p {
   font-size: 0.9rem;
-  color: #555; /* mô tả màu trung tính */
+  color: #555;
+}
+
+/* ANIMATION */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* RESPONSIVE */
+@media (max-width: 992px) {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 576px) {
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
 }
