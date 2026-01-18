@@ -1,5 +1,0 @@
-.modal-backdrop{position:fixed;inset:0;background:linear-gradient(rgba(11,18,32,0.6), rgba(11,18,32,0.7));display:flex;align-items:center;justify-content:center;z-index:60}
-.modal{background:var(--light);border-radius:14px;max-width:920px;width:94%;box-shadow:0 20px 60px rgba(11,18,32,0.12);overflow:hidden;border-top:4px solid rgba(212,175,55,0.95)}
-.modal-body{display:flex;gap:22px;padding:20px}
-.modal-body img{width:380px;max-width:44%;height:360px;object-fit:cover;border-radius:10px}
-.modal-content{padding:12px}
