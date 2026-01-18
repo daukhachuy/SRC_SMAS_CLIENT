@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import '../styles/AuthPage.css';
 import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import RestaurantLogo from '../components/RestaurantLogo';
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -32,10 +33,28 @@ const AuthPage = () => {
     <div className="auth-container">
       <div className="auth-left">
         <div className="auth-left-content">
-          <div className="restaurant-logo">
-            <span className="logo-icon">🍲</span>
-          </div>
-          <h1 className="restaurant-name">Nhà hàng Lẩu Nướng</h1>
+          <button 
+            className="restaurant-logo-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+            type="button"
+          >
+            <RestaurantLogo size={56} color="white" />
+          </button>
+          <h1 className="restaurant-name">
+            <button
+              className="restaurant-name-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/');
+              }}
+              type="button"
+            >
+              Nhà hàng Lẩu Nướng
+            </button>
+          </h1>
           <p className="restaurant-subtitle">Nhà hàng chuyên về các món nướng và lẩu</p>
           
           <ul className="restaurant-features">
@@ -102,7 +121,10 @@ const AuthPage = () => {
                 />
                 <span>Ghi nhớ đăng nhập</span>
               </label>
-              <a href="#!" className="forgot-password">
+              <a href="#!" className="forgot-password" onClick={(e) => {
+                e.preventDefault();
+                navigate('/forgot-password');
+              }}>
                 Quên mật khẩu ?
               </a>
             </div>
@@ -124,7 +146,10 @@ const AuthPage = () => {
               <button
                 type="button"
                 className="toggle-btn"
-                onClick={() => navigate('/register')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/register');
+                }}
               >
                 Đăng kí ngay
               </button>

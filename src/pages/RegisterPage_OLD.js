@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import '../styles/RegisterPage.css';
 import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import RestaurantLogo from '../components/RestaurantLogo';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -24,6 +23,7 @@ const RegisterPage = () => {
       ...prev,
       [name]: value
     }));
+    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -55,34 +55,40 @@ const RegisterPage = () => {
       newErrors.address = 'Địa chỉ không được để trống';
     }
 
-    if (!formData.password) {
+    if (!formData.password.trim()) {
       newErrors.password = 'Mật khẩu không được để trống';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Vui lòng xác nhận mật khẩu';
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Xác nhận mật khẩu không được để trống';
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Mật khẩu không khớp';
+      newErrors.confirmPassword = 'Mật khẩu không trùng khớp';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!validateForm()) {
+    const newErrors = validateForm();
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
     setLoading(true);
 
     try {
+      // TODO: Replace with actual API call
       console.log('Register data:', formData);
+      
+      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // After successful registration, redirect to login
       alert('Đăng ký thành công! Vui lòng đăng nhập.');
       navigate('/');
     } catch (error) {
@@ -94,29 +100,36 @@ const RegisterPage = () => {
   };
 
   const handleGoogleRegister = () => {
+    // TODO: Implement Google OAuth
     console.log('Google register clicked');
   };
 
   return (
-    <div className="register-container">
-      <div className="register-left">
+    <div className="register-page-container">
+      <div className="register-page-left">
         <div className="register-form-card">
-          <h2 className="form-title">Đăng Ký</h2>
-          <p className="form-subtitle">Chào mừng bạn tới với nhà hàng hải sản !</p>
+          <div className="register-form-header">
+          <h2 className="auth-title">Đăng Kí</h2>
+          <p className="auth-subtitle">
+            Chào mừng bạn tới với nhà hàng hải sản !
+          </p>
 
-          <button className="google-register-btn" onClick={handleGoogleRegister} type="button">
+          {/* Google Register Button */}
+          <button className="google-signup-btn" onClick={handleGoogleRegister}>
             <FaGoogle size={18} />
             <span>Đăng kí với google</span>
           </button>
 
-          <div className="form-divider">
+          {/* Divider */}
+          <div className="divider">
             <span>Hoặc</span>
           </div>
 
-          <form onSubmit={handleSubmit} className="register-form">
-            {/* Full Name */}
+          {/* Register Form */}
+          <form onSubmit={handleSubmit} className="auth-form">
+            {/* Full Name Field */}
             <div className="form-group">
-              <label htmlFor="fullName">Họ Và Tên</label>
+              <label htmlFor="fullName">Họ và tên</label>
               <input
                 type="text"
                 id="fullName"
@@ -124,12 +137,11 @@ const RegisterPage = () => {
                 placeholder="Nguyễn Văn A"
                 value={formData.fullName}
                 onChange={handleChange}
-                className={errors.fullName ? 'error' : ''}
               />
-              {errors.fullName && <span className="error-text">{errors.fullName}</span>}
+              {errors.fullName && <span className="error-message">{errors.fullName}</span>}
             </div>
 
-            {/* Email & Phone */}
+            {/* Email and Phone Row */}
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="email">Email</label>
@@ -140,9 +152,8 @@ const RegisterPage = () => {
                   placeholder="abc123@gmail.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className={errors.email ? 'error' : ''}
                 />
-                {errors.email && <span className="error-text">{errors.email}</span>}
+                {errors.email && <span className="error-message">{errors.email}</span>}
               </div>
 
               <div className="form-group">
@@ -154,13 +165,12 @@ const RegisterPage = () => {
                   placeholder="0123456789"
                   value={formData.phone}
                   onChange={handleChange}
-                  className={errors.phone ? 'error' : ''}
                 />
-                {errors.phone && <span className="error-text">{errors.phone}</span>}
+                {errors.phone && <span className="error-message">{errors.phone}</span>}
               </div>
             </div>
 
-            {/* Address */}
+            {/* Address Field */}
             <div className="form-group">
               <label htmlFor="address">Địa chỉ nhà</label>
               <input
@@ -170,16 +180,15 @@ const RegisterPage = () => {
                 placeholder="Số 30/10 Đường ABC"
                 value={formData.address}
                 onChange={handleChange}
-                className={errors.address ? 'error' : ''}
               />
-              {errors.address && <span className="error-text">{errors.address}</span>}
+              {errors.address && <span className="error-message">{errors.address}</span>}
             </div>
 
-            {/* Gender */}
-            <div className="form-gender">
+            {/* Gender Field */}
+            <div className="form-row gender-row">
               <span className="gender-label">Giới tính :</span>
               <div className="gender-options">
-                <label className="radio-option">
+                <label className="radio-label">
                   <input
                     type="radio"
                     name="gender"
@@ -189,7 +198,7 @@ const RegisterPage = () => {
                   />
                   Nam
                 </label>
-                <label className="radio-option">
+                <label className="radio-label">
                   <input
                     type="radio"
                     name="gender"
@@ -202,7 +211,7 @@ const RegisterPage = () => {
               </div>
             </div>
 
-            {/* Password */}
+            {/* Password Field */}
             <div className="form-group">
               <label htmlFor="password">Mật Khẩu</label>
               <input
@@ -212,14 +221,13 @@ const RegisterPage = () => {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
-                className={errors.password ? 'error' : ''}
               />
-              {errors.password && <span className="error-text">{errors.password}</span>}
+              {errors.password && <span className="error-message">{errors.password}</span>}
             </div>
 
-            {/* Confirm Password */}
+            {/* Confirm Password Field */}
             <div className="form-group">
-              <label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</label>
+              <label htmlFor="confirmPassword">Xác nhận mật Khẩu</label>
               <input
                 type="password"
                 id="confirmPassword"
@@ -227,73 +235,39 @@ const RegisterPage = () => {
                 placeholder="••••••••"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className={errors.confirmPassword ? 'error' : ''}
               />
-              {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
+              {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
             </div>
+
+            {/* Submit Error */}
+            {errors.submit && <span className="error-message">{errors.submit}</span>}
 
             {/* Submit Button */}
             <button
               type="submit"
-              className="register-submit-btn"
+              className="submit-btn"
               disabled={loading}
             >
-              {loading ? 'Đang xử lý...' : 'Đăng Ký'}
+              {loading ? 'Đang xử lý...' : 'Đăng Kí'}
             </button>
           </form>
 
           {/* Toggle to Login */}
-          <div className="form-footer">
-            <span>Đã có tài khoản? </span>
-            <button
-              type="button"
-              className="login-link"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/');
-              }}
-            >
-              Đăng nhập ngay
-            </button>
+          <div className="auth-toggle">
+            <span>
+              Đã có tài khoản?{' '}
+              <button
+                type="button"
+                className="toggle-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/');
+                }}
+              >
+                Đăng nhập ngay
+              </button>
+            </span>
           </div>
-        </div>
-      </div>
-
-      <div className="register-right">
-        <div className="register-info">
-          <button
-            className="info-logo-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/');
-            }}
-            type="button"
-          >
-            <div className="info-logo">
-              <RestaurantLogo size={64} color="white" />
-            </div>
-          </button>
-          <h3 className="info-title">
-            <button
-              className="info-title-btn"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/');
-              }}
-              type="button"
-            >
-              Nhà hàng Lẩu Nướng
-            </button>
-          </h3>
-          <p className="info-desc">Nhà hàng chuyên về món nướng và lẩu</p>
-          
-          <ul className="info-features">
-            <li>Đăng kí lần đầu nhận vouchers</li>
-            <li>Đặt độ giao tận nơi</li>
-            <li>Phản hồi nhanh chóng</li>
-            <li>Đặt tiệc nhanh gọn</li>
-            <li>Ưu đãi cư sốc</li>
-          </ul>
         </div>
       </div>
     </div>
