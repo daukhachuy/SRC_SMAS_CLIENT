@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280">
-  <rect width="100%" height="100%" fill="#fff"/>
-  <rect x="8" y="8" width="384" height="264" rx="8" fill="#eef2ff" stroke="#e0e7ff"/>
-  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter" font-size="20" fill="#3730a3">Gallery Image 5</text>
-</svg>
