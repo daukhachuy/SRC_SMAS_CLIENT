@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import '../styles/AuthPage.css';
 import { FaGoogle } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -49,12 +50,8 @@ const AuthPage = () => {
 
       <div className="auth-right">
         <div className="auth-form-wrapper">
-          <h2 className="auth-title">
-            {isLogin ? 'Đăng Nhập' : 'Đăng Kí'}
-          </h2>
-          <p className="auth-subtitle">
-            {isLogin ? 'Chào mừng bạn quay trở lại !' : 'Tạo tài khoản mới'}
-          </p>
+          <h2 className="auth-title">Đăng Nhập</h2>
+          <p className="auth-subtitle">Chào mừng bạn quay trở lại !</p>
 
           {/* Google Login Button */}
           <button className="google-login-btn" onClick={handleGoogleLogin}>
@@ -123,14 +120,13 @@ const AuthPage = () => {
           {/* Toggle to Register */}
           <div className="auth-toggle">
             <span>
-              {isLogin ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}
-              {' '}
+              Chưa có tài khoản?{' '}
               <button
                 type="button"
                 className="toggle-btn"
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => navigate('/register')}
               >
-                {isLogin ? 'Đăng kí ngay' : 'Đăng nhập'}
+                Đăng kí ngay
               </button>
             </span>
           </div>

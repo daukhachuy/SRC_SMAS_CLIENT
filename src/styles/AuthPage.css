@@ -503,9 +503,97 @@ body {
   }
 }
 
+/* ===== Form Row Layout ===== */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-row .form-group {
+  margin-bottom: 0;
+}
+
+/* ===== Gender Group ===== */
+.gender-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+}
+
+.gender-group label {
+  margin-bottom: 0;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.gender-options {
+  display: flex;
+  gap: 30px;
+}
+
+.gender-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-dark);
+  user-select: none;
+}
+
+.gender-radio input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary-color);
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== Error Text ===== */
+.error-text {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
 /* ===== Print Styles ===== */
 @media print {
   .auth-container {
     display: none;
+  }
+}
+
+/* ===== Responsive Form Row ===== */
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .gender-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .gender-options {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .gender-options {
+    gap: 15px;
+  }
+
+  .gender-radio {
+    font-size: 13px;
   }
 }
