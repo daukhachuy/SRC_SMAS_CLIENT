@@ -1,0 +1,191 @@
+/* --- BIẾN MÀU (Đã chỉnh sang Cam Nhạt) --- */
+:root {
+  --footer-orange: #FF9F43;
+  --footer-bg: #0A0A0A;
+  --footer-gray: #A0A0A0;
+}
+
+.footer {
+  background-color: var(--footer-bg);
+  padding: 80px 0 30px;
+  border-top: 1px solid #1A1A1A;
+  width: 100%;
+  color: #FFFFFF;
+}
+
+.footer-container {
+  width: 94%;
+  margin: 0 auto;
+  max-width: 1750px; /* Tối ưu cho màn 15.6 inch */
+}
+
+.footer-grid {
+  display: grid;
+  /* Chia lưới: Giới thiệu (1.5), Khám phá (0.7), Liên hệ (1), Bản đồ (1.8) */
+  grid-template-columns: 1.5fr 0.7fr 1fr 1.8fr;
+  gap: 60px;
+  margin-bottom: 60px;
+}
+
+/* --- LOGO & INTRO --- */
+.logo-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.footer-logo-img {
+  height: 50px;
+  width: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #222;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.text-primary { color: var(--footer-orange); }
+
+.intro-text {
+  max-width: 350px;
+  margin-bottom: 30px;
+}
+
+/* --- CHỮ & DANH SÁCH --- */
+.footer-heading {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 25px;
+  letter-spacing: 1px;
+}
+
+.small-heading {
+  margin-top: 25px;
+  font-size: 15px;
+}
+
+.footer-text {
+  color: var(--footer-gray);
+  font-size: 14px;
+  line-height: 1.8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.footer-list-item {
+  color: var(--footer-gray);
+  margin-bottom: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+.footer-list-item:hover {
+  color: var(--footer-orange);
+  transform: translateX(8px);
+}
+
+.icon-orange { color: var(--footer-orange); }
+
+/* --- SOCIAL & NEWSLETTER --- */
+.social-row { display: flex; gap: 12px; }
+
+.social-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background-color: #161616;
+  display: flex; justify-content: center; align-items: center;
+  color: var(--footer-orange);
+  border: 1px solid #222;
+  transition: 0.3s;
+  cursor: pointer;
+}
+
+.social-icon:hover {
+  background-color: var(--footer-orange);
+  color: #000;
+  transform: translateY(-5px);
+}
+
+.newsletter-box {
+  display: flex;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 5px;
+  margin-top: 15px;
+}
+
+.newsletter-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 10px;
+  color: #fff;
+  outline: none;
+  font-size: 13px;
+}
+
+.newsletter-btn {
+  background: var(--footer-orange);
+  color: #000;
+  border: none;
+  padding: 0 15px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* --- GOOGLE MAP WRAP --- */
+.footer-map-wrap {
+  height: 250px; /* Tăng chiều cao cho sang hơn trên màn 15.6 */
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid #222;
+  /* Đã loại bỏ filter grayscale/invert để bản đồ luôn sáng */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); 
+  transition: transform 0.3s ease;
+}
+.footer-map-wrap:hover {
+  transform: scale(1.01); /* Hiệu ứng nổi nhẹ khi di chuột vào */
+  border-color: var(--footer-orange);
+}
+
+/* Tinh chỉnh lại Grid cho màn hình rộng */
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 1.2fr 1.5fr; /* Cân đối lại các cột */
+  gap: 40px;
+  margin-bottom: 60px;
+}
+
+.footer-map-wrap:hover {
+  filter: grayscale(0) invert(0) contrast(1);
+}
+
+/* --- BOTTOM LINE --- */
+.footer-bottom {
+  border-top: 1px solid #1A1A1A;
+  padding-top: 25px;
+  text-align: center;
+  color: #555;
+  font-size: 13px;
+}
+
+/* --- RESPONSIVE 15.6 INCH --- */
+@media (max-width: 1440px) {
+  .footer-grid { gap: 30px; }
+  .intro-text { font-size: 13px; }
+}
+
+@media (max-width: 1024px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .footer-map-column { grid-column: span 2; }
+}
