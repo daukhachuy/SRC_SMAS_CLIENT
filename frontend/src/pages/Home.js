@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route } from 'react-router-dom';
 import '../styles/Home.css';
 import { 
   User, Bell, ShoppingBag, MessageSquare, 
@@ -8,6 +8,8 @@ import {
   Phone, MapPin, Star, Quote, Mail, Heart, Clock,
   Calendar, Truck, PartyPopper
 } from 'lucide-react';
+import ComboPage from './ComboPage';
+import MenuPage from './MenuPage';
 
 // --- DATA ---
 const HERO_DATA = [
@@ -29,7 +31,7 @@ const BEST_SELLERS_DATA = [
   { id: 10, name: "Cơm Chiên Hải Sản", price: "180k", img: "https://images.unsplash.com/photo-1512058564366-18510be2db19?q=80&w=500", desc: "Cơm chiên tơi xốp với tôm, mực và rau củ." },
 ];
 
-const COMBOS_DATA = [
+export const COMBOS_DATA = [
   { id: 1, name: "Set Uyên Ương", price: "599k", img: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=500", desc: "Lãng mạn dành cho 2 người với nến và rượu vang." },
   { id: 2, name: "Combo Gia Đình", price: "899k", img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=500", desc: "Lẩu hải sản và 3 món nướng cho gia đình 4 người." },
   { id: 3, name: "Tiệc Bạn Bè", price: "1.2tr", img: "https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?q=80&w=500", desc: "Khay hải sản khổng lồ kèm bia tươi mát lạnh." },
@@ -424,7 +426,7 @@ const Home = () => {
           <div className="line"></div>
           <div style={{ textAlign: 'right' }}>
             <h2 className="main-title">COMBO SIÊU LỜI 🍱</h2>
-            <p style={{ color: '#FF7A21', fontWeight: 700 }}>ƯU ĐÃI ĐẾN 30% KHI ĐẶT TRƯỚC</p>
+            <p style={{ color: '#FF7A21', fontWeight: 700 }}></p>
           </div>
         </div>
         <div className="carousel-container">
@@ -509,6 +511,8 @@ const Home = () => {
         </div>
       </section>
 
+    
+
       <FloatingChat />
       
       <footer className="footer">
@@ -555,4 +559,5 @@ const Home = () => {
   );
 };
 
+export { BEST_SELLERS_DATA };
 export default Home;
