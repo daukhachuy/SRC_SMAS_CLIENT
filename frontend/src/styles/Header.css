@@ -1,32 +1,33 @@
-/* Biến màu sắc để dễ quản lý */
+/* Variables */
+:root {
+  --primary-orange: #FF9F43;
+  --header-height: 85px;
+}
 
-
-.custom-header {
-  width: 100%;
+.header-navbar {
   height: var(--header-height);
-  background-color: #000000;
+  background-color: #000;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  z-index: 9999;
+  z-index: 1000;
   border-bottom: 1px solid #1A1A1A;
-  padding: 0 40px; /* Tăng padding để không bị dính sát mép màn hình */
-  box-sizing: border-box;
+  width: 100%;
 }
 
 .header-container {
-  width: 100%;
-  max-width: 1800px; /* Độ rộng tối đa cho màn hình lớn */
+  width: 94%;
+  max-width: 1750px;
   display: flex;
-  justify-content: space-between; /* Đẩy Logo sang trái, Icon sang phải */
+  justify-content: space-between;
   align-items: center;
+  height: 100%;
 }
 
-/* --- LOGO SECTION --- */
-.header-logo-section {
+/* Logo & Brand */
+.header-logo-group {
   display: flex;
   align-items: center;
   gap: 15px;
@@ -34,88 +35,94 @@
 }
 
 .header-logo-img {
-  height: 55px;
-  width: 55px;
+  height: 52px;
+  width: 52px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #333;
+  border: 2px solid #222;
 }
 
 .header-brand-text {
   display: flex;
   flex-direction: column;
-  line-height: 1;
+  line-height: 1.2;
 }
 
-.brand-sub {
+.text-white-sub {
   color: #FFFFFF;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 2px;
-  margin-bottom: 4px;
 }
 
-.brand-main {
+.text-primary-main {
   color: var(--primary-orange);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
+  margin-top: -2px;
 }
 
-/* --- NAVIGATION --- */
-.header-nav {
+/* Nav Links */
+.header-nav-links {
   display: flex;
-  gap: 45px;
+  gap: 40px;
 }
 
-.nav-link-item {
+.header-link-item {
   color: #fff;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  letter-spacing: 1px;
-  transition: 0.3s;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
 }
 
-.nav-link-item:hover {
+.header-link-item:hover {
   color: var(--primary-orange);
 }
 
-/* --- ACTIONS --- */
-.header-actions {
+/* Right Icons */
+.header-nav-right {
   display: flex;
   align-items: center;
-  gap: 25px;
+  gap: 18px;
 }
 
-.action-icon-wrap {
+.header-icon-wrapper {
   position: relative;
   cursor: pointer;
-  display: flex;
   color: #fff;
-  transition: 0.3s;
+  display: flex;
+  align-items: center;
 }
 
-.action-icon-wrap:hover {
+.header-icon-wrapper:hover {
   color: var(--primary-orange);
 }
 
-.action-badge {
+.header-badge {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -5px;
+  right: -5px;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 10px;
   font-weight: bold;
-  border: 2px solid #000;
 }
 
-.badge-red { background-color: #FF4D4F; color: #fff; }
-.badge-orange { background-color: var(--primary-orange); color: #000; }
+.badge-red {
+  background-color: #FF4D4F;
+  color: #fff;
+}
 
-.user-avatar-btn {
-  width: 40px;
-  height: 40px;
+.badge-orange {
+  background-color: var(--primary-orange);
+  color: #000;
+}
+
+.header-user-avatar {
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background-color: var(--primary-orange);
   display: flex;
@@ -123,10 +130,9 @@
   align-items: center;
   cursor: pointer;
   color: #000;
-  margin-left: 5px;
-  transition: transform 0.2s;
+  transition: transform 0.2s ease;
 }
 
-.user-avatar-btn:hover {
+.header-user-avatar:hover {
   transform: scale(1.05);
 }
