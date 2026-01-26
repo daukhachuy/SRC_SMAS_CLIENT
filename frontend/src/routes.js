@@ -7,12 +7,17 @@ import BuffetPage from './pages/BuffetPage';
 import AuthPage from './pages/AuthPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+// 1. Thêm dòng import này
+import Services from './pages/Services'; 
 
 const AppRoutes = () => {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        {/* 2. THÊM DÒNG NÀY VÀO ĐÂY */}
+        <Route path="/services" element={<Services />} /> 
+        
         <Route path="/menu" element={<MenuPage menuItems={BEST_SELLERS_DATA} />} />
         <Route path="/combo" element={<ComboPage combos={COMBOS_DATA} />} />
         <Route path="/buffet" element={<BuffetPage />} />

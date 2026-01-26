@@ -179,7 +179,7 @@ const DiscountAndInfo = ({ navigate }) => {
               <button className="mini-circle-nav nav-right" onClick={() => setDiscountIdx(p => p === DISCOUNTS_DATA.length - 1 ? 0 : p + 1)}>
                 <ChevronRight size={20}/>
               </button>
-              <div className="discount-badge">{current.discount}</div>
+              
             </div>
             <div className="discount-info-part">
               <h3 className="discount-name-new">{current.name}</h3>
@@ -288,7 +288,7 @@ const Home = () => {
 
   return (
     <div className="app">
-      <Header navigate={navigate} />
+      <Header />
       
       <section className="hero-section">
         <div className="hero-main">
