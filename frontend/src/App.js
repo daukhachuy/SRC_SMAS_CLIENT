@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Menu from './pages/Menu';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import AboutPage from './pages/AboutPage';
 
 function App() {
   return (
@@ -15,6 +16,9 @@ function App() {
         
         {/* Menu page */}
         <Route path="/menu" element={<Menu />} />
+        
+        {/* About page */}
+        <Route path="/about" element={<AboutPage />} />
         
         {/* Các trang khác */}
         <Route path="/auth" element={<AuthPage />} />

@@ -1,95 +1,157 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, ShoppingBag, User } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import '../styles/Header.css';
 
-const Header = ({ navigate }) => {
-  const primaryOrange = '#FF9F43'; // Màu cam nhạt sang trọng
+const MENU_ITEMS = [
+  { label: 'THỰC ĐƠN', path: '/menu', id: 'menu' },
+  { label: 'KHUYẾN MÃI', path: '/combo', id: 'combo' },
+  { label: 'DỊCH VỤ', path: '/buffet', id: 'buffet' },
+  { label: 'VỀ CHÚNG TÔI', path: '/about', id: 'about' }
+];
+
+const Header = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [activeId, setActiveId] = useState('');
+  const [shrink, setShrink] = useState(false);
+
+  // Map path -> id
+  const pathToId = useMemo(() => {
+    const map = new Map();
+    MENU_ITEMS.forEach(i => map.set(i.path, i.id));
+    return map;
+  }, []);
+
+  /* ================= ULTRA++: SHRINK + ACTIVE BY SCROLL ================= */
+  useEffect(() => {
+    let ticking = false;
+
+    const pickActiveByScroll = () => {
+      setShrink(window.scrollY > 80);
+
+      const focusY = 120;
+
+      for (const item of MENU_ITEMS) {
+        const el = document.getElementById(item.id);
+        if (!el) continue;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= focusY && rect.bottom >= focusY) {
+          setActiveId(item.id);
+          return;
+        }
+      }
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        pickActiveByScroll();
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    pickActiveByScroll();
+
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  /* ================= ULTRA++: ACTIVE BY ROUTE (fallback) ================= */
+  useEffect(() => {
+    const matched = MENU_ITEMS.find(item =>
+      location.pathname.startsWith(item.path)
+    );
+    if (matched) {
+      setActiveId(matched.id);
+      return;
+    }
+
+    const exact = pathToId.get(location.pathname);
+    if (exact) setActiveId(exact);
+  }, [location.pathname, pathToId]);
 
   return (
-    <nav className="navbar" style={{
-      height: '85px',            // Chiều cao cố định thanh header
-      backgroundColor: '#000',
-      display: 'flex',
-      alignItems: 'center',      // CĂN GIỮA THEO CHIỀU DỌC (Quan trọng nhất)
-      justifyContent: 'center',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000,
-      borderBottom: '1px solid #1A1A1A',
-      width: '100%'
-    }}>
-      <div className="nav-container" style={{
-        width: '94%',
-        maxWidth: '1750px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',    // Căn giữa các nhóm Logo, Menu, Icons
-        height: '100%'
-      }}>
-        
-        {/* NHÓM LOGO - Đã sửa lỗi sát đỉnh */}
-        <div className="logo-group" 
-             onClick={() => navigate('/')} 
-             style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }}>
-          
-          <img src="/images/LOGO.png" alt="Logo" style={{
-            height: '52px',
-            width: '52px',
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: `2px solid #222`
-          }} />
+    <nav className={`custom-header ${shrink ? 'is-shrink' : ''}`}>
+      <div className="header-container">
 
-          {/* Wrapper cho text để không bị lệch hàng */}
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
-            <span style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '500', letterSpacing: '2px' }}>
-              NHÀ HÀNG
-            </span>
-            <span style={{ color: primaryOrange, fontSize: '22px', fontWeight: '900', marginTop: '-2px' }}>
-              LẨU NƯỚNG
-            </span>
+        {/* LOGO */}
+        <div
+          className="header-logo-section"
+          onClick={() => navigate('/')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
+        >
+          <img
+            className="header-logo-img"
+            src="/images/LOGO.png"
+            alt="Logo"
+          />
+
+          <div className="header-brand-text">
+            <span className="brand-sub">NHÀ HÀNG</span>
+            <span className="brand-main">LẨU NƯỚNG</span>
           </div>
         </div>
 
-        {/* MENU CHÍNH */}
-        <div className="nav-links" style={{ display: 'flex', gap: '40px' }}>
-          {['THỰC ĐƠN', 'KHUYẾN MÃI', 'DỊCH VỤ', 'VỀ CHÚNG TÔI'].map(item => (
-            <span key={item} style={{
-              color: '#fff',
-              fontSize: '14px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              letterSpacing: '0.5px'
-            }}>{item}</span>
-          ))}
+        {/* NAV */}
+        <div className="header-nav">
+          {MENU_ITEMS.map((item) => {
+            const isActive = activeId === item.id;
+
+            return (
+              <div
+                key={item.id}
+                className={`nav-link-item ${isActive ? 'is-active' : ''}`}
+                onClick={() => navigate(item.path)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(item.path)}
+              >
+                {item.label}
+
+                {/* ULTRA++ underline trượt mượt */}
+                {isActive && (
+                  <>
+                    <motion.div
+                      layoutId="ultra-underline"
+                      className="nav-underline"
+                      transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+                    />
+                    <div className="nav-glow" />
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* CỤM ICON BÊN PHẢI */}
-        <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <Bell size={22} color="#fff" />
-            <span style={{
-              position: 'absolute', top: '-5px', right: '-5px',
-              backgroundColor: '#FF4D4F', color: '#fff',
-              fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold'
-            }}>5</span>
-          </div>
-          
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <ShoppingBag size={22} color="#fff" />
-            <span style={{
-              position: 'absolute', top: '-5px', right: '-5px',
-              backgroundColor: primaryOrange, color: '#000',
-              fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold'
-            }}>3</span>
+        {/* ACTIONS */}
+        <div className="header-actions">
+          <div className="action-icon-wrap" title="Thông báo">
+            <Bell size={22} />
+            <span className="action-badge badge-red">5</span>
           </div>
 
-          {/* Avatar User */}
-          <div onClick={() => navigate('/auth')} style={{
-            width: '42px', height: '42px', borderRadius: '50%',
-            backgroundColor: primaryOrange, display: 'flex',
-            justifyContent: 'center', alignItems: 'center', cursor: 'pointer'
-          }}>
-            <User size={20} color="#000" />
+          <div className="action-icon-wrap" title="Giỏ hàng">
+            <ShoppingBag size={22} />
+            <span className="action-badge badge-orange">3</span>
+          </div>
+
+          <div
+            className="user-avatar-btn"
+            onClick={() => navigate('/auth')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/auth')}
+            title="Tài khoản"
+          >
+            <User size={20} />
           </div>
         </div>
 

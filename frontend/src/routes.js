@@ -7,6 +7,7 @@ import BuffetPage from './pages/BuffetPage';
 import AuthPage from './pages/AuthPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import AboutPage from './pages/AboutPage';
 
 const AppRoutes = () => {
   return (
@@ -16,6 +17,7 @@ const AppRoutes = () => {
         <Route path="/menu" element={<MenuPage menuItems={BEST_SELLERS_DATA} />} />
         <Route path="/combo" element={<ComboPage combos={COMBOS_DATA} />} />
         <Route path="/buffet" element={<BuffetPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
