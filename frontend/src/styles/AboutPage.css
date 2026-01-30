@@ -1,0 +1,836 @@
+/* ===== ABOUT PAGE STYLES ===== */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+.about-page {
+  width: 100%;
+  background-color: #f5f5f5;
+  font-family: 'Poppins', sans-serif;
+  color: #333;
+}
+
+/* ===== HERO SECTION ===== */
+.about-hero {
+  position: relative;
+  width: 100%;
+  height: 450px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.3) 100%),
+              url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1600') center/cover no-repeat;
+  overflow: hidden;
+}
+
+.about-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 1;
+}
+
+.about-hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  color: white;
+}
+
+.about-hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 64px;
+  font-weight: 800;
+  margin: 0 0 15px 0;
+  letter-spacing: 3px;
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+  line-height: 1.1;
+}
+
+.about-hero-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 300;
+  margin: 0;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.5);
+  line-height: 1.6;
+}
+
+/* ===== ABOUT INTRO SECTION ===== */
+.about-intro-section {
+  background-color: white;
+  padding: 80px 0;
+}
+
+.about-intro-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+
+.about-intro-image {
+  width: 100%;
+  height: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.12);
+}
+
+.about-intro-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.about-intro-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 38px;
+  font-weight: 700;
+  color: #ff6600;
+  margin-bottom: 25px;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+
+.about-intro-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  color: #555;
+  line-height: 1.9;
+  text-align: justify;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+/* ===== SERVICES SECTION ===== */
+.services-section {
+  background-color: #f5f5f5;
+  padding: 80px 0;
+}
+
+.services-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.services-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #ff6600;
+  text-align: center;
+  margin-bottom: 60px;
+  letter-spacing: 1px;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+
+.service-card {
+  background-color: white;
+  border-radius: 12px;
+  padding: 30px 20px;
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.service-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+.service-icon {
+  font-size: 44px;
+  color: #ff6600;
+  margin-bottom: 15px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.service-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 15px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.service-description {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.7;
+  margin-bottom: 20px;
+  flex-grow: 1;
+  text-align: justify;
+  letter-spacing: 0.2px;
+}
+
+.service-image-wrapper {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.service-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.service-card:hover .service-image {
+  transform: scale(1.05);
+}
+
+.service-button {
+  background-color: #ff6600;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  width: 100%;
+}
+
+.service-button:hover {
+  background-color: #e55a00;
+}
+
+/* ===== GALLERY SECTION ===== */
+.gallery-section {
+  background-color: white;
+  padding: 80px 0;
+}
+
+.gallery-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.gallery-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #ff6600;
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+.gallery-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+  color: #777;
+  text-align: center;
+  margin-bottom: 50px;
+  line-height: 1.7;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 250px);
+  gap: 15px;
+}
+
+.gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: #e0e0e0;
+}
+
+.gallery-item:nth-child(2),
+.gallery-item:nth-child(5) {
+  grid-row: span 2;
+  grid-column: span 1;
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.gallery-item:hover img {
+  transform: scale(1.08);
+}
+
+.gallery-item.featured {
+  grid-column: span 1;
+}
+
+/* ===== REVIEWS SECTION ===== */
+.reviews-section {
+  background-color: #f5f5f5;
+  padding: 80px 0;
+}
+
+.reviews-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.reviews-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #ff6600;
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+.reviews-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+  color: #777;
+  text-align: center;
+  margin-bottom: 60px;
+  line-height: 1.8;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+.reviews-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.reviews-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.reviews-rating {
+  background: white;
+  padding: 35px 30px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.rating-score {
+  font-family: 'Playfair Display', serif;
+  font-size: 48px;
+  font-weight: 800;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.rating-number {
+  color: #ff6600;
+}
+
+.rating-slash {
+  color: #ccc;
+  margin: 0 5px;
+  font-size: 36px;
+}
+
+.rating-total {
+  color: #999;
+  font-size: 24px;
+}
+
+.rating-stars {
+  font-size: 24px;
+  color: #ff6600;
+  margin-bottom: 10px;
+  letter-spacing: 4px;
+}
+
+.star-filled {
+  color: #ff6600;
+}
+
+.star-empty {
+  color: #ddd;
+}
+
+.rating-count {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+  font-weight: 500;
+}
+
+.reviews-breakdown {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.breakdown-item {
+  display: grid;
+  grid-template-columns: 45px 1fr 40px;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+
+.breakdown-item:last-child {
+  margin-bottom: 0;
+}
+
+.breakdown-stars {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+.breakdown-bar {
+  background-color: #e8e8e8;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.breakdown-fill {
+  background-color: #ff6600;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.breakdown-count {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #999;
+  text-align: right;
+  font-weight: 500;
+}
+
+.reviews-list {
+  background: white;
+  padding: 35px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.reviews-list-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+.reviews-list-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #999;
+  line-height: 1.7;
+  margin-bottom: 25px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+.review-card {
+  padding-top: 20px;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.review-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+.review-rating {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #ff6600;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.review-comment {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.7;
+  margin: 0;
+  letter-spacing: 0.2px;
+  font-weight: 400;
+}
+
+/* ===== RESTAURANT INFO SECTION ===== */
+.restaurant-info-section {
+  background-color: white;
+  padding: 80px 0;
+  border-top: 1px solid #e0e0e0;
+}
+
+.restaurant-info-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.info-section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #ff6600;
+  text-align: center;
+  margin-bottom: 60px;
+  letter-spacing: 1px;
+}
+
+.info-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  margin-bottom: 60px;
+  align-items: center;
+}
+
+.info-details {
+  width: 100%;
+}
+
+.info-item-box {
+  background-color: #f9f9f9;
+  padding: 30px;
+  border-radius: 8px;
+  border-left: 4px solid #ff6600;
+}
+
+.info-item-icon {
+  font-size: 32px;
+  margin-bottom: 15px;
+}
+
+.info-item-content h3 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 20px;
+  letter-spacing: 0.5px;
+}
+
+.info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-list li {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.7;
+  letter-spacing: 0.2px;
+}
+
+.info-list strong {
+  color: #333;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.info-map {
+  width: 100%;
+  height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.info-map img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== BRANCHES SECTION ===== */
+.branches-section {
+  background-color: #f5f5f5;
+  padding: 60px 0;
+  border-top: 1px solid #e0e0e0;
+}
+
+.branches-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.social-icons {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.social-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #999;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.branches-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+  text-align: center;
+  margin-bottom: 50px;
+  letter-spacing: 0.5px;
+}
+
+.branches-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+
+.branch-column {
+  padding: 20px 0;
+}
+
+.branch-column h4 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.branch-column ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.branch-column ul li {
+  margin-bottom: 12px;
+}
+
+.branch-column ul li a {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #777;
+  text-decoration: none;
+  transition: color 0.3s ease;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+.branch-column ul li a:hover {
+  color: #ff6600;
+}
+
+.contact-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.branch-map-small {
+  width: 100%;
+  height: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.branch-map-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.branch-chat-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 15px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+.branch-button {
+  background-color: #ff6600;
+  color: white;
+  border: none;
+  padding: 10px 40px;
+  border-radius: 20px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  letter-spacing: 0.5px;
+}
+
+.branch-button:hover {
+  background-color: #e55a00;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1024px) {
+  .about-intro-container,
+  .info-content,
+  .branches-grid,
+  .reviews-content,
+  .services-grid {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .gallery-item:nth-child(2),
+  .gallery-item:nth-child(5) {
+    grid-row: auto;
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .about-hero {
+    height: 300px;
+  }
+
+  .about-hero-title {
+    font-size: 36px;
+  }
+
+  .about-hero-subtitle {
+    font-size: 14px;
+  }
+
+  .about-intro-section,
+  .services-section,
+  .gallery-section,
+  .reviews-section,
+  .restaurant-info-section,
+  .branches-section {
+    padding: 50px 0;
+  }
+
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .services-title,
+  .gallery-title,
+  .reviews-title,
+  .info-section-title {
+    font-size: 24px;
+  }
+
+  .about-intro-title {
+    font-size: 22px;
+  }
+
+  .reviews-content {
+    grid-template-columns: 1fr;
+  }
+
+  .about-intro-image {
+    height: 300px;
+  }
+
+  .info-map {
+    height: 250px;
+  }
+
+  .branch-column ul li a,
+  .info-list li {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .about-hero {
+    height: 200px;
+  }
+
+  .about-hero-title {
+    font-size: 24px;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .gallery-item:nth-child(n) {
+    grid-row: auto;
+    grid-column: auto;
+  }
+
+  .branches-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .about-intro-section,
+  .services-section,
+  .gallery-section,
+  .reviews-section {
+    padding: 40px 0;
+  }
+}

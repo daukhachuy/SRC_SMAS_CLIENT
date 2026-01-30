@@ -1,60 +1,188 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Bell, ShoppingBag, User, Search } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Bell, ShoppingBag, User } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import '../styles/Header.css';
+
+const MENU_ITEMS = [
+  { label: 'THỰC ĐƠN', path: '/menu', id: 'menu' },
+  { label: 'KHUYẾN MÃI', path: '/combo', id: 'combo' },
+  { label: 'DỊCH VỤ', path: '/services', id: 'services' },
+  { label: 'VỀ CHÚNG TÔI', path: '/about', id: 'about' }
+];
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const menuItems = [
-    { name: 'THỰC ĐƠN', path: '/menu' },
-    { name: 'KHUYẾN MÃI', path: '/promotions' },
-    { name: 'DỊCH VỤ', path: '/services' },
-    { name: 'VỀ CHÚNG TÔI', path: '/about' }
-  ];
+  const [activeId, setActiveId] = useState('');
+  const [shrink, setShrink] = useState(false);
+
+  // Map path -> id
+  const pathToId = useMemo(() => {
+    const map = new Map();
+    MENU_ITEMS.forEach(i => map.set(i.path, i.id));
+    return map;
+  }, []);
+
+  /* ================= ULTRA++: SHRINK + ACTIVE BY SCROLL ================= */
+  useEffect(() => {
+    let ticking = false;
+
+    const pickActiveByScroll = () => {
+      setShrink(window.scrollY > 80);
+
+      const focusY = 120;
+
+      for (const item of MENU_ITEMS) {
+        const el = document.getElementById(item.id);
+        if (!el) continue;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= focusY && rect.bottom >= focusY) {
+          setActiveId(item.id);
+          return;
+        }
+      }
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        pickActiveByScroll();
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    pickActiveByScroll();
+
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  /* ================= ULTRA++: ACTIVE BY ROUTE (PRIMARY) ================= */
+  useEffect(() => {
+    // Only use route detection if we're not on home page
+    if (location.pathname === '/') {
+      return; // Let scroll detection handle home page
+    }
+
+    // Nếu là internal nav (từ tab), highlight "menu" thôi
+    if (location.state?.isInternalNav && location.pathname !== '/menu') {
+      setActiveId('menu');
+      return;
+    }
+
+    // Exact match first
+    const exact = pathToId.get(location.pathname);
+    if (exact) {
+      setActiveId(exact);
+      return;
+    }
+
+    // Then prefix match
+    const matched = MENU_ITEMS.find(item =>
+      location.pathname.startsWith(item.path)
+    );
+    if (matched) {
+      setActiveId(matched.id);
+      return;
+    }
+  }, [location.pathname, location.state, pathToId]);
 
   return (
-    <nav className="header-navbar">
+    <nav className={`custom-header ${shrink ? 'is-shrink' : ''}`}>
       <div className="header-container">
-        
+
         {/* LOGO */}
-        <div className="header-logo-group" onClick={() => navigate('/')}>
-          <img src="/images/LOGO.png" alt="Logo" className="header-logo-img" />
+        <div
+          className="header-logo-section"
+          onClick={() => navigate('/')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
+        >
+          <img
+            className="header-logo-img"
+            src="/images/LOGO.png"
+            alt="Logo"
+          />
+
           <div className="header-brand-text">
-            <span className="text-white-sub">NHÀ HÀNG</span>
-            <span className="text-primary-main">LẨU NƯỚNG</span>
+            <span className="brand-sub">NHÀ HÀNG</span>
+            <span className="brand-main">LẨU NƯỚNG</span>
           </div>
         </div>
 
-        {/* MENU CHÍNH */}
-        <div className="header-nav-links">
-          {menuItems.map((item) => (
-            <span 
-              key={item.name} 
-              className="header-link-item"
-              onClick={() => navigate(item.path)}
-            >
-              {item.name}
-            </span>
-          ))}
+        {/* NAV */}
+        <div className="header-nav">
+          {MENU_ITEMS.map((item) => {
+            const isActive = activeId === item.id;
+
+            return (
+              <div
+                key={item.id}
+                className={`nav-link-item ${isActive ? 'is-active' : ''}`}
+                onClick={() => {
+                  // Chỉ navigate nếu không phải KHUYẾN MÃI hoặc DỊCH VỤ
+                  if (item.id !== 'combo' && item.id !== 'buffet') {
+                    navigate(item.path);
+                  } else {
+                    // Highlight nhưng không navigate
+                    setActiveId(item.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (item.id !== 'combo' && item.id !== 'buffet') {
+                      navigate(item.path);
+                    } else {
+                      setActiveId(item.id);
+                    }
+                  }
+                }}
+              >
+                {item.label}
+
+                {/* ULTRA++ underline trượt mượt */}
+                {isActive && (
+                  <>
+                    <motion.div
+                      layoutId="ultra-underline"
+                      className="nav-underline"
+                      transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+                    />
+                    <div className="nav-glow" />
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* NHÓM ICON BÊN PHẢI - ĐÃ VỨT CHỮ TÀI KHOẢN */}
-        <div className="header-nav-right">
-          {/* Thông báo */}
-          <div className="header-icon-wrapper">
+        {/* ACTIONS */}
+        <div className="header-actions">
+          <div className="action-icon-wrap" title="Thông báo">
             <Bell size={22} />
-            <span className="header-badge badge-red">5</span>
+            <span className="action-badge badge-red">5</span>
           </div>
 
-          {/* Giỏ hàng */}
-          <div className="header-icon-wrapper" onClick={() => navigate('/cart')}>
+          <div className="action-icon-wrap" title="Giỏ hàng">
             <ShoppingBag size={22} />
-            <span className="header-badge badge-orange">3</span>
+            <span className="action-badge badge-orange">3</span>
           </div>
 
-          {/* Chỉ giữ lại Icon User tròn */}
-          <div className="header-user-avatar" onClick={() => navigate('/auth')}>
+          <div
+            className="user-avatar-btn"
+            onClick={() => navigate('/auth')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/auth')}
+            title="Tài khoản"
+          >
             <User size={20} />
           </div>
         </div>

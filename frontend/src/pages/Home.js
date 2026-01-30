@@ -163,7 +163,7 @@ const DiscountAndInfo = ({ navigate }) => {
   const current = DISCOUNTS_DATA[discountIdx];
 
   return (
-    <section className="info-section">
+    <section id="about" className="info-section">
       <div className="info-grid">
         <div className="discount-card-new">
           <div className="card-header">
@@ -335,7 +335,7 @@ const Home = () => {
       <SectionDivider topColor="#ffffff" bottomColor="#ffffff" />
 
       {/* CAROUSEL 1: CHẠY TIẾN */}
-      <section className="section-padding mon-an-ban-chay">
+      <section id="menu" className="section-padding mon-an-ban-chay">
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
           <div>
             <h2 className="main-title">MÓN ĂN BÁN CHẠY 🔥</h2>
@@ -385,7 +385,7 @@ const Home = () => {
       <SectionDivider topColor="#ffffff" bottomColor="#ffffff" />
 
       {/* CAROUSEL 2: CHẠY LÙI */}
-      <section className="section-padding combo-section">
+      <section id="combo" className="section-padding combo-section">
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
           {/* Nút Xem Thêm nằm bên trái đối diện tiêu đề phải */}
           <button 
@@ -436,7 +436,7 @@ const Home = () => {
 
       {/* REVIEW ĐƯA LÊN TRƯỚC DISCOUNT */}
       <SectionDivider topColor="#ffffff" bottomColor="#0D0D0D" />
-      <section className="review-section">
+      <section id="buffet" className="review-section">
         <div className="review-header-layout">
           <div className="review-left">
             <Quote size={50} className="quote-icon" />
