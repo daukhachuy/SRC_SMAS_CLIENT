@@ -23,7 +23,7 @@ const Header = () => {
     const map = new Map();
     MENU_ITEMS.forEach(i => map.set(i.path, i.id));
     return map;
-  }, [MENU_ITEMS]);
+  }, []);
 
   /* ================= ULTRA++: SHRINK + ACTIVE BY SCROLL ================= */
   useEffect(() => {
@@ -89,7 +89,7 @@ const Header = () => {
       setActiveId(matched.id);
       return;
     }
-  }, [location.pathname, location.state, pathToId, MENU_ITEMS]);
+  }, [location.pathname, location.state, pathToId]);
 
   return (
     <nav className={`custom-header ${shrink ? 'is-shrink' : ''}`}>
