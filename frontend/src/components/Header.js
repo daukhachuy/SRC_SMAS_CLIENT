@@ -7,7 +7,7 @@ import '../styles/Header.css';
 const MENU_ITEMS = [
   { label: 'THỰC ĐƠN', path: '/menu', id: 'menu' },
   { label: 'KHUYẾN MÃI', path: '/combo', id: 'combo' },
-  { label: 'DỊCH VỤ', path: '/buffet', id: 'buffet' },
+  { label: 'DỊCH VỤ', path: '/services', id: 'services' },
   { label: 'VỀ CHÚNG TÔI', path: '/about', id: 'about' }
 ];
 
@@ -23,7 +23,7 @@ const Header = () => {
     const map = new Map();
     MENU_ITEMS.forEach(i => map.set(i.path, i.id));
     return map;
-  }, []);
+  }, [MENU_ITEMS]);
 
   /* ================= ULTRA++: SHRINK + ACTIVE BY SCROLL ================= */
   useEffect(() => {
@@ -61,8 +61,27 @@ const Header = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  /* ================= ULTRA++: ACTIVE BY ROUTE (fallback) ================= */
+  /* ================= ULTRA++: ACTIVE BY ROUTE (PRIMARY) ================= */
   useEffect(() => {
+    // Only use route detection if we're not on home page
+    if (location.pathname === '/') {
+      return; // Let scroll detection handle home page
+    }
+
+    // Nếu là internal nav (từ tab), highlight "menu" thôi
+    if (location.state?.isInternalNav && location.pathname !== '/menu') {
+      setActiveId('menu');
+      return;
+    }
+
+    // Exact match first
+    const exact = pathToId.get(location.pathname);
+    if (exact) {
+      setActiveId(exact);
+      return;
+    }
+
+    // Then prefix match
     const matched = MENU_ITEMS.find(item =>
       location.pathname.startsWith(item.path)
     );
@@ -70,10 +89,7 @@ const Header = () => {
       setActiveId(matched.id);
       return;
     }
-
-    const exact = pathToId.get(location.pathname);
-    if (exact) setActiveId(exact);
-  }, [location.pathname, pathToId]);
+  }, [location.pathname, location.state, pathToId, MENU_ITEMS]);
 
   return (
     <nav className={`custom-header ${shrink ? 'is-shrink' : ''}`}>
@@ -108,10 +124,26 @@ const Header = () => {
               <div
                 key={item.id}
                 className={`nav-link-item ${isActive ? 'is-active' : ''}`}
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  // Chỉ navigate nếu không phải KHUYẾN MÃI hoặc DỊCH VỤ
+                  if (item.id !== 'combo' && item.id !== 'buffet') {
+                    navigate(item.path);
+                  } else {
+                    // Highlight nhưng không navigate
+                    setActiveId(item.id);
+                  }
+                }}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && navigate(item.path)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (item.id !== 'combo' && item.id !== 'buffet') {
+                      navigate(item.path);
+                    } else {
+                      setActiveId(item.id);
+                    }
+                  }
+                }}
               >
                 {item.label}
 

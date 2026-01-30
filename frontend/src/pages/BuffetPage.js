@@ -2,41 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/BuffetPage.css';
 import { ChevronDown, Bell, User, MessageSquare } from 'lucide-react';
-
-const Header = () => {
-  const navigate = useNavigate();
-  return (
-    <nav className="navbar">
-      <div className="nav-container">
-        <div className="logo-group">
-          <img src="/images/LOGO.png" className="logo-img" alt="Logo" />
-          <span className="logo-text">
-            <span style={{color: '#fff'}}>OCEAN</span>
-            <span style={{color: '#FF7A21'}}>GRILL</span>
-          </span>
-        </div>
-        <div className="nav-links">
-          {['THỰC ĐƠN', 'KHUYẾN MÃI', 'DỊCH VỤ', 'VỀ CHÚNG TÔI'].map(item => (
-            <span key={item} className="nav-item" style={{cursor: 'pointer'}}>{item}</span>
-          ))}
-        </div>
-        <div className="nav-right">
-          <div className="icon-circle">
-            <Bell size={20} color="#fff" />
-            <span className="badge" style={{backgroundColor: '#FF4D4F'}}>5</span>
-          </div>
-          <div className="icon-circle">
-            <MessageSquare size={20} color="#fff" />
-            <span className="badge">3</span>
-          </div>
-          <div className="icon-circle" style={{border: '2px solid #FF7A21', cursor: 'pointer'}} onClick={() => navigate('/auth')}>
-            <User size={20} color="#fff" />
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
-};
+import Header from '../components/Header';
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -49,6 +15,7 @@ const BuffetPage = () => {
   const navigate = useNavigate();
   const [expandCategory, setExpandCategory] = useState(true);
   const [expandPrice, setExpandPrice] = useState(true);
+  const [activeTab, setActiveTab] = useState('buffet');
 
   const buffetMenu = [
     'Cá diêu hồng phi lê',
@@ -92,9 +59,9 @@ const BuffetPage = () => {
       
       <div className="buffet-page-container">
         <div className="buffet-nav-tabs">
-          <button className="nav-tab" onClick={() => navigate('/menu')}>MENU</button>
-          <button className="nav-tab" onClick={() => navigate('/combo')}>COMBO</button>
-          <button className="nav-tab active">BUFFET</button>
+          <button className={`nav-tab`} onClick={() => navigate('/menu')}>MENU</button>
+          <button className={`nav-tab`} onClick={() => navigate('/combo', { state: { isInternalNav: true } })}>COMBO</button>
+          <button className={`nav-tab active`} onClick={() => navigate('/buffet')}>BUFFET</button>
         </div>
 
         <div className="buffet-content">
