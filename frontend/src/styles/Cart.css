@@ -1,0 +1,266 @@
+/* --- BIẾN MÀU ĐỒNG BỘ VỚI SERVICE --- */
+:root {
+  --primary-orange: #FF7A21;
+  --deep-black: #1A1A1A;
+  --text-gray: #666;
+  --bg-luxury: #fcfcfc;
+  --transition-smooth: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  --glass-shadow: 0 25px 60px rgba(0,0,0,0.06);
+  --border-light: #f2f2f2;
+}
+
+.cart-page {
+  background-color: var(--bg-luxury);
+  font-family: 'Inter', sans-serif;
+  padding-bottom: 80px;
+}
+
+.cart-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* --- SECTION DANH SÁCH MÓN --- */
+.cart-section {
+  background: white;
+  border-radius: 40px;
+  padding: 40px;
+  box-shadow: var(--glass-shadow);
+  border: 1px solid var(--border-light);
+  margin-bottom: 40px;
+  transition: var(--transition-smooth);
+}
+
+.cart-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cart-table th {
+  text-align: left;
+  padding: 15px 20px;
+  color: #bbb;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border-bottom: 1px solid #f8f8f8;
+}
+
+.cart-table td {
+  padding: 25px 20px;
+  border-bottom: 1px solid #fcfcfc;
+}
+
+.item-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.item-info img {
+  width: 90px;
+  height: 90px;
+  border-radius: 25px;
+  object-fit: cover;
+  box-shadow: 0 12px 25px rgba(0,0,0,0.08);
+}
+
+.item-info h4 {
+  font-size: 18px;
+  font-weight: 850;
+  margin: 0 0 4px;
+  color: var(--deep-black);
+}
+
+.item-price-small { 
+  color: var(--primary-orange); 
+  font-weight: 800; 
+  font-size: 14px;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: #f8f8f8;
+  padding: 6px 15px;
+  border-radius: 50px;
+  width: fit-content;
+}
+
+.quantity-control button {
+  border: none; background: none; cursor: pointer;
+  font-size: 18px; color: var(--primary-orange); font-weight: bold;
+}
+
+.item-total-price {
+  font-weight: 900;
+  font-size: 18px;
+  color: var(--deep-black);
+}
+
+/* --- SECTION TÓM TẮT ĐƠN HÀNG --- */
+.order-summary-box {
+  background: white;
+  border-radius: 40px;
+  padding: 50px;
+  box-shadow: var(--glass-shadow);
+  border: 1px solid var(--border-light);
+}
+
+.summary-title {
+  font-size: 26px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+  margin-bottom: 40px;
+  text-align: center;
+  color: var(--deep-black);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+}
+
+.bill-detail {
+  border-right: 1px solid #f0f0f0;
+  padding-right: 40px;
+}
+
+.bill-rows .row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.total-row {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 2px dashed #eee;
+  font-size: 24px !important;
+}
+
+.total-row span:last-child { 
+  color: var(--primary-orange); 
+  font-weight: 900; 
+}
+
+/* --- VOUCHER CUSTOM STYLE (SHOPPEE LUXURY) --- */
+.coupon-input label {
+  font-weight: 800; font-size: 12px; text-transform: uppercase; margin-bottom: 12px; display: block;
+}
+
+.input-group {
+  background: #fffcfb;
+  border: 1px solid #ff7a2133;
+  border-radius: 15px;
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.input-group:hover {
+  border-color: var(--primary-orange);
+  background: #fff5ee;
+}
+
+.input-group::before { content: '🎟️'; margin-right: 10px; font-size: 18px; }
+
+.input-group input {
+  pointer-events: none;
+  background: none; border: none; outline: none;
+  font-weight: 800; color: var(--primary-orange); cursor: pointer;
+}
+
+.input-group::after { content: '❯'; font-size: 12px; color: #ccc; font-weight: bold; }
+
+/* --- MODAL VOUCHER --- */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px);
+  display: flex; justify-content: center; align-items: center; z-index: 9999;
+}
+
+.voucher-modal {
+  background: #f8f8f8; width: 480px; max-height: 80vh;
+  border-radius: 35px; overflow: hidden; display: flex; flex-direction: column;
+}
+
+.v-header { background: white; padding: 20px; text-align: center; font-weight: 900; border-bottom: 1px solid #eee; }
+
+.v-list { padding: 20px; overflow-y: auto; flex: 1; }
+
+/* Thẻ Voucher "Vé Xé" Shopee */
+.v-card {
+  display: flex; background: white; margin-bottom: 15px;
+  border-radius: 12px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.05));
+  position: relative; overflow: visible; /* Để hiện lỗ tròn */
+}
+
+/* Tạo lỗ tròn ở 2 đầu đường kẻ răng cưa */
+.v-card::before, .v-card::after {
+  content: ''; position: absolute; left: 74px; width: 12px; height: 12px;
+  background: #f8f8f8; border-radius: 50%; z-index: 2;
+}
+.v-card::before { top: -6px; }
+.v-card::after { bottom: -6px; }
+
+.v-card-left {
+  width: 80px; background: var(--primary-orange); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 10px; writing-mode: vertical-rl;
+  text-transform: uppercase; border-right: 2px dashed rgba(255,255,255,0.4);
+}
+
+.v-card-right { padding: 15px 15px 15px 25px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+.v-info h4 { margin: 0; font-size: 15px; font-weight: 850; }
+.v-info p { margin: 5px 0 0; font-size: 11px; color: #999; font-weight: 600; }
+
+.v-radio { accent-color: var(--primary-orange); width: 20px; height: 20px; cursor: pointer; }
+
+.v-footer { padding: 20px; background: white; border-top: 1px solid #eee; }
+
+.btn-apply-v {
+  width: 100%; background: var(--primary-orange); color: white;
+  border: none; padding: 18px; border-radius: 50px;
+  font-weight: 900; cursor: pointer; transition: 0.3s;
+}
+
+.btn-apply-v:hover { background: var(--deep-black); transform: translateY(-3px); }
+
+/* --- NÚT THANH TOÁN --- */
+.payment-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.method-item {
+  padding: 18px; border-radius: 18px; border: 1px solid #f0f0f0;
+  background: #fff; font-weight: 800; cursor: pointer; transition: 0.3s; text-align: center;
+}
+
+.method-item.active {
+  background: #fff8f4; border-color: var(--primary-orange); color: var(--primary-orange);
+}
+
+.btn-order-now {
+  width: 100%; background: var(--primary-orange); color: white;
+  padding: 22px; border-radius: 50px; font-weight: 900;
+  font-size: 18px; margin-top: 35px; cursor: pointer;
+  text-transform: uppercase; transition: var(--transition-smooth);
+  box-shadow: 0 15px 30px rgba(255, 122, 33, 0.3); border: none;
+}
+
+.btn-order-now:hover { background: var(--deep-black); transform: translateY(-5px); }
+
+/* Mobile Responsive */
+@media (max-width: 992px) {
+  .summary-grid { grid-template-columns: 1fr; gap: 40px; }
+  .bill-detail { border-right: none; padding-right: 0; }
+  .voucher-modal { width: 90%; }
+}

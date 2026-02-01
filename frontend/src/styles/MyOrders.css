@@ -1,0 +1,153 @@
+/* Kế thừa các biến số từ Profile */
+.Order-Tabs-Container {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #F8F9FA;
+    overflow-x: auto;
+}
+
+.Order-Tab-Btn {
+    padding: 12px 25px;
+    border-radius: 15px;
+    border: none;
+    background: #F8F9FA;
+    font-weight: 800;
+    font-family: inherit;
+    color: var(--Text-Gray);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--Transition);
+}
+
+.Order-Tab-Btn.Active {
+    background: var(--Primary-Orange);
+    color: var(--White);
+    box-shadow: 0 8px 20px rgba(255, 122, 33, 0.2);
+}
+
+/* Modern Order Card */
+.Order-Modern-Card {
+    background: var(--White);
+    border: 2px solid #F8F9FA;
+    border-radius: 30px;
+    padding: 30px;
+    margin-bottom: 25px;
+    transition: var(--Transition);
+}
+
+.Order-Modern-Card:hover {
+    border-color: var(--Primary-Orange);
+    transform: translateY(-5px);
+    box-shadow: var(--Shadow-Smooth);
+}
+
+.Order-Card-Header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed #EEE;
+}
+
+.Type-Tag {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 900;
+    color: var(--Deep-Black);
+    font-size: 16px;
+}
+
+.Status-Badge {
+    padding: 6px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.Status-Badge.Success { background: #E6FBF5; color: #00B894; }
+.Status-Badge.Processing { background: #E8F2FF; color: #0984E3; }
+
+.Order-Info-Grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.Info-Item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.Info-Item.Full-Width {
+    grid-column: span 2;
+}
+
+.Info-Item label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--Text-Gray);
+    letter-spacing: 1px;
+    font-weight: 700;
+}
+
+.Info-Item span {
+    font-weight: 700;
+    color: var(--Deep-Black);
+}
+
+.Highlight-Text {
+    color: var(--Primary-Orange) !important;
+}
+
+.Order-Card-Footer {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #F8F9FA;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.Total-Price-Label strong {
+    font-size: 20px;
+    color: var(--Deep-Black);
+}
+
+.Action-Section {
+    display: flex;
+    gap: 10px;
+}
+
+.Btn-Detail-Modern {
+    background: var(--Deep-Black);
+    color: var(--White);
+    border: none;
+    padding: 10px 25px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--Transition);
+}
+
+.Btn-Cancel-Modern {
+    background: #FFF0F0;
+    color: #FF3B30;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.Status-Message {
+    text-align: center;
+    padding: 50px;
+    color: var(--Text-Gray);
+    font-weight: 600;
+}
