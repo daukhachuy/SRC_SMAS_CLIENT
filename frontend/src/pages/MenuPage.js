@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/MenuPage.css';
 import { ShoppingCart, ChevronDown, Heart, Bell, User, MessageSquare } from 'lucide-react';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -153,38 +154,7 @@ const MenuPage = () => {
           </main>
         </div>
 
-        <footer className="menu-footer">
-          <h2 className="footer-title">Nhà Hàng Lẩu Nướng Số 1</h2>
-          <div className="footer-content">
-            <div className="footer-column">
-              <h4 className="footer-heading">VỀ CHÚNG TÔI</h4>
-              <ul className="footer-list">
-                <li><a href="#">https://www.facebook.com</a></li>
-                <li><a href="#">https://www.facebook.com</a></li>
-                <li><a href="#">0123456789</a></li>
-                <li><a href="#">https://www.facebook.com</a></li>
-                <li><a href="#">https://www.facebook.com</a></li>
-              </ul>
-            </div>
-            <div className="footer-column">
-              <h4 className="footer-heading">CÁC DỊCH VỤ</h4>
-              <ul className="footer-list">
-                <li>Đặt bàn trực tuyến</li>
-                <li>Đặt tiệc, sự kiện</li>
-                <li>Xem thực đơn</li>
-                <li>Xem các combo hot</li>
-                <li>Giao hàng tận nơi</li>
-              </ul>
-            </div>
-            <div className="footer-column map-section">
-              <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=400" alt="Map" className="map-image" />
-              <div className="chat-box">
-                <input type="text" placeholder="Chat với cửa hàng" className="chat-input" />
-                <button className="chat-btn">Gửi</button>
-              </div>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
 
       <FloatingChat />
