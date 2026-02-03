@@ -9,16 +9,11 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import AboutPage from './pages/AboutPage';
 import Services from './pages/Services';
-import Profile from './pages/Profile'; 
-import MyOrders from './pages/MyOrders'; 
-import UserLayout from './components/UserLayout';
-import OrderHistory from './pages/OrderHistory';
 
 const AppRoutes = () => {
   return (
     <Router>
       <Routes>
-        {/* Các trang công khai */}
         <Route path="/" element={<Home />} />
         <Route path="/menu" element={<MenuPage menuItems={BEST_SELLERS_DATA} />} />
         <Route path="/combo" element={<ComboPage combos={COMBOS_DATA} />} />
@@ -28,13 +23,6 @@ const AppRoutes = () => {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-
-       
-        <Route element={<UserLayout />}>
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/my-orders" element={<MyOrders />} />
-        <Route path="/order-history" element={<OrderHistory />} /> 
-        </Route>
       </Routes>
     </Router>
   );
