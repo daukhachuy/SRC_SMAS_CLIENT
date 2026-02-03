@@ -1,0 +1,185 @@
+/* --- BIẾN SỐ (VARIABLES) --- */
+:root {
+  --Primary-Orange: #FF7A21;
+  --Primary-Hover: #e66a1a;
+  --Deep-Black: #121212;
+  --Text-Gray: #666;
+  --White: #ffffff;
+  --Input-Bg: #fcfcfc;
+  --Border-Color: #F0F0F0;
+  --Shadow-Smooth: 0 20px 40px rgba(0,0,0,0.06);
+  --Transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- THẺ CHỨA NỘI DUNG CHÍNH --- */
+.Content-Card {
+  background: var(--White);
+  border-radius: 40px;
+  padding: 50px;
+  box-shadow: var(--Shadow-Smooth);
+}
+
+.Content-Title {
+  font-size: 38px;
+  font-weight: 950;
+  margin-bottom: 45px;
+  letter-spacing: -2px;
+  color: var(--Deep-Black);
+  border-left: 10px solid var(--Primary-Orange);
+  padding-left: 25px;
+}
+
+/* --- CẤU TRÚC FORM GRID --- */
+.Form-Grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+.Form-Group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.Form-Group label {
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--Text-Gray);
+}
+
+.Form-Group input:not([type="radio"]) {
+  width: 100%;
+  padding: 16px 22px;
+  border: 2px solid var(--Border-Color);
+  border-radius: 18px;
+  font-size: 16px;
+  font-family: inherit;
+  background: var(--Input-Bg);
+  transition: var(--Transition);
+}
+
+.Form-Group input:focus {
+  outline: none;
+  border-color: var(--Primary-Orange);
+  background: var(--White);
+  box-shadow: 0 0 0 4px rgba(255, 122, 33, 0.1);
+}
+
+/* --- PHẦN GIỚI TÍNH (RADIO BUTTONS) --- */
+.Radio-Group {
+  display: flex;
+  gap: 35px;
+  padding: 10px 0;
+}
+
+.Radio-Group label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-transform: none;
+  color: var(--Deep-Black);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* --- TRẠNG THÁI XÁC MINH & ICON --- */
+.Input-With-Status, .Input-With-Icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.Status-Verified {
+  position: absolute;
+  right: 20px;
+  color: #00B894;
+  font-weight: 800;
+  font-size: 11px;
+}
+
+.Input-With-Icon i {
+  position: absolute;
+  right: 20px;
+  color: var(--Text-Gray);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* --- NÚT BẤM (BUTTONS) --- */
+.Form-Actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.Btn-Submit {
+  background: var(--Primary-Orange);
+  color: var(--White);
+  border: none;
+  padding: 20px 70px;
+  border-radius: 50px;
+  font-weight: 900;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(255, 122, 33, 0.3);
+  transition: var(--Transition);
+}
+
+.Btn-Submit:hover {
+  background: var(--Deep-Black);
+  transform: translateY(-4px);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+}
+
+/* --- ĐỊA CHỈ & BẢN ĐỒ --- */
+.Address-Section {
+  margin-top: 60px;
+  padding-top: 50px;
+  border-top: 2px dashed #EEE;
+}
+
+.Section-Title {
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 30px;
+  color: var(--Deep-Black);
+}
+
+.Map-Preview {
+  margin: 30px 0;
+  border-radius: 35px;
+  overflow: hidden;
+  height: 350px;
+  border: 1px solid #EEE;
+  box-shadow: var(--Shadow-Smooth);
+}
+
+.Map-Img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 2s ease;
+}
+
+.Map-Preview:hover .Map-Img {
+  transform: scale(1.05);
+}
+
+/* --- ĐÁP ỨNG DI ĐỘNG (MOBILE RESPONSIVE) --- */
+@media (max-width: 768px) {
+  .Form-Grid {
+    grid-template-columns: 1fr;
+  }
+  .Content-Card {
+    padding: 30px 20px;
+  }
+  .Content-Title {
+    font-size: 30px;
+  }
+}
