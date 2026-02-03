@@ -2,41 +2,98 @@ import React, { useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
-
-import { 
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, 
-  eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, 
-  isBefore, startOfToday 
-} from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Services = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [showMenuModal, setShowMenuModal] = useState(false);
-  
-  const [menuQty, setMenuQty] = useState(1);
-  const [comboQty, setComboQty] = useState(1);
+  const [serviceCarouselIndex, setServiceCarouselIndex] = useState(0);
+  const [addOnCarouselIndex, setAddOnCarouselIndex] = useState(0);
+  const [bookingTab, setBookingTab] = useState('booking'); // 'booking' or 'event'
+  const [eventStep, setEventStep] = useState(1); // 1: Info, 2: Services, 3: Menu
+  const [eventForm, setEventForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    numTables: '',
+    numGuests: '',
+    location: '',
+    note: ''
+  });
 
-  // Giả sử đây là dữ liệu từ API của bạn (có 10 món)
-  const [selectedItems, setSelectedItems] = useState([
-    { id: 1, type: 'Menu', name: 'Cá diêu hồng hấp Hồng Kông', qty: 1, note: 'Ít cay, nhiều hành' },
-    { id: 2, type: 'Combo', name: 'Combo FPT Luxury', qty: 1, note: 'Thêm 2 coca' },
-    { id: 3, type: 'Menu', name: 'Gà đông tảo ủ muối', qty: 2, note: '' },
-    { id: 4, type: 'Menu', name: 'Lẩu hải sản chua cay', qty: 1, note: 'Nhiều rau muống' },
-    { id: 5, type: 'Combo', name: 'Combo Gia Đình 1', qty: 1, note: 'Không lấy khăn lạnh' },
-    { id: 6, type: 'Menu', name: 'Bò tơ Tây Ninh nướng', qty: 2, note: 'Thịt mềm' },
-    { id: 7, type: 'Menu', name: 'Tôm hùm bỏ lò phô mai', qty: 1, note: 'Ăn nóng' },
-    { id: 8, type: 'Combo', name: 'Combo Tiệc Cưới Gold', qty: 1, note: 'Trang trí hoa tươi' },
-    { id: 9, type: 'Menu', name: 'Mì xào hải sản', qty: 3, note: 'Cho trẻ em' },
-    { id: 10, type: 'Menu', name: 'Nộm ngó sen tôm thịt', qty: 1, note: '' },
-  ]);
+  // FAQ Data
+  const faqItems = [
+    {
+      id: 1,
+      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
+      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+    },
+    {
+      id: 2,
+      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
+      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+    },
+    {
+      id: 3,
+      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
+      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+    },
+    {
+      id: 4,
+      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
+      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+    },
+    {
+      id: 5,
+      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
+      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+    },
+    {
+      id: 6,
+      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
+      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+    }
+  ];
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+  // Service Items for Carousel
+  const serviceItems = [
+    { id: 1, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1551632786-de41ec6a05ae?auto=format&fit=crop&q=80&w=400', desc: 'Lợi chủ tự ăn tại chỗ' },
+    { id: 2, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1504674900861-b72b27e84530?auto=format&fit=crop&q=80&w=400', desc: 'Nơi lành lẽ, không khí sạch sẽ' },
+    { id: 3, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&q=80&w=400', desc: 'Lợi chủ tự ăn tại chỗ' },
+    { id: 4, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1552566239-4a8c54ef0eaa?auto=format&fit=crop&q=80&w=400', desc: 'Lợi chủ tự ăn tại chỗ' }
+  ];
+
+  // Add-on Services
+  const addOnServices = [
+    { 
+      id: 1, 
+      name: 'Bánh Sinh Nhật', 
+      image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&q=80&w=400', 
+      description: 'Cá mú được tẩm bột tỏi hành và chiên trong ngập đầu ăn sẽ tạo cảm giác như ở trên mây',
+      price: '250.000 vnđ' 
+    },
+    { 
+      id: 2, 
+      name: 'MC', 
+      image: 'https://images.unsplash.com/photo-1511379938547-c1f69b13d835?auto=format&fit=crop&q=80&w=400', 
+      description: 'Cá mú được tẩm bột tỏi hành và chiên trong ngập đầu ăn sẽ tạo cảm giác như ở trên mây',
+      price: '250.000 vnđ' 
+    },
+    { 
+      id: 3, 
+      name: 'Cá mú đủ', 
+      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=crop&q=80&w=400', 
+      description: 'Cá mú được tẩm bột tỏi hành và chiên trong ngập đầu ăn sẽ tạo cảm giác như ở trên mây',
+      price: '250.000 vnđ' 
+    }
+  ];
+
+  // Online delivery options
+  const deliveryOptions = [
+    { id: 1, title: 'Giao nhanh', subtitle: '30 phút', image: '/images/ShipFast.png' },
+    { id: 2, title: 'Tươi ngon', subtitle: 'đảm bảo', image: '/images/Food.png' },
+    { id: 3, title: 'Thanh toán', subtitle: 'tiện lợi', image: '/images/Pay.png' }
+  ];
 
   return (
     <div className="services-page-wrapper">
@@ -52,207 +109,313 @@ const Services = () => {
 
       <div className="services-main-content">
         
-        {/* SECTION 1: ĐẶT BÀN */}
+        {/* SECTION 1: ĐẶT BÀN & ĐẶT SỰ KIỆN */}
         <section className="service-card-section">
           <h2 className="service-title-gold">ĐẶT BÀN TRẢI NGHIỆM TẠI CHỖ</h2>
-          <div className="glass-card booking-container">
-            <div className="booking-left">
-              <div className="calendar-ui">
-                <div className="calendar-month">
-                  <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="nav-month-btn">❮</button>
-                  <span style={{ textTransform: 'capitalize' }}>{format(currentMonth, 'MMMM yyyy', { locale: vi })}</span>
-                  <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="nav-month-btn">❯</button>
-                </div>
-                <div className="calendar-weekdays">
-                  <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
-                </div>
-                <div className="calendar-numbers">
-                  {calendarDays.map((day, idx) => {
-                    const isCurrentMonth = isSameDay(startOfMonth(day), monthStart);
-                    const isPast = isBefore(day, startOfToday());
-                    return (
-                      <span key={idx} 
-                        className={`${!isCurrentMonth ? 'empty' : ''} ${isSameDay(day, selectedDate) ? 'day-active' : ''} ${isToday(day) ? 'is-today' : ''} ${isPast && isCurrentMonth ? 'day-past' : ''}`}
-                        onClick={() => !isPast && isCurrentMonth && setSelectedDate(day)}>
-                        {format(day, 'd')}
+          
+          {/* TABS */}
+          <div className="booking-tabs">
+            <button 
+              className={`tab-button ${bookingTab === 'booking' ? 'active' : ''}`}
+              onClick={() => setBookingTab('booking')}
+            >
+              Đặt Bàn
+            </button>
+            <button 
+              className={`tab-button ${bookingTab === 'event' ? 'active' : ''}`}
+              onClick={() => setBookingTab('event')}
+            >
+              Đặt Sự Kiện
+            </button>
+          </div>
+
+          {/* BOOKING FORM */}
+          {bookingTab === 'booking' && (
+            <div className="glass-card booking-container">
+              <div className="booking-left">
+                <div className="calendar-ui">
+                  <div className="calendar-month">
+                    <span style={{ textTransform: 'capitalize' }}>Tháng 12 2025</span>
+                  </div>
+                  <div className="calendar-weekdays">
+                    <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                  </div>
+                  <div className="calendar-numbers">
+                    {[9, 10, 11, 12, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((day, idx) => (
+                      <span key={idx} className={`${day === 5 || day === 6 ? 'day-highlighted' : ''} ${idx === 3 ? 'day-active' : ''}`}>
+                        {day}
                       </span>
-                    );
-                  })}
+                    ))}
+                  </div>
+                </div>
+                <div className="time-grid">
+                  {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30'].map((t, idx) => (
+                    idx < 10 && <button key={t} className="time-slot-btn">{t}</button>
+                  ))}
                 </div>
               </div>
-              <div className="time-grid">
-                {['09:00', '11:00', '13:00', '15:00', '17:00', '10:00', '12:00', '14:00', '16:00', '18:00'].map(t => (
-                  <button key={t} className="time-slot-btn">{t}</button>
-                ))}
+              <div className="vertical-divider"></div>
+              <div className="booking-right">
+                <div className="input-group-row">
+                  <label>Họ và tên:</label>
+                  <input type="text" placeholder="" />
+                </div>
+                <div className="input-group-row">
+                  <label>Số điện thoại:</label>
+                  <input type="text" placeholder="" />
+                </div>
+                <div className="input-group-row">
+                  <label>Email :</label>
+                  <input type="text" placeholder="" />
+                </div>
+                <div className="input-group-row">
+                  <label>Số lượng khách:</label>
+                  <input type="number" defaultValue="1" placeholder="" />
+                </div>
+                <div className="input-group-row">
+                  <label>Khu vực:</label>
+                  <select>
+                    <option>Trong nhà (Máy lạnh)</option>
+                    <option>Ngoài trời (Sân vườn)</option>
+                  </select>
+                </div>
+                <div className="input-group-row">
+                  <label>Ghi chú:</label>
+                  <textarea placeholder="Yêu cầu đặc biệt, ghi chú sự kiên..."></textarea>
+                </div>
+                <button className="primary-gold-btn">ĐẶT BÀN NGAY</button>
               </div>
             </div>
-            <div className="vertical-divider"></div>
-            <div className="booking-right">
-              {['Họ và tên', 'Số điện thoại', 'Email'].map(label => (
-                <div className="input-group-row" key={label}>
-                  <label>{label}:</label>
-                  <input type="text" placeholder={`Nhập ${label.toLowerCase()}...`} />
+          )}
+
+          {/* EVENT FORM - Placeholder for now */}
+          {bookingTab === 'event' && (
+            <div className="glass-card event-booking-container">
+              <div className="event-header">
+                <h3 className="event-title">Đặt lịch Sự Kiện</h3>
+                <p className="event-subtitle">Sự kiện dành cho 30 người trở lên bắt buộc phải ký hợp đồng</p>
+              </div>
+
+              {/* PROGRESS STEPS */}
+              <div className="event-progress-steps">
+                <div className={`progress-step ${eventStep >= 1 ? 'active' : ''}`}>
+                  <div className="step-circle">
+                    <span>✓</span>
+                  </div>
+                  <p className="step-label">Thông Tin</p>
+                </div>
+                <div className="progress-line"></div>
+                <div className={`progress-step ${eventStep >= 2 ? 'active' : ''}`}>
+                  <div className="step-circle">
+                    <span>✓</span>
+                  </div>
+                  <p className="step-label">Sự kiện & Dịch vụ</p>
+                </div>
+                <div className="progress-line"></div>
+                <div className={`progress-step ${eventStep >= 3 ? 'active' : ''}`}>
+                  <div className="step-circle">
+                    <span>✓</span>
+                  </div>
+                  <p className="step-label">Lên thực đơn</p>
+                </div>
+              </div>
+
+              {/* STEP 1: INFO */}
+              {eventStep === 1 && (
+                <div className="event-form-step">
+                  <div className="form-row-two-col">
+                    <div className="form-col">
+                      <label>Họ và tên:</label>
+                      <input 
+                        type="text" 
+                        value={eventForm.fullName}
+                        onChange={(e) => setEventForm({...eventForm, fullName: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-col">
+                      <label>Số điện thoại:</label>
+                      <input 
+                        type="text" 
+                        value={eventForm.phone}
+                        onChange={(e) => setEventForm({...eventForm, phone: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row-two-col">
+                    <div className="form-col">
+                      <label>Email :</label>
+                      <input 
+                        type="email" 
+                        value={eventForm.email}
+                        onChange={(e) => setEventForm({...eventForm, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-col">
+                      <label>Số lượng khách:</label>
+                      <input 
+                        type="number" 
+                        value={eventForm.numGuests}
+                        onChange={(e) => setEventForm({...eventForm, numGuests: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row-two-col">
+                    <div className="form-col">
+                      <label>Số Lượng bàn:</label>
+                      <input 
+                        type="number" 
+                        value={eventForm.numTables}
+                        onChange={(e) => setEventForm({...eventForm, numTables: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-col">
+                      <label>Khu vực:</label>
+                      <select 
+                        value={eventForm.location}
+                        onChange={(e) => setEventForm({...eventForm, location: e.target.value})}
+                      >
+                        <option>Trong nhà (Máy lạnh)</option>
+                        <option>Ngoài trời (Sân vườn)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-row-full">
+                    <label>Ghi chú:</label>
+                    <textarea 
+                      rows="5"
+                      value={eventForm.note}
+                      onChange={(e) => setEventForm({...eventForm, note: e.target.value})}
+                      placeholder="Ghi chú thêm về sự kiện..."
+                    ></textarea>
+                  </div>
+
+                  <button className="primary-gold-btn event-next-btn" onClick={() => setEventStep(2)}>
+                    Tiếp Tục → Chọn Sự Kiện
+                  </button>
+                </div>
+              )}
+
+              {/* STEP 2: SERVICES - Placeholder */}
+              {eventStep === 2 && (
+                <div className="event-form-step">
+                  <p style={{textAlign: 'center', color: '#999', padding: '40px'}}>
+                    Bước 2: Chọn dịch vụ sẽ được cập nhật...
+                  </p>
+                  <div style={{display: 'flex', gap: '20px', justifyContent: 'center'}}>
+                    <button className="primary-gold-btn event-back-btn" onClick={() => setEventStep(1)} style={{width: '150px'}}>
+                      ← Quay lại
+                    </button>
+                    <button className="primary-gold-btn event-next-btn" onClick={() => setEventStep(3)} style={{width: '200px'}}>
+                      Tiếp Tục → Lên Thực Đơn
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: MENU - Placeholder */}
+              {eventStep === 3 && (
+                <div className="event-form-step">
+                  <p style={{textAlign: 'center', color: '#999', padding: '40px'}}>
+                    Bước 3: Lên thực đơn sẽ được cập nhật...
+                  </p>
+                  <div style={{display: 'flex', gap: '20px', justifyContent: 'center'}}>
+                    <button className="primary-gold-btn event-back-btn" onClick={() => setEventStep(2)} style={{width: '150px'}}>
+                      ← Quay lại
+                    </button>
+                    <button className="primary-gold-btn" style={{width: '200px'}}>
+                      Xác Nhận Đặt Sự Kiện
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* SECTION 2: FAQ */}
+        <section className="service-card-section">
+          <h2 className="service-title-gold">NHỮNG CÂU HỎI PHỔ BIẾN NHẤT</h2>
+          <div className="faq-grid">
+            {faqItems.map((item, idx) => (
+              <div key={item.id} className="faq-item">
+                <div className="faq-icon">?</div>
+                <p className="faq-question">{item.question}</p>
+                <p className="faq-answer">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 3: SERVICE CAROUSEL */}
+        <section className="service-card-section">
+          <h2 className="service-title-gold">ĐẦY ĐỦ CÁC SỰ KIỆN</h2>
+          <div className="carousel-container">
+            <button className="carousel-nav prev" onClick={() => setServiceCarouselIndex(Math.max(0, serviceCarouselIndex - 1))}>
+              <ChevronLeft size={24} />
+            </button>
+            <div className="carousel-content">
+              {serviceItems.slice(serviceCarouselIndex, serviceCarouselIndex + 4).map(item => (
+                <div key={item.id} className="carousel-item">
+                  <img src={item.image} alt={item.name} />
+                  <h4>{item.name}</h4>
+                  <p className="carousel-item-desc">{item.desc}</p>
                 </div>
               ))}
-              <div className="input-group-row"><label>Số lượng khách:</label><input type="number" defaultValue="1" /></div>
-              <div className="input-group-row">
-                <label>Khu vực:</label>
-                <select><option>Trong nhà (Máy lạnh)</option><option>Ngoài trời (Sân vườn)</option></select>
-              </div>
-              <div className="input-group-row"><label>Ghi chú:</label><textarea placeholder="Yêu cầu đặc biệt..."></textarea></div>
-              <button className="primary-gold-btn">ĐẶT BÀN NGAY</button>
             </div>
+            <button className="carousel-nav next" onClick={() => setServiceCarouselIndex(Math.min(serviceItems.length - 4, serviceCarouselIndex + 1))}>
+              <ChevronRight size={24} />
+            </button>
           </div>
         </section>
 
-        {/* SECTION 2: ĐẶT SỰ KIỆN */}
+        {/* SECTION 4: ADD-ON SERVICES */}
         <section className="service-card-section">
-          <h2 className="service-title-gold">ĐẶT LỊCH SỰ KIỆN</h2>
-          <p className="service-subtitle">Sự kiện dành cho 30 người trở lên bắt buộc phải ký hợp đồng</p>
-          <div className="glass-card event-container">
-            <div className="event-grid">
-              <div className="event-inputs">
-                {['Họ và tên', 'Số điện thoại', 'Email', 'Số lượng khách', 'Số lượng bàn'].map(label => (
-                  <div className="input-group-row" key={label}><label>{label}:</label><input type="text" /></div>
-                ))}
-                <div className="input-group-row"><label>Ghi chú:</label><textarea rows="4"></textarea></div>
-              </div>
-              <div className="event-menu-preview">
-                <div className="table-header-info">
-                  <h4>Các món ăn trên mỗi bàn</h4>
-                  <p>Nếu không đặt món trước xin bỏ qua</p>
+          <h2 className="service-title-gold">DỊCH VỤ KÈM THEO</h2>
+          <div className="addon-carousel-container">
+            <button className="addon-carousel-nav prev" onClick={() => setAddOnCarouselIndex(Math.max(0, addOnCarouselIndex - 1))}>
+              <ChevronLeft size={32} />
+            </button>
+            <div className="addon-carousel-content">
+              {addOnServices.slice(addOnCarouselIndex, addOnCarouselIndex + 3).map(item => (
+                <div key={item.id} className="addon-item-card">
+                  <div className="addon-item-image">
+                    <img src={item.image} alt={item.name} />
+                  </div>
+                  <div className="addon-item-info">
+                    <h4 className="addon-item-name">{item.name}</h4>
+                    <p className="addon-item-description">{item.description}</p>
+                    <p className="addon-item-price">{item.price}</p>
+                  </div>
                 </div>
-                {/* ĐÃ SỬA: Bỏ .slice(0,5) để hiện đầy đủ 10 món từ API */}
-                <div className="menu-table-wrapper">
-                  <table>
-                    <thead><tr><th>STT</th><th>Loại</th><th>Tên Món</th><th>SL</th><th>Giá</th></tr></thead>
-                    <tbody>
-                      {selectedItems.map((item, idx) => (
-                        <tr key={item.id}>
-                          <td>{idx + 1}</td>
-                          <td><span className={`badge-${item.type.toLowerCase()}`}>{item.type}</span></td>
-                          <td>{item.name}</td>
-                          <td>{item.qty}</td>
-                          <td>150k</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="edit-menu-text" onClick={() => setShowMenuModal(true)}>Chỉnh sửa thực đơn</div>
-              </div>
+              ))}
             </div>
-            <button className="primary-gold-btn large-wide">ĐẶT LỊCH NGAY</button>
+            <button className="addon-carousel-nav next" onClick={() => setAddOnCarouselIndex(Math.min(addOnServices.length - 3, addOnCarouselIndex + 1))}>
+              <ChevronRight size={32} />
+            </button>
           </div>
         </section>
 
-        {/* SECTION 3: DELIVERY */}
-        <section className="service-card-section delivery-section">
+        {/* SECTION 5: ONLINE DELIVERY */}
+        <section className="service-card-section">
           <h2 className="service-title-gold">ĐẶT HÀNG TRỰC TUYẾN</h2>
-          <div className="glass-card delivery-container">
-            <div className="delivery-steps-modern">
-              <div className="step-card">
-                <div className="step-img-box"><img src="/images/ShipFast.png" alt="Ship" /></div>
-                <h3>Giao nhanh</h3><p>30 phút</p>
+          <div className="delivery-container">
+            {deliveryOptions.map(option => (
+              <div key={option.id} className="delivery-item">
+                <div className="delivery-icon">
+                  <img src={option.image} alt={option.title} />
+                </div>
+                <h4>{option.title}</h4>
+                <p>{option.subtitle}</p>
               </div>
-              <div className="step-card">
-                <div className="step-img-box"><img src="/images/Food.png" alt="Food" /></div>
-                <h3>Đảm bảo</h3><p>tươi ngon</p>
-              </div>
-              <div className="step-card">
-                <div className="step-img-box"><img src="/images/Pay.png" alt="Pay" /></div>
-                <h3>Thanh toán</h3><p>tiện lợi</p>
-              </div>
-            </div>
-            <button className="primary-gold-btn extra-large">ĐẶT HÀNG NGAY</button>
+            ))}
           </div>
+          <button className="primary-gold-btn large-btn">ĐẶT HÀNG NGAY</button>
         </section>
       </div>
 
-      {/* MODAL THÊM MÓN & COMBO */}
-      {showMenuModal && (
-        <div className="modal-overlay">
-          <div className="menu-modal-content">
-            <div className="modal-header-flex">
-              <h3>Thêm Món Ăn & Combo</h3>
-              <span className="close-icon" onClick={() => setShowMenuModal(false)}>✖</span>
-            </div>
-            <div className="modal-body">
-              <div className="form-row-flex">
-                <div className="input-col">
-                  <label>Menu</label>
-                  <select><option>Chọn món từ thực đơn...</option></select>
-                  <div className="qty-control">
-                    <button className="qty-btn-minus" onClick={() => setMenuQty(Math.max(1, menuQty-1))}>-</button>
-                    <span className="qty-display">{menuQty}</span>
-                    <button className="qty-btn-plus" onClick={() => setMenuQty(menuQty+1)}>+</button>
-                  </div>
-                </div>
-                <div className="note-col">
-                    <label>Ghi chú :</label>
-                    <textarea placeholder="Không hành, ít cay..."></textarea>
-                </div>
-                <div className="action-col">
-                    <button className="save-item-btn">Lưu món</button>
-                </div>
-              </div>
-
-              <div className="form-row-flex" style={{marginTop: '15px'}}>
-                <div className="input-col">
-                  <label>Combo</label>
-                  <select><option>Chọn combo tiệc...</option></select>
-                  <div className="qty-control">
-                    <button className="qty-btn-minus" onClick={() => setComboQty(Math.max(1, comboQty-1))}>-</button>
-                    <span className="qty-display">{comboQty}</span>
-                    <button className="qty-btn-plus" onClick={() => setComboQty(comboQty+1)}>+</button>
-                  </div>
-                </div>
-                <div className="note-col">
-                    <label>Ghi chú :</label>
-                    <textarea placeholder="Thêm nước ngọt, đổi món..."></textarea>
-                </div>
-                <div className="action-col">
-                    <button className="save-item-btn">Lưu combo</button>
-                </div>
-              </div>
-
-              <div className="modal-table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{width: '50px'}}>STT</th>
-                      <th style={{width: '80px'}}>Loại</th>
-                      <th>Tên Món</th>
-                      <th style={{width: '60px'}}>SL</th>
-                      <th style={{width: '180px'}}>Ghi chú</th>
-                      <th style={{width: '180px'}}>Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedItems.map((item, index) => (
-                      <tr key={item.id}>
-                        <td>{index + 1}</td>
-                        <td><span className={`badge-${item.type.toLowerCase()}`}>{item.type}</span></td>
-                        <td style={{ fontWeight: '800', textAlign: 'left' }}>{item.name}</td>
-                        <td>{item.qty}</td>
-                        <td className="note-cell-truncate">{item.note || '---'}</td>
-                        <td>
-                          {/* ĐÃ SỬA: Class nhận màu từ CSS */}
-                          <div className="btn-action-group">
-                            <button className="btn-mini-edit">Sửa</button>
-                            <button className="btn-mini-delete" style={{ marginLeft: '8px' }}>Xóa</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <button className="finish-menu-btn" onClick={() => setShowMenuModal(false)}>Xác nhận & Hoàn thành</button>
-            </div>
-          </div>
-        </div>
-      )}
       <Footer />
     </div>
   );

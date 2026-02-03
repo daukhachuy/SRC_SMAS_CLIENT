@@ -31,7 +31,7 @@ const ComboPage = () => {
       description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
       price: 300000,
       oldPrice: 400000,
-      img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&q=80&w=500',
+      img: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
       rating: 4.8
     },
     {
@@ -41,7 +41,7 @@ const ComboPage = () => {
       description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
       price: 300000,
       oldPrice: 400000,
-      img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&q=80&w=500',
+      img: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
       rating: 4.8
     },
     {
@@ -51,7 +51,7 @@ const ComboPage = () => {
       description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
       price: 300000,
       oldPrice: 400000,
-      img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&q=80&w=500',
+      img: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpghttps://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpghttps://statics.vinwonders.com/lau-thai-ngon-ha-noi-11_1693364782.jpghttps://statics.vinwonders.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
       rating: 4.8
     },
     {

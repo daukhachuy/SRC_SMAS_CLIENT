@@ -80,6 +80,8 @@ const FloatingChat = () => (
   </div>
 );
 
+
+
 const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
   <div className="product-card">
     <div className="product-img-container">
@@ -501,7 +503,6 @@ const Home = () => {
       <SectionDivider topColor="#0D0D0D" bottomColor="#ffffff" />
       <DiscountAndInfo navigate={navigate} />
       
-
       <FloatingChat />
       <Footer />
     </div>

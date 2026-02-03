@@ -29,7 +29,7 @@ const MenuPage = () => {
     category: 'Món hấp',
     price: 120000,
     oldPrice: 200000,
-    img: 'https://images.unsplash.com/photo-1553247407-23251ce81f59?auto=format&fit=crop&q=80&w=500',
+    img: 'https://giadinh.mediacdn.vn/thumb_w/640/296230595582509056/2022/12/21/an-gi-93-16715878747471102776072.jpg',
     rating: 4.8
   }));
 
