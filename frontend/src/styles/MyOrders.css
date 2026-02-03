@@ -1,0 +1,246 @@
+:root {
+  --Primary-Orange: #FF7A21;
+  --Secondary-Orange: #FF9F5E;
+  --Success-Green: #27AE60;
+  --Warning-Yellow: #F39C12;
+  --Processing-Blue: #3498DB;
+  --Danger-Red: #FF3B30;
+  --Bg-Body: #F8F9FA;
+  --Transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.MyOrders-Wrapper {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  background-color: var(--Bg-Body);
+  min-height: 100vh;
+}
+
+/* Tiêu đề trang */
+.Page-Title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #2C3E50;
+  margin-bottom: 40px;
+  border-left: 10px solid var(--Primary-Orange);
+  padding-left: 20px;
+}
+
+/* Tabs Container */
+.Order-Tabs-Container {
+  position: sticky;
+  top: 10px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 15px;
+  margin-bottom: 35px;
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  display: flex;
+  gap: 15px;
+  overflow-x: auto;
+}
+
+.Order-Tab-Btn {
+  padding: 12px 30px;
+  border-radius: 50px;
+  border: 2px solid #eee;
+  background: #fff;
+  font-weight: 800;
+  color: #666;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--Transition);
+}
+
+.Order-Tab-Btn.Active {
+  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(255, 122, 33, 0.4);
+}
+
+/* Card Đơn Hàng */
+.Order-Horizontal-Card {
+  background: #fff;
+  border-left: 8px solid var(--Primary-Orange);
+  border-radius: 20px;
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  border: 1px solid #f0f0f0;
+}
+
+.Card-Top-Row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #f9f9f9;
+  padding-bottom: 20px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.Type-Header {
+  display: flex;
+  align-items: center;
+  font-size: 1.2rem;
+}
+
+.orange-icon {
+  color: var(--Primary-Orange);
+  margin-right: 12px;
+  font-size: 1.4rem;
+}
+
+.Status-Label {
+  padding: 8px 18px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.Status-Label.Success { background: #E6FBF3; color: var(--Success-Green); }
+.Status-Label.Waiting { background: #FFF9E6; color: var(--Warning-Yellow); }
+.Status-Label.Processing { background: #EBF5FB; color: var(--Processing-Blue); }
+
+.Order-Time-Badge {
+  background: #f0f0f0;
+  padding: 8px 15px;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #555;
+  font-size: 14px;
+}
+
+/* Grid Thông Tin */
+.Card-Main-Grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.Grid-Col p {
+  margin-bottom: 12px;
+  font-weight: 700;
+  color: #333;
+}
+
+.Grid-Col p span {
+  font-weight: 500;
+  color: #666;
+  margin-left: 5px;
+}
+
+.Highlight-Address { color: var(--Primary-Orange) !important; font-weight: 700 !important; }
+
+/* Bảng Món Ăn */
+.Order-Table-Wrapper {
+  margin-top: 20px;
+  background: #fafafa;
+  border-radius: 15px;
+  padding: 15px;
+}
+
+.Minimal-Table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.Minimal-Table th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 2px solid #eee;
+  color: #888;
+}
+
+.Minimal-Table td {
+  padding: 12px 10px;
+  font-weight: 600;
+}
+
+/* Footer Actions */
+.Card-Footer-Actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px dashed #ddd;
+}
+
+.Cancel-Policy {
+  font-size: 13px;
+  color: var(--Danger-Red);
+  font-style: italic;
+  font-weight: 600;
+}
+
+.Btn-Cancel-Order {
+  background: #fff;
+  color: var(--Danger-Red);
+  border: 2px solid var(--Danger-Red);
+  padding: 10px 25px;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.Btn-Cancel-Order:hover {
+  background: var(--Danger-Red);
+  color: white;
+  box-shadow: 0 5px 15px rgba(255, 59, 48, 0.3);
+}
+
+.Total-Text {
+  font-size: 1.1rem;
+}
+
+.Total-Text strong {
+  color: var(--Primary-Orange);
+  font-size: 1.3rem;
+}
+
+.Link-Action {
+  display: inline-block;
+  margin-right: 15px;
+  color: var(--Primary-Orange);
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.Link-Action.blue { color: var(--Processing-Blue); }
+
+/* Trạng thái trống */
+.Empty-State {
+  text-align: center;
+  padding: 100px 0;
+  color: #999;
+}
+
+.Empty-State i { font-size: 4rem; margin-bottom: 20px; }
+
+/* Spinner */
+.Spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--Primary-Orange);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+@media (max-width: 992px) {
+  .Card-Main-Grid { grid-template-columns: 1fr; }
+}
