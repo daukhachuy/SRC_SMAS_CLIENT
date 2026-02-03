@@ -244,50 +244,7 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* BRANCHES & FOOTER INFO */}
-      <section className="branches-section">
-        <div className="branches-container">
-          <div className="social-icons">
-            <span className="social-label">Theo dõi chúng tôi</span>
-          </div>
-
-          <h3 className="branches-title">Nhà Hàng Lẩu Nướng Số 1</h3>
-
-          <div className="branches-grid">
-            <div className="branch-column">
-              <h4>VỀ CHÚNG TÔI</h4>
-              <ul>
-                <li><a href="#about">Về chúng tôi</a></li>
-                <li><a href="#contact">Liên hệ</a></li>
-              </ul>
-            </div>
-
-            <div className="branch-column">
-              <h4>CÁC DỊCH VỤ</h4>
-              <ul>
-                <li><a href="#booking">Đặt bàn trực tuyến</a></li>
-                <li><a href="#delivery">Đặt tiệc, sự kiến</a></li>
-                <li><a href="#menu">Xem thực đơn</a></li>
-                <li><a href="#combo">Xem các combo hot</a></li>
-                <li><a href="#delivery">Giao hàng tận nơi</a></li>
-              </ul>
-            </div>
-
-            <div className="branch-column contact-column">
-              <div className="branch-map-small">
-                <img 
-                  src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=400" 
-                  alt="Location"
-                />
-              </div>
-              <p className="branch-chat-text">Chat với cửa hàng</p>
-              <button className="branch-button" onClick={() => navigate('/auth')}>
-                Gửi
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+     
 
       <Footer />
     </div>

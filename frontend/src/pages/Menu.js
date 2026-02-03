@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/Menu.css';
 import { 
   User, Bell, ShoppingBag, MessageSquare,
-  ChevronDown, Heart, Star, MapPin, Phone, Mail,
-  Facebook, Instagram, Twitter
+  ChevronDown, Heart, Star
 } from 'lucide-react';
+import Footer from '../components/Footer';
 
 // --- MENU DATA ---
 const MENU_ITEMS = [
@@ -402,47 +402,7 @@ const Menu = () => {
 
       <FloatingChat />
 
-      {/* Footer */}
-      <footer className="footer">
-        <div className="footer-container">
-          <div className="footer-grid">
-            <div>
-              <div className="logo-group" style={{marginBottom: 20}}>
-                <span style={{ fontSize: 26, fontWeight: 900 }}>
-                  <span style={{color: '#FFFFFF'}}>OCEAN</span>
-                  <span style={{color: '#FF7A21'}}>GRILL</span>
-                </span>
-              </div>
-              <p className="footer-text">Tinh hoa ẩm thực biển khơi trong không gian sang trọng.</p>
-              <div className="social-row">
-                {[Facebook, Instagram, Twitter, Mail].map((Icon, i) => (
-                  <div key={i} className="social-icon"><Icon size={18} /></div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="footer-heading">KHÁM PHÁ</h4>
-              <ul className="footer-list">
-                {['Thực đơn chính', 'Hải sản tươi sống', 'Đặt tiệc & Sự kiện', 'Ưu đãi'].map(item => (
-                  <li key={item} className="footer-list-item">{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="footer-heading">LIÊN HỆ</h4>
-              <p className="footer-text"><MapPin size={16} color="#FF7A21" /> 123 Võ Nguyên Giáp, Đà Nẵng</p>
-              <p className="footer-text"><Phone size={16} color="#FF7A21" /> +84 905 123 456</p>
-            </div>
-            <div>
-              <h4 className="footer-heading">BẢN TIN</h4>
-              <div className="newsletter-box">
-                <input placeholder="Email của bạn..." className="newsletter-input" />
-                <button className="newsletter-btn">GỬI</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };

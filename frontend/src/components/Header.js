@@ -111,7 +111,7 @@ const Header = () => {
 
           <div className="header-brand-text">
             <span className="brand-sub">NHÀ HÀNG</span>
-            <span className="brand-main">LẨU NƯỚNG</span>
+            <span className="brand-main">FPT</span>
           </div>
         </div>
 

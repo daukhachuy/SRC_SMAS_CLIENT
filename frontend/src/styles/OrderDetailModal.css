@@ -1,38 +1,111 @@
-.Modal-Overlay {
+.Order-Detail-Overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
+  background: rgba(0,0,0,0.5);
   display: flex; justify-content: center; align-items: center;
-  z-index: 9999;
+  z-index: 1000;
 }
 
-.Modal-Content {
+.Order-Detail-Container {
   background: white;
-  width: 90%; max-width: 480px;
-  border-radius: 24px;
+  width: 900px;
+  max-width: 95%;
+  border-radius: 20px;
   padding: 30px;
   position: relative;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
-.Bill-Header { text-align: center; border-bottom: 2px dashed #eee; padding-bottom: 15px; margin-bottom: 15px; }
-.Close-X { position: absolute; right: 20px; top: 15px; font-size: 28px; border: none; background: none; cursor: pointer; color: #999; }
+.Detail-Header {
+  display: flex; justify-content: center; align-items: center;
+  position: relative; margin-bottom: 30px;
+}
 
-.Bill-Table { width: 100%; margin: 20px 0; border-collapse: collapse; }
-.Bill-Table th { text-align: left; color: #888; font-size: 0.85rem; padding-bottom: 10px; }
-.Bill-Table td { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+.Detail-Header h2 { font-weight: 800; font-size: 1.8rem; }
 
-.Bill-Total { background: #fff7f2; padding: 15px; border-radius: 12px; margin-top: 15px; }
-.Total-Row { display: flex; justify-content: space-between; align-items: center; }
-.Grand-Total { font-weight: bold; color: #ff6b00; font-size: 1.4rem; }
+.Back-Arrow-Btn {
+  position: absolute; right: 0;
+  background: none; border: none;
+  font-size: 24px; color: var(--Primary-Orange);
+  cursor: pointer;
+}
 
-.Bill-Rating-Section { text-align: center; margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px; }
-.Stars { color: #ffc107; font-size: 1.6rem; margin: 12px 0; display: flex; justify-content: center; gap: 8px; }
-.Bill-Rating-Section textarea { width: 100%; height: 80px; border-radius: 12px; border: 1px solid #e0e0e0; padding: 12px; margin-bottom: 15px; font-family: inherit; }
+.Detail-Main-Content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
 
-.Btn-Submit-Rating { width: 100%; padding: 12px; background: #ff6b00; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-.Btn-Submit-Rating:hover { background: #e65a00; }
+/* Cột Biên Lai (Receipt) */
+.Receipt-Column {
+  background: #fdfdfd;
+  border-radius: 15px;
+  padding: 20px;
+  border: 1px solid #eee;
+}
 
-.animate-zoom-in { animation: zoom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes zoom { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.Shop-Brand { text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+.Shop-Brand h3 { font-size: 1.4rem; margin: 10px 0; }
+.Shop-Brand p { font-size: 13px; color: #666; margin: 2px; }
+
+.Receipt-Item {
+  display: flex; justify-content: space-between;
+  margin: 15px 0; font-weight: 600;
+}
+
+.Item-Name { display: flex; flex-direction: column; }
+.Item-Name small { color: #888; margin-top: 4px; }
+
+.Item-Price { text-align: right; display: flex; flex-direction: column; }
+
+.Receipt-Summary {
+  border-top: 2px solid #333;
+  margin-top: 20px; padding-top: 15px;
+}
+
+.Summary-Row {
+  display: flex; justify-content: space-between;
+  margin-bottom: 5px; font-weight: 700;
+}
+
+.Final-Total { font-size: 1.1rem; margin-top: 10px; }
+
+/* Cột Thông tin & Đánh giá */
+.Order-Meta-Info h3 { margin-bottom: 20px; }
+.Order-Meta-Info p {
+  margin: 10px 0; font-weight: 600; color: #444;
+}
+.Order-Meta-Info span { float: right; color: #000; }
+
+.Rating-Section { text-align: center; margin-top: 40px; }
+.Rating-Prompt { font-weight: 600; margin-bottom: 15px; }
+
+.Star-Rating { color: #333; font-size: 24px; gap: 10px; display: flex; justify-content: center; margin-bottom: 25px; }
+.Star-Rating i { cursor: pointer; transition: 0.2s; }
+.Star-Rating i:hover { transform: scale(1.2); }
+
+.Comment-Box { text-align: left; margin-top: 20px; }
+.Comment-Box label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 13px; color: #666; }
+
+.Comment-Box textarea {
+  width: 100%; border-radius: 15px; border: 1px solid #ccc;
+  padding: 15px; font-family: inherit; resize: none;
+}
+
+.Submit-Rating-Btn {
+  margin-top: 20px; background: var(--Primary-Orange);
+  color: white; border: none; padding: 12px 40px;
+  border-radius: 10px; font-weight: 800; cursor: pointer;
+  transition: 0.3s;
+}
+
+.Submit-Rating-Btn:hover { opacity: 0.9; transform: translateY(-2px); }
+
+/* Animation */
+.animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+@media (max-width: 800px) {
+  .Detail-Main-Content { grid-template-columns: 1fr; }
+}

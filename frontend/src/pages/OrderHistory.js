@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import OrderDetailModal from './OrderDetailModal'; // Import cùng thư mục pages
-import '../styles/MyOrders.css';
+import OrderDetailModal from './OrderDetailModal'; 
+import '../styles/OrderHistory.css';
 
 const OrderHistory = () => {
   const [activeTab, setActiveTab] = useState('all');
@@ -16,37 +16,40 @@ const OrderHistory = () => {
 
   const fetchHistory = async () => {
     setLoading(true);
-    // Fake API lịch sử đơn hàng
     const mockApi = () => new Promise((resolve) => {
       setTimeout(() => {
         resolve([
           { 
-            id: 'HIS-8892', type: 'completed', typeName: 'Tiệc Sinh Nhật', 
-            statusName: 'Đã hoàn thành', statusClass: 'Success', 
-            date: '20/12/2025', totalPrice: 2500000 
+            id: 'EVT-001', type: 'completed', typeName: 'Đặt sự kiện tại cửa hàng', 
+            statusName: 'Đã thanh toán', statusClass: 'Success', 
+            customer: 'Nguyen Van A', email: 'abc123@gmail.com', eventName: 'Họp lớp',
+            guests: 30, tables: 5, phone: '0123456789', date: '09/11/2025'
           },
           { 
-            id: 'HIS-1102', type: 'cancelled', typeName: 'Giao Hàng', 
-            statusName: 'Đã hủy', statusClass: 'Cancel', 
-            date: '10/01/2026', totalPrice: 120000 
+            id: 'EVT-002', type: 'pending', typeName: 'Đặt sự kiện tại cửa hàng', 
+            statusName: 'Đang chờ ký hợp đồng', statusClass: 'Waiting', 
+            customer: 'Nguyen Van B', email: 'vanb@gmail.com', eventName: 'Sinh nhật',
+            guests: 30, tables: 5, phone: '0987654321', date: '10/11/2025'
           }
         ]);
-      }, 800);
+      }, 600);
     });
 
     const allData = await mockApi();
-    const filtered = activeTab === 'all' ? allData : allData.filter(i => i.type === activeTab);
+    const filtered = activeTab === 'all' ? allData : allData.filter(i => {
+        if(activeTab === 'completed') return i.statusClass === 'Success';
+        if(activeTab === 'cancelled') return i.statusClass === 'Cancel';
+        return true;
+    });
     setHistory(filtered);
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchHistory();
-  }, [activeTab]);
+  useEffect(() => { fetchHistory(); }, [activeTab]);
 
   return (
-    <div className="Content-Card animate-fade-in">
-      <h1 className="Content-Title">Lịch Sử Giao Dịch</h1>
+    <div className="Order-History-Page">
+      <h1 className="Page-Title">Lịch Sử Giao Dịch</h1>
 
       <div className="Order-Tabs-Container">
         {tabs.map(tab => (
@@ -60,61 +63,48 @@ const OrderHistory = () => {
         ))}
       </div>
 
-      <div className="Orders-List-Wrapper">
+      <div className="Orders-List-Container">
         {loading ? (
-          <div className="Status-Message">
-            <div className="Loading-Spinner"></div>
-            <p>Đang tải lịch sử...</p>
-          </div>
-        ) : history.length > 0 ? (
+          <div className="Loading-State"><div className="Spinner"></div></div>
+        ) : (
           history.map(item => (
-            <div key={item.id} className="Order-Modern-Card">
-              <div className="Order-Card-Header">
-                <div className="Type-Tag">
-                  <i className="fa-solid fa-clock-rotate-left"></i> {item.typeName}
+            <div key={item.id} className="Order-Horizontal-Card">
+              <div className="Card-Top-Row">
+                <div className="Type-Header">
+                  <i className="fa-solid fa-house-chimney orange-icon"></i>
+                  <strong>{item.typeName}</strong>
                 </div>
-                <span className={`Status-Badge ${item.statusClass}`}>{item.statusName}</span>
+                <div className={`Status-Label ${item.statusClass}`}>
+                  <i className={`fa-solid ${item.statusClass === 'Success' ? 'fa-circle-check' : 'fa-circle-dot'}`}></i>
+                  {item.statusName}
+                </div>
+                <button className="Btn-View-Detail" onClick={() => setSelectedOrder(item)}>
+                  Chi tiết
+                </button>
               </div>
 
-              <div className="Order-Card-Body">
-                <div className="Order-Info-Grid">
-                  <div className="Info-Item">
-                    <label>Mã đơn</label>
-                    <span className="Highlight-Text">#{item.id}</span>
-                  </div>
-                  <div className="Info-Item">
-                    <label>Ngày giao dịch</label>
-                    <span>{item.date}</span>
-                  </div>
-                  <div className="Info-Item">
-                    <label>Tổng thanh toán</label>
-                    <span className="Price-Text">{item.totalPrice.toLocaleString()} đ</span>
-                  </div>
+              <div className="Card-Main-Grid">
+                <div className="Grid-Col">
+                  <p>Người đặt : <span>{item.customer}</span></p>
+                  <p>Email: <span>{item.email}</span></p>
+                  <p>Sự kiện : <span>{item.eventName}</span></p>
                 </div>
-
-                <div className="Order-Card-Footer">
-                  <div className="Action-Section">
-                    <button className="Btn-Detail-Modern" onClick={() => setSelectedOrder(item)}>
-                      Xem hóa đơn
-                    </button>
-                  </div>
+                <div className="Grid-Col">
+                  <p>Số người : <span>{item.guests}</span></p>
+                  <p>Liên Hệ : <span>{item.phone}</span></p>
+                </div>
+                <div className="Grid-Col">
+                  <p>Số bàn : <span>{item.tables}</span></p>
+                  <p>Đặt Ngày : <span>{item.date}</span></p>
                 </div>
               </div>
             </div>
           ))
-        ) : (
-          <div className="Empty-State Status-Message">
-            <i className="fa-solid fa-folder-open" style={{fontSize: '3rem', opacity: 0.3}}></i>
-            <p>Không có dữ liệu giao dịch.</p>
-          </div>
         )}
       </div>
 
       {selectedOrder && (
-        <OrderDetailModal 
-          order={selectedOrder} 
-          onClose={() => setSelectedOrder(null)} 
-        />
+        <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
       )}
     </div>
   );
