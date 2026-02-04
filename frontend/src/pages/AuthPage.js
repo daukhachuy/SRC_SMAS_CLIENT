@@ -4,6 +4,7 @@ import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import RestaurantLogo from '../components/RestaurantLogo';
+import { login } from '../api/authApi';
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -12,23 +13,52 @@ const AuthPage = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
+    setSuccess('');
     
-    // TODO: Thêm logic xác thực thực tế ở đây
-    console.log('Form submitted:', { email, password, rememberMe });
-    
-    setTimeout(() => {
+    try {
+      const response = await login(email, password);
+      console.log('Login response:', response);
+      
+      // Lưu token nếu backend trả về
+      if (response.token) {
+        localStorage.setItem('authToken', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        if (rememberMe) {
+          localStorage.setItem('rememberMe', 'true');
+        }
+        
+        setSuccess('Đăng nhập thành công! Chuyển hướng...');
+        setTimeout(() => {
+          navigate('/profile');
+        }, 1500);
+      } else if (response.success === true) {
+        setSuccess('Đăng nhập thành công! Chuyển hướng...');
+        setTimeout(() => {
+          navigate('/profile');
+        }, 1500);
+      } else {
+        setError(response.message || 'Đăng nhập thất bại');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.response?.data?.message || err.message || 'Lỗi kết nối. Kiểm tra API backend.');
+    } finally {
       setLoading(false);
-      // Chuyển hướng sau khi đăng nhập thành công
-    }, 1000);
+    }
   };
 
   const handleGoogleLogin = () => {
     // TODO: Thêm logic Google OAuth ở đây
     console.log('Google login clicked');
+    setError('Chức năng Google Login chưa được triển khai');
   };
 
   return (
@@ -84,6 +114,36 @@ const AuthPage = () => {
           <div className="divider">
             <span>Hoặc</span>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              backgroundColor: '#fee',
+              border: '1px solid #fcc',
+              color: '#c33',
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '15px',
+              fontSize: '14px'
+            }}>
+              ❌ {error}
+            </div>
+          )}
+
+          {/* Success Message */}
+          {success && (
+            <div style={{
+              backgroundColor: '#efe',
+              border: '1px solid #cfc',
+              color: '#3c3',
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '15px',
+              fontSize: '14px'
+            }}>
+              ✅ {success}
+            </div>
+          )}
 
           {/* Auth Form */}
           <form onSubmit={handleSubmit} className="auth-form">
