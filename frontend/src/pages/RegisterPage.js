@@ -4,6 +4,7 @@ import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import RestaurantLogo from '../components/RestaurantLogo';
+import { register } from '../api/authApi';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const RegisterPage = () => {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -82,15 +84,31 @@ const RegisterPage = () => {
     }
 
     setLoading(true);
+    setSuccessMessage('');
+    setErrors({});
 
     try {
-      console.log('Register data:', formData);
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      alert('Đăng ký thành công! Vui lòng đăng nhập.');
-      navigate('/auth');
+      // Backend chỉ yêu cầu: email, password, fullname
+      const userData = {
+        email: formData.email,
+        password: formData.password,
+        fullname: formData.fullName
+      };
+
+      const response = await register(userData);
+      console.log('Register response:', response);
+
+      if (response.success === true || response.user) {
+        setSuccessMessage('Đăng ký thành công! Chuyển hướng đến đăng nhập...');
+        setTimeout(() => {
+          navigate('/auth');
+        }, 1500);
+      } else {
+        setErrors({ submit: response.message || 'Đăng ký thất bại' });
+      }
     } catch (error) {
       console.error('Registration error:', error);
-      setErrors({ submit: 'Đã xảy ra lỗi. Vui lòng thử lại.' });
+      setErrors({ submit: error.response?.data?.message || error.message || 'Lỗi kết nối. Kiểm tra API backend.' });
     } finally {
       setLoading(false);
     }
@@ -115,6 +133,36 @@ const RegisterPage = () => {
           <div className="form-divider">
             <span>Hoặc</span>
           </div>
+
+          {/* Error Message */}
+          {errors.submit && (
+            <div style={{
+              backgroundColor: '#fee',
+              border: '1px solid #fcc',
+              color: '#c33',
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '15px',
+              fontSize: '14px'
+            }}>
+              ❌ {errors.submit}
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div style={{
+              backgroundColor: '#efe',
+              border: '1px solid #cfc',
+              color: '#3c3',
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '15px',
+              fontSize: '14px'
+            }}>
+              ✅ {successMessage}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="register-form">
             {/* Full Name */}
