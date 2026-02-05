@@ -1,23 +1,115 @@
-import axios from 'axios';
+import instance, { API_BASE_URL } from './axiosInstance';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'https://localhost:5001/api';
+/**
+ * Authentication API calls
+ * Endpoints: /api/auth/login, /api/auth/register, etc.
+ */
 
 export async function login(email, password) {
   try {
-    const resp = await axios.post(`${API_BASE}/auth/login`, { email, password });
-    return resp.data;
+    console.log('🔐 Logging in:', email);
+    const response = await instance.post('/auth/login', { 
+      email: email.trim(), 
+      password 
+    });
+    
+    if (response.data?.token) {
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user || { email }));
+      console.log('✅ Login successful');
+    }
+    
+    return response.data;
   } catch (error) {
-    console.error('Login error:', error);
-    throw error;
+    console.error('❌ Login failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Login failed. Check credentials or server connection.',
+      error
+    };
   }
 }
 
-export async function register(user) {
+export async function register(userData) {
   try {
-    const resp = await axios.post(`${API_BASE}/auth/register`, user);
-    return resp.data;
+    console.log('📝 Registering user:', userData.email);
+    const response = await instance.post('/auth/register', {
+      email: userData.email?.trim(),
+      password: userData.password,
+      fullname: userData.fullName || userData.fullname
+    });
+    
+    console.log('✅ Registration successful');
+    return response.data;
   } catch (error) {
-    console.error('Register error:', error);
-    throw error;
+    console.error('❌ Registration failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Registration failed.',
+      error
+    };
   }
+}
+
+export async function googleLogin(token) {
+  try {
+    console.log('🔐 Google Login...');
+    const response = await instance.post('/auth/login/google', { token });
+    
+    if (response.data?.token) {
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user || {}));
+      console.log('✅ Google login successful');
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ Google login failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Google login failed.',
+      error
+    };
+  }
+}
+
+export async function googleRegister(token) {
+  try {
+    console.log('📝 Google Register...');
+    const response = await instance.post('/auth/register/google', { token });
+    
+    if (response.data?.token) {
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user || {}));
+      console.log('✅ Google register successful');
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ Google register failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Google register failed.',
+      error
+    };
+  }
+}
+
+export function logout() {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('user');
+  console.log('👋 User logged out');
+}
+
+export function isAuthenticated() {
+  return !!localStorage.getItem('authToken');
+}
+
+export function getAuthToken() {
+  return localStorage.getItem('authToken');
+}
+
+export function getCurrentUser() {
+  const user = localStorage.getItem('user');
+  return user ? JSON.parse(user) : null;
 }

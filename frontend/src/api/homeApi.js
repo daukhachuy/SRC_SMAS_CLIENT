@@ -1,53 +1,76 @@
+import instance, { API_BASE_URL } from './axiosInstance';
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/public` : 'https://localhost:5001/api/public';
+/**
+ * Home/Public API calls
+ * Endpoints: /api/public/* (không cần auth)
+ */
+
+// Dùng axios thường cho public endpoints (không cần token)
+const publicAxios = axios.create({
+  baseURL: `${API_BASE_URL}/public`,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
 
 export async function getRestaurantInfo() {
   try {
-    const r = await axios.get(`${API_BASE}/info`);
+    console.log('📍 Fetching restaurant info...');
+    const r = await publicAxios.get('/info');
+    console.log('✅ Restaurant info loaded');
     return r.data;
   } catch (error) {
-    console.error('Get restaurant info error:', error);
+    console.error('❌ Failed to fetch restaurant info:', error.message);
     throw error;
   }
 }
 
 export async function getFeaturedMenu() {
   try {
-    const r = await axios.get(`${API_BASE}/featured-menu`);
+    console.log('🍽️ Fetching featured menu...');
+    const r = await publicAxios.get('/featured-menu');
+    console.log('✅ Featured menu loaded');
     return r.data;
   } catch (error) {
-    console.error('Get featured menu error:', error);
+    console.error('❌ Failed to fetch featured menu:', error.message);
     throw error;
   }
 }
 
 export async function createReservation(payload) {
   try {
-    const r = await axios.post(`${API_BASE}/reservations`, payload);
+    console.log('📅 Creating reservation...');
+    const r = await instance.post('/reservations', payload);
+    console.log('✅ Reservation created');
     return r.data;
   } catch (error) {
-    console.error('Create reservation error:', error);
+    console.error('❌ Failed to create reservation:', error.response?.data || error.message);
     throw error;
   }
 }
 
 export async function getBlogs() {
   try {
-    const r = await axios.get(`${API_BASE}/blogs`);
+    console.log('📰 Fetching blogs...');
+    const r = await publicAxios.get('/blogs');
+    console.log('✅ Blogs loaded');
     return r.data;
   } catch (error) {
-    console.error('Get blogs error:', error);
+    console.error('❌ Failed to fetch blogs:', error.message);
     throw error;
   }
 }
 
 export async function getFeedbacks() {
   try {
-    const r = await axios.get(`${API_BASE}/feedbacks`);
+    console.log('⭐ Fetching feedbacks...');
+    const r = await publicAxios.get('/feedbacks');
+    console.log('✅ Feedbacks loaded');
     return r.data;
   } catch (error) {
-    console.error('Get feedbacks error:', error);
+    console.error('❌ Failed to fetch feedbacks:', error.message);
     throw error;
   }
 }
