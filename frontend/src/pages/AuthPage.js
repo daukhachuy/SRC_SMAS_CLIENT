@@ -24,32 +24,19 @@ const AuthPage = () => {
     
     try {
       const response = await login(email, password);
-      console.log('Login response:', response);
       
-      // Lưu token nếu backend trả về
-      if (response.token) {
-        localStorage.setItem('authToken', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-        
-        if (rememberMe) {
-          localStorage.setItem('rememberMe', 'true');
-        }
-        
-        setSuccess('Đăng nhập thành công! Chuyển hướng...');
-        setTimeout(() => {
-          navigate('/profile');
-        }, 1500);
-      } else if (response.success === true) {
-        setSuccess('Đăng nhập thành công! Chuyển hướng...');
-        setTimeout(() => {
-          navigate('/profile');
-        }, 1500);
-      } else {
-        setError(response.message || 'Đăng nhập thất bại');
+      if (rememberMe) {
+        localStorage.setItem('rememberMe', 'true');
       }
+      
+      setSuccess('✅ Đăng nhập thành công! Chuyển hướng...');
+      setTimeout(() => {
+        navigate('/profile');
+      }, 1500);
     } catch (err) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.message || err.message || 'Lỗi kết nối. Kiểm tra API backend.');
+      console.error('Auth error:', err);
+      const errorMsg = err?.message || err?.response?.data?.message || 'Lỗi đăng nhập. Vui lòng kiểm tra tài khoản và mật khẩu.';
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
