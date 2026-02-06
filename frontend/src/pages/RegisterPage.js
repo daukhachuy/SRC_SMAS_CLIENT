@@ -136,31 +136,17 @@ const RegisterPage = () => {
 
           {/* Error Message */}
           {errors.submit && (
-            <div style={{
-              backgroundColor: '#fee',
-              border: '1px solid #fcc',
-              color: '#c33',
-              padding: '10px',
-              borderRadius: '4px',
-              marginBottom: '15px',
-              fontSize: '14px'
-            }}>
-              ❌ {errors.submit}
+            <div className="message-alert message-error">
+              <span className="message-icon">❌</span>
+              <span className="message-text">{errors.submit}</span>
             </div>
           )}
 
           {/* Success Message */}
           {successMessage && (
-            <div style={{
-              backgroundColor: '#efe',
-              border: '1px solid #cfc',
-              color: '#3c3',
-              padding: '10px',
-              borderRadius: '4px',
-              marginBottom: '15px',
-              fontSize: '14px'
-            }}>
-              ✅ {successMessage}
+            <div className="message-alert message-success">
+              <span className="message-icon">✅</span>
+              <span className="message-text">{successMessage}</span>
             </div>
           )}
 
