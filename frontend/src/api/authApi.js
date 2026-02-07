@@ -113,3 +113,59 @@ export function getCurrentUser() {
   const user = localStorage.getItem('user');
   return user ? JSON.parse(user) : null;
 }
+export async function forgotPassword(email) {
+  try {
+    console.log('📧 Sending password reset email to:', email);
+    const response = await instance.post('/auth/forgot-password', { 
+      email: email.trim()
+    });
+    console.log('✅ Password reset email sent');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Forgot password failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to send reset email. Please check your email address.',
+      error
+    };
+  }
+}
+
+export async function verifyOtp(email, otp) {
+  try {
+    console.log('🔐 Verifying OTP for:', email);
+    const response = await instance.post('/auth/verify-otp', { 
+      email: email.trim(),
+      otp: otp.trim()
+    });
+    console.log('✅ OTP verified successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ OTP verification failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Invalid or expired OTP. Please try again.',
+      error
+    };
+  }
+}
+
+export async function resetPassword(email, otp, newPassword) {
+  try {
+    console.log('🔄 Resetting password for:', email);
+    const response = await instance.post('/auth/reset-password', { 
+      email: email.trim(),
+      otp: otp.trim(),
+      newPassword
+    });
+    console.log('✅ Password reset successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Password reset failed:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to reset password. Please try again.',
+      error
+    };
+  }
+}

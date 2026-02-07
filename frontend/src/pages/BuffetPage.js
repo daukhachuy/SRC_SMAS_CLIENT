@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/BuffetPage.css';
 import { ChevronDown, Bell, User, MessageSquare } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getFoodCategories } from '../api/foodApi';
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -17,15 +18,33 @@ const BuffetPage = () => {
   const [expandCategory, setExpandCategory] = useState(true);
   const [expandPrice, setExpandPrice] = useState(true);
   const [activeTab, setActiveTab] = useState('buffet');
+  const [buffetItems, setBuffetItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const buffetMenu = [
-    'Cá diêu hồng phi lê',
-    'Cá diêu hồng phi lê',
-    'Cá diêu hồng phi lê',
-    'Cá diêu hồng phi lê',
-    'Cá diêu hồng phi lê',
-    'Cá diêu hồng phi lê',
-  ];
+  useEffect(() => {
+    const loadBuffetItems = async () => {
+      try {
+        setLoading(true);
+        const data = await getFoodCategories();
+        console.log('Loaded buffet items:', data);
+        
+        // Handle both array and object response
+        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+        
+        if (Array.isArray(items)) {
+          setBuffetItems(items);
+        }
+      } catch (err) {
+        console.error('Error loading buffet items:', err);
+        setError(err?.message || 'Failed to load buffet items');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBuffetItems();
+  }, []);
 
   const buffetOptions = [
     {

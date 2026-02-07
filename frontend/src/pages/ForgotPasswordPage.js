@@ -4,6 +4,7 @@ import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import RestaurantLogo from '../components/RestaurantLogo';
+import { forgotPassword, verifyOtp, resetPassword } from '../api/authApi';
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
@@ -59,24 +60,16 @@ const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
-      // Simulate API call to check if account exists
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simulate account found (in real app, this would come from API)
-      const accountExists = Math.random() > 0.2; // 80% chance account exists
-      
-      if (!accountExists) {
-        setErrors({ emailPhone: 'Tài khoản không tồn tại trong hệ thống' });
-        setLoading(false);
-        return;
-      }
+      // Call API to send password reset email
+      await forgotPassword(formData.emailPhone);
 
       setAccountFound(true);
       setCurrentStep(2); // Move to OTP step
       setErrors({});
+      setSuccessMessage('Mã OTP đã được gửi đến email của bạn');
     } catch (error) {
       console.error('Error:', error);
-      setErrors({ submit: 'Đã xảy ra lỗi. Vui lòng thử lại.' });
+      setErrors({ emailPhone: error?.message || 'Đã xảy ra lỗi. Vui lòng thử lại.' });
     } finally {
       setLoading(false);
     }
@@ -101,23 +94,14 @@ const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
-      // Simulate OTP verification
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simulate successful OTP verification
-      const otpValid = formData.otp === '123456' || Math.random() > 0.1;
-      
-      if (!otpValid) {
-        setErrors({ otp: 'Mã OTP không chính xác' });
-        setLoading(false);
-        return;
-      }
+      // Call API to verify OTP
+      await verifyOtp(formData.emailPhone, formData.otp);
 
       setCurrentStep(3); // Move to new password step
       setErrors({});
     } catch (error) {
       console.error('Error:', error);
-      setErrors({ submit: 'Đã xảy ra lỗi. Vui lòng thử lại.' });
+      setErrors({ otp: error?.message || 'Đã xảy ra lỗi. Vui lòng thử lại.' });
     } finally {
       setLoading(false);
     }
@@ -148,8 +132,8 @@ const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
-      // Simulate password update
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call API to reset password
+      await resetPassword(formData.emailPhone, formData.otp, formData.newPassword);
       
       setSuccessMessage('Mật khẩu đã được cập nhật thành công!');
       setCurrentStep(4); // Success step
@@ -160,7 +144,7 @@ const ForgotPasswordPage = () => {
       }, 3000);
     } catch (error) {
       console.error('Error:', error);
-      setErrors({ submit: 'Đã xảy ra lỗi khi cập nhật mật khẩu. Vui lòng thử lại.' });
+      setErrors({ submit: error?.message || 'Đã xảy ra lỗi khi cập nhật mật khẩu. Vui lòng thử lại.' });
     } finally {
       setLoading(false);
     }
@@ -170,11 +154,13 @@ const ForgotPasswordPage = () => {
   const handleResendOTP = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setSuccessMessage('Mã OTP mới đã được gửi đến điện thoại của bạn');
+      await forgotPassword(formData.emailPhone);
+      setSuccessMessage('Mã OTP mới đã được gửi đến email của bạn');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error('Error:', error);
+      setErrors({ submit: error?.message || 'Không thể gửi lại mã OTP. Vui lòng thử lại.' });
+      setTimeout(() => setErrors({}), 3000);
     } finally {
       setLoading(false);
     }
