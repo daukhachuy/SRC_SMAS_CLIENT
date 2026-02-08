@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/MenuPage.css';
 import { ShoppingCart, ChevronDown, Heart, Bell, User, MessageSquare } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getFoodCategories } from '../api/foodApi';
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -22,16 +23,40 @@ const MenuPage = () => {
   const [expandPrice, setExpandPrice] = useState(true);
   const [expandRating, setExpandRating] = useState(true);
   const [activeTab, setActiveTab] = useState('menu');
+  const [menuItems, setMenuItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const menuItems = Array.from({ length: 50 }).map((_, i) => ({
-    id: i,
-    name: 'Tôm sú cuốn',
-    category: 'Món hấp',
-    price: 120000,
-    oldPrice: 200000,
-    img: 'https://giadinh.mediacdn.vn/thumb_w/640/296230595582509056/2022/12/21/an-gi-93-16715878747471102776072.jpg',
-    rating: 4.8
-  }));
+  useEffect(() => {
+    const loadMenuItems = async () => {
+      try {
+        setLoading(true);
+        const data = await getFoodCategories();
+        console.log('Loaded menu items:', data);
+        
+        // Handle both array and object response
+        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+        setMenuItems(Array.isArray(items) ? items : []);
+      } catch (err) {
+        console.error('Error loading menu items:', err);
+        setError(err?.message || 'Failed to load menu items');
+        // Fallback to dummy data for demonstration
+        setMenuItems(Array.from({ length: 12 }).map((_, i) => ({
+          id: i,
+          name: `Món ăn ${i + 1}`,
+          category: 'Món hấp',
+          price: 120000 + (i * 5000),
+          oldPrice: 200000 + (i * 5000),
+          image: 'https://giadinh.mediacdn.vn/thumb_w/640/296230595582509056/2022/12/21/an-gi-93-16715878747471102776072.jpg',
+          rating: 4.8
+        })));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMenuItems();
+  }, []);
 
   const filteredItems = menuItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -127,13 +152,13 @@ const MenuPage = () => {
               {displayedItems.map(item => (
                 <div key={item.id} className="menu-item">
                   <div className="item-image-container">
-                    <img src={item.img} alt={item.name} className="item-image" />
+                    <img src={item.image || item.img} alt={item.name} className="item-image" />
                   </div>
                   <h3 className="item-name">{item.name}</h3>
                   <p className="item-category">{item.category}</p>
                   <div className="price-info">
-                    <span className="old-price">{item.oldPrice.toLocaleString()}</span>
-                    <span className="new-price">{item.price.toLocaleString()} đ/a</span>
+                    <span className="old-price">{item.oldPrice?.toLocaleString?.() || item.promotionalPrice?.toLocaleString?.() || '-'}</span>
+                    <span className="new-price">{item.price?.toLocaleString?.() || '-'} đ/a</span>
                     <ShoppingCart size={18} className="cart-icon" />
                   </div>
                 </div>

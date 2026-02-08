@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/ComboPage.css';
 import { ShoppingCart, ChevronDown, Heart, Bell, User, MessageSquare } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getFoodCategories } from '../api/foodApi';
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -22,69 +23,55 @@ const ComboPage = () => {
   const [expandPrice, setExpandPrice] = useState(true);
   const [expandRating, setExpandRating] = useState(true);
   const [activeTab, setActiveTab] = useState('combo');
+  const [comboItems, setComboItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const comboItems = [
-    {
-      id: 1,
-      name: 'Combo lẩu thái',
-      category: 'Combo',
-      description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-      price: 300000,
-      oldPrice: 400000,
-      img: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
-      rating: 4.8
-    },
-    {
-      id: 2,
-      name: 'Combo lẩu thái',
-      category: 'Combo',
-      description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-      price: 300000,
-      oldPrice: 400000,
-      img: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
-      rating: 4.8
-    },
-    {
-      id: 3,
-      name: 'Combo lẩu thái',
-      category: 'Combo',
-      description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-      price: 300000,
-      oldPrice: 400000,
-      img: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpghttps://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpghttps://statics.vinwonders.com/lau-thai-ngon-ha-noi-11_1693364782.jpghttps://statics.vinwonders.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
-      rating: 4.8
-    },
-    {
-      id: 4,
-      name: 'Combo lẩu thái',
-      category: 'Combo',
-      description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-      price: 300000,
-      oldPrice: 400000,
-      img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&q=80&w=500',
-      rating: 4.8
-    },
-    {
-      id: 5,
-      name: 'Combo lẩu thái',
-      category: 'Combo',
-      description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-      price: 300000,
-      oldPrice: 400000,
-      img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&q=80&w=500',
-      rating: 4.8
-    },
-    {
-      id: 6,
-      name: 'Combo lẩu thái',
-      category: 'Combo',
-      description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-      price: 300000,
-      oldPrice: 400000,
-      img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&q=80&w=500',
-      rating: 4.8
-    },
-  ];
+  useEffect(() => {
+    const loadComboItems = async () => {
+      try {
+        setLoading(true);
+        const data = await getFoodCategories();
+        console.log('Loaded combo items:', data);
+        
+        // Handle both array and object response
+        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+        
+        // Filter for combo items if API supports it, otherwise use all
+        const processedItems = Array.isArray(items) ? items.map((item, idx) => ({
+          ...item,
+          id: item.id || idx,
+          category: item.category || 'Combo',
+          description: item.description || '',
+          image: item.image || item.img,
+          oldPrice: item.oldPrice || item.promotionalPrice || item.price * 1.2,
+          rating: item.rating || 4.8
+        })) : [];
+        
+        setComboItems(processedItems);
+      } catch (err) {
+        console.error('Error loading combo items:', err);
+        setError(err?.message || 'Failed to load combo items');
+        // Fallback to dummy data
+        setComboItems([
+          {
+            id: 1,
+            name: 'Combo lẩu thái',
+            category: 'Combo',
+            description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
+            price: 300000,
+            oldPrice: 400000,
+            image: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
+            rating: 4.8
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadComboItems();
+  }, []);
 
   const filteredItems = comboItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -180,12 +167,12 @@ const ComboPage = () => {
               {displayedItems.map(item => (
                 <div key={item.id} className="combo-item">
                   <div className="item-image-container">
-                    <img src={item.img} alt={item.name} className="item-image" />
+                    <img src={item.image || item.img} alt={item.name} className="item-image" />
                   </div>
                   <h3 className="item-name">{item.name}</h3>
                   <p className="item-description">{item.description}</p>
                   <div className="price-info">
-                    <span className="new-price">{item.price.toLocaleString()} đ</span>
+                    <span className="new-price">{item.price?.toLocaleString?.() || '-'} đ</span>
                     <ShoppingCart size={18} className="cart-icon" />
                   </div>
                 </div>
