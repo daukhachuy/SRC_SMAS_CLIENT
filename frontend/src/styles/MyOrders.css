@@ -238,6 +238,35 @@
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
 }
+.Card-Main-Grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.Full-Width-Note {
+  grid-column: 1 / -1; /* Ép phần này chiếm từ cột 1 đến cột cuối */
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px dashed #eee; /* Đường kẻ phân cách cho đẹp */
+}
+
+.Full-Width-Note p {
+  display: flex !important;
+  gap: 10px;
+  margin-bottom: 0 !important;
+  color: #333 !important;
+  font-weight: 700 !important;
+}
+
+.Full-Width-Note .Note-Text {
+  color: #666 !important;
+  font-weight: 500 !important;
+  white-space: normal !important; /* Cho phép xuống dòng */
+  word-break: break-word !important; /* Tránh vỡ khung nếu từ quá dài */
+  line-height: 1.6;
+  flex: 1; /* Chiếm trọn không gian còn lại */
+}
 
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 

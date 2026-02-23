@@ -6,7 +6,7 @@ import '../styles/Header.css';
 
 const MENU_ITEMS = [
   { label: 'THỰC ĐƠN', path: '/menu', id: 'menu' },
-  { label: 'KHUYẾN MÃI', path: '/combo', id: 'combo' },
+  { label: 'KHUYẾN MÃI', path: '/promotion', id: 'promotion' },
   { label: 'DỊCH VỤ', path: '/services', id: 'services' },
   { label: 'VỀ CHÚNG TÔI', path: '/about', id: 'about' }
 ];
@@ -63,31 +63,29 @@ const Header = () => {
 
   /* ================= ULTRA++: ACTIVE BY ROUTE (PRIMARY) ================= */
   useEffect(() => {
-    // Only use route detection if we're not on home page
     if (location.pathname === '/') {
-      return; // Let scroll detection handle home page
+      return; 
     }
 
-    // Nếu là internal nav (từ tab), highlight "menu" thôi
     if (location.state?.isInternalNav && location.pathname !== '/menu') {
       setActiveId('menu');
       return;
     }
 
-    // Exact match first
     const exact = pathToId.get(location.pathname);
     if (exact) {
       setActiveId(exact);
       return;
     }
 
-    // Then prefix match
     const matched = MENU_ITEMS.find(item =>
       location.pathname.startsWith(item.path)
     );
     if (matched) {
       setActiveId(matched.id);
       return;
+    } else {
+      setActiveId(''); // Reset active nếu không khớp menu chính (ví dụ vào trang /cart)
     }
   }, [location.pathname, location.state, pathToId]);
 
@@ -125,29 +123,17 @@ const Header = () => {
                 key={item.id}
                 className={`nav-link-item ${isActive ? 'is-active' : ''}`}
                 onClick={() => {
-                  // Chỉ navigate nếu không phải KHUYẾN MÃI hoặc DỊCH VỤ
                   if (item.id !== 'combo' && item.id !== 'buffet') {
                     navigate(item.path);
                   } else {
-                    // Highlight nhưng không navigate
                     setActiveId(item.id);
                   }
                 }}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (item.id !== 'combo' && item.id !== 'buffet') {
-                      navigate(item.path);
-                    } else {
-                      setActiveId(item.id);
-                    }
-                  }
-                }}
               >
                 {item.label}
 
-                {/* ULTRA++ underline trượt mượt */}
                 {isActive && (
                   <>
                     <motion.div
@@ -170,17 +156,23 @@ const Header = () => {
             <span className="action-badge badge-red">5</span>
           </div>
 
-          <div className="action-icon-wrap" title="Giỏ hàng">
+          {/* SỬA TẠI ĐÂY: Thêm onClick điều hướng tới trang Cart */}
+          <div 
+            className="action-icon-wrap" 
+            title="Giỏ hàng"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/cart')}
+          >
             <ShoppingBag size={22} />
             <span className="action-badge badge-orange">3</span>
           </div>
 
           <div
             className="user-avatar-btn"
-            onClick={() => navigate('/auth')}
+            onClick={() => navigate('/profile')}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && navigate('/auth')}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/profile')}
             title="Tài khoản"
           >
             <User size={20} />

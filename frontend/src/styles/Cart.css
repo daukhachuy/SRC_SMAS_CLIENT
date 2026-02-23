@@ -1,0 +1,500 @@
+/* ============================================================
+   GIỮ NGUYÊN CSS CŨ CỦA BẠN (CẬP NHẬT PHẦN GIÁ MÓN ĂN)
+   ============================================================ */
+:root {
+  --Primary-Orange: #FF7A21;
+  --Secondary-Orange: #FF9F5E;
+  --Bg-Body: #F8F9FA;
+  --Navy-Dark: #2C3E50;
+  --Transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.Cart-Page-Wrapper {
+  padding-top: 100px; 
+  background-color: var(--Bg-Body);
+  min-height: 100vh;
+}
+
+.Cart-Main-Content {
+  flex: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 40px 20px; 
+}
+
+.Cart-Container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.Page-Title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--Navy-Dark);
+  margin-bottom: 30px;
+  border-left: 10px solid var(--Primary-Orange);
+  padding-left: 20px;
+}
+
+.Cart-Table-Card {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  margin-bottom: 30px;
+}
+
+.Cart-Table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.Cart-Table th {
+  text-align: left;
+  padding: 15px;
+  border-bottom: 2px solid #f0f0f0;
+  color: #888;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 14px;
+}
+
+/* SỬA LỖI ĐỐI XỨNG CỘT GIÁ */
+.Cart-Table th:nth-child(3), 
+.Cart-Table td:nth-child(3) {
+  text-align: right; 
+  padding-right: 40px; 
+}
+
+.Cart-Table td {
+  padding: 20px 15px;
+  border-bottom: 1px solid #f9f9f9;
+  vertical-align: middle;
+}
+
+.Item-Info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.Item-Img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.Item-Name {
+  font-weight: 700;
+  color: var(--Navy-Dark);
+  font-size: 1.1rem;
+}
+
+.Item-Note {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+.Quantity-Control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.Qty-Btn {
+  width: 25px;
+  height: 25px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  color: var(--Primary-Orange);
+  font-weight: bold;
+}
+
+.Quantity-Control input {
+  width: 30px;
+  text-align: center;
+  border: none;
+  font-weight: 700;
+}
+
+.Item-Price {
+  font-weight: 700;
+  color: #333;
+}
+
+.Action-Icons {
+  display: flex;
+  gap: 15px;
+  font-size: 1.2rem;
+}
+
+.note-icon { color: #3498DB; cursor: pointer; }
+.delete-icon { color: #FF3B30; cursor: pointer; }
+
+.Cart-Pagination {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 20px;
+  margin-top: 20px;
+  padding: 10px;
+  color: #666;
+  font-size: 14px;
+}
+
+.Page-Numbers {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.Page-Numbers button {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  background: white;
+  cursor: pointer;
+}
+
+.Page-Numbers button.Active {
+  background: var(--Primary-Orange);
+  color: white;
+  border-color: var(--Primary-Orange);
+}
+
+.Cart-Summary-Card {
+  background: white;
+  border-radius: 20px;
+  padding: 25px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  border: 1px solid #f0f0f0;
+}
+
+.Summary-Left {
+  display: flex;
+  gap: 40px;
+}
+
+.Summary-Left p {
+  color: #444;
+  font-size: 1.1rem;
+}
+
+.Summary-Left strong {
+  color: var(--Navy-Dark);
+  margin-left: 5px;
+}
+
+.Summary-Right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.Deposit-Policy {
+  font-size: 13px;
+  color: #888;
+  max-width: 300px;
+}
+
+.Btn-Order-Now {
+  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
+  color: white;
+  border: none;
+  padding: 12px 60px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(255, 122, 33, 0.3);
+  transition: var(--Transition);
+}
+
+.Btn-Order-Now:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(255, 122, 33, 0.5);
+}
+
+.Modal-Overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 9999;
+}
+
+.Info-Modal-Box {
+  background: white;
+  width: 95%;
+  max-width: 600px;
+  border-radius: 30px;
+  padding: 40px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+  position: relative;
+  animation: modalScaleUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalScaleUp {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.Modal-Header {
+  display: flex; justify-content: center; align-items: center;
+  position: relative; margin-bottom: 30px;
+}
+
+.Modal-Header h3 { font-size: 1.8rem; font-weight: 800; color: var(--Navy-Dark); }
+
+.Close-Modal-Btn {
+  position: absolute; right: 0; background: none; border: none;
+  font-size: 1.5rem; color: var(--Primary-Orange); cursor: pointer;
+  transition: var(--Transition);
+}
+
+.Close-Modal-Btn:hover { transform: rotate(90deg); }
+
+/* ============================================================
+   BỔ SUNG CSS PHẦN TÓM TẮT ĐƠN HÀNG (CÓ CHỈNH SỬA VOUCHER)
+   ============================================================ */
+
+.summary-modal-wide {
+  max-width: 900px;
+}
+
+.Summary-Main-Layout {
+  display: flex;
+  gap: 30px;
+  margin-top: 10px;
+}
+
+.Summary-Bill-Detail {
+  flex: 1;
+  background: #FDFDFD;
+  border: 1px dashed #DDD;
+  border-radius: 20px;
+  padding: 25px;
+}
+
+.Bill-Brand {
+  font-weight: 900;
+  font-size: 1.2rem;
+  text-align: center;
+  color: var(--Navy-Dark);
+}
+
+.Bill-Address {
+  font-size: 11px;
+  color: #888;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.Bill-Divider {
+  border-top: 1px dashed #EEE;
+  margin: 15px 0;
+}
+
+.Bill-Row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #555;
+}
+
+.Bill-Total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 900;
+  font-size: 1.3rem;
+  color: var(--Navy-Dark);
+}
+
+.Customer-Brief {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.text-red { color: #E74C3C !important; font-weight: bold; }
+
+/* Cột phải: Thanh toán & CHỈNH VOUCHER CÂN XỨNG */
+.Summary-Payment-Section {
+  flex: 1.2;
+  text-align: left;
+}
+
+.Promo-Input-Box label {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 10px;
+  color: #444;
+}
+
+.Promo-Input-Box .Input-With-Icon {
+  display: flex;
+  align-items: stretch; /* Đảm bảo nút và input cao bằng nhau */
+  height: 50px;
+}
+
+.Promo-Input-Box input {
+  flex: 1;
+  border: 2px solid #f0f0f0 !important;
+  border-right: none !important;
+  border-radius: 12px 0 0 12px !important;
+  padding: 0 15px !important;
+}
+
+.Apply-Btn {
+  background: var(--Navy-Dark);
+  color: white;
+  border: none;
+  padding: 0 25px;
+  border-radius: 0 12px 12px 0;
+  cursor: pointer;
+  font-weight: 700;
+  transition: var(--Transition);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.Apply-Btn:hover {
+  background: #000;
+}
+
+.Section-Title {
+  margin: 25px 0 15px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--Navy-Dark);
+}
+
+.Payment-Grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 25px;
+}
+
+.Payment-Card {
+  border: 2px solid #F0F0F0;
+  border-radius: 15px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: var(--Transition);
+}
+
+.Payment-Card i { font-size: 1.4rem; color: #888; }
+
+.Payment-Card.active {
+  border-color: var(--Primary-Orange);
+  background: #FFF8F4;
+}
+
+.Payment-Card.active i { color: var(--Primary-Orange); }
+.Payment-Card span { font-weight: 700; font-size: 13px; }
+
+.Btn-Final-Order {
+  width: 100%;
+  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
+  color: white;
+  border: none;
+  padding: 16px;
+  border-radius: 15px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(255, 122, 33, 0.3);
+  transition: var(--Transition);
+}
+
+.Btn-Final-Order:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 30px rgba(255, 122, 33, 0.4);
+}
+
+.E-Invoice-Link {
+  margin-top: 15px;
+  font-size: 12px;
+  text-align: center;
+  color: #777;
+}
+
+.Orange-Link {
+  color: var(--Primary-Orange);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.Back-Btn {
+  position: absolute;
+  top: 40px; left: 40px;
+  background: none; border: none;
+  color: var(--Primary-Orange);
+  font-weight: 800;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* ============================================================
+   CHỈNH SỬA NÚT XÁC NHẬN BƯỚC 1 (HOÀN THIỆN)
+   ============================================================ */
+.Btn-Confirm-Order {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 15px;
+  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
+  color: white;
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 8px 15px rgba(255, 122, 33, 0.2);
+  transition: var(--Transition);
+  margin-top: 15px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.Btn-Confirm-Order:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 30px rgba(255, 122, 33, 0.4);
+}
+
+/* Các Input Group cũ */
+.Input-Row { display: flex; gap: 20px; margin-bottom: 20px; }
+.flex-1 { flex: 1; }
+.Input-Group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.Input-Group label { font-weight: 700; color: #555; }
+.Input-Group input, .Input-Group textarea {
+  padding: 14px 20px; border: 2px solid #f0f0f0; border-radius: 15px; outline: none; transition: var(--Transition);
+}
+.Input-Group input:focus { border-color: var(--Primary-Orange); }
+.Input-With-Icon { position: relative; display: flex; align-items: center; }
+.Input-With-Icon input { padding-left: 45px; width: 100%; }
+.orange-icon { position: absolute; left: 15px; color: var(--Primary-Orange); }
+
+@media (max-width: 768px) {
+  .Summary-Main-Layout { flex-direction: column; }
+  .summary-modal-wide { width: 95%; padding: 20px; }
+  .Payment-Grid { grid-template-columns: 1fr; }
+}
