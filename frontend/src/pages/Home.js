@@ -10,7 +10,6 @@ import {
 // Import các component đã tách ra
 import Header from '../components/Header'; 
 import Footer from '../components/Footer';
-import { getFoodDiscounts, getFeedbackList } from '../api/foodApi';
 
 // --- DATA ---
 const HERO_DATA = [
@@ -81,8 +80,6 @@ const FloatingChat = () => (
   </div>
 );
 
-
-
 const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
   <div className="product-card">
     <div className="product-img-container">
@@ -140,7 +137,7 @@ const ServiceHighlight = ({ navigate }) => (
   </section>
 );
 
-const DiscountAndInfo = ({ navigate, discounts = DISCOUNTS_DATA }) => {
+const DiscountAndInfo = ({ navigate }) => {
   const [discountIdx, setDiscountIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(9910);
 
@@ -158,15 +155,15 @@ const DiscountAndInfo = ({ navigate, discounts = DISCOUNTS_DATA }) => {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setDiscountIdx(prev => (prev === discounts.length - 1 ? 0 : prev + 1));
+      setDiscountIdx(prev => (prev === DISCOUNTS_DATA.length - 1 ? 0 : prev + 1));
     }, 4000);
     return () => clearInterval(timer);
-  }, [discounts.length]);
+  }, []);
 
-  const current = discounts[discountIdx] || (discounts[0] || DISCOUNTS_DATA[0]);
+  const current = DISCOUNTS_DATA[discountIdx];
 
   return (
-    <section id="about" className="info-section">
+    <section className="info-section">
       <div className="info-grid">
         <div className="discount-card-new">
           <div className="card-header">
@@ -182,7 +179,7 @@ const DiscountAndInfo = ({ navigate, discounts = DISCOUNTS_DATA }) => {
               <button className="mini-circle-nav nav-right" onClick={() => setDiscountIdx(p => p === DISCOUNTS_DATA.length - 1 ? 0 : p + 1)}>
                 <ChevronRight size={20}/>
               </button>
-              
+              <div className="discount-badge">{current.discount}</div>
             </div>
             <div className="discount-info-part">
               <h3 className="discount-name-new">{current.name}</h3>
@@ -198,7 +195,7 @@ const DiscountAndInfo = ({ navigate, discounts = DISCOUNTS_DATA }) => {
               </div>
               <button className="btn-order-now" onClick={() => navigate('/register')}>SĂN NGAY</button>
               <div className="discount-dots">
-                {discounts.map((_, i) => (
+                {DISCOUNTS_DATA.map((_, i) => (
                   <div key={i} className={`mini-dot ${discountIdx === i ? 'active' : ''}`} />
                 ))}
               </div>
@@ -249,85 +246,9 @@ const Home = () => {
   const [reviewOffset, setReviewOffset] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  const [discounts, setDiscounts] = useState(DISCOUNTS_DATA);
-  const [reviews, setReviews] = useState(REVIEWS_DATA);
-  const [discountsLoading, setDiscountsLoading] = useState(true);
-  const [reviewsLoading, setReviewsLoading] = useState(true);
-
   const BEST_EXTENDED = [...BEST_SELLERS_DATA, ...BEST_SELLERS_DATA];
   const COMBO_EXTENDED = [...COMBOS_DATA, ...COMBOS_DATA, ...COMBOS_DATA];
 
-  // Load discounts
-  useEffect(() => {
-    const loadDiscounts = async () => {
-      try {
-        setDiscountsLoading(true);
-        const data = await getFoodDiscounts();
-        console.log('Loaded discounts:', data);
-        
-        // Handle both array and object response
-        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
-        
-        if (Array.isArray(items) && items.length > 0) {
-          // Transform API response to match expected format
-          const transformedDiscounts = items.map((item, idx) => ({
-            ...item,
-            id: item.id || idx,
-            img: item.image || item.img,
-            oldPrice: item.oldPrice || item.promotionalPrice || 'N/A',
-            newPrice: item.price || 'N/A',
-            discount: item.discount || '-',
-            left: item.left || 5
-          }));
-          setDiscounts(transformedDiscounts);
-        }
-      } catch (err) {
-        console.error('Error loading discounts:', err);
-        // Use default discounts if error
-        setDiscounts(DISCOUNTS_DATA);
-      } finally {
-        setDiscountsLoading(false);
-      }
-    };
-
-    loadDiscounts();
-  }, []);
-
-  // Load reviews/feedback
-  useEffect(() => {
-    const loadReviews = async () => {
-      try {
-        setReviewsLoading(true);
-        const data = await getFeedbackList();
-        console.log('Loaded reviews:', data);
-        
-        // Handle both array and object response
-        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
-        
-        if (Array.isArray(items) && items.length > 0) {
-          // Transform API response to match expected format
-          const transformedReviews = items.map((item, idx) => ({
-            id: item.id || idx,
-            name: item.fullname || item.name || `Guest ${idx}`,
-            text: item.comment || item.text || '',
-            avatar: item.avatar || `https://i.pravatar.cc/150?u=v${idx + 50}`,
-            rating: item.rating || 5
-          }));
-          setReviews(transformedReviews);
-        }
-      } catch (err) {
-        console.error('Error loading reviews:', err);
-        // Use default reviews if error
-        setReviews(REVIEWS_DATA);
-      } finally {
-        setReviewsLoading(false);
-      }
-    };
-
-    loadReviews();
-  }, []);
-
-  // Carousel transitions
   useEffect(() => {
     const timer = setInterval(() => {
       setIsBestTransition(true);
@@ -367,7 +288,7 @@ const Home = () => {
 
   return (
     <div className="app">
-      <Header />
+      <Header navigate={navigate} />
       
       <section className="hero-section">
         <div className="hero-main">
@@ -414,7 +335,7 @@ const Home = () => {
       <SectionDivider topColor="#ffffff" bottomColor="#ffffff" />
 
       {/* CAROUSEL 1: CHẠY TIẾN */}
-      <section id="menu" className="section-padding mon-an-ban-chay">
+      <section className="section-padding mon-an-ban-chay">
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
           <div>
             <h2 className="main-title">MÓN ĂN BÁN CHẠY 🔥</h2>
@@ -464,7 +385,7 @@ const Home = () => {
       <SectionDivider topColor="#ffffff" bottomColor="#ffffff" />
 
       {/* CAROUSEL 2: CHẠY LÙI */}
-      <section id="combo" className="section-padding combo-section">
+      <section className="section-padding combo-section">
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
           {/* Nút Xem Thêm nằm bên trái đối diện tiêu đề phải */}
           <button 
@@ -515,7 +436,7 @@ const Home = () => {
 
       {/* REVIEW ĐƯA LÊN TRƯỚC DISCOUNT */}
       <SectionDivider topColor="#ffffff" bottomColor="#0D0D0D" />
-      <section id="buffet" className="review-section">
+      <section className="review-section">
         <div className="review-header-layout">
           <div className="review-left">
             <Quote size={50} className="quote-icon" />
@@ -540,7 +461,7 @@ const Home = () => {
                 transform: `translateY(-${reviewOffset * 310}px)`, 
                 transition: isTransitioning ? 'transform 1.2s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
               }}>
-                {reviews.slice(0, 10).concat(reviews.slice(0, 10)).map((item, i) => (
+                {REVIEWS_DATA.slice(0, 10).concat(REVIEWS_DATA.slice(0, 10)).map((item, i) => (
                   <div key={i} className="feedback-card">
                     <p className="feedback-text">"{item.text}"</p>
                     <div className="feedback-user">
@@ -559,7 +480,7 @@ const Home = () => {
                 transform: `translateY(-${(9 - reviewOffset) * 310}px)`,
                 transition: isTransitioning ? 'transform 1.2s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
               }}>
-                {reviews.slice(Math.max(0, 10), 20).concat(reviews.slice(Math.max(0, 10), 20)).map((item, i) => (
+                {REVIEWS_DATA.slice(10, 20).concat(REVIEWS_DATA.slice(10, 20)).map((item, i) => (
                   <div key={i} className="feedback-card">
                     <p className="feedback-text">"{item.text}"</p>
                     <div className="feedback-user">
@@ -578,8 +499,9 @@ const Home = () => {
       </section>
 
       <SectionDivider topColor="#0D0D0D" bottomColor="#ffffff" />
-      <DiscountAndInfo navigate={navigate} discounts={discounts} />
+      <DiscountAndInfo navigate={navigate} />
       
+
       <FloatingChat />
       <Footer />
     </div>

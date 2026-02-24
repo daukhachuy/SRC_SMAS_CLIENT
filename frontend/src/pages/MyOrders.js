@@ -30,7 +30,7 @@ const MyOrders = () => {
         customer: 'Nguyen Van B', phone: '0987654321', 
         people: 30, tables: 5, eventType: 'Họp lớp',
         createdAt: '10/11/2025', bookingTime: '20/11/2025 18:00',
-        note: 'Cần dàn âm thanh và máy chiếu',
+        note: 'Cần dàn âm thanh và máy chiếu. Ngoài ra cần chuẩn bị thêm hoa tươi ở các bàn tiệc và khu vực sân khấu chính.',
         policy: 'Chỉ được hủy trước 5 ngày'
       },
       { 
@@ -58,10 +58,8 @@ const MyOrders = () => {
 
   return (
     <div className="MyOrders-Wrapper">
-      {/* Tiêu đề trang giống OrderHistory */}
       <h1 className="Page-Title">Đơn Hàng Của Tôi</h1>
 
-      {/* Tabs Gradient */}
       <div className="Order-Tabs-Container">
         {tabs.map(tab => (
           <button 
@@ -107,7 +105,6 @@ const MyOrders = () => {
                 <div className="Grid-Col">
                    {order.people && <p>Số người : <span>{order.people}</span></p>}
                    {order.tables && <p>Số bàn : <span>{order.tables}</span></p>}
-                   <p>Ghi chú : <span className="Note-Text">{order.note}</span></p>
                 </div>
 
                 <div className="Grid-Col">
@@ -124,9 +121,15 @@ const MyOrders = () => {
                       <p className="Total-Text">Tổng thanh toán: <strong>{order.totalPrice.toLocaleString()} đ</strong></p>
                    )}
                 </div>
+
+                {/* Phần Ghi chú đưa xuống dưới cùng và tràn dòng */}
+                {order.note && (
+                  <div className="Full-Width-Note">
+                    <p>Ghi chú : <span className="Note-Text">{order.note}</span></p>
+                  </div>
+                )}
               </div>
 
-              {/* Phần danh sách món ăn cho Delivery */}
               {order.items && (
                 <div className="Order-Table-Wrapper">
                   <table className="Minimal-Table">

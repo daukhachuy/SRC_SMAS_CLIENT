@@ -13,6 +13,10 @@ import Profile from './pages/Profile';
 import MyOrders from './pages/MyOrders'; 
 import UserLayout from './components/UserLayout';
 import OrderHistory from './pages/OrderHistory';
+import Cart from './pages/Cart'; 
+
+// 1. Import trang Promotion
+import Promotion from './pages/Promotion'; 
 
 const AppRoutes = () => {
   return (
@@ -25,15 +29,21 @@ const AppRoutes = () => {
         <Route path="/buffet" element={<BuffetPage />} />
         <Route path="/services" element={<Services />} />
         <Route path="/about" element={<AboutPage />} />
+        
+        {/* 2. Thêm Route cho trang Khuyến mãi */}
+        <Route path="/promotion" element={<Promotion />} />
+
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        
+        <Route path="/cart" element={<Cart />} />
 
-       
+        {/* Các trang yêu cầu UserLayout (thông tin cá nhân, đơn hàng) */}
         <Route element={<UserLayout />}>
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/my-orders" element={<MyOrders />} />
-        <Route path="/order-history" element={<OrderHistory />} /> 
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/my-orders" element={<MyOrders />} />
+          <Route path="/order-history" element={<OrderHistory />} /> 
         </Route>
       </Routes>
     </Router>
