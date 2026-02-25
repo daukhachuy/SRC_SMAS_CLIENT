@@ -1,0 +1,184 @@
+/* --- BIẾN TOÀN CỤC --- */
+:root {
+  --Primary-Orange: #FF7A21;
+  --Secondary-Orange: #FF9F5E;
+  --Primary-Blue: #3498DB;
+  --Success-Green: #27AE60;
+  --Warning-Yellow: #F39C12;
+  --Danger-Red: #FF3B30;
+  --Bg-Body: #F8F9FA;
+  --Header-Height: 80px; /* Độ cao header trang web của bạn */
+  --Transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* --- CONTAINER TỔNG --- */
+.Order-History-Page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  background-color: var(--Bg-Body);
+  box-sizing: border-box;
+  /* Đảm bảo tiêu đề không bị dính vào mép trên trình duyệt */
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- TIÊU ĐỀ (Đã sửa lỗi bị đè) --- */
+.Page-Title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #2C3E50;
+  margin-top: 0;
+  margin-bottom: 30px;
+  border-left: 8px solid var(--Primary-Orange);
+  padding-left: 20px;
+  /* Tránh bị ảnh hưởng bởi sticky của phần tử bên dưới */
+  position: relative; 
+  z-index: 10;
+}
+
+/* --- THANH TABS STICKY --- */
+.Order-Tabs-Container {
+  position: sticky;
+  /* top này phải lớn hơn độ cao của Header cố định (nếu có) */
+  top: 10px; 
+  z-index: 100;
+  background: var(--Bg-Body); /* Quan trọng: Phải có màu nền để che nội dung khi cuộn */
+  padding: 15px 0; /* Khoảng cách trên dưới cho thanh tabs */
+  margin-bottom: 30px;
+  display: flex;
+  gap: 15px;
+  width: 100%;
+}
+
+.Order-Tab-Btn {
+  padding: 12px 35px;
+  border-radius: 50px;
+  border: 2px solid #eee;
+  background: #fff;
+  font-weight: 800;
+  color: #666;
+  font-size: 15px;
+  transition: var(--Transition);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.Order-Tab-Btn.Active {
+  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(255, 122, 33, 0.4);
+  transform: scale(1.05);
+}
+
+/* --- THẺ ĐƠN HÀNG --- */
+.Order-Horizontal-Card {
+  background: #fff;
+  border-left: 8px solid var(--Primary-Orange);
+  border-radius: 20px;
+  padding: 30px 40px;
+  margin-bottom: 25px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  transition: var(--Transition);
+  border: 1px solid #f0f0f0;
+}
+
+.Order-Horizontal-Card:hover {
+  transform: translateX(10px);
+  box-shadow: 0 15px 45px rgba(0,0,0,0.12);
+}
+
+.Card-Top-Row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #f9f9f9;
+  padding-bottom: 20px;
+  margin-bottom: 25px;
+}
+
+.Type-Header {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #2C3E50;
+  display: flex;
+  align-items: center;
+}
+
+.orange-icon {
+  color: var(--Primary-Orange);
+  margin-right: 12px;
+}
+
+.Status-Label {
+  font-weight: 800;
+  font-size: 13px;
+  padding: 8px 18px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.Status-Label.Success { background: #E6FBF3; color: var(--Success-Green); }
+.Status-Label.Waiting { background: #FFF9E6; color: var(--Warning-Yellow); }
+
+.Btn-View-Detail {
+  background: #fff;
+  color: var(--Primary-Orange);
+  border: 2px solid var(--Primary-Orange);
+  padding: 8px 25px;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: var(--Transition);
+}
+
+.Btn-View-Detail:hover {
+  background: var(--Primary-Orange);
+  color: white;
+  transform: translateY(-3px);
+}
+
+/* --- GRID THÔNG TIN --- */
+.Card-Main-Grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 30px;
+}
+
+.Grid-Col p {
+  font-size: 15px;
+  font-weight: 700;
+  color: #7F8C8D; /* Màu xám cho label */
+  margin-bottom: 10px;
+}
+
+.Grid-Col p span {
+  color: #333; /* Màu đen cho giá trị thực tế */
+  font-weight: 600;
+  margin-left: 5px;
+}
+
+/* --- LOADING --- */
+.Spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #f3f3f3; border-top: 4px solid var(--Primary-Orange);
+  border-radius: 50%; animation: spin 1s linear infinite;
+  margin: 50px auto;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* --- RESPONSIVE --- */
+@media (max-width: 992px) {
+  .Card-Main-Grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 650px) {
+  .Card-Main-Grid { grid-template-columns: 1fr; }
+  .Card-Top-Row { flex-direction: column; align-items: flex-start; gap: 15px; }
+  .Order-Tabs-Container { overflow-x: auto; padding-bottom: 10px; }
+}
