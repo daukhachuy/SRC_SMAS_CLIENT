@@ -1,25 +1,73 @@
-import React, { useState } from 'react'; // Thêm useState
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios'; // Đảm bảo đã npm install axios
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/UserLayout.css';
 
 const UserLayout = () => {
   const navigate = useNavigate();
-  
-  // 1. Khởi tạo state cho Avatar (Sử dụng ảnh mặc định ban đầu)
   const [avatar, setAvatar] = useState("https://www.w3schools.com/howto/img_avatar.png");
+  const [loading, setLoading] = useState(false);
 
-  // 2. Hàm xử lý khi chọn file ảnh
-  const handleAvatarChange = (event) => {
+  // Thông tin Cloudinary của bạn
+  const cloudName = "dgjkqvbhm";
+  const uploadPreset = "YOUR_UNSIGNED_PRESET"; // BẮT BUỘC: Thay bằng tên preset Unsigned bạn tạo trên Cloudinary
+
+  const handleAvatarChange = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      // Tạo một đường dẫn tạm thời để hiển thị ảnh ngay lập tức
-      const imageUrl = URL.createObjectURL(file);
-      setAvatar(imageUrl);
+    if (!file) return;
+
+    // 1. Hiển thị ảnh tạm thời để UX mượt mà
+    const localUrl = URL.createObjectURL(file);
+    setAvatar(localUrl);
+
+    // 2. Bắt đầu quá trình upload
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+
+    try {
+      // BƯỚC A: Upload lên Cloudinary
+      const clodinaryRes = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        formData
+      );
+      const imageUrlOnCloud = clodinaryRes.data.secure_url;
+      console.log("Link ảnh từ Cloudinary:", imageUrlOnCloud);
+
+      // BƯỚC B: Gửi URL này lên Backend C#
+      const token = localStorage.getItem("token"); // Đảm bảo bạn lưu token khi Login
       
-      // Gợi ý: Tại đây bạn có thể thêm logic gọi API để upload file lên Server/Cloudinary
-      console.log("File đã chọn:", file);
+      // Chú ý: API này yêu cầu JSON full profile nên bạn cần gửi kèm các field khác 
+      // (Hoặc backend của bạn chỉ cần gửi mỗi avatar thì bỏ các field kia đi)
+      await axios.put(
+        "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/User/profile",
+        {
+          fullname: "Khánh Hồ", // Có thể lấy từ state nếu có
+          avatar: imageUrlOnCloud,
+          gender: "string", 
+          dob: "2026-02-25",
+          phone: "string",
+          address: "string"
+        },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      setAvatar(imageUrlOnCloud); // Cập nhật link chính thức
+      alert("Cập nhật ảnh đại diện thành công!");
+
+    } catch (error) {
+      console.error("Lỗi quá trình upload/update:", error);
+      alert("Không thể lưu ảnh. Vui lòng thử lại!");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,22 +76,29 @@ const UserLayout = () => {
       <Header />
       <main className="Profile-Container">
         <div className="Profile-Layout">
-          {/* SIDEBAR */}
           <aside className="Profile-Sidebar">
             <div className="Avatar-Wrapper">
               <div className="Avatar-Relative">
-                {/* 3. Hiển thị ảnh từ state */}
-                <img src={avatar} alt="Avatar" className="User-Img" />
+                <img 
+                  src={avatar} 
+                  alt="Avatar" 
+                  className="User-Img" 
+                  style={{ opacity: loading ? 0.5 : 1 }} // Làm mờ khi đang load
+                />
                 
                 <label htmlFor="upload-photo" className="Camera-Icon">
-                  <i className="fa-solid fa-camera"></i>
-                  {/* 4. Thêm sự kiện onChange */}
+                  {loading ? (
+                    <i className="fa-solid fa-spinner fa-spin"></i> // Hiệu ứng xoay khi load
+                  ) : (
+                    <i className="fa-solid fa-camera"></i>
+                  )}
                   <input 
                     type="file" 
                     id="upload-photo" 
-                    accept="image/*" // Chỉ chấp nhận file ảnh
+                    accept="image/*" 
                     style={{display: 'none'}} 
                     onChange={handleAvatarChange}
+                    disabled={loading} // Khóa input khi đang upload
                   />
                 </label>
               </div>
