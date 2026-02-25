@@ -124,7 +124,17 @@ const UserLayout = () => {
               
               <hr className="Nav-Divider" />
 
-              <button className="Btn-Logout" onClick={() => navigate('/auth')}>
+              <button 
+                className="Btn-Logout" 
+                onClick={() => {
+                  // Clear authentication data
+                  localStorage.removeItem('authToken');
+                  localStorage.removeItem('user');
+                  localStorage.removeItem('rememberMe');
+                  console.log('✅ Đã đăng xuất');
+                  navigate('/auth');
+                }}
+              >
                 <i className="fa-solid fa-right-from-bracket"></i> Đăng Xuất
               </button>
             </nav>

@@ -14,6 +14,9 @@ import MyOrders from './pages/MyOrders';
 import UserLayout from './components/UserLayout';
 import OrderHistory from './pages/OrderHistory';
 import Cart from './pages/Cart'; 
+import ProtectedRoute from './components/ProtectedRoute';
+import DebugPage from './pages/DebugPage';
+import AuthTestPage from './pages/AuthTestPage';
 
 // 1. Import trang Promotion
 import Promotion from './pages/Promotion'; 
@@ -36,11 +39,16 @@ const AppRoutes = () => {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        
+        <Route path="/debug" element={<DebugPage />} />
+        <Route path="/auth-test" element={<AuthTestPage />} />
         <Route path="/cart" element={<Cart />} />
 
-        {/* Các trang yêu cầu UserLayout (thông tin cá nhân, đơn hàng) */}
-        <Route element={<UserLayout />}>
+        {/* Các trang yêu cầu đăng nhập - Bảo vệ bằng ProtectedRoute */}
+        <Route element={
+          <ProtectedRoute>
+            <UserLayout />
+          </ProtectedRoute>
+        }>
           <Route path="/profile" element={<Profile />} />
           <Route path="/my-orders" element={<MyOrders />} />
           <Route path="/order-history" element={<OrderHistory />} /> 

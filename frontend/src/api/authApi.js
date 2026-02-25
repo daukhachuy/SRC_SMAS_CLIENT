@@ -96,9 +96,11 @@ export async function googleRegister(token) {
 }
 
 export function logout() {
+  console.log('🚪 Logging out...');
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
-  console.log('👋 User logged out');
+  localStorage.removeItem('rememberMe');
+  console.log('✅ Logged out successfully');
 }
 
 export function isAuthenticated() {
