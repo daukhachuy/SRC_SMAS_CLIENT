@@ -473,3 +473,276 @@
     border-color: var(--primary-orange);
     transform: translateY(-50%) scale(1.1);
 }
+
+/* --- LOADING STATE --- */
+.Loading-State {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    gap: 20px;
+}
+
+.spinner-icon {
+    width: 50px;
+    height: 50px;
+    color: var(--primary-orange);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* --- MODAL VOUCHER (PHONG CÁCH ĐỒNG BỘ) --- */
+.Voucher-Modal-Overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.Voucher-Modal-Content {
+    background: white;
+    width: 95%;
+    max-width: 600px;
+    max-height: 80vh;
+    border-radius: 40px; /* Đồng bộ với Hero Card */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.3);
+    animation: fadeInUp 0.5s var(--transition-smooth);
+}
+
+.Modal-Header {
+    padding: 30px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.Modal-Header h2 {
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--deep-black);
+}
+
+.close-btn {
+    background: var(--light-gray);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.close-btn:hover {
+    background: #ff4d4d;
+    color: white;
+    transform: rotate(90deg);
+}
+
+.Modal-Body {
+    padding: 30px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+/* --- VOUCHER ITEM TRONG MODAL --- */
+.Voucher-Item-Full {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #FFF8F3;
+    border: 2px dashed var(--primary-orange);
+    padding: 20px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    transition: 0.3s;
+}
+
+.V-Info {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.V-Tag {
+    background: var(--primary-orange);
+    color: white;
+    font-weight: 900;
+    padding: 12px;
+    border-radius: 15px;
+    min-width: 70px;
+    text-align: center;
+    font-size: 18px;
+}
+
+.V-Text h4 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.V-Text p {
+    margin: 5px 0;
+    font-size: 14px;
+    color: var(--text-gray);
+}
+
+.copy-btn-modal {
+    background: var(--deep-black);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: 0.3s;
+}
+
+.copy-btn-modal:hover {
+    background: var(--primary-orange);
+    transform: scale(1.05);
+}
+
+/* --- NÚT XEM TẤT CẢ --- */
+.btn-view-all {
+    background: transparent;
+    border: 2px solid var(--primary-orange);
+    color: var(--primary-orange);
+    padding: 10px 25px;
+    border-radius: 50px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.btn-view-all:hover {
+    background: var(--primary-orange);
+    color: white;
+    box-shadow: 0 10px 20px rgba(255,122,33,0.2);
+}
+/* Container tiêu đề để đẩy nút về bên phải */
+.header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* Nút Xem tất cả không viền, nằm sát lề phải */
+.btn-view-all-minimal {
+    background: none;
+    border: none;
+    color: var(--primary-orange);
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 5px 0;
+    transition: var(--transition-smooth);
+    position: relative;
+}
+
+.btn-view-all-minimal::after {
+    content: ' →'; /* Thêm mũi tên nhỏ cho tinh tế */
+    transition: 0.3s;
+}
+
+.btn-view-all-minimal:hover {
+    color: var(--deep-black);
+    transform: translateX(5px); /* Hiệu ứng nhích nhẹ sang phải khi hover */
+}
+
+/* Modal: Đảm bảo Modal che phủ toàn màn hình */
+.Voucher-Modal-Overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+/* Container tiêu đề */
+.header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Nút Xem tất cả tối giản */
+.btn-view-all-minimal {
+    background: none;
+    border: none;
+    color: var(--primary-orange);
+    font-weight: 800;
+    font-size: 15px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-view-all-minimal:hover {
+    opacity: 0.7;
+    transform: translateX(3px);
+}
+
+/* Modal & Scrollbar */
+.Voucher-Modal-Overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.Voucher-Modal-Content {
+    background: white;
+    width: 95%;
+    max-width: 600px;
+    border-radius: 30px;
+    overflow: hidden;
+    animation: fadeInUp 0.4s var(--transition-smooth);
+}
+
+.Modal-Body-Scroll {
+    padding: 20px 30px;
+    max-height: 60vh; /* Chiều cao tối đa bảng */
+    overflow-y: auto;  /* Tạo thanh cuộn */
+}
+
+/* Tùy chỉnh thanh cuộn */
+.Modal-Body-Scroll::-webkit-scrollbar {
+    width: 6px;
+}
+.Modal-Body-Scroll::-webkit-scrollbar-thumb {
+    background: var(--muted-gray);
+    border-radius: 10px;
+}
+.Modal-Body-Scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-orange);
+}
+
+.close-btn-minimal {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-gray);
+}
