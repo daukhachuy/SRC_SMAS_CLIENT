@@ -22,34 +22,35 @@ const MenuPage = () => {
   const [expandCategory, setExpandCategory] = useState(true);
   const [expandPrice, setExpandPrice] = useState(true);
   const [expandRating, setExpandRating] = useState(true);
-  const [activeTab, setActiveTab] = useState('menu');
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // URL gốc để hiển thị hình ảnh từ server
+  const IMAGE_BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
 
   useEffect(() => {
     const loadMenuItems = async () => {
       try {
         setLoading(true);
         const data = await getFoodCategories();
-        console.log('Loaded menu items:', data);
         
-        // Handle both array and object response
-        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
-        setMenuItems(Array.isArray(items) ? items : []);
+        // Mapping dữ liệu từ API thật sang cấu trúc của Component
+        const mappedItems = data.map(item => ({
+          id: item.foodId, // API dùng foodId
+          name: item.name,
+          // Lấy tên category đầu tiên trong mảng categories
+          category: item.categories?.[0]?.name || 'Món ăn', 
+          price: item.price,
+          oldPrice: item.promotionalPrice, // API dùng promotionalPrice làm giá cũ/giảm
+          image: item.image?.startsWith('http') ? item.image : `${IMAGE_BASE_URL}${item.image}`,
+          rating: item.rating || 5.0
+        }));
+
+        setMenuItems(mappedItems);
       } catch (err) {
         console.error('Error loading menu items:', err);
         setError(err?.message || 'Failed to load menu items');
-        // Fallback to dummy data for demonstration
-        setMenuItems(Array.from({ length: 12 }).map((_, i) => ({
-          id: i,
-          name: `Món ăn ${i + 1}`,
-          category: 'Món hấp',
-          price: 120000 + (i * 5000),
-          oldPrice: 200000 + (i * 5000),
-          image: 'https://giadinh.mediacdn.vn/thumb_w/640/296230595582509056/2022/12/21/an-gi-93-16715878747471102776072.jpg',
-          rating: 4.8
-        })));
       } finally {
         setLoading(false);
       }
@@ -109,7 +110,7 @@ const MenuPage = () => {
                   <ul className="filter-list">
                     <li><input type="radio" name="price" /> 0 - 50000</li>
                     <li><input type="radio" name="price" /> 50000 - 100000</li>
-                    <li><input type="radio" name="price" checked /> 100000 - 150000</li>
+                    <li><input type="radio" name="price" /> 100000 - 150000</li>
                     <li><input type="radio" name="price" /> 150000 - 200000</li>
                     <li><input type="radio" name="price" /> Lớn hơn 200000</li>
                   </ul>
@@ -148,32 +149,49 @@ const MenuPage = () => {
               </div>
             </div>
 
-            <div className="menu-grid">
-              {displayedItems.map(item => (
-                <div key={item.id} className="menu-item">
-                  <div className="item-image-container">
-                    <img src={item.image || item.img} alt={item.name} className="item-image" />
+            {loading ? (
+              <p>Đang tải dữ liệu...</p>
+            ) : error ? (
+              <p style={{ color: 'red' }}>{error}</p>
+            ) : (
+              <div className="menu-grid">
+                {displayedItems.map(item => (
+                  <div key={item.id} className="menu-item">
+                    <div className="item-image-container">
+                      <img 
+                        src={item.image} 
+                        alt={item.name} 
+                        className="item-image" 
+                        onError={(e) => { e.target.src = 'https://via.placeholder.com/150'; }}
+                      />
+                    </div>
+                    <h3 className="item-name">{item.name}</h3>
+                    <p className="item-category">{item.category}</p>
+                    <div className="price-info">
+                      {/* Hiển thị giá cũ nếu có */}
+                      <span className="old-price">
+                        {item.oldPrice ? `${item.oldPrice.toLocaleString()} đ` : ''}
+                      </span>
+                      <span className="new-price">{item.price?.toLocaleString()} đ/a</span>
+                      <ShoppingCart size={18} className="cart-icon" />
+                    </div>
                   </div>
-                  <h3 className="item-name">{item.name}</h3>
-                  <p className="item-category">{item.category}</p>
-                  <div className="price-info">
-                    <span className="old-price">{item.oldPrice?.toLocaleString?.() || item.promotionalPrice?.toLocaleString?.() || '-'}</span>
-                    <span className="new-price">{item.price?.toLocaleString?.() || '-'} đ/a</span>
-                    <ShoppingCart size={18} className="cart-icon" />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div className="pagination">
-              <span className="pagination-text">Hiển thị <strong>12</strong> Tổng <strong>{filteredItems.length}</strong></span>
+              <span className="pagination-text">Hiển thị <strong>{displayedItems.length}</strong> Tổng <strong>{filteredItems.length}</strong></span>
               <div className="pagination-controls">
-                <button className="page-btn active">1</button>
-                <button className="page-btn">2</button>
-                <button className="page-btn">3</button>
-                <span className="pagination-dots">...</span>
-                <button className="page-btn">5</button>
-                <button className="page-btn next-btn">›</button>
+                {[...Array(totalPages)].map((_, i) => (
+                  <button 
+                    key={i} 
+                    className={`page-btn ${currentPage === i + 1 ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(i + 1)}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
               </div>
             </div>
           </main>

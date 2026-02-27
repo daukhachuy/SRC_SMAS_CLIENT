@@ -947,6 +947,43 @@
   border: 3px solid #E65100; 
   border-radius: 50%;
 }
+/* Container chứa tiêu đề và nút */
+.category-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end; /* Căn lề dưới để nút ngang hàng với dòng tiêu đề */
+  margin-bottom: 40px;
+  border-bottom: 1px solid #eee; /* Thêm đường gạch nhẹ phía dưới nếu muốn */
+  padding-bottom: 15px;
+}
+
+/* Style cho nút Xem tất cả */
+.view-all-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #FF7A21; /* Màu cam chủ đạo của bạn */
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.view-all-link:hover {
+  background-color: rgba(255, 122, 33, 0.1); /* Hiệu ứng highlight nhẹ khi hover */
+  gap: 10px; /* Mũi tên dịch chuyển nhẹ tạo hiệu ứng động */
+  color: #e66a1a;
+}
+
+.view-all-link svg {
+  transition: transform 0.3s ease;
+}
 
 /* --- RESPONSIVE --- */
 @media (max-width: 1024px) {
