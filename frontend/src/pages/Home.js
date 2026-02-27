@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import '../styles/Home.css';
 import { 
   MessageSquare, ChevronLeft, ChevronRight,
@@ -7,29 +8,17 @@ import {
   Calendar, Truck, PartyPopper
 } from 'lucide-react';
 
-// Import các component đã tách ra
 import Header from '../components/Header'; 
 import Footer from '../components/Footer';
 
-// --- DATA ---
+// --- DATA CỐ ĐỊNH ---
 const HERO_DATA = [
   { id: 1, title: "Cá Mú Hoa Hấp Dưa", tag: "Best Seller", desc: "Tinh hoa biển cả với thớ cá trắng ngần, quyện cùng vị chua thanh của dưa cải, tạo nên bản giao hương vị khó cưỡng.", img: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=1000" },
   { id: 2, title: "Lẩu Nướng Hải Sản", tag: "Signature", desc: "Sự kết hợp hoàn hảo giữa các loại hải sản tươi sống và nước lẩu đặc trưng, mang lại hương vị truyền thống tinh tế.", img: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=1000" },
   { id: 3, title: "Combo Family", tag: "Promotion", desc: "Trọn vẹn niềm vui sum vầy với set ăn đầy đủ dinh dưỡng, được thiết kế riêng cho những khoảnh khắc ấm áp bên gia đình.", img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1000" }
 ];
 
-const BEST_SELLERS_DATA = [
-  { id: 1, name: "Tôm Hùm Bỏ Lò", price: "890k", img: "https://file.hstatic.net/200000441267/file/cach-lam-tom-hum-sot-bo-toi-an-la-ghien-04_dfab10dfd2cc43deb08e034d061cb237_grande.jpg", desc: "Tôm hùm xanh tươi sống kết hợp phô mai Mozzarella tan chảy." },
-  { id: 2, name: "Cua Hoàng Đế", price: "2.4tr", img: "https://images.unsplash.com/photo-1599458252573-56ae36120de1?q=80&w=500", desc: "Cua hoàng đế hấp rượu vang trắng giữ trọn vị ngọt thanh khiết." },
-  { id: 3, name: "Cá Hồi Áp Chảo", price: "450k", img: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?q=80&w=500", desc: "Sốt chanh dây thanh mát kết hợp măng tây giòn ngọt." },
-  { id: 4, name: "Mực Trứng Nướng", price: "320k", img: "https://haisancoto.com/uploads/images/muc-trung-nuong-muoi-ot.jpg", desc: "Mực trứng tươi nướng muối ớt cay nồng hấp dẫn." },
-  { id: 5, name: "Hàu Nướng Mỡ Hành", price: "150k", img: "https://cdn.tgdd.vn/Files/2018/12/20/1139386/cong-thuc-cach-lam-hau-nuong-mo-hanh-bang-lo-vi-song-cuc-ngon-7-760x367.jpg", desc: "Hàu sữa béo ngậy cùng mỡ hành thơm nức." },
-  { id: 6, name: "Bào Ngư Sốt Dầu Hào", price: "680k", img: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?q=80&w=500", desc: "Bào ngư thượng hạng hầm nấm đông cô đậm đà." },
-  { id: 7, name: "Ốc Hương Cam Muối", price: "280k", img: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500", desc: "Ốc hương giòn sần sật quyện sốt trứng muối cam." },
-  { id: 8, name: "Lẩu Thái Hải Sản", price: "550k", img: "https://images.unsplash.com/photo-1547592166-23ac45744acd?q=80&w=500", desc: "Nước dùng chua cay đậm đà với tôm, mực, nghêu." },
-  { id: 9, name: "Sashimi Tổng Hợp", price: "790k", img: "https://spartabeerclub.vn/media/images/article/252/cach_lam_ca_hoi_sashimi_4.jpg", desc: "Các loại cá tươi sống thái lát chuẩn phong cách Nhật." },
-  { id: 10, name: "Cơm Chiên Hải Sản", price: "180k", img: "https://images.unsplash.com/photo-1512058564366-18510be2db19?q=80&w=500", desc: "Cơm chiên tơi xốp với tôm, mực và rau củ." },
-];
+export let BEST_SELLERS_DATA = [];
 
 export const COMBOS_DATA = [
   { id: 1, name: "Set Uyên Ương", price: "599k", img: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=500", desc: "Lãng mạn dành cho 2 người với nến và rượu vang." },
@@ -44,18 +33,9 @@ export const COMBOS_DATA = [
   { id: 10, name: "Tiệc Ngoài Trời", price: "3.5tr", img: "https://images.unsplash.com/photo-1558030006-450675393462?q=80&w=500", desc: "Set nướng BBQ hải sản kèm nhân viên phục vụ tại chỗ." }
 ];
 
-const DISCOUNTS_DATA = [
-  { id: 1, name: "Tôm hùm baby sốt bơ tỏi", oldPrice: "300k", newPrice: "199k", discount: "-35%", img: "https://images.unsplash.com/photo-1553247407-23251ce81f59?auto=format&fit=crop&q=80&w=800", left: 5 },
-  { id: 2, name: "Cua Cà Mau hấp nước dừa", oldPrice: "450k", newPrice: "315k", discount: "-30%", img: "https://images.unsplash.com/photo-1599458252573-56ae36120de1?auto=format&fit=crop&q=80&w=800", left: 8 },
-  { id: 3, name: "Hàu nướng phô mai Pháp", oldPrice: "180k", newPrice: "120k", discount: "-33%", img: "https://images.unsplash.com/photo-1599249300675-c39f1dd2d6be?auto=format&fit=crop&q=80&w=800", left: 12 },
-  { id: 4, name: "Lẩu Cá Đuối đặc sản", oldPrice: "350k", newPrice: "245k", discount: "-30%", img: "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&q=80&w=800", left: 3 },
-  { id: 5, name: "Mực lá câu hấp hành gừng", oldPrice: "280k", newPrice: "199k", discount: "-28%", img: "https://haisancoto.com/uploads/images/muc-trung-nuong-muoi-ot.jpg", left: 15 },
-  { id: 6, name: "Sò huyết cháy tỏi", oldPrice: "150k", newPrice: "99k", discount: "-34%", img: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?q=80&w=500", left: 20 },
-];
-
 const SERVICES_DATA = [
   { title: 'Đặt Bàn Trực Tuyến', desc: 'Không gian thoáng mát với ẩm thực phong phú đa dạng kết hợp nhiều tiện ích cho bữa ăn hấp dẫn.', icon: <Calendar size={32} />, img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=400', btn: 'Đặt Bàn' },
-  { title: 'Giao Hàng Tận Nơi', desc: 'Chúng tôi cung cấp dịch vụ đóng gói và vận chuyển chuyên nghiệp không làm mất đi vị ngon của món ăn.', icon: <Truck size={32} />, img: '/images/Ship.jpg', btn: 'Giao Hàng' },
+  { title: 'Giao Hàng Tận Nơi', desc: 'Chúng tôi cung cấp dịch vụ đóng gói và vận chuyển chuyên nghiệp không làm mất đi vị ngon của món ăn.', icon: <Truck size={32} />, img: 'https://images.unsplash.com/photo-1553247407-23251ce81f59?q=80&w=400', btn: 'Giao Hàng' },
   { title: 'Sự Kiện', desc: 'Nếu bạn cần một không gian trang trí nhiều màu sắc kết hợp âm nhạc, hãy đến với chúng tôi để trải nghiệm.', icon: <PartyPopper size={32} />, img: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80&w=400', btn: 'Xem Sự Kiện' }
 ];
 
@@ -83,8 +63,13 @@ const FloatingChat = () => (
 const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
   <div className="product-card">
     <div className="product-img-container">
-      <img src={img} alt={name} className="product-img" loading="lazy" />
-      <div className="product-price-tag">{price}</div>
+      <img 
+        src={img?.startsWith('http') ? img : `https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net${img}`} 
+        alt={name} 
+        className="product-img" 
+        loading="lazy" 
+      />
+      <div className="product-price-tag">{typeof price === 'number' ? price.toLocaleString() + 'đ' : price}</div>
       <div className="heart-icon">
         <Heart size={18} fill="#FF7A21" color="#FF7A21" />
       </div>
@@ -100,10 +85,7 @@ const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
 );
 
 const SectionDivider = ({ topColor = "#ffffff", bottomColor = "#ffffff" }) => (
-  <div 
-    className="section-divider-container" 
-    style={{ background: `linear-gradient(to bottom, ${topColor} 50%, ${bottomColor} 50%)` }}
-  >
+  <div className="section-divider-container" style={{ background: `linear-gradient(to bottom, ${topColor} 50%, ${bottomColor} 50%)` }}>
     <div className="section-divider"></div>
   </div>
 );
@@ -120,14 +102,11 @@ const ServiceHighlight = ({ navigate }) => (
           <div className="service-body">
             <h3 className="service-title-text">{s.title}</h3>
             <p className="service-desc-text">{s.desc}</p>
-            <button 
-              className="service-btn"
-              onClick={() => {
-                if (s.btn === 'Đặt Bàn') navigate('/booking');
-                else if (s.btn === 'Giao Hàng') navigate('/delivery');
-                else navigate('/events');
-              }}
-            >
+            <button className="service-btn" onClick={() => {
+              if (s.btn === 'Đặt Bàn') navigate('/booking');
+              else if (s.btn === 'Giao Hàng') navigate('/delivery');
+              else navigate('/events');
+            }}>
               {s.btn}
             </button>
           </div>
@@ -137,30 +116,39 @@ const ServiceHighlight = ({ navigate }) => (
   </section>
 );
 
+// --- UPDATED DISCOUNT SECTION FROM API ---
 const DiscountAndInfo = ({ navigate }) => {
   const [discountIdx, setDiscountIdx] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(9910);
+  const [foodDiscounts, setFoodDiscounts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(prev => (prev > 0 ? prev - 1 : 0)), 1000);
-    return () => clearInterval(timer);
+    const fetchDiscounts = async () => {
+      try {
+        const response = await axios.get("https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/food/discount");
+        setFoodDiscounts(response.data);
+        setLoading(false);
+      } catch (err) {
+        console.error("Lỗi API Discount:", err);
+        setLoading(false);
+      }
+    };
+    fetchDiscounts();
   }, []);
-
-  const formatTime = (seconds) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setDiscountIdx(prev => (prev === DISCOUNTS_DATA.length - 1 ? 0 : prev + 1));
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
+    if (foodDiscounts.length > 0) {
+      const timer = setInterval(() => {
+        setDiscountIdx(prev => (prev === foodDiscounts.length - 1 ? 0 : prev + 1));
+      }, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [foodDiscounts]);
 
-  const current = DISCOUNTS_DATA[discountIdx];
+  if (loading || foodDiscounts.length === 0) return null;
+
+  const current = foodDiscounts[discountIdx];
+  const discountPercent = Math.round(((current.price - current.promotionalPrice) / current.price) * 100);
 
   return (
     <section className="info-section">
@@ -168,34 +156,40 @@ const DiscountAndInfo = ({ navigate }) => {
         <div className="discount-card-new">
           <div className="card-header">
             <h2 className="info-title-left">ƯU ĐÃI GIỜ VÀNG 🔥</h2>
-            
           </div>
           <div className="discount-dish-layout">
             <div className="discount-img-part">
-              <button className="mini-circle-nav nav-left" onClick={() => setDiscountIdx(p => p === 0 ? DISCOUNTS_DATA.length - 1 : p - 1)}>
+              <button className="mini-circle-nav nav-left" onClick={() => setDiscountIdx(p => p === 0 ? foodDiscounts.length - 1 : p - 1)}>
                 <ChevronLeft size={20}/>
               </button>
-              <img src={current.img} alt={current.name} className="discount-img-new" />
-              <button className="mini-circle-nav nav-right" onClick={() => setDiscountIdx(p => p === DISCOUNTS_DATA.length - 1 ? 0 : p + 1)}>
+              <img 
+                src={current.image?.startsWith('http') ? current.image : `https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net${current.image}`} 
+                alt={current.name} 
+                className="discount-img-new" 
+              />
+              <button className="mini-circle-nav nav-right" onClick={() => setDiscountIdx(p => p === foodDiscounts.length - 1 ? 0 : p + 1)}>
                 <ChevronRight size={20}/>
               </button>
-              <div className="discount-badge">{current.discount}</div>
+              <div className="discount-badge">-{discountPercent}%</div>
             </div>
             <div className="discount-info-part">
               <h3 className="discount-name-new">{current.name}</h3>
+              <p style={{fontSize: '0.85rem', color: '#636e72', margin: '5px 0', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>
+                {current.description}
+              </p>
               <div className="price-container-new">
-                <span className="old-price-new">{current.oldPrice}</span>
-                <span className="new-price-new">{current.newPrice}</span>
+                <span className="old-price-new">{current.price.toLocaleString()}đ</span>
+                <span className="new-price-new">{current.promotionalPrice.toLocaleString()}đ</span>
               </div>
               <div className="stock-level">
                 <div className="stock-bar">
-                  <div className="stock-fill" style={{width: `${(current.left/25)*100}%`}}></div>
+                  <div className="stock-fill" style={{width: '75%'}}></div>
                 </div>
-                <span className="stock-text">Còn lại: {current.left} suất</span>
+                <span className="stock-text">⭐ {current.rating} | {current.viewCount} lượt xem</span>
               </div>
-              <button className="btn-order-now" onClick={() => navigate('/register')}>SĂN NGAY</button>
+              <button className="btn-order-now" onClick={() => navigate('/menu')}>SĂN NGAY</button>
               <div className="discount-dots">
-                {DISCOUNTS_DATA.map((_, i) => (
+                {foodDiscounts.map((_, i) => (
                   <div key={i} className={`mini-dot ${discountIdx === i ? 'active' : ''}`} />
                 ))}
               </div>
@@ -237,19 +231,41 @@ const DiscountAndInfo = ({ navigate }) => {
 // --- MAIN HOME PAGE ---
 const Home = () => {
   const navigate = useNavigate();
+  const [bestSellers, setBestSellers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [heroIdx, setHeroIdx] = useState(0);
   const [bestIdx, setBestIdx] = useState(0);
   const [comboIdx, setComboIdx] = useState(COMBOS_DATA.length); 
-  
   const [isBestTransition, setIsBestTransition] = useState(true);
   const [isComboTransition, setIsComboTransition] = useState(true);
   const [reviewOffset, setReviewOffset] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  const BEST_EXTENDED = [...BEST_SELLERS_DATA, ...BEST_SELLERS_DATA];
-  const COMBO_EXTENDED = [...COMBOS_DATA, ...COMBOS_DATA, ...COMBOS_DATA];
+  useEffect(() => {
+    const fetchBestSellers = async () => {
+      try {
+        const response = await axios.get("https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/food/best-sellers?top=10");
+        const mappedData = response.data.map(item => ({
+          id: item.foodId,
+          name: item.name,
+          price: item.price,
+          img: item.image,
+          desc: item.description || "Thưởng thức hương vị hải sản thượng hạng."
+        }));
+        setBestSellers(mappedData);
+        BEST_SELLERS_DATA = mappedData;
+        setLoading(false);
+      } catch (err) {
+        console.error("Lỗi khi gọi API Best Sellers:", err);
+        setLoading(false);
+      }
+    };
+    fetchBestSellers();
+  }, []);
 
   useEffect(() => {
+    if (loading || bestSellers.length === 0) return;
     const timer = setInterval(() => {
       setIsBestTransition(true);
       setBestIdx(prev => prev + 1);
@@ -261,25 +277,19 @@ const Home = () => {
       setReviewOffset(p => p + 1);
     }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [loading, bestSellers]);
 
   useEffect(() => {
-    if (bestIdx >= BEST_SELLERS_DATA.length) {
-      setTimeout(() => { 
-        setIsBestTransition(false); 
-        setBestIdx(0); 
-      }, 800);
+    if (bestSellers.length > 0 && bestIdx >= bestSellers.length) {
+      setTimeout(() => { setIsBestTransition(false); setBestIdx(0); }, 800);
     }
     if (comboIdx <= 0) {
-      setTimeout(() => { 
-        setIsComboTransition(false); 
-        setComboIdx(COMBOS_DATA.length); 
-      }, 800);
+      setTimeout(() => { setIsComboTransition(false); setComboIdx(COMBOS_DATA.length); }, 800);
     }
     if (reviewOffset === 10) {
       setTimeout(() => { setIsTransitioning(false); setReviewOffset(0); }, 1200); 
     }
-  }, [bestIdx, comboIdx, reviewOffset]);
+  }, [bestIdx, comboIdx, reviewOffset, bestSellers]);
 
   useEffect(() => {
     const timer = setInterval(() => setHeroIdx(p => (p + 1) % HERO_DATA.length), 7000);
@@ -290,6 +300,7 @@ const Home = () => {
     <div className="app">
       <Header navigate={navigate} />
       
+      {/* HERO SECTION */}
       <section className="hero-section">
         <div className="hero-main">
           <div className="hero-info">
@@ -307,23 +318,13 @@ const Home = () => {
               <button className="btn-secondary" onClick={() => navigate('/menu')}>XEM THỰC ĐƠN</button>
             </div>
           </div>
-
           <div className="hero-image-wrap">
             {HERO_DATA.map((item, i) => (
-              <img 
-                key={item.id} 
-                src={item.img} 
-                className={`hero-img ${heroIdx === i ? 'active' : ''}`}
-                alt="banner" 
-              />
+              <img key={item.id} src={item.img} className={`hero-img ${heroIdx === i ? 'active' : ''}`} alt="banner" />
             ))}
             <div className="slider-dots">
               {HERO_DATA.map((_, i) => (
-                <div 
-                  key={i} 
-                  onClick={() => setHeroIdx(i)} 
-                  className={`dot ${heroIdx === i ? 'active' : ''}`}
-                ></div>
+                <div key={i} onClick={() => setHeroIdx(i)} className={`dot ${heroIdx === i ? 'active' : ''}`}></div>
               ))}
             </div>
           </div>
@@ -334,46 +335,24 @@ const Home = () => {
       <ServiceHighlight navigate={navigate} />
       <SectionDivider topColor="#ffffff" bottomColor="#ffffff" />
 
-      {/* CAROUSEL 1: CHẠY TIẾN */}
+      {/* CAROUSEL 1: DÙNG DỮ LIỆU TỪ API */}
       <section className="section-padding mon-an-ban-chay">
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
           <div>
             <h2 className="main-title">MÓN ĂN BÁN CHẠY 🔥</h2>
-            <p className="sub-title">Top 10 hương vị đại dương được yêu thích nhất</p>
+            <p className="sub-title">Top hương vị đại dương được yêu thích nhất từ API</p>
           </div>
-          
-          {/* Nút Xem Thêm đối diện tiêu đề */}
-          <button 
-            className="view-all-link" 
-            onClick={() => navigate('/menu')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#FF7A21',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              paddingBottom: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}
-          >
-            Xem tất cả <ChevronRight size={16} />
-          </button>
+          <button className="view-all-link" onClick={() => navigate('/menu')}>Xem tất cả <ChevronRight size={16} /></button>
         </div>
 
         <div className="carousel-container">
-          {/* ... giữ nguyên track carousel ... */}
           <button className="carousel-nav nav-left" onClick={() => setBestIdx(p => p - 1)}><ChevronLeft /></button>
           <div className="carousel-window">
             <div className="carousel-track" style={{
                 transform: `translateX(-${bestIdx * 25}%)`,
                 transition: isBestTransition ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
             }}>
-              {BEST_EXTENDED.map((item, idx) => (
+              {[...bestSellers, ...bestSellers].map((item, idx) => (
                 <div key={idx} className="carousel-item"><ProductCard {...item} /></div>
               ))}
             </div>
@@ -384,46 +363,23 @@ const Home = () => {
 
       <SectionDivider topColor="#ffffff" bottomColor="#ffffff" />
 
-      {/* CAROUSEL 2: CHẠY LÙI */}
+      {/* CAROUSEL 2: COMBO */}
       <section className="section-padding combo-section">
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
-          {/* Nút Xem Thêm nằm bên trái đối diện tiêu đề phải */}
-          <button 
-            className="view-all-link" 
-            onClick={() => navigate('/menu')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#E65100', // Màu cam cháy đồng bộ
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              paddingBottom: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}
-          >
-            <ChevronLeft size={16} /> Khám phá thêm
-          </button>
-
+          <button className="view-all-link" onClick={() => navigate('/menu')}> <ChevronLeft size={16} /> Khám phá thêm</button>
           <div style={{ textAlign: 'right' }}>
             <h2 className="main-title">COMBO SIÊU LỜI 🍱</h2>
             <p className="sub-title" style={{ color: '#636E72' }}>Tiết kiệm hơn khi đi cùng nhóm</p>
           </div>
         </div>
-
         <div className="carousel-container">
-          {/* ... giữ nguyên track carousel ... */}
           <button className="carousel-nav nav-left dark-nav" onClick={() => setComboIdx(p => p - 1)}><ChevronLeft /></button>
           <div className="carousel-window">
             <div className="carousel-track" style={{
                 transform: `translateX(-${comboIdx * 25}%)`,
                 transition: isComboTransition ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
             }}>
-              {COMBO_EXTENDED.map((item, idx) => (
+              {[...COMBOS_DATA, ...COMBOS_DATA, ...COMBOS_DATA].map((item, idx) => (
                 <div key={idx} className="carousel-item"><ProductCard {...item} isCombo={true} /></div>
               ))}
             </div>
@@ -432,9 +388,7 @@ const Home = () => {
         </div>
       </section>
 
-
-
-      {/* REVIEW ĐƯA LÊN TRƯỚC DISCOUNT */}
+      {/* REVIEW SECTION */}
       <SectionDivider topColor="#ffffff" bottomColor="#0D0D0D" />
       <section className="review-section">
         <div className="review-header-layout">
@@ -454,7 +408,6 @@ const Home = () => {
               </div>
             </div>
           </div>
-
           <div className="review-container">
             <div className="review-column">
               <div className="review-track" style={{
@@ -499,14 +452,14 @@ const Home = () => {
       </section>
 
       <SectionDivider topColor="#0D0D0D" bottomColor="#ffffff" />
+      
+      {/* PHẦN ĐÃ SỬA: DÙNG API /api/food/discount */}
       <DiscountAndInfo navigate={navigate} />
       
-
       <FloatingChat />
       <Footer />
     </div>
   );
 };
 
-export { BEST_SELLERS_DATA };
 export default Home;

@@ -1,202 +1,133 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import '../styles/ComboPage.css';
-import { ShoppingCart, ChevronDown, Heart, Bell, User, MessageSquare } from 'lucide-react';
+import { Search, ShoppingCart, MessageSquare, ChevronDown } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getFoodCategories } from '../api/foodApi';
-
-const FloatingChat = () => (
-  <div className="fixed-chat">
-    <MessageSquare size={28} color="white" />
-    <span className="online-status"></span>
-  </div>
-);
+import '../styles/ComboPage.css';
 
 const ComboPage = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [priceFilter, setPriceFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(12);
-  const [expandCategory, setExpandCategory] = useState(true);
-  const [expandPrice, setExpandPrice] = useState(true);
-  const [expandRating, setExpandRating] = useState(true);
-  const [activeTab, setActiveTab] = useState('combo');
-  const [comboItems, setComboItems] = useState([]);
+  const [combos, setCombos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
+  // GỌI API THẬT
   useEffect(() => {
-    const loadComboItems = async () => {
+    const fetchCombos = async () => {
       try {
         setLoading(true);
-        const data = await getFoodCategories();
-        console.log('Loaded combo items:', data);
+        // URL lấy từ hình ảnh Swagger bạn cung cấp
+        const response = await axios.get('https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/combo');
         
-        // Handle both array and object response
-        const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
-        
-        // Filter for combo items if API supports it, otherwise use all
-        const processedItems = Array.isArray(items) ? items.map((item, idx) => ({
-          ...item,
-          id: item.id || idx,
-          category: item.category || 'Combo',
-          description: item.description || '',
-          image: item.image || item.img,
-          oldPrice: item.oldPrice || item.promotionalPrice || item.price * 1.2,
-          rating: item.rating || 4.8
-        })) : [];
-        
-        setComboItems(processedItems);
-      } catch (err) {
-        console.error('Error loading combo items:', err);
-        setError(err?.message || 'Failed to load combo items');
-        // Fallback to dummy data
-        setComboItems([
-          {
-            id: 1,
-            name: 'Combo lẩu thái',
-            category: 'Combo',
-            description: '2 Dĩa rau + 2 10 cạnh + 2 Lý Pepsi',
-            price: 300000,
-            oldPrice: 400000,
-            image: 'https://statics.vinpearl.com/lau-thai-ngon-ha-noi-11_1693364782.jpg',
-            rating: 4.8
-          }
-        ]);
+        // Kiểm tra nếu dữ liệu trả về là mảng
+        if (Array.isArray(response.data)) {
+          setCombos(response.data);
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy dữ liệu combo:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadComboItems();
+    fetchCombos();
   }, []);
 
-  const filteredItems = comboItems.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPrice = priceFilter ? item.price <= priceFilter.split('-')[1] : true;
-    return matchesSearch && matchesPrice;
-  });
-
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const displayedItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+  // Logic tìm kiếm
+  const filteredCombos = combos.filter(combo =>
+    combo.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="app">
       <Header />
-      
+
       <div className="combo-page-container">
+        {/* Điều hướng Tabs */}
         <div className="combo-nav-tabs">
-          <button className={`nav-tab`} onClick={() => navigate('/menu')}>MENU</button>
-          <button className={`nav-tab active`} onClick={() => navigate('/combo')}>COMBO</button>
-          <button className={`nav-tab`} onClick={() => navigate('/buffet', { state: { isInternalNav: true } })}>BUFFET</button>
+          <button className="nav-tab" onClick={() => navigate('/menu')}>MENU</button>
+          <button className="nav-tab active" onClick={() => navigate('/combo')}>COMBO</button>
+          <button className="nav-tab" onClick={() => navigate('/buffet')}>BUFFET</button>
         </div>
 
         <div className="combo-content">
+          {/* Sidebar Bộ lọc */}
           <aside className="sidebar">
-            <div className="filter-section-main">
-              <h3 className="filter-title">Lọc sản phẩm</h3>
-              
-              <div className="filter-group">
-                <div className="filter-header" onClick={() => setExpandCategory(!expandCategory)}>
-                  <h4>Loại sản phẩm</h4>
-                  <ChevronDown size={18} style={{transform: expandCategory ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s'}} />
-                </div>
-                {expandCategory && (
-                  <ul className="filter-list">
-                    <li><input type="checkbox" /> Combo</li>
-                    <li><input type="checkbox" /> 2 người</li>
-                    <li><input type="checkbox" /> 3 người</li>
-                    <li><input type="checkbox" /> 4 người</li>
-                  </ul>
-                )}
+            <h3 className="filter-title">Lọc sản phẩm</h3>
+            <div className="filter-group">
+              <div className="filter-header">
+                <h4>Loại Combo</h4>
+                <ChevronDown size={16} />
               </div>
-
-              <div className="filter-group">
-                <div className="filter-header" onClick={() => setExpandPrice(!expandPrice)}>
-                  <h4>Theo giá</h4>
-                  <ChevronDown size={18} style={{transform: expandPrice ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s'}} />
-                </div>
-                {expandPrice && (
-                  <ul className="filter-list">
-                    <li><input type="radio" name="price" /> Tất cả</li>
-                    <li><input type="radio" name="price" /> 0 - 100000</li>
-                    <li><input type="radio" name="price" /> 100000 - 200000</li>
-                    <li><input type="radio" name="price" checked /> 200000 - 300000</li>
-                    <li><input type="radio" name="price" /> 300000 - 500000</li>
-                    <li><input type="radio" name="price" /> Lớn hơn 500000</li>
-                  </ul>
-                )}
-              </div>
-
-              <div className="filter-group">
-                <div className="filter-header" onClick={() => setExpandRating(!expandRating)}>
-                  <h4>Đánh giá</h4>
-                  <ChevronDown size={18} style={{transform: expandRating ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s'}} />
-                </div>
-                {expandRating && (
-                  <ul className="filter-list">
-                    <li><input type="checkbox" /> Gọi nhiều</li>
-                    <li><input type="checkbox" /> Giảm giá</li>
-                    <li><input type="checkbox" /> Hot trend</li>
-                  </ul>
-                )}
-              </div>
+              <ul className="filter-list">
+                <li><input type="checkbox" /> Combo Gia Đình</li>
+                <li><input type="checkbox" /> Combo 2 Người</li>
+                <li><input type="checkbox" /> Combo Tiết Kiệm</li>
+              </ul>
             </div>
           </aside>
 
-          <main className="main-content">
+          {/* Nội dung chính */}
+          <main className="main-content" style={{ flex: 1 }}>
             <div className="search-section">
-              <input
-                type="text"
-                placeholder="Tìm kiếm sản phẩm"
-                className="search-input"
+              <input 
+                type="text" 
+                className="search-input" 
+                placeholder="Tìm kiếm combo..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <button className="search-btn">Tìm Kiếm</button>
-              <div className="sort-section">
-                <span className="sort-label">Xấp xếp :</span>
-                <span className="sort-text">Tăng dần</span>
+              <button className="search-btn">
+                <Search size={20} color="white" />
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="loading">Đang tải dữ liệu...</div>
+            ) : (
+              <div className="combo-grid">
+                {filteredCombos.map((combo) => (
+                  <div key={combo.id} className="combo-item">
+                    <div className="item-image-container">
+                      <img 
+                        src={combo.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'} 
+                        alt={combo.name} 
+                        className="item-image" 
+                      />
+                    </div>
+                    <h3 className="item-name">{combo.name}</h3>
+                    <p className="item-description">{combo.description}</p>
+                    <div className="price-info">
+                      <span className="new-price">
+                        {combo.price?.toLocaleString()}đ
+                      </span>
+                      <ShoppingCart className="cart-icon" size={24} />
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
 
-            <div className="combo-grid">
-              {displayedItems.map(item => (
-                <div key={item.id} className="combo-item">
-                  <div className="item-image-container">
-                    <img src={item.image || item.img} alt={item.name} className="item-image" />
-                  </div>
-                  <h3 className="item-name">{item.name}</h3>
-                  <p className="item-description">{item.description}</p>
-                  <div className="price-info">
-                    <span className="new-price">{item.price?.toLocaleString?.() || '-'} đ</span>
-                    <ShoppingCart size={18} className="cart-icon" />
-                  </div>
-                </div>
-              ))}
-            </div>
-
+            {/* Pagination mẫu */}
             <div className="pagination">
-              <span className="pagination-text">Hiển thị <strong>12</strong> Tổng <strong>{filteredItems.length}</strong></span>
-              <div className="pagination-controls">
+              <span>Hiển thị {filteredCombos.length} kết quả</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button className="page-btn active">1</button>
                 <button className="page-btn">2</button>
-                <button className="page-btn">3</button>
-                <span className="pagination-dots">...</span>
-                <button className="page-btn">5</button>
-                <button className="page-btn next-btn">›</button>
               </div>
             </div>
           </main>
         </div>
-
-        <Footer />
       </div>
 
-      <FloatingChat />
+      {/* Nút Chat cố định */}
+      <div className="fixed-chat">
+        <MessageSquare size={28} color="white" />
+        <span className="online-status"></span>
+      </div>
+
+      <Footer />
     </div>
   );
 };
