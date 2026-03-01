@@ -10,7 +10,7 @@ const Footer = () => {
           {/* Cột 1: Logo & Giới thiệu */}
           <div className="footer-column-main">
             <div className="logo-group">
-              <img src="/images/LOGO.png" alt="Logo" className="footer-logo-img" />
+              <img src="https://res.cloudinary.com/dmzuier4p/image/upload/v1772344074/image_nxgnsu.webp" alt="Logo" className="footer-logo-img" />
               <span className="logo-text">
                 <span className="text-white">Nhà Hàng</span>
                 {" "}

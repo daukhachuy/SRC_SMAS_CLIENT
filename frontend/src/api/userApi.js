@@ -33,9 +33,9 @@ export async function updateProfile(profileData) {
       avatar: profileData.avatar
     };
 
-    // Thêm newPassword nếu có
-    if (profileData.newPassword && profileData.newPassword.trim()) {
-      updateData.newPassword = profileData.newPassword;
+    // Thêm newPassword nếu có (confirmPassword được gửi như newPassword)
+    if (profileData.confirmPassword && profileData.confirmPassword.trim()) {
+      updateData.newPassword = profileData.confirmPassword;
     }
 
     const response = await instance.put('/User/profile', updateData);
