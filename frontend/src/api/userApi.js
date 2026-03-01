@@ -24,14 +24,21 @@ export async function getProfile() {
 export async function updateProfile(profileData) {
   try {
     console.log('📝 Updating user profile...');
-    const response = await instance.put('/User/profile', {
+    const updateData = {
       fullname: profileData.fullname,
       gender: profileData.gender,
       dob: profileData.dob,
       phone: profileData.phone,
       address: profileData.address,
       avatar: profileData.avatar
-    });
+    };
+
+    // Thêm newPassword nếu có
+    if (profileData.newPassword && profileData.newPassword.trim()) {
+      updateData.newPassword = profileData.newPassword;
+    }
+
+    const response = await instance.put('/User/profile', updateData);
     console.log('✅ User profile updated');
     return response.data;
   } catch (error) {

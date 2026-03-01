@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/Profile.css';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
-import { getProfile } from '../api/userApi';
+import { getProfile, updateProfile } from '../api/userApi';
 
 const Profile = () => {
   // State quản lý thông tin người dùng
@@ -21,6 +21,8 @@ const Profile = () => {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Khởi tạo Google Maps
   const { isLoaded } = useJsApiLoader({
@@ -51,7 +53,12 @@ const Profile = () => {
 
         // Update map position nếu có address hợp lệ
         if (profileData.address && profileData.address !== 'string') {
-          handleUpdateAddressMap(profileData.address);
+          try {
+            await handleUpdateAddressMap(profileData.address);
+          } catch (mapErr) {
+            console.warn('Map update failed:', mapErr);
+            // Không dừng nếu map update thất bại
+          }
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -67,6 +74,74 @@ const Profile = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setUserInfo({ ...userInfo, [name]: value });
+  };
+
+  // Xóa thông báo sau 5 giây
+  useEffect(() => {
+    if (successMessage || error) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage, error]);
+
+  const handleSubmitProfile = async (e) => {
+    e.preventDefault();
+    
+    // Reset messages
+    setSuccessMessage('');
+    setError('');
+
+    // Validation
+    if (!userInfo.fullname || !userInfo.fullname.trim()) {
+      setError('Vui lòng nhập họ và tên!');
+      return;
+    }
+
+    if (!userInfo.phone || !userInfo.phone.trim()) {
+      setError('Vui lòng nhập số điện thoại!');
+      return;
+    }
+
+    // Nếu có nhập mật khẩu mới
+    if (userInfo.newPassword && userInfo.newPassword.trim()) {
+      if (!userInfo.oldPassword || !userInfo.oldPassword.trim()) {
+        setError('Vui lòng nhập mật khẩu cũ để thay đổi mật khẩu!');
+        return;
+      }
+      
+      if (userInfo.newPassword.length < 6) {
+        setError('Mật khẩu mới phải có ít nhất 6 ký tự!');
+        return;
+      }
+
+      if (userInfo.newPassword === userInfo.oldPassword) {
+        setError('Mật khẩu mới phải khác mật khẩu cũ!');
+        return;
+      }
+    }
+
+    try {
+      setIsSubmitting(true);
+      const result = await updateProfile(userInfo);
+      console.log('Profile updated:', result);
+      
+      // Reset password fields
+      setUserInfo(prev => ({
+        ...prev,
+        oldPassword: '',
+        newPassword: ''
+      }));
+      
+      setSuccessMessage('Cập nhật thông tin thành công!');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError(err.message || 'Cập nhật thông tin thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUpdateAddressMap = async (addressToUpdate = null) => {
@@ -108,13 +183,19 @@ const Profile = () => {
       )}
 
       {error && (
-        <div style={{ padding: '15px', marginBottom: '20px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px' }}>
-          <p>{error}</p>
+        <div style={{ padding: '15px', marginBottom: '20px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px', borderLeft: '4px solid #721c24' }}>
+          <p><strong>❌ Lỗi:</strong> {error}</p>
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={{ padding: '15px', marginBottom: '20px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '4px', borderLeft: '4px solid #155724' }}>
+          <p><strong>✅ Thành công:</strong> {successMessage}</p>
         </div>
       )}
 
       {!loading && (
-      <form className="Profile-Form" onSubmit={(e) => e.preventDefault()}>
+      <form className="Profile-Form" onSubmit={handleSubmitProfile}>
         <div className="Form-Grid">
           <div className="Form-Group">
             <label>Họ Và Tên</label>
@@ -173,7 +254,14 @@ const Profile = () => {
         </div>
 
         <div className="Form-Actions">
-          <button type="submit" className="Btn-Submit">Thay Đổi</button>
+          <button 
+            type="submit" 
+            className="Btn-Submit"
+            disabled={isSubmitting}
+            style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+          >
+            {isSubmitting ? 'Đang cập nhật...' : 'Thay Đổi'}
+          </button>
         </div>
       </form>
       )}
