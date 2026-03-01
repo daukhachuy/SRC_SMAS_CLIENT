@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import '../styles/RegisterPage.css';
-import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import RestaurantLogo from '../components/RestaurantLogo';
-import { register } from '../api/authApi';
+import { register, googleRegister } from '../api/authApi';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -114,8 +114,37 @@ const RegisterPage = () => {
     }
   };
 
-  const handleGoogleRegister = () => {
-    console.log('Google register clicked');
+  const handleGoogleRegisterSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setErrors({});
+    setSuccessMessage('');
+
+    try {
+      const googleToken = credentialResponse.credential;
+      console.log('🔐 Google token received for registration:', googleToken.substring(0, 20) + '...');
+
+      // Send token to backend for Google registration
+      const response = await googleRegister(googleToken);
+
+      if (response.success === true || response.user) {
+        setSuccessMessage('✅ Đăng ký Google thành công! Chuyển hướng...');
+        setTimeout(() => {
+          navigate('/profile');
+        }, 1500);
+      } else {
+        setErrors({ submit: response.message || 'Đăng ký Google thất bại' });
+      }
+    } catch (error) {
+      console.error('Google registration error:', error);
+      setErrors({ submit: error?.message || 'Lỗi đăng ký Google. Vui lòng thử lại hoặc đăng ký với email.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRegisterError = () => {
+    setErrors({ submit: '❌ Lỗi đăng ký Google. Vui lòng thử lại.' });
+    console.error('Google registration failed');
   };
 
   return (
@@ -125,10 +154,16 @@ const RegisterPage = () => {
           <h2 className="form-title">Đăng Ký</h2>
           <p className="form-subtitle">Chào mừng bạn tới với nhà hàng hải sản !</p>
 
-          <button className="google-register-btn" onClick={handleGoogleRegister} type="button">
-            <FaGoogle size={18} />
-            <span>Đăng kí với google</span>
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+            <GoogleLogin
+              onSuccess={handleGoogleRegisterSuccess}
+              onError={handleGoogleRegisterError}
+              text="signup_with"
+              type="standard"
+              theme="outline"
+              locale="vi"
+            />
+          </div>
 
           <div className="form-divider">
             <span>Hoặc</span>

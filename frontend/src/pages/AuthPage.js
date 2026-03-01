@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import '../styles/AuthPage.css';
-import { FaGoogle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import RestaurantLogo from '../components/RestaurantLogo';
-import { login } from '../api/authApi';
+import { login, googleLogin } from '../api/authApi';
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -42,10 +42,34 @@ const AuthPage = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    // TODO: Thêm logic Google OAuth ở đây
-    console.log('Google login clicked');
-    setError('Chức năng Google Login chưa được triển khai');
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const googleToken = credentialResponse.credential;
+      console.log('🔐 Google token received:', googleToken.substring(0, 20) + '...');
+      
+      // Send token to backend for verification
+      const response = await googleLogin(googleToken);
+      
+      setSuccess(' Đăng nhập Google thành công! Chuyển hướng...');
+      setTimeout(() => {
+        navigate('/profile');
+      }, 1500);
+    } catch (err) {
+      console.error('Google login error:', err);
+      const errorMsg = err?.message || 'Lỗi đăng nhập Google. Vui lòng thử lại hoặc sử dụng email/mật khẩu.';
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    setError(' Lỗi đăng nhập Google. Vui lòng thử lại.');
+    console.error('Google login failed');
   };
 
   return (
@@ -92,10 +116,16 @@ const AuthPage = () => {
           <p className="auth-subtitle">Chào mừng bạn quay trở lại !</p>
 
           {/* Google Login Button */}
-          <button className="google-login-btn" onClick={handleGoogleLogin}>
-            <FaGoogle size={18} />
-            <span>Đăng nhập với google</span>
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <GoogleLogin
+              onSuccess={handleGoogleLoginSuccess}
+              onError={handleGoogleLoginError}
+              text="signin"
+              type="standard"
+              theme="outline"
+              locale="vi"
+            />
+          </div>
 
           {/* Divider */}
           <div className="divider">

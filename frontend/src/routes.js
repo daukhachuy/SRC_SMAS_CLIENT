@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import Home, { COMBOS_DATA, BEST_SELLERS_DATA } from './pages/Home';
 import ComboPage from './pages/ComboPage';
 import MenuPage from './pages/MenuPage';
@@ -18,12 +19,16 @@ import ProtectedRoute from './components/ProtectedRoute';
 import DebugPage from './pages/DebugPage';
 import AuthTestPage from './pages/AuthTestPage';
 
-// 1. Import trang Promotion
-import Promotion from './pages/Promotion'; 
+// Import trang Promotion
+import Promotion from './pages/Promotion';
+
+// Google OAuth Client ID from backend config
+const GOOGLE_CLIENT_ID = '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com';
 
 const AppRoutes = () => {
   return (
-    <Router>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <Router>
       <Routes>
         {/* Các trang công khai */}
         <Route path="/" element={<Home />} />
@@ -54,7 +59,8 @@ const AppRoutes = () => {
           <Route path="/order-history" element={<OrderHistory />} /> 
         </Route>
       </Routes>
-    </Router>
+      </Router>
+    </GoogleOAuthProvider>
   );
 };
 
