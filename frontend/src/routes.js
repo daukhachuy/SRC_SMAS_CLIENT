@@ -22,8 +22,8 @@ import AuthTestPage from './pages/AuthTestPage';
 // Import trang Promotion
 import Promotion from './pages/Promotion';
 
-// Google OAuth Client ID from backend config
-const GOOGLE_CLIENT_ID = '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com';
+// Google OAuth Client ID from environment variable
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com';
 
 const AppRoutes = () => {
   return (
