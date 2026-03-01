@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getProfile } from '../api/userApi';
 import '../styles/UserLayout.css';
 
 const UserLayout = () => {
@@ -13,6 +14,23 @@ const UserLayout = () => {
     localStorage.getItem("userAvatar") || "https://www.w3schools.com/howto/img_avatar.png"
   );
   const [loading, setLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState({ fullname: '', email: '' });
+
+  // Fetch user profile từ API
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profileData = await getProfile();
+        setUserProfile({
+          fullname: profileData.fullname || '',
+          email: profileData.email || ''
+        });
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+    fetchUserProfile();
+  }, []);
 
   // Cấu hình Cloudinary dựa trên tài khoản của bạn
   const cloudName = "dmzuier4p"; 
@@ -119,8 +137,8 @@ const UserLayout = () => {
                 </label>
               </div>
             </div>
-            <h2 className="User-Name">Khánh Hồ</h2>
-            <p className="User-Email">Khanhho123@gmail.com</p>
+            <h2 className="User-Name">{userProfile.fullname || 'Đang tải...'}</h2>
+            <p className="User-Email">{userProfile.email || 'Đang tải...'}</p>
 
             <nav className="Profile-Nav">
               <NavLink to="/profile" className={({ isActive }) => isActive ? "Nav-Item Active" : "Nav-Item"}>

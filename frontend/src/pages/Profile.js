@@ -11,7 +11,7 @@ const Profile = () => {
     phone: '',
     email: '',
     oldPassword: '',
-    newPassword: '',
+    confirmPassword: '',
     address: '',
     avatar: '',
     dob: ''
@@ -48,7 +48,7 @@ const Profile = () => {
           avatar: (profileData.avatar && profileData.avatar !== 'string') ? profileData.avatar : '',
           dob: profileData.dob || '',
           oldPassword: '',
-          newPassword: ''
+          confirmPassword: ''
         });
 
         // Update map position nếu có address hợp lệ
@@ -73,7 +73,35 @@ const Profile = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setUserInfo({ ...userInfo, [name]: value });
+    // Chỉ cho phép số cho trường điện thoại
+    if (name === 'phone') {
+      const phoneValue = value.replace(/[^0-9]/g, '');
+      setUserInfo({ ...userInfo, [name]: phoneValue });
+    } else {
+      setUserInfo({ ...userInfo, [name]: value });
+    }
+  };
+
+  // Validate số điện thoại Việt Nam
+  const validateVietnamesePhone = (phone) => {
+    // Loại bỏ toàn bộ ký tự không phải số
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    
+    // Vietnam phone must have 10 digits starting with 0
+    // Or be valid format: 0xxxxxxxxx (10 digits)
+    if (!/^0\d{9}$/.test(cleanPhone)) {
+      return { valid: false, message: 'Số điện thoại Vietnam phải có 10 chữ số, bắt đầu bằng 0 (ví dụ: 0123456789)' };
+    }
+    return { valid: true, message: '' };
+  };
+
+  // Format số điện thoại: bỏ số 0 đầu, thêm +84
+  const formatPhoneToInternational = (phone) => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (/^0\d{9}$/.test(cleanPhone)) {
+      return '+84' + cleanPhone.substring(1); // Bỏ số 0 đầu, thêm +84
+    }
+    return cleanPhone;
   };
 
   // Xóa thông báo sau 5 giây
@@ -105,19 +133,34 @@ const Profile = () => {
       return;
     }
 
-    // Nếu có nhập mật khẩu mới
-    if (userInfo.newPassword && userInfo.newPassword.trim()) {
+    // Validate số điện thoại Việt Nam
+    const phoneValidation = validateVietnamesePhone(userInfo.phone);
+    if (!phoneValidation.valid) {
+      setError(phoneValidation.message);
+      return;
+    }
+
+    // Nếu có nhập mật khẩu cũ hoặc xác nhận mật khẩu
+    const hasPasswordChange = userInfo.oldPassword && userInfo.oldPassword.trim();
+    const hasConfirmPassword = userInfo.confirmPassword && userInfo.confirmPassword.trim();
+    
+    if (hasPasswordChange || hasConfirmPassword) {
       if (!userInfo.oldPassword || !userInfo.oldPassword.trim()) {
-        setError('Vui lòng nhập mật khẩu cũ để thay đổi mật khẩu!');
+        setError('Vui lòng nhập mật khẩu cũ!');
         return;
       }
       
-      if (userInfo.newPassword.length < 6) {
-        setError('Mật khẩu mới phải có ít nhất 6 ký tự!');
+      if (!userInfo.confirmPassword || !userInfo.confirmPassword.trim()) {
+        setError('Vui lòng nhập xác nhận mật khẩu!');
         return;
       }
 
-      if (userInfo.newPassword === userInfo.oldPassword) {
+      if (userInfo.confirmPassword.length < 6) {
+        setError('Mật khẩu phải có ít nhất 6 ký tự!');
+        return;
+      }
+
+      if (userInfo.confirmPassword === userInfo.oldPassword) {
         setError('Mật khẩu mới phải khác mật khẩu cũ!');
         return;
       }
@@ -125,14 +168,21 @@ const Profile = () => {
 
     try {
       setIsSubmitting(true);
-      const result = await updateProfile(userInfo);
+      
+      // Format số điện thoại: bỏ số 0 đầu, thêm +84
+      const formattedPhone = formatPhoneToInternational(userInfo.phone);
+      
+      const result = await updateProfile({
+        ...userInfo,
+        phone: formattedPhone
+      });
       console.log('Profile updated:', result);
       
       // Reset password fields
       setUserInfo(prev => ({
         ...prev,
         oldPassword: '',
-        newPassword: ''
+        confirmPassword: ''
       }));
       
       setSuccessMessage('Cập nhật thông tin thành công!');
@@ -222,23 +272,22 @@ const Profile = () => {
           </div>
 
           <div className="Form-Group">
-            <label>Số Điện Thoại</label>
-            <div className="Input-With-Status">
-              <input type="text" name="phone" value={userInfo.phone} onChange={handleInputChange} placeholder="Nhập số điện thoại" />
-              <span className="Status-Verified">Đã Xác Minh</span>
-            </div>
+            <label>Số Điện Thoại (Vietnam +84)</label>
+            <input 
+              type="text" 
+              name="phone" 
+              value={userInfo.phone} 
+              onChange={handleInputChange} 
+              placeholder="0123456789" 
+              maxLength="10"
+            />
+            <small style={{color: '#666', marginTop: '5px', display: 'block'}}>
+              Định dạng: 10 chữ số bắt đầu bằng 0 (ví dụ: 0123456789)
+            </small>
           </div>
 
           <div className="Form-Group">
-            <label>Địa Chỉ Email</label>
-            <div className="Input-With-Status">
-              <input type="email" value={userInfo.email} readOnly />
-              <span className="Status-Verified">Đã Xác Minh</span>
-            </div>
-          </div>
-
-          <div className="Form-Group">
-            <label>Mật Khẩu Cũ</label>
+            <label>Mật Khẩu Mới</label>
             <div className="Input-With-Icon">
               <input type={showPass ? "text" : "password"} name="oldPassword" value={userInfo.oldPassword} onChange={handleInputChange} />
               <i className={`fa-solid ${showPass ? 'fa-eye' : 'fa-eye-slash'}`} onClick={() => setShowPass(!showPass)}></i>
@@ -246,9 +295,14 @@ const Profile = () => {
           </div>
 
           <div className="Form-Group">
-            <label>Mật Khẩu Mới</label>
+            <label>Địa Chỉ Email</label>
+            <input type="email" value={userInfo.email} readOnly />
+          </div>
+
+          <div className="Form-Group">
+            <label>Xác Nhận Mật Khẩu</label>
             <div className="Input-With-Icon">
-              <input type={showPass ? "text" : "password"} name="newPassword" value={userInfo.newPassword} onChange={handleInputChange} placeholder="Nhập Mật Khẩu Mới" />
+              <input type={showPass ? "text" : "password"} name="confirmPassword" value={userInfo.confirmPassword} onChange={handleInputChange} placeholder="Nhập Xác Nhận Mật Khẩu" />
             </div>
           </div>
         </div>

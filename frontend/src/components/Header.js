@@ -103,7 +103,7 @@ const Header = () => {
         >
           <img
             className="header-logo-img"
-            src="/images/LOGO.png"
+            src="https://res.cloudinary.com/dmzuier4p/image/upload/v1772344074/image_nxgnsu.webp"
             alt="Logo"
           />
 
