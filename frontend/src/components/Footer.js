@@ -54,12 +54,12 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Cột 4: Bản đồ (Map) - Điểm nhấn cho màn hình 15.6 */}
+          {/* Cột 4: Bản đồ */}
           <div className="footer-column footer-map-column">
             <h4 className="footer-heading">VỊ TRÍ CHÚNG TÔI</h4>
             <div className="footer-map-wrap">
               <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3834.103936603058!2d108.2435!3d16.0544!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTbCsDAzJzE1LjgiTiAxMDjCsDE0JzM2LjYiRQ!5e0!3m2!1svi!2s!4v1630000000000!5m2!1svi!2s" 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3833.91104313217!2d108.243542!3d16.070104!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTbCsDA0JzEyLjQiTiAxMDjCsDE0JzM2LjciRQ!5e0!3m2!1svi!2svn!4v1625000000000!5m2!1svi!2svn" 
                 width="100%" 
                 height="100%" 
                 style={{ border: 0 }} 
