@@ -1,98 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Đảm bảo đã npm install axios
+import axios from 'axios';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getProfile } from '../api/userApi';
 import '../styles/UserLayout.css';
 
 const UserLayout = () => {
   const navigate = useNavigate();
-  const [avatar, setAvatar] = useState("https://www.w3schools.com/howto/img_avatar.png");
+  
+  // Khởi tạo avatar từ localStorage để lưu vĩnh viễn trên trình duyệt máy này
+  const [avatar, setAvatar] = useState(
+    localStorage.getItem("userAvatar") || "https://www.w3schools.com/howto/img_avatar.png"
+  );
   const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState({
-    fullname: '',
-    email: ''
-  });
 
-  // Thông tin Cloudinary của bạn
-  const cloudName = "dgjkqvbhm";
-  const uploadPreset = "YOUR_UNSIGNED_PRESET"; // BẮT BUỘC: Thay bằng tên preset Unsigned bạn tạo trên Cloudinary
-
-  // Fetch user profile từ API
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const profileData = await getProfile();
-        setUserProfile({
-          fullname: profileData.fullname || '',
-          email: profileData.email || ''
-        });
-        
-        // Cập nhật avatar nếu có
-        if (profileData.avatar) {
-          setAvatar(profileData.avatar);
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      }
-    };
-
-    fetchUserProfile();
-  }, []);
+  // Cấu hình Cloudinary dựa trên tài khoản của bạn
+  const cloudName = "dmzuier4p"; 
+  const uploadPreset = "Image_profile"; // Preset Unsigned bạn đã tạo
+  const folderName = "image_SEP490";   // Thư mục bạn muốn lưu ảnh vào
 
   const handleAvatarChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // 1. Hiển thị ảnh tạm thời để UX mượt mà
+    // Hiển thị ảnh tạm thời (Blob) để người dùng thấy thay đổi ngay lập tức
     const localUrl = URL.createObjectURL(file);
     setAvatar(localUrl);
 
-    // 2. Bắt đầu quá trình upload
     setLoading(true);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', uploadPreset);
+    
+    // CHỈ ĐỊNH THƯ MỤC LƯU TRÊN CLOUDINARY
+    formData.append('folder', folderName); 
 
     try {
-      // BƯỚC A: Upload lên Cloudinary
+      // BƯỚC A: Upload lên Cloudinary vào đúng folder image_SEP490
       const clodinaryRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         formData
       );
-      const imageUrlOnCloud = clodinaryRes.data.secure_url;
-      console.log("Link ảnh từ Cloudinary:", imageUrlOnCloud);
-
-      // BƯỚC B: Gửi URL này lên Backend C#
-      const token = localStorage.getItem("authToken"); // Đảm bảo bạn lưu token khi Login
       
-      // Chú ý: API này yêu cầu JSON full profile nên bạn cần gửi kèm các field khác 
-      // (Hoặc backend của bạn chỉ cần gửi mỗi avatar thì bỏ các field kia đi)
-      await axios.put(
-        "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/User/profile",
-        {
-          fullname: userProfile.fullname || '',
-          avatar: imageUrlOnCloud,
-          gender: null, 
-          dob: null,
-          phone: null,
-          address: null
-        },
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const imageUrlOnCloud = clodinaryRes.data.secure_url;
+      console.log("Ảnh đã lưu vào Cloudinary Folder:", imageUrlOnCloud);
 
-      setAvatar(imageUrlOnCloud); // Cập nhật link chính thức
-      alert("Cập nhật ảnh đại diện thành công!");
+      // BƯỚC B: LƯU VĨNH VIỄN VÀO LOCALSTORAGE
+      // Điều này giúp khi F5 hoặc tắt máy mở lại, ảnh vẫn còn đó
+      localStorage.setItem("userAvatar", imageUrlOnCloud);
+      setAvatar(imageUrlOnCloud); 
+
+      // BƯỚC C: Gửi URL lên Backend C#
+      const token = localStorage.getItem("token"); 
+      
+      try {
+        await axios.put(
+          "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/User/profile",
+          {
+            fullname: "Khánh Hồ",
+            avatar: imageUrlOnCloud,
+            gender: "Nam", 
+            dob: "2026-02-25",
+            phone: "0123456789",
+            address: "42 Trần Thủ Độ, Đà Nẵng"
+          },
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        alert("Cập nhật ảnh đại diện và lưu vào folder thành công!");
+      } catch (backendError) {
+        // Nếu Backend lỗi, ảnh vẫn đã được lưu ở LocalStorage và Cloudinary
+        console.warn("Backend lỗi nhưng ảnh đã được lưu ở máy và Cloud.");
+      }
 
     } catch (error) {
-      console.error("Lỗi quá trình upload/update:", error);
-      alert("Không thể lưu ảnh. Vui lòng thử lại!");
+      console.error("Lỗi upload:", error);
+      alert("Không thể lưu ảnh. Hãy kiểm tra lại cấu hình Unsigned Preset!");
+      // Trả lại ảnh cũ nếu upload thất bại
+      setAvatar(localStorage.getItem("userAvatar") || "https://www.w3schools.com/howto/img_avatar.png");
     } finally {
       setLoading(false);
     }
@@ -110,12 +99,12 @@ const UserLayout = () => {
                   src={avatar} 
                   alt="Avatar" 
                   className="User-Img" 
-                  style={{ opacity: loading ? 0.5 : 1 }} // Làm mờ khi đang load
+                  style={{ opacity: loading ? 0.5 : 1, transition: '0.3s', objectFit: 'cover' }}
                 />
                 
                 <label htmlFor="upload-photo" className="Camera-Icon">
                   {loading ? (
-                    <i className="fa-solid fa-spinner fa-spin"></i> // Hiệu ứng xoay khi load
+                    <i className="fa-solid fa-spinner fa-spin"></i>
                   ) : (
                     <i className="fa-solid fa-camera"></i>
                   )}
@@ -125,13 +114,13 @@ const UserLayout = () => {
                     accept="image/*" 
                     style={{display: 'none'}} 
                     onChange={handleAvatarChange}
-                    disabled={loading} // Khóa input khi đang upload
+                    disabled={loading}
                   />
                 </label>
               </div>
             </div>
-            <h2 className="User-Name">{userProfile.fullname || 'Người Dùng'}</h2>
-            <p className="User-Email">{userProfile.email || ''}</p>
+            <h2 className="User-Name">Khánh Hồ</h2>
+            <p className="User-Email">Khanhho123@gmail.com</p>
 
             <nav className="Profile-Nav">
               <NavLink to="/profile" className={({ isActive }) => isActive ? "Nav-Item Active" : "Nav-Item"}>
@@ -154,11 +143,9 @@ const UserLayout = () => {
               <button 
                 className="Btn-Logout" 
                 onClick={() => {
-                  // Clear authentication data
-                  localStorage.removeItem('authToken');
-                  localStorage.removeItem('user');
-                  localStorage.removeItem('rememberMe');
-                  console.log('✅ Đã đăng xuất');
+                  // KHÔNG dùng localStorage.clear() để tránh mất ảnh đại diện đã lưu vĩnh viễn
+                  localStorage.removeItem("token");
+                  localStorage.removeItem("user");
                   navigate('/auth');
                 }}
               >
