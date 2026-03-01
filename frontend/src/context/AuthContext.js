@@ -42,7 +42,11 @@ export const AuthProvider = ({ children }) => {
       
       // Token được lưu trong apiLogin, nhưng cập nhật context
       setToken(response.token);
-      setUser(response.user || { email });
+      const userData = response.user || { email };
+      setUser(userData);
+      
+      // 🔥 Lưu user vào localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
       
       return response;
     } catch (err) {

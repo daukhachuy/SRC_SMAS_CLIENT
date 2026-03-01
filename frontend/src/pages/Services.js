@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getProfile } from '../api/userApi';
 
 const Services = () => {
+  
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState(0);
   const [addOnCarouselIndex, setAddOnCarouselIndex] = useState(0);
@@ -18,6 +21,14 @@ const Services = () => {
     numTables: '',
     numGuests: '',
     location: '',
+    note: ''
+  });
+  const [bookingForm, setBookingForm] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    numGuests: '1',
+    location: 'Trong nhà (Máy lạnh)',
     note: ''
   });
   const [selectedEvent, setSelectedEvent] = useState('');
@@ -34,6 +45,134 @@ const Services = () => {
     notes: '',
     price: 0
   });
+
+  // Lấy dữ liệu profile người dùng khi component mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        console.log('📡 Đang gọi getProfile API...');
+        const profile = await getProfile();
+        console.log('✅ Profile API response:', profile);
+        
+        // Điền dữ liệu từ API vào form
+        if (profile) {
+          const userData = {
+            fullName: profile.fullname || '',
+            phone: profile.phone || '',
+            email: profile.email || ''
+          };
+          
+          console.log('📝 userData để fill form:', userData);
+          
+          // Cập nhật eventForm
+          setEventForm(prev => ({
+            ...prev,
+            ...userData
+          }));
+          
+          // Cập nhật bookingForm
+          setBookingForm(prev => ({
+            ...prev,
+            ...userData
+          }));
+        } else {
+          console.log('⚠️ Profile response empty');
+        }
+      } catch (error) {
+        console.error('❌ Lỗi khi lấy profile:', error);
+        console.log('ℹ️ User chưa đăng nhập hoặc API error - để trống form');
+      }
+    };
+    
+    // Gọi API ngay khi component mount
+    fetchUserProfile();
+  }, []);
+
+  // ===== HELPER FUNCTIONS FOR BOOKING =====
+  
+  // Lấy 6 ngày tiếp theo từ hôm nay
+  const getNextDays = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = [];
+    
+    for (let i = 0; i < 6; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      days.push(date);
+    }
+    
+    return days;
+  };
+
+  // Kiểm tra ngày có thể chọn được không (không được chọn ngày trong quá khứ)
+  const isDateSelectable = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date >= today;
+  };
+
+  // Lấy các giờ có sẵn
+  // - Từ giờ hiện tại + 1 tiếng
+  // - Trước 21:00 (22:00 - 1 tiếng)
+  const getAvailableTimes = (selectedDateParam) => {
+    const now = new Date();
+    const times = [];
+    
+    // Kiểm tra nếu ngày được chọn là hôm nay
+    const isToday = selectedDateParam.toDateString() === now.toDateString();
+    
+    // Bắt đầu từ 09:00
+    let startHour = 9;
+    let startMinute = 0;
+    
+    if (isToday) {
+      // Nếu là hôm nay, bắt đầu từ giờ hiện tại + 1 tiếng
+      let minEarliestTime = new Date(now);
+      minEarliestTime.setHours(minEarliestTime.getHours() + 1, 0, 0);
+      startHour = minEarliestTime.getHours();
+      startMinute = minEarliestTime.getMinutes();
+    }
+    
+    // Kết thúc trước 21:00 (22:00 - 1 tiếng)
+    const endHour = 21;
+    const endMinute = 0;
+    
+    // Generate thời gian mỗi 30 phút
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        // Skip nếu là thời gian đầu ngày và chưa đến startMinute
+        if (hour === startHour && minute < startMinute) {
+          continue;
+        }
+        
+        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        times.push(timeStr);
+      }
+    }
+    
+    return times;
+  };
+
+  // Kiểm tra giờ có thể chọn được không
+  const isTimeSelectable = (time, selectedDateParam) => {
+    const now = new Date();
+    const isToday = selectedDateParam.toDateString() === now.toDateString();
+    
+    if (!isToday) {
+      return true; // Có thể chọn bất kỳ giờ nào ngoài hôm nay
+    }
+    
+    // Hôm nay: chỉ có thể chọn giờ từ hiện tại + 1 tiếng
+    const [hours, minutes] = time.split(':').map(Number);
+    const timeDate = new Date();
+    timeDate.setHours(hours, minutes, 0);
+    
+    let minAllowedTime = new Date(now);
+    minAllowedTime.setHours(minAllowedTime.getHours() + 1, 0, 0);
+    
+    return timeDate >= minAllowedTime;
+  };
 
   // Menu và Combo options
   const menuOptions = [
@@ -270,53 +409,117 @@ const Services = () => {
               <div className="booking-left">
                 <div className="calendar-ui">
                   <div className="calendar-month">
-                    <span style={{ textTransform: 'capitalize' }}>Tháng 12 2025</span>
+                    <span style={{ textTransform: 'capitalize' }}>
+                      Tháng {String(selectedDate.getMonth() + 1).padStart(2, '0')} {selectedDate.getFullYear()}
+                    </span>
                   </div>
                   <div className="calendar-weekdays">
                     <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
                   </div>
                   <div className="calendar-numbers">
-                    {[9, 10, 11, 12, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((day, idx) => (
-                      <span key={idx} className={`${day === 5 || day === 6 ? 'day-highlighted' : ''} ${idx === 3 ? 'day-active' : ''}`}>
-                        {day}
-                      </span>
-                    ))}
+                    {getNextDays().map((date, idx) => {
+                      const dayOfWeek = date.getDay();
+                      const day = date.getDate();
+                      const isSelectable = isDateSelectable(date);
+                      const isSelected = date.toDateString() === selectedDate.toDateString();
+                      
+                      return (
+                        <span 
+                          key={idx} 
+                          onClick={() => isSelectable && setSelectedDate(date)}
+                          className={`
+                            ${!isSelectable ? 'day-disabled' : ''}
+                            ${isSelected ? 'day-active' : ''}
+                            ${isSelectable ? 'day-selectable' : ''}
+                          `}
+                          style={{ 
+                            cursor: isSelectable ? 'pointer' : 'not-allowed',
+                            opacity: isSelectable ? 1 : 0.5
+                          }}
+                        >
+                          {day}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="time-grid">
-                  {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30'].map((t, idx) => (
-                    idx < 10 && <button key={t} className="time-slot-btn">{t}</button>
-                  ))}
+                  {getAvailableTimes(selectedDate).map((time) => {
+                    const isSelectable = isTimeSelectable(time, selectedDate);
+                    const isSelected = time === selectedTime;
+                    
+                    return (
+                      <button 
+                        key={time} 
+                        className={`time-slot-btn ${isSelected ? 'active' : ''} ${!isSelectable ? 'disabled' : ''}`}
+                        onClick={() => isSelectable && setSelectedTime(time)}
+                        disabled={!isSelectable}
+                        style={{
+                          opacity: isSelectable ? 1 : 0.4,
+                          cursor: isSelectable ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        {time}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="vertical-divider"></div>
               <div className="booking-right">
                 <div className="input-group-row">
                   <label>Họ và tên:</label>
-                  <input type="text" placeholder="" />
+                  <input 
+                    type="text" 
+                    placeholder="" 
+                    value={bookingForm.fullName}
+                    onChange={(e) => setBookingForm({...bookingForm, fullName: e.target.value})}
+                  />
                 </div>
                 <div className="input-group-row">
                   <label>Số điện thoại:</label>
-                  <input type="text" placeholder="" />
+                  <input 
+                    type="text" 
+                    placeholder="" 
+                    value={bookingForm.phone}
+                    onChange={(e) => setBookingForm({...bookingForm, phone: e.target.value})}
+                  />
                 </div>
                 <div className="input-group-row">
                   <label>Email :</label>
-                  <input type="text" placeholder="" />
+                  <input 
+                    type="text" 
+                    placeholder="" 
+                    value={bookingForm.email}
+                    onChange={(e) => setBookingForm({...bookingForm, email: e.target.value})}
+                  />
                 </div>
                 <div className="input-group-row">
                   <label>Số lượng khách:</label>
-                  <input type="number" defaultValue="1" placeholder="" />
+                  <input 
+                    type="number" 
+                    value={bookingForm.numGuests}
+                    onChange={(e) => setBookingForm({...bookingForm, numGuests: e.target.value})}
+                    placeholder="" 
+                  />
                 </div>
                 <div className="input-group-row">
                   <label>Khu vực:</label>
-                  <select>
+                  <select
+                    value={bookingForm.location}
+                    onChange={(e) => setBookingForm({...bookingForm, location: e.target.value})}
+                  >
                     <option>Trong nhà (Máy lạnh)</option>
                     <option>Ngoài trời (Sân vườn)</option>
                   </select>
                 </div>
                 <div className="input-group-row">
                   <label>Ghi chú:</label>
-                  <textarea placeholder="Yêu cầu đặc biệt, ghi chú sự kiên..."></textarea>
+                  <textarea 
+                    placeholder="Yêu cầu đặc biệt, ghi chú sự kiên..."
+                    value={bookingForm.note}
+                    onChange={(e) => setBookingForm({...bookingForm, note: e.target.value})}
+                  ></textarea>
                 </div>
                 <button className="primary-gold-btn">ĐẶT BÀN NGAY</button>
               </div>
