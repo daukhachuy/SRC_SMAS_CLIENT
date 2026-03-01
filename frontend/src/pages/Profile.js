@@ -1,38 +1,160 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/Profile.css';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
+import { getProfile, updateProfile } from '../api/userApi';
 
 const Profile = () => {
   // State quản lý thông tin người dùng
   const [userInfo, setUserInfo] = useState({
-    fullName: 'Khánh Hồ',
-    gender: 'Nam',
-    phone: '0123456789',
-    email: 'Khanhho123@Gmail.Com',
-    oldPassword: 'password123',
+    fullname: '',
+    gender: '',
+    phone: '',
+    email: '',
+    oldPassword: '',
     newPassword: '',
-    taxCode: '',
-    address: '42 Trần Thủ Độ, Phường Điện Bàn Đông, Đà Nẵng'
+    address: '',
+    avatar: '',
+    dob: ''
   });
 
   const [mapPosition, setMapPosition] = useState({ lat: 15.9753, lng: 108.2524 });
   const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Khởi tạo Google Maps
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "YOUR_GOOGLE_MAPS_API_KEY" 
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyABC123" 
   });
+
+  // Fetch profile data từ API
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const profileData = await getProfile();
+        
+        // Map API response vào state, convert "string" literal thành empty string
+        setUserInfo({
+          fullname: (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '',
+          gender: (profileData.gender && profileData.gender !== 'string') ? profileData.gender : '',
+          phone: (profileData.phone && profileData.phone !== 'string') ? profileData.phone : '',
+          email: profileData.email || '',
+          address: (profileData.address && profileData.address !== 'string') ? profileData.address : '',
+          avatar: (profileData.avatar && profileData.avatar !== 'string') ? profileData.avatar : '',
+          dob: profileData.dob || '',
+          oldPassword: '',
+          newPassword: ''
+        });
+
+        // Update map position nếu có address hợp lệ
+        if (profileData.address && profileData.address !== 'string') {
+          try {
+            await handleUpdateAddressMap(profileData.address);
+          } catch (mapErr) {
+            console.warn('Map update failed:', mapErr);
+            // Không dừng nếu map update thất bại
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+        setError('Không thể tải thông tin cá nhân. Vui lòng thử lại.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setUserInfo({ ...userInfo, [name]: value });
   };
 
-  const handleUpdateAddressMap = async () => {
+  // Xóa thông báo sau 5 giây
+  useEffect(() => {
+    if (successMessage || error) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage, error]);
+
+  const handleSubmitProfile = async (e) => {
+    e.preventDefault();
+    
+    // Reset messages
+    setSuccessMessage('');
+    setError('');
+
+    // Validation
+    if (!userInfo.fullname || !userInfo.fullname.trim()) {
+      setError('Vui lòng nhập họ và tên!');
+      return;
+    }
+
+    if (!userInfo.phone || !userInfo.phone.trim()) {
+      setError('Vui lòng nhập số điện thoại!');
+      return;
+    }
+
+    // Nếu có nhập mật khẩu mới
+    if (userInfo.newPassword && userInfo.newPassword.trim()) {
+      if (!userInfo.oldPassword || !userInfo.oldPassword.trim()) {
+        setError('Vui lòng nhập mật khẩu cũ để thay đổi mật khẩu!');
+        return;
+      }
+      
+      if (userInfo.newPassword.length < 6) {
+        setError('Mật khẩu mới phải có ít nhất 6 ký tự!');
+        return;
+      }
+
+      if (userInfo.newPassword === userInfo.oldPassword) {
+        setError('Mật khẩu mới phải khác mật khẩu cũ!');
+        return;
+      }
+    }
+
+    try {
+      setIsSubmitting(true);
+      const result = await updateProfile(userInfo);
+      console.log('Profile updated:', result);
+      
+      // Reset password fields
+      setUserInfo(prev => ({
+        ...prev,
+        oldPassword: '',
+        newPassword: ''
+      }));
+      
+      setSuccessMessage('Cập nhật thông tin thành công!');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError(err.message || 'Cập nhật thông tin thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateAddressMap = async (addressToUpdate = null) => {
+    const addressValue = addressToUpdate || userInfo.address;
+    
+    if (!addressValue) {
+      alert("Vui lòng nhập địa chỉ!");
+      return;
+    }
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(userInfo.address)}`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressValue)}`
       );
       const data = await response.json();
       if (data && data.length > 0) {
@@ -45,6 +167,7 @@ const Profile = () => {
       }
     } catch (error) {
       console.error("Lỗi cập nhật bản đồ:", error);
+      alert("Lỗi cập nhật bản đồ. Vui lòng thử lại.");
     }
   };
 
@@ -52,12 +175,36 @@ const Profile = () => {
     /* Thêm class animate-fade-in để tạo hiệu ứng mượt khi chuyển từ MyOrders sang */
     <div className="Content-Card animate-fade-in">
       <h1 className="Content-Title">Thông Tin Cá Nhân</h1>
-      
-      <form className="Profile-Form" onSubmit={(e) => e.preventDefault()}>
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#ff6600' }}>
+          <p>Đang tải thông tin cá nhân...</p>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: '15px', marginBottom: '20px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px', borderLeft: '4px solid #721c24' }}>
+          <p><strong>❌ Lỗi:</strong> {error}</p>
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={{ padding: '15px', marginBottom: '20px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '4px', borderLeft: '4px solid #155724' }}>
+          <p><strong>✅ Thành công:</strong> {successMessage}</p>
+        </div>
+      )}
+
+      {!loading && (
+      <form className="Profile-Form" onSubmit={handleSubmitProfile}>
         <div className="Form-Grid">
           <div className="Form-Group">
             <label>Họ Và Tên</label>
-            <input type="text" name="fullName" value={userInfo.fullName} onChange={handleInputChange} />
+            <input type="text" name="fullname" value={userInfo.fullname} onChange={handleInputChange} />
+          </div>
+
+          <div className="Form-Group">
+            <label>Ngày Sinh</label>
+            <input type="date" name="dob" value={userInfo.dob} onChange={handleInputChange} />
           </div>
 
           <div className="Form-Group">
@@ -77,7 +224,7 @@ const Profile = () => {
           <div className="Form-Group">
             <label>Số Điện Thoại</label>
             <div className="Input-With-Status">
-              <input type="text" value={userInfo.phone} readOnly />
+              <input type="text" name="phone" value={userInfo.phone} onChange={handleInputChange} placeholder="Nhập số điện thoại" />
               <span className="Status-Verified">Đã Xác Minh</span>
             </div>
           </div>
@@ -99,11 +246,6 @@ const Profile = () => {
           </div>
 
           <div className="Form-Group">
-            <label>Mã Số Thuế</label>
-            <input type="text" name="taxCode" value={userInfo.taxCode} onChange={handleInputChange} placeholder="Nhập Mã Số Thuế" />
-          </div>
-
-          <div className="Form-Group">
             <label>Mật Khẩu Mới</label>
             <div className="Input-With-Icon">
               <input type={showPass ? "text" : "password"} name="newPassword" value={userInfo.newPassword} onChange={handleInputChange} placeholder="Nhập Mật Khẩu Mới" />
@@ -112,15 +254,23 @@ const Profile = () => {
         </div>
 
         <div className="Form-Actions">
-          <button type="submit" className="Btn-Submit">Thay Đổi</button>
+          <button 
+            type="submit" 
+            className="Btn-Submit"
+            disabled={isSubmitting}
+            style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+          >
+            {isSubmitting ? 'Đang cập nhật...' : 'Thay Đổi'}
+          </button>
         </div>
       </form>
+      )}
 
       <div className="Address-Section">
         <h2 className="Section-Title">Địa Chỉ Giao Hàng</h2>
         <div className="Form-Group">
           <label>Địa Chỉ Chi Tiết</label>
-          <input type="text" name="address" value={userInfo.address} onChange={handleInputChange} className="Full-Width" />
+          <input type="text" name="address" value={userInfo.address} onChange={handleInputChange} className="Full-Width" placeholder="Nhập địa chỉ giao hàng" />
         </div>
         
         <div className="Map-Preview">

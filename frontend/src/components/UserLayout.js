@@ -1,18 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios'; // Đảm bảo đã npm install axios
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getProfile } from '../api/userApi';
 import '../styles/UserLayout.css';
 
 const UserLayout = () => {
   const navigate = useNavigate();
   const [avatar, setAvatar] = useState("https://www.w3schools.com/howto/img_avatar.png");
   const [loading, setLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState({
+    fullname: '',
+    email: ''
+  });
 
   // Thông tin Cloudinary của bạn
   const cloudName = "dgjkqvbhm";
   const uploadPreset = "YOUR_UNSIGNED_PRESET"; // BẮT BUỘC: Thay bằng tên preset Unsigned bạn tạo trên Cloudinary
+
+  // Fetch user profile từ API
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profileData = await getProfile();
+        setUserProfile({
+          fullname: profileData.fullname || '',
+          email: profileData.email || ''
+        });
+        
+        // Cập nhật avatar nếu có
+        if (profileData.avatar) {
+          setAvatar(profileData.avatar);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const handleAvatarChange = async (event) => {
     const file = event.target.files[0];
@@ -38,19 +65,19 @@ const UserLayout = () => {
       console.log("Link ảnh từ Cloudinary:", imageUrlOnCloud);
 
       // BƯỚC B: Gửi URL này lên Backend C#
-      const token = localStorage.getItem("token"); // Đảm bảo bạn lưu token khi Login
+      const token = localStorage.getItem("authToken"); // Đảm bảo bạn lưu token khi Login
       
       // Chú ý: API này yêu cầu JSON full profile nên bạn cần gửi kèm các field khác 
       // (Hoặc backend của bạn chỉ cần gửi mỗi avatar thì bỏ các field kia đi)
       await axios.put(
         "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/User/profile",
         {
-          fullname: "Khánh Hồ", // Có thể lấy từ state nếu có
+          fullname: userProfile.fullname || '',
           avatar: imageUrlOnCloud,
-          gender: "string", 
-          dob: "2026-02-25",
-          phone: "string",
-          address: "string"
+          gender: null, 
+          dob: null,
+          phone: null,
+          address: null
         },
         {
           headers: { 
@@ -103,8 +130,8 @@ const UserLayout = () => {
                 </label>
               </div>
             </div>
-            <h2 className="User-Name">Khánh Hồ</h2>
-            <p className="User-Email">Khanhho123@gmail.com</p>
+            <h2 className="User-Name">{userProfile.fullname || 'Người Dùng'}</h2>
+            <p className="User-Email">{userProfile.email || ''}</p>
 
             <nav className="Profile-Nav">
               <NavLink to="/profile" className={({ isActive }) => isActive ? "Nav-Item Active" : "Nav-Item"}>
