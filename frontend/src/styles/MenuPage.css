@@ -305,6 +305,34 @@
   border: 3px solid var(--soft-black);
 }
 
+/* --- TỔNG THỂ --- */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; /* Luôn cao ít nhất bằng màn hình */
+  background-color: var(--white);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.menu-page-container {
+  padding-top: 100px;
+  flex: 1 0 auto; /* QUAN TRỌNG: Giúp vùng này tự giãn ra để đẩy Footer xuống đáy */
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  flex-shrink: 0; /* Đảm bảo Footer không bị bóp nghẹt */
+}
+
+.old-price {
+  font-size: 14px;
+  font-weight: 500;
+  color: #999;
+  text-decoration: line-through; /* Nên để gạch ngang để thể hiện khuyến mãi */
+  margin-right: 8px;
+}
+
 /* --- RESPONSIVE --- */
 @media (max-width: 1200px) {
   .menu-grid { grid-template-columns: repeat(3, 1fr); }
