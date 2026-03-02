@@ -1,106 +1,181 @@
-import instance, { API_BASE_URL } from './axiosInstance';
+import instance from './axiosInstance';
 
-/**
- * Authentication API calls
- * Endpoints: /api/auth/login, /api/auth/register, etc.
- */
+/* =====================================================
+   HELPER: Save Auth Data
+===================================================== */
+function saveAuthData(data) {
+  if (data?.token) {
+    localStorage.setItem('authToken', data.token);
+  }
 
-export async function login(email, password) {
-  try {
-    console.log('🔐 Logging in:', email);
-    const response = await instance.post('/auth/login', { 
-      email: email.trim(), 
-      password 
-    });
-    
-    if (response.data?.token) {
-      localStorage.setItem('authToken', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user || { email }));
-      console.log('✅ Login successful');
-    }
-    
-    return response.data;
-  } catch (error) {
-    console.error('❌ Login failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Login failed. Check credentials or server connection.',
-      error
-    };
+  if (data?.user) {
+    localStorage.setItem('user', JSON.stringify(data.user));
   }
 }
 
+/* =====================================================
+   HELPER: Handle Axios Error
+   Chuẩn hóa error trả về cho UI
+===================================================== */
+function handleApiError(error) {
+  const status = error.response?.status || 500;
+  const message =
+    error.response?.data?.message ||
+    error.message ||
+    'Unexpected error occurred';
+
+  const code = error.response?.data?.msgCode || null;
+
+  return {
+    status,
+    message,
+    code,
+  };
+}
+
+/* =====================================================
+   LOGIN
+===================================================== */
+export async function login(email, password) {
+  try {
+    const response = await instance.post('/auth/login', {
+      email: email.trim(),
+      password,
+    });
+
+    if (!response.data?.token) {
+      throw {
+        response: {
+          status: 401,
+          data: {
+            message: 'Email hoặc mật khẩu không chính xác',
+          },
+        },
+      };
+    }
+
+    saveAuthData(response.data);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/* =====================================================
+   REGISTER
+===================================================== */
 export async function register(userData) {
   try {
-    console.log('📝 Registering user:', userData.email);
     const response = await instance.post('/auth/register', {
       email: userData.email?.trim(),
       password: userData.password,
-      fullname: userData.fullName || userData.fullname
+      fullname: userData.fullName || userData.fullname,
     });
-    
-    console.log('✅ Registration successful');
+
     return response.data;
   } catch (error) {
-    console.error('❌ Registration failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Registration failed.',
-      error
-    };
+    throw handleApiError(error);
   }
 }
 
+/* =====================================================
+   GOOGLE LOGIN
+===================================================== */
 export async function googleLogin(token) {
   try {
-    console.log('🔐 Google Login...');
-    const response = await instance.post('/auth/login/google', { token });
-    
-    if (response.data?.token) {
-      localStorage.setItem('authToken', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user || {}));
-      console.log('✅ Google login successful');
+    const response = await instance.post('/auth/login/google', {
+      token,
+    });
+
+    if (!response.data?.token) {
+      throw {
+        response: {
+          status: 401,
+          data: {
+            message: 'Google login failed',
+          },
+        },
+      };
     }
-    
+
+    saveAuthData(response.data);
     return response.data;
   } catch (error) {
-    console.error('❌ Google login failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Google login failed.',
-      error
-    };
+    throw handleApiError(error);
   }
 }
 
+/* =====================================================
+   GOOGLE REGISTER
+===================================================== */
 export async function googleRegister(token) {
   try {
-    console.log('📝 Google Register...');
-    const response = await instance.post('/auth/register/google', { token });
-    
-    if (response.data?.token) {
-      localStorage.setItem('authToken', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user || {}));
-      console.log('✅ Google register successful');
-    }
-    
+    const response = await instance.post('/auth/register/google', {
+      token,
+    });
+
+    saveAuthData(response.data);
     return response.data;
   } catch (error) {
-    console.error('❌ Google register failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Google register failed.',
-      error
-    };
+    throw handleApiError(error);
   }
 }
 
+/* =====================================================
+   FORGOT PASSWORD
+===================================================== */
+export async function forgotPassword(email) {
+  try {
+    const response = await instance.post('/auth/forgot-password', {
+      email: email.trim(),
+    });
+
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/* =====================================================
+   VERIFY OTP
+===================================================== */
+export async function verifyOtp(email, otp) {
+  try {
+    const response = await instance.post('/auth/verify-otp', {
+      email: email.trim(),
+      otp: otp.trim(),
+    });
+
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/* =====================================================
+   RESET PASSWORD
+===================================================== */
+export async function resetPassword(email, otp, newPassword) {
+  try {
+    const response = await instance.post('/auth/reset-password', {
+      email: email.trim(),
+      otp: otp.trim(),
+      newPassword,
+    });
+
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/* =====================================================
+   AUTH HELPERS
+===================================================== */
 export function logout() {
-  console.log('🚪 Logging out...');
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
   localStorage.removeItem('rememberMe');
-  console.log('✅ Logged out successfully');
 }
 
 export function isAuthenticated() {
@@ -114,60 +189,4 @@ export function getAuthToken() {
 export function getCurrentUser() {
   const user = localStorage.getItem('user');
   return user ? JSON.parse(user) : null;
-}
-export async function forgotPassword(email) {
-  try {
-    console.log('📧 Sending password reset email to:', email);
-    const response = await instance.post('/auth/forgot-password', { 
-      email: email.trim()
-    });
-    console.log('✅ Password reset email sent');
-    return response.data;
-  } catch (error) {
-    console.error('❌ Forgot password failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Failed to send reset email. Please check your email address.',
-      error
-    };
-  }
-}
-
-export async function verifyOtp(email, otp) {
-  try {
-    console.log('🔐 Verifying OTP for:', email);
-    const response = await instance.post('/auth/verify-otp', { 
-      email: email.trim(),
-      otp: otp.trim()
-    });
-    console.log('✅ OTP verified successfully');
-    return response.data;
-  } catch (error) {
-    console.error('❌ OTP verification failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Invalid or expired OTP. Please try again.',
-      error
-    };
-  }
-}
-
-export async function resetPassword(email, otp, newPassword) {
-  try {
-    console.log('🔄 Resetting password for:', email);
-    const response = await instance.post('/auth/reset-password', { 
-      email: email.trim(),
-      otp: otp.trim(),
-      newPassword
-    });
-    console.log('✅ Password reset successfully');
-    return response.data;
-  } catch (error) {
-    console.error('❌ Password reset failed:', error.response?.data || error.message);
-    throw {
-      status: error.response?.status,
-      message: error.response?.data?.message || 'Failed to reset password. Please try again.',
-      error
-    };
-  }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import '../styles/AuthPage.css';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
@@ -8,6 +8,8 @@ import { login, googleLogin } from '../api/authApi';
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const timeoutRef = useRef(null);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -16,93 +18,166 @@ const AuthPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  // ==========================
+  // ERROR PARSER
+  // ==========================
+  const parseError = (err) => {
+    const status = err?.status;
+    const msgCode = err?.error;
+    const backendMessage = err?.message?.toLowerCase();
+
+    if (msgCode === 'MSG_001') return 'Email không tồn tại.';
+    if (msgCode === 'MSG_002') return 'Mật khẩu không chính xác.';
+    if (msgCode === 'MSG_003') return 'Đăng nhập thành công nhưng xảy ra lỗi.';
+
+    if (status === 400) return backendMessage || 'Dữ liệu không hợp lệ.';
+    if (status === 401) return 'Email hoặc mật khẩu không chính xác.';
+    if (status === 500) return 'Lỗi máy chủ. Vui lòng thử lại sau.';
+
+    if (err?.message?.includes('Network'))
+      return 'Lỗi kết nối. Vui lòng kiểm tra internet.';
+
+    return 'Đăng nhập thất bại. Vui lòng thử lại.';
+  };
+
+  // ==========================
+  // SUBMIT LOGIN
+  // ==========================
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     setSuccess('');
-    
+    setLoading(true);
+
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    // Validation
+    if (!trimmedEmail) {
+      setError('Vui lòng nhập email.');
+      setLoading(false);
+      return;
+    }
+
+    if (!trimmedPassword) {
+      setError('Vui lòng nhập mật khẩu.');
+      setLoading(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Email không đúng định dạng.');
+      setLoading(false);
+      return;
+    }
+
+    if (trimmedPassword.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await login(email, password);
-      
+      const response = await login(trimmedEmail, trimmedPassword);
+
+      // Lưu token
+      if (response?.token) {
+        localStorage.setItem('accessToken', response.token);
+      }
+
       if (rememberMe) {
         localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', trimmedEmail);
       }
-      
-      setSuccess('✅ Đăng nhập thành công! Chuyển hướng...');
-      setTimeout(() => {
+
+      setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
+
+      timeoutRef.current = setTimeout(() => {
         navigate('/profile');
-      }, 1500);
+      }, 1200);
     } catch (err) {
-      console.error('Auth error:', err);
-      const errorMsg = err?.message || err?.response?.data?.message || 'Lỗi đăng nhập. Vui lòng kiểm tra tài khoản và mật khẩu.';
-      setError(errorMsg);
+      setError(parseError(err));
     } finally {
       setLoading(false);
     }
   };
 
+  // ==========================
+  // GOOGLE LOGIN
+  // ==========================
   const handleGoogleLoginSuccess = async (credentialResponse) => {
-    setLoading(true);
     setError('');
     setSuccess('');
-    
+    setLoading(true);
+
     try {
+      if (!credentialResponse?.credential) {
+        throw new Error('Không nhận được token từ Google');
+      }
+
       const googleToken = credentialResponse.credential;
-      console.log('🔐 Google token received:', googleToken.substring(0, 20) + '...');
-      
-      // Send token to backend for verification
+
       const response = await googleLogin(googleToken);
-      
-      setSuccess(' Đăng nhập Google thành công! Chuyển hướng...');
-      setTimeout(() => {
+
+      if (response?.token) {
+        localStorage.setItem('accessToken', response.token);
+      }
+
+      setSuccess('Đăng nhập Google thành công!');
+
+      timeoutRef.current = setTimeout(() => {
         navigate('/profile');
-      }, 1500);
+      }, 1200);
     } catch (err) {
-      console.error('Google login error:', err);
-      const errorMsg = err?.message || 'Lỗi đăng nhập Google. Vui lòng thử lại hoặc sử dụng email/mật khẩu.';
-      setError(errorMsg);
+      setError(parseError(err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLoginError = () => {
-    setError(' Lỗi đăng nhập Google. Vui lòng thử lại.');
-    console.error('Google login failed');
+    setError('Đăng nhập Google thất bại. Vui lòng thử lại.');
   };
 
+  // ==========================
+  // UI
+  // ==========================
   return (
     <div className="auth-container">
       <div className="auth-left">
         <div className="auth-left-content">
-          <button 
+          <button
             className="restaurant-logo-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/');
-            }}
+            onClick={() => navigate('/')}
             type="button"
           >
             <RestaurantLogo size={56} color="white" />
           </button>
+
           <h1 className="restaurant-name">
             <button
               className="restaurant-name-btn"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/');
-              }}
+              onClick={() => navigate('/')}
               type="button"
             >
               Nhà hàng Lẩu Nướng
             </button>
           </h1>
-          <p className="restaurant-subtitle">Nhà hàng chuyên về các món nướng và lẩu</p>
-          
+
+          <p className="restaurant-subtitle">
+            Nhà hàng chuyên về các món nướng và lẩu
+          </p>
+
           <ul className="restaurant-features">
-            <li>Nguyên liệu tươi sông bảo quản kỹ kàng</li>
-            <li>Bếp trưởng chuyên nghiệp , tận tâm</li>
+            <li>Nguyên liệu tươi sống, bảo quản kỹ càng</li>
+            <li>Bếp trưởng chuyên nghiệp, tận tâm</li>
             <li>Gọi món nhanh chóng</li>
             <li>Phục vụ tận tâm với nhiều loại dịch vụ</li>
             <li>Nhiều combo ưu đãi đặc biệt</li>
@@ -113,112 +188,88 @@ const AuthPage = () => {
       <div className="auth-right">
         <div className="auth-form-wrapper">
           <h2 className="auth-title">Đăng Nhập</h2>
-          <p className="auth-subtitle">Chào mừng bạn quay trở lại !</p>
+          <p className="auth-subtitle">Chào mừng bạn quay trở lại!</p>
 
-          {/* Google Login Button */}
+          {/* Google */}
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
               onError={handleGoogleLoginError}
               text="signin"
-              type="standard"
               theme="outline"
               locale="vi"
             />
           </div>
 
-          {/* Divider */}
           <div className="divider">
             <span>Hoặc</span>
           </div>
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
-            <div style={{
-              backgroundColor: '#fee',
-              border: '1px solid #fcc',
-              color: '#c33',
-              padding: '10px',
-              borderRadius: '4px',
-              marginBottom: '15px',
-              fontSize: '14px'
-            }}>
-              ❌ {error}
+            <div className="error-box">
+              ⚠ {error}
             </div>
           )}
 
-          {/* Success Message */}
+          {/* Success */}
           {success && (
-            <div style={{
-              backgroundColor: '#efe',
-              border: '1px solid #cfc',
-              color: '#3c3',
-              padding: '10px',
-              borderRadius: '4px',
-              marginBottom: '15px',
-              fontSize: '14px'
-            }}>
-              ✅ {success}
+            <div className="success-box">
+              ✓ {success}
             </div>
           )}
 
-          {/* Auth Form */}
           <form onSubmit={handleSubmit} className="auth-form">
-            {/* Email Field */}
             <div className="form-group">
-              <label htmlFor="email">Email</label>
+              <label>Email</label>
               <input
                 type="email"
-                id="email"
                 placeholder="abc123@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
+                disabled={loading}
               />
             </div>
 
-            {/* Password Field */}
             <div className="form-group password-group">
-              <label htmlFor="password">Mật Khẩu</label>
+              <label>Mật khẩu</label>
               <div className="password-input-wrapper">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  id="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
-                  tabIndex="-1"
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
                 </button>
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="form-footer">
-              <label className="checkbox-wrapper">
+              <label>
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
-                <span>Ghi nhớ đăng nhập</span>
+                Ghi nhớ đăng nhập
               </label>
-              <a href="#!" className="forgot-password" onClick={(e) => {
-                e.preventDefault();
-                navigate('/forgot-password');
-              }}>
-                Quên mật khẩu ?
-              </a>
+
+              <button
+                type="button"
+                className="forgot-password"
+                onClick={() => navigate('/forgot-password')}
+              >
+                Quên mật khẩu?
+              </button>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               className="submit-btn"
@@ -228,21 +279,11 @@ const AuthPage = () => {
             </button>
           </form>
 
-          {/* Toggle to Register */}
           <div className="auth-toggle">
-            <span>
-              Chưa có tài khoản?{' '}
-              <button
-                type="button"
-                className="toggle-btn"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/register');
-                }}
-              >
-                Đăng kí ngay
-              </button>
-            </span>
+            Chưa có tài khoản?{' '}
+            <button onClick={() => navigate('/register')}>
+              Đăng ký ngay
+            </button>
           </div>
         </div>
       </div>
