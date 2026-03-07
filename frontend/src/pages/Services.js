@@ -10,6 +10,11 @@ const Services = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Reset selectedTime khi đổi ngày
+  useEffect(() => {
+    setSelectedTime('');
+  }, [selectedDate]);
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState(0);
   const [addOnCarouselIndex, setAddOnCarouselIndex] = useState(0);
   const [bookingTab, setBookingTab] = useState('booking'); // 'booking' or 'event'
@@ -90,13 +95,13 @@ const Services = () => {
 
   // ===== HELPER FUNCTIONS FOR BOOKING =====
   
-  // Lấy 6 ngày tiếp theo từ hôm nay
+  // Lấy 14 ngày tiếp theo từ hôm nay
   const getNextDays = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const days = [];
     
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() + i);
       days.push(date);
@@ -112,9 +117,9 @@ const Services = () => {
     return date >= today;
   };
 
-  // Lấy các giờ có sẵn
+  // Lấy các giờ có sẵn (Nhà hàng mở 09:00 - 22:00, nhận booking đến 21:00)
   // - Từ giờ hiện tại + 1 tiếng
-  // - Trước 21:00 (22:00 - 1 tiếng)
+  // - Trước 21:00 (kết thúc phục vụ 22:00 = 1 tiếng chuẩn bị đóng)
   const getAvailableTimes = (selectedDateParam) => {
     const now = new Date();
     const times = [];
@@ -134,7 +139,7 @@ const Services = () => {
       startMinute = minEarliestTime.getMinutes();
     }
     
-    // Kết thúc trước 21:00 (22:00 - 1 tiếng)
+    // Kết thúc trước 21:00 (Nhà hàng nhận booking đến 21:00)
     const endHour = 21;
     const endMinute = 0;
     
@@ -269,6 +274,31 @@ const Services = () => {
       categoryLabel: 'Trang Trí'
     }
   ];
+
+  // Validate form trước khi next step
+  const handleNextStep = () => {
+    if (!eventForm.fullName || !eventForm.fullName.trim()) {
+      alert('Vui lòng nhập họ và tên');
+      return;
+    }
+    if (!eventForm.phone || !eventForm.phone.trim()) {
+      alert('Vui lòng nhập số điện thoại');
+      return;
+    }
+    if (!eventForm.email || !eventForm.email.trim()) {
+      alert('Vui lòng nhập email');
+      return;
+    }
+    if (!eventForm.numGuests || eventForm.numGuests <= 0) {
+      alert('Vui lòng nhập số lượng khách');
+      return;
+    }
+    if (!eventForm.numTables || eventForm.numTables <= 0) {
+      alert('Vui lòng nhập số lượng bàn');
+      return;
+    }
+    setEventStep(2);
+  };
 
   // Function to toggle service selection
   const toggleService = (serviceId) => {
@@ -538,21 +568,21 @@ const Services = () => {
               <div className="event-progress-steps">
                 <div className={`progress-step ${eventStep >= 1 ? 'active' : ''}`}>
                   <div className="step-circle">
-                    <span>✓</span>
+                    <span>{eventStep > 1 ? '✓' : '1'}</span>
                   </div>
                   <p className="step-label">Thông Tin</p>
                 </div>
                 <div className="progress-line"></div>
                 <div className={`progress-step ${eventStep >= 2 ? 'active' : ''}`}>
                   <div className="step-circle">
-                    <span>✓</span>
+                    <span>{eventStep > 2 ? '✓' : '2'}</span>
                   </div>
                   <p className="step-label">Sự kiện & Dịch vụ</p>
                 </div>
                 <div className="progress-line"></div>
                 <div className={`progress-step ${eventStep >= 3 ? 'active' : ''}`}>
                   <div className="step-circle">
-                    <span>✓</span>
+                    <span>{eventStep > 3 ? '✓' : '3'}</span>
                   </div>
                   <p className="step-label">Lên thực đơn</p>
                 </div>
@@ -630,7 +660,7 @@ const Services = () => {
                     ></textarea>
                   </div>
 
-                  <button className="primary-gold-btn event-next-btn" onClick={() => setEventStep(2)}>
+                  <button className="primary-gold-btn event-next-btn" onClick={handleNextStep}>
                     Tiếp Tục → Chọn Sự Kiện
                   </button>
                 </div>
@@ -734,7 +764,7 @@ const Services = () => {
                             );
                           })}
                         </div>
-                        <div className="summary-total" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 15px', backgroundColor: 'linear-gradient(135deg, #fff0e6, #ffe8d6)', borderRadius: '10px', marginTop: '16px', borderTop: '2px solid #FFE8D6'}}>
+                        <div className="summary-total" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 15px', background: 'linear-gradient(135deg, #fff0e6, #ffe8d6)', borderRadius: '10px', marginTop: '16px', borderTop: '2px solid #FFE8D6'}}>
                           <span style={{fontWeight: 700, fontSize: '15px', color: 'var(--deep-black)'}}>Tổng dịch vụ:</span>
                           <span style={{fontWeight: 700, fontSize: '16px', color: 'var(--primary-orange)'}}>{formatCurrency(calculateServiceTotal())}</span>
                         </div>
@@ -744,7 +774,7 @@ const Services = () => {
 
                   <div style={{display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '40px'}}>
                     <button className="primary-gold-btn event-next-btn" onClick={() => setEventStep(3)} style={{width: '100%', maxWidth: '400px'}}>
-                      Tiếp Tục → Chọn Sự Kiện
+                      Tiếp Tục → Lên Thực Đơn
                     </button>
                   </div>
                 </div>
@@ -843,7 +873,7 @@ const Services = () => {
                             onClick={() => {
                               if (newDishForm.name) {
                                 const newDish = {
-                                  id: Math.max(...menuDishes.map(d => d.id), 0) + 1,
+                                  id: menuDishes.length > 0 ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1,
                                   type: newDishForm.type,
                                   name: newDishForm.name,
                                   quantity: newDishForm.quantity,
@@ -946,7 +976,7 @@ const Services = () => {
                     <div className="menu-footer-left">
                       <div className="menu-total">
                         <span className="total-label">Tổng giá mỗi bàn :</span>
-                        <span className="total-amount">{formatCurrency(menuDishes.reduce((sum, dish) => sum + dish.subtotal, 0))} đ</span>
+                        <span className="total-amount">{formatCurrency(menuDishes.reduce((sum, dish) => sum + dish.subtotal, 0))}</span>
                       </div>
                       <a href="#" onClick={(e) => { e.preventDefault(); setIsEditingMenu(!isEditingMenu); }} className="edit-menu-link">
                         {isEditingMenu ? 'Đóng' : 'Lấy món trong giỏ hàng'}
