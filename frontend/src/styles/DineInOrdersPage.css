@@ -1,0 +1,707 @@
+/* Dine-In Orders Page Styles */
+
+.dinein-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.dinein-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dinein-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.dinein-page-header h1 {
+  font-size: 1.875rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.dinein-page-header p {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0.5rem 0 0 0;
+}
+
+.dinein-page-header strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.dinein-header-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Buttons */
+.dinein-btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: white;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dinein-btn-secondary:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+/* Tabs */
+.dinein-tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 2rem;
+  overflow-x: auto;
+}
+
+.dinein-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  padding-top: 0.5rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.dinein-tab small {
+  padding: 0.125rem 0.5rem;
+  background-color: #f1f5f9;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.dinein-tab:hover {
+  color: #475569;
+}
+
+.dinein-tab.active {
+  color: #FF6C1F;
+  border-bottom-color: #FF6C1F;
+}
+
+.dinein-tab.active small {
+  background-color: rgba(255, 108, 31, 0.1);
+  color: #FF6C1F;
+}
+
+/* Active Orders Section */
+.dinein-active-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dinein-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dinein-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dinein-icon-box {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 108, 31, 0.1);
+  border-radius: 0.5rem;
+  color: #FF6C1F;
+}
+
+.dinein-header-title h2 {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.dinein-count-badge {
+  padding: 0.25rem 0.75rem;
+  background-color: rgba(255, 108, 31, 0.1);
+  color: #FF6C1F;
+  font-size: 0.625rem;
+  font-weight: 900;
+  border-radius: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Orders Grid */
+.dinein-orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .dinein-orders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .dinein-orders-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Order Card */
+.dinein-order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.dinein-order-card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-0.25rem);
+}
+
+.dinein-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.dinein-card-info {
+  flex: 1;
+}
+
+.dinein-card-type {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.dinein-icon {
+  font-size: 0.875rem;
+}
+
+.dinein-code {
+  font-size: 0.625rem;
+  color: #94a3b8;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dinein-table-number {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.dinein-waiter-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.dinein-waiter-info p {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.dinein-duration {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.dinein-status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  letter-spacing: 0.025em;
+}
+
+.status-serving {
+  background-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.status-ready {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-preparing {
+  background-color: #fed7aa;
+  color: #b45309;
+}
+
+.status-pending {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+/* Card Image */
+.dinein-card-image {
+  width: 100%;
+  height: 8rem;
+  background-size: cover;
+  background-position: center;
+  border-radius: 0.75rem;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.dinein-image-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  transition: background-color 0.2s;
+}
+
+.dinein-order-card:hover .dinein-image-overlay {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.dinein-items-count {
+  position: relative;
+  color: white;
+  font-weight: 900;
+  font-size: 0.875rem;
+}
+
+/* Card Status */
+.dinein-card-status {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Card Footer */
+.dinein-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.dinein-card-amount {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #FF6C1F;
+  margin: 0;
+}
+
+.dinein-more-btn {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.dinein-more-btn:hover {
+  color: #FF6C1F;
+}
+
+/* Pagination */
+.dinein-pagination-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dinein-pagination-text {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.dinein-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dinein-pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: white;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dinein-pagination-btn:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.dinein-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dinein-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dinein-page-numbers button,
+.dinein-page-numbers span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.dinein-page-numbers button {
+  border: 1px solid #e2e8f0;
+  background-color: white;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dinein-page-numbers button:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.dinein-page-numbers button.active {
+  background-color: #FF6C1F;
+  color: white;
+  border-color: #FF6C1F;
+  box-shadow: 0 4px 6px rgba(255, 108, 31, 0.2);
+}
+
+/* History Section */
+.dinein-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dinein-history-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dinein-history-header svg {
+  color: #64748b;
+}
+
+.dinein-history-header h2 {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* History Table */
+.dinein-history-table-wrapper {
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dinein-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.dinein-history-table thead {
+  background-color: #f8fafc;
+}
+
+.dinein-history-table thead th {
+  padding: 1rem 1.5rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dinein-history-table tbody tr {
+  border-top: 1px solid #f1f5f9;
+  transition: background-color 0.2s;
+}
+
+.dinein-history-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.dinein-history-table tbody td {
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.dinein-table-code,
+.dinein-table-amount {
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.dinein-status-completed {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background-color: #dcfce7;
+  color: #166534;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.dinein-detail-btn {
+  color: #FF6C1F;
+  background: none;
+  border: none;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: text-decoration 0.2s;
+  opacity: 0;
+}
+
+.dinein-history-table tbody tr:hover .dinein-detail-btn {
+  opacity: 1;
+}
+
+.dinein-detail-btn:hover {
+  text-decoration: underline;
+}
+
+/* Footer */
+.dinein-history-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background-color: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.dinein-history-pagination {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dinein-history-pagination button {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  background-color: white;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #64748b;
+}
+
+.dinein-history-pagination button:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.dinein-history-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .dinein-page-wrapper {
+    background-color: transparent;
+  }
+
+  .dinein-page-header h1,
+  .dinein-header-title h2,
+  .dinein-history-header h2,
+  .dinein-table-code,
+  .dinein-table-amount,
+  .dinein-table-number {
+    color: #f1f5f9;
+  }
+
+  .dinein-btn-secondary,
+  .dinein-pagination-btn,
+  .dinein-page-numbers button,
+  .dinein-history-pagination button {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+
+  .dinein-btn-secondary:hover,
+  .dinein-pagination-btn:hover:not(:disabled),
+  .dinein-page-numbers button:hover,
+  .dinein-history-pagination button:hover {
+    background-color: #334155;
+    border-color: #475569;
+  }
+
+  .dinein-order-card {
+    background-color: #1e293b;
+    border-color: #334155;
+  }
+
+  .dinein-tabs-container {
+    border-bottom-color: #334155;
+  }
+
+  .dinein-tab {
+    color: #94a3b8;
+  }
+
+  .dinein-tab small {
+    background-color: #334155;
+    color: #cbd5e1;
+  }
+
+  .dinein-history-table-wrapper {
+    border-color: #334155;
+  }
+
+  .dinein-history-table thead {
+    background-color: rgba(30, 41, 59, 0.5);
+  }
+
+  .dinein-history-table tbody tr {
+    border-top-color: #334155;
+  }
+
+  .dinein-history-table tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.3);
+  }
+
+  .dinein-history-footer {
+    background-color: rgba(30, 41, 59, 0.3);
+    border-top-color: #334155;
+  }
+
+  .dinein-pagination-section {
+    border-top-color: #334155;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dinein-header-content {
+    flex-direction: column;
+  }
+
+  .dinein-header-actions {
+    width: 100%;
+  }
+
+  .dinein-btn-secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .dinein-pagination-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dinein-pagination-btn,
+  .dinein-page-numbers {
+    width: 100%;
+  }
+
+  .dinein-history-table {
+    font-size: 0.75rem;
+  }
+
+  .dinein-history-table th,
+  .dinein-history-table td {
+    padding: 0.75rem;
+  }
+}
