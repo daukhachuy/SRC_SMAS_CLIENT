@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import '../styles/ComboPage.css'; // Sử dụng chung file CSS để đồng bộ giao diện
+import '../styles/ComboPage.css'; 
 import { ShoppingCart, MessageSquare, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+// Import helper kiểm tra đăng nhập
+import { isAuthenticated } from '../api/authApi'; 
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -24,14 +26,13 @@ const ComboPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  // FETCH COMBOS
+  // 1. FETCH COMBOS
   useEffect(() => {
     const fetchCombos = async () => {
       try {
         setLoading(true);
         const response = await axios.get(`${BASE_URL}/api/combo`);
         
-        // Xử lý dữ liệu trả về (hỗ trợ cả JSON bọc trong $values của .NET)
         const data = Array.isArray(response.data) 
           ? response.data 
           : response.data?.$values || [];
@@ -41,7 +42,6 @@ const ComboPage = () => {
           name: item.name,
           description: item.description,
           price: item.price,
-          // Nếu không có ảnh dùng placeholder, nếu có dùng URL từ API
           image: item.imageUrl 
             ? (item.imageUrl.startsWith('http') ? item.imageUrl : `${BASE_URL}${item.imageUrl}`) 
             : "https://via.placeholder.com/300x300?text=Combo+Hấp+Dẫn"
@@ -57,6 +57,41 @@ const ComboPage = () => {
     };
     fetchCombos();
   }, []);
+
+  // ==========================================
+  // 2. HÀM THÊM COMBO VÀO GIỎ HÀNG
+  // ==========================================
+  const addToCart = (combo) => {
+    // Kiểm tra đăng nhập qua token (authToken)
+    if (!isAuthenticated()) {
+      alert("Vui lòng đăng nhập để đặt Combo!");
+      navigate('/login');
+      return;
+    }
+
+    const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
+    // Tìm kiếm xem combo này đã có trong giỏ chưa (check ID và cờ isCombo)
+    const itemIndex = existingCart.findIndex(item => item.id === combo.id && item.isCombo === true);
+
+    if (itemIndex > -1) {
+      existingCart[itemIndex].quantity += 1;
+    } else {
+      existingCart.push({
+        id: combo.id,
+        name: combo.name,
+        price: combo.price,
+        image: combo.image,
+        quantity: 1,
+        isCombo: true // Đánh dấu đây là COMBO để Backend xử lý riêng nếu cần
+      });
+    }
+
+    localStorage.setItem('cart', JSON.stringify(existingCart));
+    
+    // Đồng bộ số lượng trên Header
+    window.dispatchEvent(new Event('storage')); 
+    alert(`Đã thêm "${combo.name}" vào giỏ hàng!`);
+  };
 
   // Logic Tìm kiếm
   const filteredCombos = combos.filter(item =>
@@ -80,7 +115,6 @@ const ComboPage = () => {
       <Header />
 
       <div className="menu-page-container">
-        {/* THANH TAB ĐIỀU HƯỚNG */}
         <div className="menu-control-bar">
           <div className="control-left">
             <button className="nav-tab" onClick={() => navigate('/menu')}>MENU</button>
@@ -99,7 +133,6 @@ const ComboPage = () => {
         </div>
 
         <div className="menu-content">
-          {/* SIDEBAR BỘ LỌC (GIỮ NGUYÊN STYLE MENU) */}
           <aside className="sidebar">
             <div className="filter-section-main">
               <h3 className="filter-title">Lọc Combo</h3>
@@ -126,7 +159,6 @@ const ComboPage = () => {
           </aside>
 
           <main className="main-content">
-            {/* THANH TÌM KIẾM ĐỒNG BỘ */}
             <div className="search-row-container">
               <div className="search-container-new">
                 <input 
@@ -159,21 +191,25 @@ const ComboPage = () => {
                       </div>
                       <span className="item-category">Combo Đặc Biệt</span>
                       <h3 className="item-name">{item.name}</h3>
-                      {/* Thêm mô tả ngắn nếu có */}
-                      <p style={{ fontSize: '12px', color: '#666', height: '32px', overflow: 'hidden', marginBottom: '10px' }}>
+                      <p style={{ fontSize: '12px', color: '#666', height: '32px', overflow: 'hidden', marginBottom: '10px', lineHeight: '1.4' }}>
                         {item.description}
                       </p>
                       <div className="price-info">
                         <div className="price-box">
                           <span className="new-price">{item.price?.toLocaleString()}đ</span>
                         </div>
-                        <ShoppingCart size={22} className="cart-icon" />
+                        {/* THÊM CLICK ĐỂ CHẠY HÀM addToCart */}
+                        <ShoppingCart 
+                          size={22} 
+                          className="cart-icon" 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => addToCart(item)}
+                        />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* PHÂN TRANG ĐỒNG BỘ */}
                 {totalPages > 1 && (
                   <div className="pagination-wrapper">
                     <div className="pagination-info">Hiển thị {displayedItems.length} / {filteredCombos.length} combo</div>
