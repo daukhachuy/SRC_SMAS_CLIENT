@@ -1,37 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/BuffetPage.css';
-import { ChevronDown, MessageSquare, CheckCircle } from 'lucide-react';
+import { Search, MessageSquare, CheckCircle } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getBuffetLists } from '../api/foodApi'; // Sử dụng hàm gọi API Buffet thực tế
-
-const FloatingChat = () => (
-  <div className="fixed-chat">
-    <MessageSquare size={28} color="white" />
-    <span className="online-status"></span>
-  </div>
-);
+import { getBuffetLists, getBuffetDetail } from '../api/foodApi'; // Đảm bảo import cả 2 hàm này
 
 const BuffetPage = () => {
   const navigate = useNavigate();
-  const [expandCategory, setExpandCategory] = useState(true);
-  const [expandPrice, setExpandPrice] = useState(true);
   const [buffetItems, setBuffetItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const loadBuffetData = async () => {
       try {
         setLoading(true);
-        const data = await getBuffetLists(); // Gọi API /api/Buffer/lists
-        setBuffetItems(Array.isArray(data) ? data : []);
+        // 1. Lấy danh sách buffet cơ bản
+        const data = await getBuffetLists();
+        const baseList = Array.isArray(data) ? data : data?.$values || [];
+
+        // 2. Lấy chi tiết từng buffet để lấy mảng foods (chứa foodName)
+        const detailedItems = await Promise.all(
+          baseList.map(async (item) => {
+            try {
+              const detail = await getBuffetDetail(item.buffetId);
+              return { ...item, foods: detail?.foods || [] };
+            } catch {
+              return { ...item, foods: [] };
+            }
+          })
+        );
+        setBuffetItems(detailedItems);
       } catch (err) {
-        console.error('Lỗi khi tải danh sách buffet:', err);
-        setError("Không thể tải dữ liệu Buffet từ máy chủ.");
+        console.error('Lỗi tải dữ liệu:', err);
       } finally {
         setLoading(false);
       }
@@ -39,121 +41,135 @@ const BuffetPage = () => {
     loadBuffetData();
   }, []);
 
-  // Dữ liệu menu chi tiết (vì API chưa trả về mảng món ăn con nên ta để demo hoặc dùng description)
-  const defaultFeatures = [
-    "Hải sản tươi sống mỗi ngày", "Bò Mỹ nhập khẩu", "Nước lẩu độc quyền",
-    "Quầy line hơn 30 món", "Tráng miệng đa dạng", "Không giới hạn thời gian"
-  ];
-
   return (
     <div className="app">
       <Header />
       
-      <div className="buffet-page-container">
-        <div className="buffet-nav-tabs">
-          <button className="nav-tab" onClick={() => navigate('/menu')}>MENU</button>
-          <button className="nav-tab" onClick={() => navigate('/combo')}>COMBO</button>
-          <button className="nav-tab active">BUFFET</button>
+      <div className="menu-page-container">
+        {/* THANH ĐIỀU KHIỂN */}
+        <div className="menu-control-bar">
+          <div className="control-left">
+            <button className="nav-tab" onClick={() => navigate('/menu')}>Menu</button>
+            <button className="nav-tab" onClick={() => navigate('/combo')}>Combo</button>
+            <button className="nav-tab active">Buffet</button>
+          </div>
+          
+          <div className="control-right">
+            <span className="sort-dropdown-label">Sắp xếp theo:</span>
+            <select className="sort-dropdown">
+              <option>Mặc định</option>
+              <option>Giá: Thấp đến Cao</option>
+              <option>Giá: Cao đến Thấp</option>
+            </select>
+          </div>
         </div>
 
-        <div className="buffet-content">
+        <div className="menu-content">
+          {/* SIDEBAR */}
           <aside className="sidebar">
-            <div className="filter-section-main">
-              <h3 className="filter-title">Lọc sản phẩm</h3>
-              <div className="filter-group">
-                <div className="filter-header" onClick={() => setExpandCategory(!expandCategory)}>
-                  <h4>Loại sản phẩm</h4>
-                  <ChevronDown size={18} style={{transform: expandCategory ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.3s'}} />
-                </div>
-                {expandCategory && (
-                  <ul className="filter-list">
-                    <li><input type="checkbox" defaultChecked /> Tất cả Buffet</li>
-                  </ul>
-                )}
+            <h3 className="filter-title">Bộ lọc Buffet</h3>
+            <div className="filter-group">
+              <div className="filter-header">
+                <h4>Loại sản phẩm</h4>
               </div>
+              <ul className="filter-list">
+                <li>
+                  <label>
+                    <input type="checkbox" defaultChecked />
+                    <span>Tất cả Buffet</span>
+                  </label>
+                </li>
+              </ul>
             </div>
           </aside>
 
-          <main className="buffet-main">
+          <main className="buffet-main-area">
+            {/* THANH TÌM KIẾM */}
+            <div className="search-row-container">
+              <div className="search-container-new">
+                <Search size={20} color="#888" />
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm gói buffet cực phẩm..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button className="btn-tim-kiem">TÌM KIẾM</button>
+            </div>
+
             {loading ? (
-              <div className="loading-state">Đang tải dữ liệu buffet...</div>
-            ) : error ? (
-              <div className="error-state">{error}</div>
-            ) : buffetItems.length === 0 ? (
-              <div className="empty-state">Hiện chưa có chương trình Buffet nào.</div>
+              <div className="status-msg">Đang chuẩn bị buffet...</div>
             ) : (
-              buffetItems.map((item) => (
-                <div key={item.buffetId} className="buffet-item-section" style={{ marginBottom: '80px' }}>
-                  <div className="buffet-header">
-                    <h1>{item.name}</h1>
-                  </div>
-
-                  <div className="buffet-showcase">
-                    <div className="buffet-menu-card">
-                      <h3>Đặc Điểm Nổi Bật</h3>
-                      <p className="item-desc-text" style={{ color: '#ccc', marginBottom: '20px', fontSize: '14px' }}>
-                        {item.description}
-                      </p>
-                      <ul className="buffet-menu-list">
-                        {defaultFeatures.map((feature, idx) => (
-                          <li key={idx}>
-                            <CheckCircle size={16} color="#FF7A21" /> {feature}
-                          </li>
-                        ))}
-                      </ul>
+              <div className="buffet-list">
+                {buffetItems.map((item) => (
+                  <div key={item.buffetId} className="buffet-item-wrapper">
+                    <div className="buffet-header">
+                      <h1>{item.name}</h1>
                     </div>
 
-                    <div className="buffet-image">
-                      <img 
-                        src={`${BASE_URL}${item.image}`} 
-                        alt={item.name} 
-                        onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1567521464027-f127ff144326?q=80&w=800"; }}
-                      />
+                    <div className="buffet-showcase">
+                      {/* CỘT TRÁI: MÔ TẢ */}
+                      <div className="buffet-menu-card">
+                        <h3>Đặc Điểm Nổi Bật</h3>
+                        <p>{item.description}</p>
+                        <ul className="buffet-feature-list">
+                          {["Hải sản tươi sống", "Bò Mỹ nhập khẩu", "Phục vụ tại bàn"].map((f, i) => (
+                            <li key={i}>
+                              <CheckCircle size={16} color="var(--primary-orange)" /> 
+                              <span>{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* CỘT PHẢI: LIST FOODNAME (THAY CHO ẢNH) */}
+                      <div className="buffet-food-container-box">
+                        <h3 className="food-list-title">Thực đơn bao gồm:</h3>
+                        <div className="food-names-grid">
+                          {(item.foods?.$values || item.foods || []).map((food, idx) => (
+                            <div key={idx} className="food-name-tag">
+                              <span className="dot">•</span>
+                              <span className="text">{food.foodName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="buffet-prices">
-                    <h2>Bảng Giá Chi Tiết</h2>
-                    <div className="price-list">
-                      {/* Giá người lớn */}
-                      <div className="price-item">
-                        <div className="price-info-left">
-                          <h4 className="price-name">Suất Người Lớn</h4>
-                          <p className="price-description">Áp dụng cho khách hàng cao trên 1m3</p>
-                        </div>
-                        <div className="price-value">{item.mainPrice?.toLocaleString()} đ</div>
-                      </div>
-
-                      {/* Giá trẻ em */}
-                      <div className="price-item">
-                        <div className="price-info-left">
-                          <h4 className="price-name">Suất Trẻ Em</h4>
-                          <p className="price-description">Chiều cao từ 1m đến 1m3</p>
-                        </div>
-                        <div className="price-value">{item.childrenPrice?.toLocaleString()} đ</div>
-                      </div>
-
-                      {/* Giá Side (Ngày lễ/Dịch vụ thêm) */}
-                      {item.sidePrice > 0 && (
-                        <div className="price-item">
-                          <div className="price-info-left">
-                            <h4 className="price-name">Phụ thu / Dịch vụ kèm</h4>
-                            <p className="price-description">Tùy chọn bổ sung hoặc ngày lễ</p>
+                    <div className="buffet-prices">
+                      <h2 className="price-title">Bảng Giá Chi Tiết</h2>
+                      <div className="price-grid-custom">
+                        <div className="price-box-custom">
+                          <div className="price-info-custom">
+                            <h4>Suất Người Lớn</h4>
+                            <p>Dành cho khách trên 1m3</p>
                           </div>
-                          <div className="price-value">{item.sidePrice?.toLocaleString()} đ</div>
+                          <span className="price-num-custom">{item.mainPrice?.toLocaleString()} đ</span>
                         </div>
-                      )}
+                        <div className="price-box-custom">
+                          <div className="price-info-custom">
+                            <h4>Suất Trẻ Em</h4>
+                            <p>Khách hàng từ 1m - 1m3</p>
+                          </div>
+                          <span className="price-num-custom">{item.childrenPrice?.toLocaleString()} đ</span>
+                        </div>
+                      </div>
+                      <button className="btn-order-now">ĐẶT BÀN NGAY</button>
                     </div>
-                    <button className="book-btn">ĐẶT BÀN NGAY</button>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </main>
         </div>
-        <Footer />
       </div>
-      <FloatingChat />
+      
+      <div className="fixed-chat">
+        <MessageSquare size={28} color="white" />
+        <div className="online-status"></div>
+      </div>
+      <Footer />
     </div>
   );
 };
