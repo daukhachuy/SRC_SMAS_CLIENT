@@ -1,0 +1,685 @@
+/* Takeaway Orders Page Styles */
+
+.takeaway-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.takeaway-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.takeaway-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.takeaway-page-header h1 {
+  font-size: 1.875rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.takeaway-page-header p {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0.5rem 0 0 0;
+}
+
+.takeaway-page-header strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.takeaway-header-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Buttons */
+.takeaway-btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: white;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.takeaway-btn-secondary:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+/* Tabs */
+.takeaway-tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 2rem;
+  overflow-x: auto;
+}
+
+.takeaway-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  padding-top: 0.5rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.takeaway-tab small {
+  padding: 0.125rem 0.5rem;
+  background-color: #f1f5f9;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.takeaway-tab:hover {
+  color: #475569;
+}
+
+.takeaway-tab.active {
+  color: #FF6C1F;
+  border-bottom-color: #FF6C1F;
+}
+
+.takeaway-tab.active small {
+  background-color: rgba(255, 108, 31, 0.1);
+  color: #FF6C1F;
+}
+
+/* Active Orders Section */
+.takeaway-active-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.takeaway-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.takeaway-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.takeaway-icon-box {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 108, 31, 0.1);
+  border-radius: 0.5rem;
+  color: #FF6C1F;
+}
+
+.takeaway-header-title h2 {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.takeaway-count-badge {
+  padding: 0.25rem 0.75rem;
+  background-color: rgba(255, 108, 31, 0.1);
+  color: #FF6C1F;
+  font-size: 0.625rem;
+  font-weight: 900;
+  border-radius: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Orders Grid */
+.takeaway-orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .takeaway-orders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .takeaway-orders-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Order Card */
+.takeaway-order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.takeaway-order-card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-0.25rem);
+}
+
+.takeaway-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.takeaway-card-info {
+  flex: 1;
+}
+
+.takeaway-card-type {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.takeaway-icon {
+  font-size: 0.875rem;
+}
+
+.takeaway-code {
+  font-size: 0.625rem;
+  color: #94a3b8;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.takeaway-customer-name {
+  font-size: 1.125rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0;
+}
+
+.takeaway-status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  letter-spacing: 0.025em;
+}
+
+.status-ready {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-preparing {
+  background-color: #fed7aa;
+  color: #b45309;
+}
+
+.status-completed {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-pending {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+/* Card Image */
+.takeaway-card-image {
+  width: 100%;
+  height: 8rem;
+  background-size: cover;
+  background-position: center;
+  border-radius: 0.75rem;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.takeaway-image-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  transition: background-color 0.2s;
+}
+
+.takeaway-order-card:hover .takeaway-image-overlay {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.takeaway-items-count {
+  position: relative;
+  color: white;
+  font-weight: 900;
+  font-size: 0.875rem;
+}
+
+/* Card Footer */
+.takeaway-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.takeaway-card-amount {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #FF6C1F;
+  margin: 0;
+}
+
+.takeaway-more-btn {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.takeaway-more-btn:hover {
+  color: #FF6C1F;
+}
+
+/* Pagination */
+.takeaway-pagination-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.takeaway-pagination-text {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.takeaway-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.takeaway-pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: white;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.takeaway-pagination-btn:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.takeaway-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.takeaway-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.takeaway-page-numbers button,
+.takeaway-page-numbers span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.takeaway-page-numbers button {
+  border: 1px solid #e2e8f0;
+  background-color: white;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.takeaway-page-numbers button:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.takeaway-page-numbers button.active {
+  background-color: #FF6C1F;
+  color: white;
+  border-color: #FF6C1F;
+  box-shadow: 0 4px 6px rgba(255, 108, 31, 0.2);
+}
+
+.takeaway-page-numbers span {
+  color: #94a3b8;
+}
+
+/* History Section */
+.takeaway-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.takeaway-history-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.takeaway-history-header svg {
+  color: #64748b;
+}
+
+.takeaway-history-header h2 {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* History Table */
+.takeaway-history-table-wrapper {
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.takeaway-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.takeaway-history-table thead {
+  background-color: #f8fafc;
+}
+
+.takeaway-history-table thead th {
+  padding: 1rem 1.5rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.takeaway-history-table tbody tr {
+  border-top: 1px solid #f1f5f9;
+  transition: background-color 0.2s;
+}
+
+.takeaway-history-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.takeaway-history-table tbody td {
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.takeaway-table-code,
+.takeaway-table-amount {
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.takeaway-status-completed {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background-color: #dcfce7;
+  color: #166534;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.takeaway-detail-btn {
+  color: #FF6C1F;
+  background: none;
+  border: none;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: text-decoration 0.2s;
+  opacity: 0;
+}
+
+.takeaway-history-table tbody tr:hover .takeaway-detail-btn {
+  opacity: 1;
+}
+
+.takeaway-detail-btn:hover {
+  text-decoration: underline;
+}
+
+/* Footer */
+.takeaway-history-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background-color: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.takeaway-history-pagination {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.takeaway-history-pagination button {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  background-color: white;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #64748b;
+}
+
+.takeaway-history-pagination button:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.takeaway-history-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .takeaway-page-wrapper {
+    background-color: transparent;
+  }
+
+  .takeaway-page-header h1,
+  .takeaway-header-title h2,
+  .takeaway-history-header h2,
+  .takeaway-table-code,
+  .takeaway-table-amount,
+  .takeaway-customer-name {
+    color: #f1f5f9;
+  }
+
+  .takeaway-btn-secondary,
+  .takeaway-pagination-btn,
+  .takeaway-page-numbers button,
+  .takeaway-history-pagination button {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+
+  .takeaway-btn-secondary:hover,
+  .takeaway-pagination-btn:hover:not(:disabled),
+  .takeaway-page-numbers button:hover,
+  .takeaway-history-pagination button:hover {
+    background-color: #334155;
+    border-color: #475569;
+  }
+
+  .takeaway-order-card {
+    background-color: #1e293b;
+    border-color: #334155;
+  }
+
+  .takeaway-tabs-container {
+    border-bottom-color: #334155;
+  }
+
+  .takeaway-tab {
+    color: #94a3b8;
+  }
+
+  .takeaway-tab small {
+    background-color: #334155;
+    color: #cbd5e1;
+  }
+
+  .takeaway-history-table-wrapper {
+    border-color: #334155;
+  }
+
+  .takeaway-history-table thead {
+    background-color: rgba(30, 41, 59, 0.5);
+  }
+
+  .takeaway-history-table tbody tr {
+    border-top-color: #334155;
+  }
+
+  .takeaway-history-table tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.3);
+  }
+
+  .takeaway-history-footer {
+    background-color: rgba(30, 41, 59, 0.3);
+    border-top-color: #334155;
+  }
+
+  .takeaway-pagination-section {
+    border-top-color: #334155;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .takeaway-header-content {
+    flex-direction: column;
+  }
+
+  .takeaway-header-actions {
+    width: 100%;
+  }
+
+  .takeaway-btn-secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .takeaway-pagination-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .takeaway-pagination-btn,
+  .takeaway-page-numbers {
+    width: 100%;
+  }
+
+  .takeaway-history-table {
+    font-size: 0.75rem;
+  }
+
+  .takeaway-history-table th,
+  .takeaway-history-table td {
+    padding: 0.75rem;
+  }
+}
