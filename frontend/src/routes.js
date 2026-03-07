@@ -18,17 +18,19 @@ import Cart from './pages/Cart';
 import ProtectedRoute from './components/ProtectedRoute';
 import DebugPage from './pages/DebugPage';
 import AuthTestPage from './pages/AuthTestPage';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboardPage from './pages/admin/AdminDashboardPage';
-import AdminOrdersPage from './pages/admin/AdminOrdersPage';
-import DineInOrderDetailPage from './pages/admin/DineInOrderDetailPage';
-import TakeawayOrderDetailPage from './pages/admin/TakeawayOrderDetailPage';
-import AdminReservationsPage from './pages/admin/AdminReservationsPage';
-import AdminStaffPage from './pages/admin/AdminStaffPage';
-import AdminInventoryPage from './pages/admin/AdminInventoryPage';
-import AdminPayrollPage from './pages/admin/AdminPayrollPage';
+import ManagerLayout from './pages/manager/ManagerLayout';
+import ManagerDashboardPage from './pages/manager/ManagerDashboardPage';
+import ManagerOrdersPage from './pages/manager/ManagerOrdersPage';
+import DineInOrderDetailPage from './pages/manager/DineInOrderDetailPage';
+import TakeawayOrderDetailPage from './pages/manager/TakeawayOrderDetailPage';
+import ManagerReservationsPage from './pages/manager/ManagerReservationsPage';
+import EventDetailPage from './pages/manager/EventDetailPage';
+import ContractSigningPage from './pages/manager/ContractSigningPage';
+import ManagerStaffPage from './pages/manager/ManagerStaffPage';
+import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
+import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
-import TakeawayOrdersPage from './pages/admin/TakeawayOrdersPage';
+import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -62,19 +64,24 @@ const AppRoutes = () => {
         <Route path="/auth-test" element={<AuthTestPage />} />
         <Route path="/cart" element={<Cart />} />
 
-        {/* Admin pages */}
-        <Route path="/admin" element={<AdminLayout />}>
+        {/* Redirect old admin URLs to manager */}
+        <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
+
+        {/* Manager pages */}
+        <Route path="/manager" element={<ManagerLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="dashboard" element={<ManagerDashboardPage />} />
+          <Route path="orders" element={<ManagerOrdersPage />} />
           <Route path="orders/dine-in/:id" element={<DineInOrderDetailPage />} />
           <Route path="orders/takeaway/:id" element={<TakeawayOrderDetailPage />} />
           <Route path="dine-in" element={<DineInOrdersPage />} />
           <Route path="takeaway" element={<TakeawayOrdersPage />} />
-          <Route path="reservations" element={<AdminReservationsPage />} />
-          <Route path="staff" element={<AdminStaffPage />} />
-          <Route path="inventory" element={<AdminInventoryPage />} />
-          <Route path="payroll" element={<AdminPayrollPage />} />
+          <Route path="reservations" element={<ManagerReservationsPage />} />
+          <Route path="reservations/:eventId" element={<EventDetailPage />} />
+          <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
+          <Route path="staff" element={<ManagerStaffPage />} />
+          <Route path="inventory" element={<ManagerInventoryPage />} />
+          <Route path="salary" element={<ManagerSalaryPage />} />
         </Route>
 
         {/* Các trang yêu cầu đăng nhập - Bảo vệ bằng ProtectedRoute */}

@@ -1,0 +1,1143 @@
+/* ==================== Salary Page Container ==================== */
+.salary-page {
+  max-width: 1536px;
+  margin: 0 auto;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* ==================== Header Section ==================== */
+.salary-header {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.header-blur-effect {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8rem;
+  height: 8rem;
+  background: rgba(255, 108, 31, 0.05);
+  border-radius: 50%;
+  margin-right: -4rem;
+  margin-top: -4rem;
+  filter: blur(3rem);
+  pointer-events: none;
+}
+
+.header-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.employee-info-section {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.employee-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar-ring {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 108, 31, 0.1);
+  padding: 0.25rem;
+  background: white;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.status-indicator {
+  position: absolute;
+  bottom: 0.25rem;
+  right: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #22c55e;
+  border-radius: 50%;
+  border: 4px solid white;
+}
+
+.employee-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.employee-name {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.employee-role {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.role-icon {
+  color: #ff6c1f;
+}
+
+.employee-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.meta-item svg {
+  width: 14px;
+  height: 14px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-secondary,
+.btn-primary {
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.btn-secondary:hover {
+  background: #f8fafc;
+}
+
+.btn-primary {
+  background: #ff6c1f;
+  color: white;
+  box-shadow: 0 10px 15px -3px rgba(255, 108, 31, 0.2);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-primary svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ==================== Content Grid ==================== */
+.salary-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .salary-content-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.salary-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ==================== Salary Chart Section ==================== */
+.salary-chart-section {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.title-icon {
+  color: #ff6c1f;
+  width: 20px;
+  height: 20px;
+}
+
+.section-subtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.average-display {
+  text-align: right;
+}
+
+.average-label {
+  font-size: 0.625rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.average-amount {
+  font-weight: 900;
+  font-size: 1.25rem;
+  color: #ff6c1f;
+  line-height: 1;
+}
+
+.average-amount .currency {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.salary-chart {
+  height: 16rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.5rem;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  height: 100%;
+}
+
+.chart-bar {
+  position: relative;
+  width: 100%;
+  background: #f1f5f9;
+  border-radius: 0.75rem 0.75rem 0 0;
+  transition: all 0.3s;
+  cursor: pointer;
+  min-height: 2rem;
+}
+
+.chart-bar:hover {
+  background: rgba(255, 108, 31, 0.2);
+}
+
+.chart-bar.bar-active {
+  background: #ff6c1f;
+  box-shadow: 0 10px 15px -3px rgba(255, 108, 31, 0.2);
+}
+
+.chart-bar.bar-current {
+  background: #cbd5e1;
+}
+
+.bar-tooltip {
+  position: absolute;
+  top: -2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: white;
+  font-size: 0.625rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.chart-bar:hover .bar-tooltip {
+  opacity: 1;
+}
+
+.chart-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.label-active {
+  color: #ff6c1f;
+  font-weight: 900;
+}
+
+/* ==================== Salary Breakdown Section ==================== */
+.salary-breakdown-section {
+  background: white;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.breakdown-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.status-badge {
+  background: #d1fae5;
+  color: #059669;
+  font-size: 0.625rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.status-completed {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.breakdown-item {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.breakdown-item:last-child {
+  border-bottom: none;
+}
+
+.breakdown-item:hover {
+  background: #f8fafc;
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.item-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.item-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-slate {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.breakdown-item:hover .icon-slate {
+  background: rgba(255, 108, 31, 0.1);
+  color: #ff6c1f;
+}
+
+.icon-green {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.breakdown-item:hover .icon-green {
+  background: #a7f3d0;
+}
+
+.icon-red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.breakdown-item:hover .icon-red {
+  background: #fecaca;
+}
+
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.item-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.label-green {
+  color: #059669;
+}
+
+.label-red {
+  color: #dc2626;
+}
+
+.item-description {
+  font-size: 0.625rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.item-amount {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.amount-green {
+  color: #059669;
+}
+
+.amount-red {
+  color: #dc2626;
+}
+
+.breakdown-total {
+  background: rgba(255, 108, 31, 0.05);
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 108, 31, 0.1);
+}
+
+.total-label {
+  font-size: 0.875rem;
+  font-weight: 900;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.total-amount {
+  font-size: 1.875rem;
+  font-weight: 900;
+  color: #ff6c1f;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.total-amount .currency-sm {
+  font-size: 0.875rem;
+}
+
+/* ==================== Sidebar Section ==================== */
+.salary-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-content {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 2rem;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.sidebar-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.view-all-btn {
+  color: #ff6c1f;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-all-btn:hover {
+  text-decoration: underline;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-card {
+  padding: 1rem;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.history-card:hover {
+  border-color: rgba(255, 108, 31, 0.4);
+}
+
+.card-highlight {
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.history-month {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.history-status {
+  font-size: 0.563rem;
+  padding: 0.125rem 0.5rem;
+  background: #d1fae5;
+  color: #059669;
+  border-radius: 9999px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.history-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.history-amount {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+}
+
+.history-date {
+  font-size: 0.625rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.payment-note {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 1rem;
+  border: 1px solid #f1f5f9;
+  display: flex;
+  gap: 1rem;
+}
+
+.note-icon {
+  color: #ff6c1f;
+  background: rgba(255, 108, 31, 0.1);
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+}
+
+.note-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.note-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.note-text {
+  font-size: 0.625rem;
+  color: #64748b;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+/* ==================== Modal Styles ==================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.modal-container {
+  background: white;
+  width: 100%;
+  max-width: 42rem;
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: rgba(255, 108, 31, 0.1);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff6c1f;
+}
+
+.modal-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.modal-close-btn {
+  color: #94a3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: color 0.2s;
+}
+
+.modal-close-btn:hover {
+  color: #475569;
+}
+
+.modal-close-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Avatar Section */
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 1rem;
+}
+
+.avatar-preview-wrapper {
+  flex-shrink: 0;
+}
+
+.avatar-preview {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  border: 4px solid white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: #0f172a;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.btn-upload {
+  padding: 0.375rem 0.75rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.btn-upload:hover {
+  background: #f8fafc;
+}
+
+.btn-upload svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-remove {
+  padding: 0.375rem 0.75rem;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 0.5rem;
+}
+
+.btn-remove:hover {
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.avatar-note {
+  font-size: 0.625rem;
+  color: #94a3b8;
+}
+
+/* Form Grid */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-section-title {
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title-line {
+  width: 1rem;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.field-input {
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  color: #0f172a;
+  background: white;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: #ff6c1f;
+  box-shadow: 0 0 0 3px rgba(255, 108, 31, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Admin Section */
+.admin-section {
+  padding: 1.25rem;
+  border: 1px solid #f1f5f9;
+  background: rgba(248, 250, 252, 0.5);
+  border-radius: 1rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.admin-icon {
+  color: #94a3b8;
+  width: 18px;
+  height: 18px;
+}
+
+.admin-title {
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.admin-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 1rem;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.admin-input {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  background: rgba(248, 250, 252, 0.5);
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.modal-footer {
+  padding: 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  background: rgba(248, 250, 252, 0.3);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.btn-cancel {
+  padding: 0.625rem 1.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #475569;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background: #f1f5f9;
+}
+
+.btn-save {
+  padding: 0.625rem 2rem;
+  background: #ff6c1f;
+  color: white;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 15px -3px rgba(255, 108, 31, 0.25);
+  transition: all 0.2s;
+}
+
+.btn-save:hover {
+  filter: brightness(1.1);
+}
+
+/* ==================== Responsive Design ==================== */
+@media (max-width: 768px) {
+  .salary-page {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .salary-header {
+    padding: 1rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .employee-info-section {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+  }
+
+  .employee-details {
+    align-items: center;
+  }
+
+  .employee-meta {
+    justify-content: center;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .btn-secondary,
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .salary-content-grid {
+    gap: 1rem;
+  }
+
+  .salary-chart-section,
+  .salary-breakdown-section {
+    padding: 1rem;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .average-display {
+    text-align: left;
+  }
+
+  .salary-chart {
+    gap: 0.5rem;
+    height: 12rem;
+  }
+
+  .breakdown-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .item-amount {
+    width: 100%;
+    text-align: right;
+  }
+
+  .breakdown-total {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .sidebar-content {
+    position: static;
+  }
+
+  .modal-container {
+    max-height: 95vh;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-section {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .avatar-actions {
+    justify-content: center;
+  }
+
+  .admin-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .employee-name {
+    font-size: 1.25rem;
+  }
+
+  .avatar-ring {
+    width: 5rem;
+    height: 5rem;
+  }
+
+  .total-amount {
+    font-size: 1.5rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}

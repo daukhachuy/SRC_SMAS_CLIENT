@@ -20,20 +20,20 @@ const staffRows = [
   { name: 'Trần Thị Hoa', role: 'Thu ngân', shift: '--:--', status: 'Nghỉ phép', perf: 0 }
 ];
 
-const AdminDashboardPage = () => {
+const ManagerDashboardPage = () => {
   return (
-    <div className="admin-page-grid">
-      <div className="admin-page-header">
+    <div className="manager-page-grid">
+      <div className="manager-page-header">
         <h1>Tổng quan hệ thống</h1>
         <p>Bức tranh kinh doanh hôm nay, cập nhật theo ca trực.</p>
       </div>
 
-      <div className="admin-stats-grid">
+      <div className="manager-stats-grid">
         {stats.map((card) => (
-          <article key={card.title} className="admin-card stat-card">
+          <article key={card.title} className="manager-card stat-card">
             <p>{card.title}</p>
             <h3>{card.value}</h3>
-            <div className={`admin-badge ${card.trend}`}>
+            <div className={`manager-badge ${card.trend}`}>
               {card.trend === 'up' && <ArrowUpRight size={14} />}
               {card.trend === 'down' && <ArrowDownRight size={14} />}
               <span>{card.delta}</span>
@@ -42,36 +42,36 @@ const AdminDashboardPage = () => {
         ))}
       </div>
 
-      <div className="admin-two-col">
-        <article className="admin-card">
-          <div className="admin-card-head">
+      <div className="manager-two-col">
+        <article className="manager-card">
+          <div className="manager-card-head">
             <h2>Doanh thu 7 ngày</h2>
             <span>Biểu đồ mô phỏng</span>
           </div>
-          <div className="admin-chart">
+          <div className="manager-chart">
             {[72, 64, 81, 93, 58, 100, 76].map((v, idx) => (
-              <div key={`bar-${idx}`} className="admin-chart-col">
-                <div style={{ height: `${v}%` }} className="admin-chart-bar" />
+              <div key={`bar-${idx}`} className="manager-chart-col">
+                <div style={{ height: `${v}%` }} className="manager-chart-bar" />
                 <small>{['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][idx]}</small>
               </div>
             ))}
           </div>
         </article>
 
-        <article className="admin-card">
-          <div className="admin-card-head">
+        <article className="manager-card">
+          <div className="manager-card-head">
             <h2>Đơn mới nhất</h2>
-            <a href="/admin/orders">Xem tất cả</a>
+            <a href="/manager/orders">Xem tất cả</a>
           </div>
-          <div className="admin-list">
+          <div className="manager-list">
             {recentOrders.map((order) => (
-              <div key={`${order.table}-${order.time}`} className="admin-list-item">
-                <div className="admin-table-code">{order.table}</div>
+              <div key={`${order.table}-${order.time}`} className="manager-list-item">
+                <div className="manager-table-code">{order.table}</div>
                 <div>
                   <strong>{order.item}</strong>
                   <p>{order.time} - {order.type}</p>
                 </div>
-                <span className={`admin-pill ${order.status.includes('Cho') ? 'pending' : 'cooking'}`}>
+                <span className={`manager-pill ${order.status.includes('Cho') ? 'pending' : 'cooking'}`}>
                   {order.status}
                 </span>
               </div>
@@ -80,13 +80,13 @@ const AdminDashboardPage = () => {
         </article>
       </div>
 
-      <article className="admin-card">
-        <div className="admin-card-head">
+      <article className="manager-card">
+        <div className="manager-card-head">
           <h2>Trạng thái nhân viên</h2>
           <span>Cập nhật theo ca</span>
         </div>
-        <div className="admin-table-wrap">
-          <table className="admin-table">
+        <div className="manager-table-wrap">
+          <table className="manager-table">
             <thead>
               <tr>
                 <th>Nhân viên</th>
@@ -104,7 +104,7 @@ const AdminDashboardPage = () => {
                   <td>{row.shift}</td>
                   <td>{row.status}</td>
                   <td>
-                    <div className="admin-progress">
+                    <div className="manager-progress">
                       <span style={{ width: `${row.perf}%` }} />
                     </div>
                   </td>
@@ -118,4 +118,4 @@ const AdminDashboardPage = () => {
   );
 };
 
-export default AdminDashboardPage;
+export default ManagerDashboardPage;

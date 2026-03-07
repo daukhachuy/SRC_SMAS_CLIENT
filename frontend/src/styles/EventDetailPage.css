@@ -1,0 +1,553 @@
+/* =========================================
+   EVENT DETAIL PAGE - CHI TIẾT SỰ KIỆN
+   ========================================= */
+
+/* Main Container */
+.event-detail-page {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #f7fafc;
+  min-height: 100vh;
+}
+
+/* =========================================
+   HEADER & BREADCRUMB
+   ========================================= */
+
+.event-detail-header {
+  margin-bottom: 2rem;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #718096;
+  margin-bottom: 0.75rem;
+}
+
+.breadcrumb-item {
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-item:hover:not(.active) {
+  color: #ff6d1f;
+  cursor: pointer;
+}
+
+.breadcrumb-item.active {
+  color: #1a202c;
+  font-weight: 600;
+}
+
+.event-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #1a202c;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.025em;
+}
+
+.event-subtitle {
+  font-size: 1.125rem;
+  color: #718096;
+  margin: 0;
+}
+
+/* =========================================
+   INFO CARDS
+   ========================================= */
+
+.event-info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.info-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.info-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.info-card.status-card {
+  background: rgba(255, 109, 31, 0.05);
+  border-color: rgba(255, 109, 31, 0.2);
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.info-card-icon {
+  color: #ff6d1f;
+}
+
+.info-card-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #718096;
+}
+
+.info-card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+  letter-spacing: -0.025em;
+}
+
+.status-confirmed {
+  color: #ff6d1f !important;
+}
+
+/* =========================================
+   MAIN CONTENT GRID
+   ========================================= */
+
+.event-content-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+/* Left Column */
+.event-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Right Column */
+.event-right-column {
+  position: sticky;
+  top: 6rem;
+  height: fit-content;
+}
+
+/* =========================================
+   SECTION COMMON STYLES
+   ========================================= */
+
+.event-section {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.section-title svg {
+  color: #ff6d1f;
+}
+
+.combo-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.375rem 0.75rem;
+  background: rgba(255, 109, 31, 0.15);
+  color: #ff6d1f;
+  border-radius: 6px;
+}
+
+/* =========================================
+   MENU SECTION
+   ========================================= */
+
+.menu-table-container {
+  overflow-x: auto;
+}
+
+.menu-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.menu-table thead {
+  background: #f7fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.menu-table thead th {
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.menu-table tbody tr {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.menu-table tbody tr:hover:not(.category-row) {
+  background: #f7fafc;
+}
+
+.menu-table tbody tr.category-row {
+  background: #f7fafc;
+}
+
+.menu-table tbody tr.category-row td {
+  padding: 0.625rem 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a0aec0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.menu-table tbody td {
+  padding: 1.25rem 1.5rem;
+  font-size: 0.95rem;
+  color: #2d3748;
+  vertical-align: top;
+}
+
+.menu-item-name {
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 0.25rem;
+}
+
+.menu-item-desc {
+  font-size: 0.875rem;
+  color: #718096;
+  font-style: italic;
+}
+
+.menu-price {
+  font-weight: 600;
+  color: #2d3748;
+  white-space: nowrap;
+}
+
+.menu-note {
+  font-size: 0.875rem;
+  color: #718096;
+}
+
+/* =========================================
+   TERMS & SERVICES SECTION
+   ========================================= */
+
+.terms-section {
+  padding: 1.5rem;
+}
+
+.terms-section .section-title {
+  margin-bottom: 1.5rem;
+}
+
+.terms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.terms-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.terms-subtitle {
+  font-weight: 700;
+  color: #1a202c;
+  border-left: 4px solid #ff6d1f;
+  padding-left: 0.75rem;
+  margin: 0;
+}
+
+.policy-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.policy-item {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.policy-icon {
+  color: #ff6d1f;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.service-badge {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #2d3748;
+  text-align: center;
+}
+
+/* =========================================
+   PAYMENT SECTION
+   ========================================= */
+
+.payment-section {
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.payment-section .section-title {
+  margin-bottom: 1.5rem;
+}
+
+.payment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.payment-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  color: #718096;
+}
+
+.payment-value {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.payment-divider {
+  border: none;
+  border-top: 2px dashed #e2e8f0;
+  margin: 0.5rem 0;
+}
+
+.payment-total {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-top: 0.5rem;
+}
+
+.payment-total-value {
+  font-size: 1.5rem;
+  color: #ff6d1f !important;
+}
+
+.payment-status-box {
+  background: rgba(255, 109, 31, 0.05);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.payment-deposit {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #718096;
+}
+
+.deposit-amount {
+  font-weight: 700;
+  color: #059669;
+}
+
+.payment-remaining {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  color: #1a202c;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 109, 31, 0.15);
+}
+
+.remaining-amount {
+  color: #1a202c;
+}
+
+.payment-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.btn-confirm-payment {
+  width: 100%;
+  padding: 0.875rem;
+  background: #ff6d1f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 109, 31, 0.3);
+}
+
+.btn-confirm-payment:hover {
+  background: #e85d0d;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 109, 31, 0.4);
+}
+
+.btn-transaction-history {
+  width: 100%;
+  padding: 0.875rem;
+  background: #f7fafc;
+  color: #2d3748;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-transaction-history:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e0;
+}
+
+/* =========================================
+   FOOTER
+   ========================================= */
+
+.event-footer {
+  border-top: 1px solid #e2e8f0;
+  padding: 1.5rem 0;
+  text-align: center;
+  color: #718096;
+  font-size: 0.875rem;
+  margin-top: 3rem;
+}
+
+.event-footer p {
+  margin: 0;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN
+   ========================================= */
+
+/* Tablets */
+@media (max-width: 1024px) {
+  .event-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .event-right-column {
+    position: static;
+  }
+
+  .terms-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .event-detail-page {
+    padding: 1rem;
+  }
+
+  .event-title {
+    font-size: 1.875rem;
+  }
+
+  .event-subtitle {
+    font-size: 1rem;
+  }
+
+  .event-info-cards {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .event-content-grid {
+    gap: 1.5rem;
+  }
+
+  .menu-table-container {
+    overflow-x: scroll;
+  }
+
+  .menu-table {
+    min-width: 700px;
+  }
+
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .event-title {
+    font-size: 1.5rem;
+  }
+
+  .info-card-value {
+    font-size: 1.25rem;
+  }
+
+  .payment-total-value {
+    font-size: 1.25rem;
+  }
+}

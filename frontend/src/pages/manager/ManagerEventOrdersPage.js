@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import EventDetailModal from './EventDetailModal';
 
-const AdminEventOrdersPage = () => {
+const ManagerEventOrdersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('events');
   const [searchTerm, setSearchTerm] = useState('');
@@ -471,4 +471,4 @@ const AdminEventOrdersPage = () => {
   );
 };
 
-export default AdminEventOrdersPage;
+export default ManagerEventOrdersPage;
