@@ -107,3 +107,15 @@ export async function getFeedbackList() {
     throw error;
   }
 }
+
+export async function getBuffetDetail(id) {
+  try {
+    console.log(`🔍 Fetching detail for buffet ID: ${id}...`);
+    const response = await instance.get(`/food/BuffetId/${id}`);
+    console.log(`✅ Buffet detail ${id} loaded:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Failed to fetch buffet detail ${id}:`, error.message);
+    return null;
+  }
+}

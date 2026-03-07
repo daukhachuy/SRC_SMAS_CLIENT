@@ -1,221 +1,126 @@
-/* --- BIẾN TOÀN CỤC --- */
+/* --- BIẾN TOÀN CỤC (Đồng bộ với Menu) --- */
 :root {
   --primary-orange: #FF7A21;
   --primary-hover: #E85C00;
   --soft-black: #1A1A1A;
-  --deep-black: #121212;
-  --light-gray: #F8F8F8;
+  --light-gray: #F5F5F5;
   --white: #ffffff;
   --red-price: #FF3B30;
-  --transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  --shadow-premium: 0 15px 35px rgba(0,0,0,0.06);
+  --border-color: #EEEEEE;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* --- TỔNG THỂ & FIX HEADER CHE NỘI DUNG --- */
-.app {
-  background-color: var(--white);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-}
-
+/* --- BỐ CỤC CHÍNH --- */
 .combo-page-container {
-  padding-top: 100px; /* Đẩy xuống để không bị Header che */
-  min-height: 100vh;
-}
-
-/* --- TABS ĐIỀU HƯỚNG (PHONG CÁCH BLACK PILL) --- */
-.combo-nav-tabs {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  background-color: var(--soft-black);
-  border-radius: 60px;
-  justify-content: center;
-  width: fit-content;
-  margin: 0 auto 40px;
-  box-shadow: 0 15px 30px rgba(0,0,0,0.15);
-}
-
-.nav-tab {
-  padding: 10px 30px;
-  background-color: transparent;
-  border: none;
-  border-radius: 50px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 14px;
-  color: #888;
-  transition: var(--transition);
-  text-transform: uppercase;
-}
-
-.nav-tab.active {
-  background-color: var(--primary-orange);
-  color: white;
-  box-shadow: 0 8px 15px rgba(255, 122, 33, 0.3);
-}
-
-.nav-tab:hover:not(.active) {
-  color: white;
-}
-
-/* --- NỘI DUNG CHÍNH --- */
-.combo-content {
-  display: flex;
-  gap: 30px;
-  padding: 0 4% 60px;
+  padding-top: 100px;
   max-width: 1440px;
   margin: 0 auto;
+  width: 100%;
 }
 
-/* --- SIDEBAR BỘ LỌC (BO GÓC LỚN) --- */
-.sidebar {
-  width: 280px;
-  background-color: var(--light-gray);
-  padding: 30px;
-  border-radius: 40px;
-  height: fit-content;
+.combo-content {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 30px;
+  padding: 0 4% 60px;
 }
 
-.filter-title {
-  font-size: 20px;
-  font-weight: 900;
-  margin-bottom: 25px;
-  color: var(--deep-black);
-}
-
-.filter-group {
-  margin-bottom: 20px;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 15px;
-}
-
-.filter-header h4 {
-  font-size: 14px;
-  color: var(--primary-orange);
-  text-transform: uppercase;
-  font-weight: 800;
-}
-
-.filter-list {
-  list-style: none;
-  padding: 10px 0 0;
-}
-
-.filter-list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  font-weight: 600;
-  color: #555;
-  font-size: 14px;
-}
-
-/* --- TÌM KIẾM --- */
-.search-section {
-  display: flex;
-  align-items: center;
-  background: var(--light-gray);
-  padding: 8px;
-  border-radius: 50px;
-  margin-bottom: 35px;
-}
-
-.search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 10px 20px;
-  font-weight: 600;
-  outline: none;
-}
-
-.search-btn {
-  background-color: var(--soft-black);
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 40px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.search-btn:hover {
-  background-color: var(--primary-orange);
-}
-
-/* --- COMBO GRID (4 MÓN / HÀNG) --- */
+/* --- GRID COMBO (KHÓA 4 CỘT) --- */
 .combo-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, 1fr); 
   gap: 20px;
-  margin-bottom: 40px;
+  align-items: stretch; /* Ép các item cùng hàng cao bằng nhau */
 }
 
+/* --- THẺ COMBO ITEM --- */
 .combo-item {
-  background-color: white;
-  border: 1px solid #f0f0f0;
-  border-radius: 35px; /* Bo góc cực đại */
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
   padding: 15px;
-  transition: var(--transition);
   display: flex;
   flex-direction: column;
+  height: 100%; 
+  box-sizing: border-box;
+  transition: var(--transition);
+  position: relative;
 }
 
 .combo-item:hover {
-  transform: translateY(-10px);
-  box-shadow: var(--shadow-premium);
+  transform: translateY(-8px);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.08);
   border-color: var(--primary-orange);
 }
 
+/* 1. KHÓA ẢNH VUÔNG 1:1 */
 .item-image-container {
-  height: 180px;
-  border-radius: 25px;
+  width: 100%;
+  aspect-ratio: 1 / 1; 
+  border-radius: 15px;
   overflow: hidden;
   margin-bottom: 15px;
+  background-color: #f9f9f9;
+  flex-shrink: 0;
 }
 
 .item-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s ease;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important; 
+  display: block;
+  transition: transform 0.5s ease;
 }
 
 .combo-item:hover .item-image {
   transform: scale(1.1);
 }
 
-.item-name {
-  font-size: 17px;
-  font-weight: 900;
-  margin: 5px 10px;
-  color: var(--soft-black);
-  text-align: left;
+/* 2. NHÃN CATEGORY */
+.item-category {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--primary-orange);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: block;
 }
 
-.item-description {
-  font-size: 13px;
-  color: #777;
-  margin: 0 10px 15px;
-  text-align: left;
-  line-height: 1.4;
-  /* Giới hạn 2 dòng mô tả */
+/* 3. KHÓA TÊN COMBO (Tối đa 2 dòng) */
+.item-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--soft-black);
+  margin-bottom: 10px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  height: 36px;
+  height: 44px; /* Khóa độ cao cố định */
+  line-height: 1.4;
 }
 
-/* --- GIÁ & CART (CAM & MINI) --- */
+/* 4. MÔ TẢ NGẮN (Khóa 2 dòng) */
+.item-description {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.5;
+  margin-bottom: 15px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 38px; /* Đảm bảo các mô tả bằng nhau */
+}
+
+/* 5. PHẦN GIÁ (DÍNH ĐÁY) */
 .price-info {
+  margin-top: auto; /* Đẩy xuống đáy thẻ */
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 10px 10px;
-  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #f5f5f5;
 }
 
 .new-price {
@@ -225,74 +130,137 @@
 }
 
 .cart-icon {
-  color: var(--primary-orange) !important; /* Giữ icon cũ nhưng đổi màu cam */
+  color: var(--primary-orange);
   cursor: pointer;
+  padding: 8px;
+  background: #fff4ee;
+  border-radius: 12px;
   transition: var(--transition);
 }
 
 .cart-icon:hover {
-  transform: scale(1.3) rotate(-10deg);
-  color: var(--soft-black) !important;
+  background: var(--primary-orange);
+  color: white !important;
 }
 
 /* --- PHÂN TRANG (PAGINATION) --- */
-.pagination {
+.pagination-wrapper {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid #eee;
-  padding-top: 25px;
+  margin-top: 40px;
+  padding: 30px 0;
+  border-top: 1px solid var(--border-color);
 }
 
-.page-btn {
+.pagination-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.p-btn {
   width: 40px;
   height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 12px;
-  border: 1px solid #eee;
+  border: 1px solid #ddd;
   background: white;
   font-weight: 800;
   cursor: pointer;
   transition: var(--transition);
 }
 
-.page-btn.active {
-  background-color: var(--primary-orange);
+.p-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.p-btn.active {
+  background: var(--primary-orange);
   color: white;
   border-color: var(--primary-orange);
+  box-shadow: 0 4px 10px rgba(255, 122, 33, 0.3);
 }
 
-/* --- CHAT CỐ ĐỊNH --- */
-.fixed-chat {
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  width: 65px;
-  height: 65px;
-  background-color: var(--soft-black);
-  border-radius: 20px;
+.p-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--primary-orange);
+  color: var(--primary-orange);
+}
+
+/* Đồng bộ Control Bar */
+.menu-control-bar {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  padding: 20px 4%;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 20px;
+}
+
+.control-left {
+  display: flex;
+  gap: 15px;
+}
+
+/* Tab buttons */
+.nav-tab {
+  padding: 10px 25px;
+  border: none;
+  background: #f5f5f5;
+  border-radius: 30px;
+  font-weight: 700;
   cursor: pointer;
-  z-index: 1000;
-  transition: var(--transition);
+  transition: 0.3s;
 }
 
-.fixed-chat:hover {
-  background-color: var(--primary-orange);
-  transform: translateY(-5px);
+.nav-tab.active {
+  background: #FF7A21;
+  color: white;
 }
 
-.online-status {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background-color: #4CAF50;
-  border-radius: 50%;
-  bottom: 8px;
-  right: 8px;
-  border: 3px solid var(--soft-black);
+/* Search Row */
+.search-row-container {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.search-container-new {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0 15px;
+}
+
+.search-container-new input {
+  flex: 1;
+  border: none;
+  padding: 12px 0;
+  outline: none;
+}
+
+.btn-tim-kiem {
+  background: #FF7A21;
+  color: white;
+  border: none;
+  padding: 0 30px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Status messages */
+.status-msg {
+  text-align: center;
+  padding: 50px;
+  font-size: 18px;
+  color: #666;
 }
 
 /* --- RESPONSIVE --- */
@@ -300,8 +268,8 @@
   .combo-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
-@media (max-width: 768px) {
-  .combo-content { flex-direction: column; }
-  .sidebar { width: 100%; }
+@media (max-width: 992px) {
+  .combo-content { grid-template-columns: 1fr; }
+  .sidebar { display: none; } /* Có thể ẩn sidebar trên mobile */
   .combo-grid { grid-template-columns: repeat(2, 1fr); }
 }
