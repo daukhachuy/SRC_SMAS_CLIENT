@@ -53,13 +53,6 @@ const REVIEWS_DATA = Array.from({ length: 20 }).map((_, i) => ({
 
 // --- SMALL COMPONENTS ---
 
-const FloatingChat = () => (
-  <div className="fixed-chat">
-    <MessageSquare size={28} color="white" />
-    <span className="online-status"></span>
-  </div>
-);
-
 const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
   <div className="product-card">
     <div className="product-img-container">
@@ -456,7 +449,6 @@ const Home = () => {
       {/* PHẦN ĐÃ SỬA: DÙNG API /api/food/discount */}
       <DiscountAndInfo navigate={navigate} />
       
-      <FloatingChat />
       <Footer />
     </div>
   );

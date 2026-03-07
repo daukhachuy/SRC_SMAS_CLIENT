@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Home, { COMBOS_DATA, BEST_SELLERS_DATA } from './pages/Home';
 import ComboPage from './pages/ComboPage';
@@ -18,6 +18,17 @@ import Cart from './pages/Cart';
 import ProtectedRoute from './components/ProtectedRoute';
 import DebugPage from './pages/DebugPage';
 import AuthTestPage from './pages/AuthTestPage';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminOrdersPage from './pages/admin/AdminOrdersPage';
+import DineInOrderDetailPage from './pages/admin/DineInOrderDetailPage';
+import TakeawayOrderDetailPage from './pages/admin/TakeawayOrderDetailPage';
+import AdminReservationsPage from './pages/admin/AdminReservationsPage';
+import AdminStaffPage from './pages/admin/AdminStaffPage';
+import AdminInventoryPage from './pages/admin/AdminInventoryPage';
+import AdminPayrollPage from './pages/admin/AdminPayrollPage';
+import DineInOrdersPage from './pages/DineInOrdersPage';
+import TakeawayOrdersPage from './pages/admin/TakeawayOrdersPage';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -50,6 +61,21 @@ const AppRoutes = () => {
         <Route path="/debug" element={<DebugPage />} />
         <Route path="/auth-test" element={<AuthTestPage />} />
         <Route path="/cart" element={<Cart />} />
+
+        {/* Admin pages */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="orders/dine-in/:id" element={<DineInOrderDetailPage />} />
+          <Route path="orders/takeaway/:id" element={<TakeawayOrderDetailPage />} />
+          <Route path="dine-in" element={<DineInOrdersPage />} />
+          <Route path="takeaway" element={<TakeawayOrdersPage />} />
+          <Route path="reservations" element={<AdminReservationsPage />} />
+          <Route path="staff" element={<AdminStaffPage />} />
+          <Route path="inventory" element={<AdminInventoryPage />} />
+          <Route path="payroll" element={<AdminPayrollPage />} />
+        </Route>
 
         {/* Các trang yêu cầu đăng nhập - Bảo vệ bằng ProtectedRoute */}
         <Route element={
