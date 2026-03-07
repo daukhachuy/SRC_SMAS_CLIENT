@@ -6,6 +6,8 @@ import { ShoppingCart, MessageSquare, ChevronLeft, ChevronRight, Search } from '
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { getAllCategories } from '../api/categoryApi';
+// Import helper kiểm tra đăng nhập từ file auth của bạn
+import { isAuthenticated } from '../api/authApi'; 
 
 const FloatingChat = () => (
   <div className="fixed-chat">
@@ -28,7 +30,7 @@ const MenuPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  // FETCH CATEGORIES
+  // 1. FETCH CATEGORIES (Giữ nguyên logic của bạn)
   useEffect(() => {
     const fetchCats = async () => {
       try {
@@ -46,7 +48,7 @@ const MenuPage = () => {
     fetchCats();
   }, []);
 
-  // FETCH FOOD
+  // 2. FETCH FOOD (Giữ nguyên logic filter của bạn)
   useEffect(() => {
     const loadFilteredFoods = async () => {
       try {
@@ -79,6 +81,38 @@ const MenuPage = () => {
     loadFilteredFoods();
   }, [selectedCategoryIds, priceRange]);
 
+  // ==========================================
+  // 3. HÀM THÊM VÀO GIỎ HÀNG (THEO YÊU CẦU)
+  // ==========================================
+  const addToCart = (item) => {
+    // Kiểm tra đăng nhập qua helper (check authToken)
+    if (!isAuthenticated()) {
+      alert("Vui lòng đăng nhập để thêm món vào giỏ hàng!");
+      navigate('/login');
+      return;
+    }
+
+    // Xử lý giỏ hàng trong LocalStorage
+    const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
+    const itemIndex = existingCart.findIndex(cartItem => cartItem.id === item.id);
+
+    if (itemIndex > -1) {
+      existingCart[itemIndex].quantity += 1;
+    } else {
+      existingCart.push({
+        ...item,
+        quantity: 1,
+        isCombo: false // Món lẻ
+      });
+    }
+
+    localStorage.setItem('cart', JSON.stringify(existingCart));
+    
+    // Bắn event để Header cập nhật số lượng badge
+    window.dispatchEvent(new Event('storage')); 
+    alert(`Đã thêm ${item.name} vào giỏ hàng!`);
+  };
+
   const handleCategoryChange = (id) => {
     setSelectedCategoryIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -101,7 +135,7 @@ const MenuPage = () => {
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 200, behavior: 'smooth' }); // Cuộn nhẹ lên đầu thực đơn
+    window.scrollTo({ top: 200, behavior: 'smooth' });
   };
 
   return (
@@ -109,7 +143,6 @@ const MenuPage = () => {
       <Header />
 
       <div className="menu-page-container">
-        {/* THANH TAB & SORT */}
         <div className="menu-control-bar">
           <div className="control-left">
             <button className="nav-tab active">MENU</button>
@@ -163,7 +196,6 @@ const MenuPage = () => {
           </aside>
 
           <main className="main-content">
-            {/* THANH TÌM KIẾM THEO YÊU CẦU */}
             <div className="search-row-container">
                 <div className="search-container-new">
                   <input 
@@ -197,7 +229,13 @@ const MenuPage = () => {
                           {item.oldPrice && <span className="old-price">{item.oldPrice.toLocaleString()}đ</span>}
                           <span className="new-price">{item.price.toLocaleString()}đ</span>
                         </div>
-                        <ShoppingCart size={20} className="cart-icon" />
+                        {/* THÊM SỰ KIỆN CLICK VÀO ICON GIỎ HÀNG */}
+                        <ShoppingCart 
+                          size={20} 
+                          className="cart-icon" 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => addToCart(item)} 
+                        />
                       </div>
                     </div>
                   ))}
