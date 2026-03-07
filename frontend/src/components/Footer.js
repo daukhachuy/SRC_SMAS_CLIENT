@@ -36,7 +36,6 @@ const Footer = () => {
               <li className="footer-list-item">Thực đơn chính</li>
               <li className="footer-list-item">Ưu đãi Combo</li>
               <li className="footer-list-item">Đặt bàn ngay</li>
-              <li className="footer-list-item">Tuyển dụng</li>
             </ul>
           </div>
 

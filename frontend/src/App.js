@@ -1,13 +1,13 @@
 import React from 'react';
 import AppRoutes from './routes';
-import ApiDiagnostics from './components/ApiDiagnostics';
+import AIChatBot from './components/AIChatBot';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
   return (
     <AuthProvider>
       <AppRoutes />
-      <ApiDiagnostics />
+      <AIChatBot />
     </AuthProvider>
   );
 }
