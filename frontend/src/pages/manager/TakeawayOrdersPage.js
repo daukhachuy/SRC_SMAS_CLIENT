@@ -146,7 +146,7 @@ const TakeawayOrdersPage = () => {
               key={order.code} 
               className="takeaway-order-card"
               style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/admin/orders/takeaway/${order.code}`)}
+              onClick={() => navigate(`/manager/orders/takeaway/${order.code}`)}
             >
               <div className="takeaway-card-header">
                 <div className="takeaway-card-info">

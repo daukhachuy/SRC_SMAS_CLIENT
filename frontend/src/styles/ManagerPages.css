@@ -1,31 +1,31 @@
-.admin-page-grid {
+.manager-page-grid {
   display: grid;
   gap: 18px;
 }
 
-.admin-page-header h1 {
+.manager-page-header h1 {
   margin: 0;
   font-size: clamp(28px, 4vw, 38px);
   line-height: 1.12;
   color: #25160d;
 }
 
-.admin-page-header p {
+.manager-page-header p {
   margin: 8px 0 0;
   color: #7a6352;
 }
 
-.admin-stats-grid {
+.manager-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
-.admin-stats-grid.compact h3 {
+.manager-stats-grid.compact h3 {
   font-size: 30px;
 }
 
-.admin-card {
+.manager-card {
   border: 1px solid #e6d9ca;
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, #fff8f1 100%);
@@ -45,7 +45,7 @@
   line-height: 1;
 }
 
-.admin-badge {
+.manager-badge {
   width: fit-content;
   margin-top: 12px;
   border-radius: 999px;
@@ -57,28 +57,28 @@
   font-weight: 700;
 }
 
-.admin-badge.up {
+.manager-badge.up {
   color: #0f7a45;
   background: #dcfce7;
 }
 
-.admin-badge.down {
+.manager-badge.down {
   color: #b91c1c;
   background: #fee2e2;
 }
 
-.admin-badge.flat {
+.manager-badge.flat {
   color: #8b5e38;
   background: #ffedd5;
 }
 
-.admin-two-col {
+.manager-two-col {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 14px;
 }
 
-.admin-card-head {
+.manager-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -86,19 +86,19 @@
   margin-bottom: 14px;
 }
 
-.admin-card-head h2 {
+.manager-card-head h2 {
   margin: 0;
   font-size: 20px;
 }
 
-.admin-card-head span,
-.admin-card-head a {
+.manager-card-head span,
+.manager-card-head a {
   color: #91684a;
   font-size: 13px;
   text-decoration: none;
 }
 
-.admin-chart {
+.manager-chart {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;
@@ -106,26 +106,26 @@
   min-height: 240px;
 }
 
-.admin-chart-col {
+.manager-chart-col {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
 
-.admin-chart-bar {
+.manager-chart-bar {
   width: 100%;
   border-radius: 12px 12px 6px 6px;
   background: linear-gradient(180deg, #ffb067 0%, #ff7a21 100%);
   min-height: 20px;
 }
 
-.admin-list {
+.manager-list {
   display: grid;
   gap: 10px;
 }
 
-.admin-list-item {
+.manager-list-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -136,18 +136,18 @@
   background: #fff;
 }
 
-.admin-list-item p {
+.manager-list-item p {
   margin: 4px 0 0;
   font-size: 13px;
   color: #8a6c56;
 }
 
-.admin-list-item.reservation {
+.manager-list-item.reservation {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   display: grid;
 }
 
-.admin-table-code {
+.manager-table-code {
   width: 44px;
   height: 44px;
   border-radius: 10px;
@@ -158,7 +158,7 @@
   font-weight: 700;
 }
 
-.admin-pill {
+.manager-pill {
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -166,55 +166,55 @@
   width: fit-content;
 }
 
-.admin-pill.pending {
+.manager-pill.pending {
   background: #fef3c7;
   color: #9a6700;
 }
 
-.admin-pill.cooking {
+.manager-pill.cooking {
   background: #dbeafe;
   color: #1856ad;
 }
 
-.admin-pill.done {
+.manager-pill.done {
   background: #dcfce7;
   color: #0e7a45;
 }
 
-.admin-table-wrap {
+.manager-table-wrap {
   overflow-x: auto;
 }
 
-.admin-table {
+.manager-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 680px;
 }
 
-.admin-table thead {
+.manager-table thead {
   background: #fff3e6;
 }
 
-.admin-table th,
-.admin-table td {
+.manager-table th,
+.manager-table td {
   text-align: left;
   padding: 12px 14px;
   border-bottom: 1px solid #efdfcf;
 }
 
-.admin-table th {
+.manager-table th {
   font-size: 12px;
   color: #8d6648;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.admin-table td {
+.manager-table td {
   font-size: 14px;
   color: #321f14;
 }
 
-.admin-progress {
+.manager-progress {
   width: 120px;
   height: 8px;
   border-radius: 999px;
@@ -222,7 +222,7 @@
   overflow: hidden;
 }
 
-.admin-progress span {
+.manager-progress span {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, #ffb067, #ff7a21);
@@ -554,7 +554,7 @@
 }
 
 @media (max-width: 1080px) {
-  .admin-two-col {
+  .manager-two-col {
     grid-template-columns: 1fr;
   }
 
@@ -572,11 +572,11 @@
 }
 
 @media (max-width: 860px) {
-  .admin-stats-grid {
+  .manager-stats-grid {
     grid-template-columns: 1fr;
   }
 
-  .admin-list-item.reservation {
+  .manager-list-item.reservation {
     grid-template-columns: 1fr;
   }
 

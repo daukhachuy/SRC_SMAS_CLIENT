@@ -520,7 +520,7 @@ const ModeIcon = ({ mode }) => {
   return <UtensilsCrossed size={14} />;
 };
 
-const AdminOrdersPage = () => {
+const ManagerOrdersPage = () => {
   const navigate = useNavigate();
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -536,9 +536,9 @@ const AdminOrdersPage = () => {
       setSelectedDelivery(order);
       setIsDeliveryModalOpen(true);
     } else if (order.icon === 'dine') {
-      navigate(`/admin/orders/dine-in/${encodeURIComponent(order.code)}`);
+      navigate(`/manager/orders/dine-in/${encodeURIComponent(order.code)}`);
     } else if (order.icon === 'takeaway') {
-      navigate(`/admin/orders/takeaway/${encodeURIComponent(order.code)}`);
+      navigate(`/manager/orders/takeaway/${encodeURIComponent(order.code)}`);
     }
   };
 
@@ -552,8 +552,8 @@ const AdminOrdersPage = () => {
     : activeOrders.filter(order => order.icon === activeTab);
 
   return (
-    <div className="admin-page-grid orders-page">
-      <div className="admin-page-header orders-header-row">
+    <div className="manager-page-grid orders-page">
+      <div className="manager-page-header orders-header-row">
         <div>
           <h1>Quản lý đơn hàng</h1>
           <p>
@@ -561,11 +561,11 @@ const AdminOrdersPage = () => {
           </p>
         </div>
         <div className="orders-toolbar-actions">
-          <button className="admin-secondary-btn orders-tool-btn">
+          <button className="manager-secondary-btn orders-tool-btn">
             <Filter size={16} />
             <span>Bộ lọc</span>
           </button>
-          <button className="admin-secondary-btn orders-tool-btn">
+          <button className="manager-secondary-btn orders-tool-btn">
             <Download size={16} />
             <span>Xuất báo cáo</span>
           </button>
@@ -585,7 +585,7 @@ const AdminOrdersPage = () => {
         ))}
       </div>
 
-      <section className="admin-card orders-active-section">
+      <section className="manager-card orders-active-section">
         <div className="orders-section-head">
           <div>
             <h2>Đơn hàng đang hoạt động</h2>
@@ -654,7 +654,7 @@ const AdminOrdersPage = () => {
         </div>
       </section>
 
-      <section className="admin-card orders-history-section">
+      <section className="manager-card orders-history-section">
         <div className="orders-section-head history">
           <div>
             <h2>
@@ -664,8 +664,8 @@ const AdminOrdersPage = () => {
           </div>
         </div>
 
-        <div className="admin-table-wrap">
-          <table className="admin-table orders-history-table">
+        <div className="manager-table-wrap">
+          <table className="manager-table orders-history-table">
             <thead>
               <tr>
                 <th>Mã đơn</th>
@@ -746,4 +746,4 @@ const AdminOrdersPage = () => {
   );
 };
 
-export default AdminOrdersPage;
+export default ManagerOrdersPage;

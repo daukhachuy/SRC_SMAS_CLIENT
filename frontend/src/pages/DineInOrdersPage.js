@@ -166,7 +166,7 @@ function DineInOrdersPage() {
                 key={order.code} 
                 className="dinein-order-card"
                 style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/admin/orders/dine-in/${encodeURIComponent(order.code)}`)}
+                onClick={() => navigate(`/manager/orders/dine-in/${encodeURIComponent(order.code)}`)}
               >
                 <div className="dinein-card-header">
                   <div className="dinein-card-info">
