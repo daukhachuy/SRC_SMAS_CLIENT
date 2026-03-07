@@ -42,7 +42,7 @@ export async function getFeaturedMenu() {
 export async function createReservation(payload) {
   try {
     console.log('📅 Creating reservation...');
-    const r = await instance.post('/reservations', payload);
+    const r = await instance.post('/reservation/create', payload);
     console.log('✅ Reservation created');
     return r.data;
   } catch (error) {
