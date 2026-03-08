@@ -32,6 +32,16 @@ import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 
+import WaiterLayout from './pages/waiter/WaiterLayout';
+import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
+import WaiterSchedulePage from './pages/waiter/WaiterSchedulePage';
+import WaiterProfilePage from './pages/waiter/WaiterProfilePage';
+
+import KitchenLayout from './pages/kitchen/KitchenLayout';
+import KitchenOrdersPage from './pages/kitchen/KitchenOrdersPage';
+import KitchenSchedulePage from './pages/kitchen/KitchenSchedulePage';
+import KitchenProfilePage from './pages/kitchen/KitchenProfilePage';
+
 // Import trang Promotion
 import Promotion from './pages/Promotion';
 
@@ -83,6 +93,22 @@ const AppRoutes = () => {
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
         </Route>
+
+          {/* Waiter pages */}
+          <Route path="/waiter" element={<WaiterLayout />}>
+            <Route index element={<Navigate to="orders" replace />} />
+            <Route path="orders" element={<WaiterOrdersPage />} />
+              <Route path="schedule" element={<WaiterSchedulePage />} />
+              <Route path="profile" element={<WaiterProfilePage />} />
+          </Route>
+
+          {/* Kitchen pages */}
+          <Route path="/kitchen" element={<KitchenLayout />}>
+            <Route index element={<Navigate to="orders" replace />} />
+            <Route path="orders" element={<KitchenOrdersPage />} />
+            <Route path="schedule" element={<KitchenSchedulePage />} />
+            <Route path="profile" element={<KitchenProfilePage />} />
+          </Route>
 
         {/* Các trang yêu cầu đăng nhập - Bảo vệ bằng ProtectedRoute */}
         <Route element={

@@ -87,6 +87,7 @@
   line-height: 1.1;
   margin-bottom: 20px;
   letter-spacing: -2px;
+  color: white;
   /* Xuất hiện trễ hơn tag một chút */
   animation: fadeInUp 0.8s ease forwards 0.2s;
   opacity: 0;
