@@ -1,0 +1,273 @@
+:root {
+  --waiter-bg: #f8f6f5;
+  --waiter-surface: #ffffff;
+  --waiter-border: #e0dcd8;
+  --waiter-text: #23160f;
+  --waiter-muted: #7a6f66;
+  --waiter-primary: #ff6d1f;
+  --waiter-primary-deep: #d95f0c;
+}
+
+.waiter-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  background: var(--waiter-bg);
+  color: var(--waiter-text);
+}
+
+.waiter-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  border-right: 1px solid var(--waiter-border);
+  background: var(--waiter-surface);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 20;
+}
+
+.waiter-brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 4px;
+  margin-bottom: 16px;
+}
+
+.waiter-brand-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 109, 31, 0.2);
+  color: var(--waiter-primary);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 22px;
+}
+
+.waiter-brand h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.waiter-brand p {
+  margin: 4px 0 0;
+  color: var(--waiter-muted);
+  font-size: 12px;
+}
+
+.waiter-nav {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.waiter-nav-item {
+  text-decoration: none;
+  color: #64574e;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.waiter-nav-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--waiter-text);
+}
+
+.waiter-nav-item.active {
+  background: rgba(255, 109, 31, 0.1);
+  color: var(--waiter-primary);
+  font-weight: 700;
+}
+
+.waiter-sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--waiter-border);
+  padding-top: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.waiter-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e0dcd8;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.waiter-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.waiter-sidebar-footer strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--waiter-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waiter-sidebar-footer p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--waiter-muted);
+}
+
+.waiter-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.waiter-menu-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 25;
+  display: none;
+  border: 0;
+  background: #fff;
+  color: var(--waiter-primary);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.waiter-menu-btn:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.waiter-content {
+  padding: 28px;
+}
+
+.waiter-floating-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  width: 50px;
+  height: 50px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  color: var(--waiter-primary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.waiter-floating-notification:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 24px rgba(255, 109, 31, 0.3);
+}
+
+.waiter-notification-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #fff;
+}
+
+.waiter-overlay {
+  display: none;
+}
+
+/* Responsive Design */
+@media (max-width: 1080px) {
+  .waiter-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-sidebar {
+    position: fixed;
+    left: -300px;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    transition: left 0.3s ease;
+  }
+
+  .waiter-sidebar.open {
+    left: 0;
+  }
+
+  .waiter-menu-btn {
+    display: grid;
+  }
+
+  .waiter-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 15;
+  }
+}
+
+@media (max-width: 768px) {
+  .waiter-content {
+    padding: 16px;
+  }
+
+  .waiter-floating-notification {
+    top: 16px;
+    right: 16px;
+    width: 46px;
+    height: 46px;
+  }
+
+  .waiter-menu-btn {
+    top: 16px;
+    left: 16px;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 620px) {
+  .waiter-brand h2 {
+    font-size: 16px;
+  }
+
+  .waiter-brand p {
+    font-size: 11px;
+  }
+
+  .waiter-nav-item {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
