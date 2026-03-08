@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, Menu, Search, ShoppingCart, Users, X } from 'lucide-react';
+import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, Menu, ShoppingCart, Users, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
@@ -44,7 +44,7 @@ const ManagerLayout = () => {
                 }
                 onClick={() => setMenuOpen(false)}
               >
-                <Icon size={18} />
+                <Icon size={16} />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -60,41 +60,32 @@ const ManagerLayout = () => {
         </div>
       </aside>
 
+      {/* Mobile Menu Button */}
+      <button
+        className="manager-menu-btn"
+        onClick={() => setMenuOpen((prev) => !prev)}
+        aria-label="Toggle manager menu"
+      >
+        {menuOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
       {menuOpen && <div className="manager-overlay" onClick={() => setMenuOpen(false)} />}
 
       <main className="manager-main">
-        <header className="manager-topbar">
-          <div className="manager-topbar-left">
-            <button
-              className="manager-menu-btn"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              aria-label="Toggle manager menu"
-            >
-              {menuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-            <div className="manager-search">
-              <Search size={16} />
-              <input placeholder="Tìm kiếm đơn hàng, nhân viên, bàn..." type="text" />
-            </div>
-          </div>
-
-          <div className="manager-topbar-right">
-            <button 
-              className="manager-icon-btn" 
-              aria-label="Notifications"
-              onClick={() => setNotificationOpen(!notificationOpen)}
-            >
-              <Bell size={16} />
-              <span className="manager-dot" />
-            </button>
-            <button className="manager-primary-btn">Tạo đơn mới</button>
-          </div>
-        </header>
-
         <section className="manager-content">
           <Outlet />
         </section>
       </main>
+
+      {/* Floating Notification Button */}
+      <button 
+        className="manager-floating-notification" 
+        aria-label="Notifications"
+        onClick={() => setNotificationOpen(!notificationOpen)}
+      >
+        <Bell size={20} />
+        <span className="manager-notification-badge" />
+      </button>
 
       {/* Notification Dropdown */}
       <NotificationDropdown 

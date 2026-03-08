@@ -4,6 +4,7 @@ import Footer from '../components/Footer';
 import '../styles/Services.css';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getProfile } from '../api/userApi';
+import { createReservation } from '../api/homeApi';
 
 const Services = () => {
   
@@ -36,6 +37,9 @@ const Services = () => {
     location: 'Trong nhà (Máy lạnh)',
     note: ''
   });
+  const [bookingError, setBookingError] = useState('');
+  const [bookingSuccess, setBookingSuccess] = useState('');
+  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [menuDishes, setMenuDishes] = useState([
@@ -177,6 +181,74 @@ const Services = () => {
     minAllowedTime.setHours(minAllowedTime.getHours() + 1, 0, 0);
     
     return timeDate >= minAllowedTime;
+  };
+
+  const formatReservationDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const validateBookingForm = () => {
+    if (!bookingForm.fullName.trim()) {
+      return 'Vui lòng nhập họ và tên.';
+    }
+
+    if (!bookingForm.phone.trim()) {
+      return 'Vui lòng nhập số điện thoại.';
+    }
+
+    if (!selectedTime) {
+      return 'Vui lòng chọn giờ đặt bàn.';
+    }
+
+    const guests = Number(bookingForm.numGuests);
+    if (!guests || guests < 1 || guests > 29) {
+      return 'Số lượng khách hợp lệ từ 1 đến 29.';
+    }
+
+    return '';
+  };
+
+  const handleBookingSubmit = async () => {
+    setBookingError('');
+    setBookingSuccess('');
+
+    const validationError = validateBookingForm();
+    if (validationError) {
+      setBookingError(validationError);
+      return;
+    }
+
+    const requestPayload = {
+      reservationDate: formatReservationDate(selectedDate),
+      reservationTime: `${selectedTime}:00`,
+      numberOfGuests: Number(bookingForm.numGuests),
+      specialRequests: `Khu vuc: ${bookingForm.location}. Ghi chu: ${bookingForm.note || 'Khong co'}`
+    };
+
+    try {
+      setIsBookingSubmitting(true);
+      await createReservation(requestPayload);
+      setBookingSuccess('Đặt bàn thành công. Nhà hàng sẽ liên hệ xác nhận sớm nhất.');
+      setBookingForm((prev) => ({
+        ...prev,
+        numGuests: '1',
+        note: ''
+      }));
+      setSelectedTime('');
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401) {
+        setBookingError('Bạn cần đăng nhập để đặt bàn. Vui lòng đăng nhập và thử lại.');
+      } else {
+        const message = error?.response?.data?.message || error?.message || 'Không thể tạo đặt bàn. Vui lòng thử lại.';
+        setBookingError(message);
+      }
+    } finally {
+      setIsBookingSubmitting(false);
+    }
   };
 
   // Menu và Combo options
@@ -551,7 +623,15 @@ const Services = () => {
                     onChange={(e) => setBookingForm({...bookingForm, note: e.target.value})}
                   ></textarea>
                 </div>
-                <button className="primary-gold-btn">ĐẶT BÀN NGAY</button>
+                {bookingError && <p className="booking-status booking-status-error">{bookingError}</p>}
+                {bookingSuccess && <p className="booking-status booking-status-success">{bookingSuccess}</p>}
+                <button
+                  className="primary-gold-btn"
+                  onClick={handleBookingSubmit}
+                  disabled={isBookingSubmitting}
+                >
+                  {isBookingSubmitting ? 'ĐANG GỬI...' : 'ĐẶT BÀN NGAY'}
+                </button>
               </div>
             </div>
           )}

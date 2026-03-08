@@ -2,8 +2,6 @@ import React, { useMemo, useState } from 'react';
 import {
   Search,
   Plus,
-  Bell,
-  Settings,
   Edit,
   Package,
   ArrowUpToLine,
@@ -333,10 +331,6 @@ const ManagerInventoryPage = () => {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
-        </div>
-        <div className="topbar-actions">
-          <button className="icon-square"><Bell size={18} /></button>
-          <button className="icon-square"><Settings size={18} /></button>
         </div>
       </header>
 

@@ -5,11 +5,10 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Download,
-  Filter,
   History,
   MoreHorizontal,
   PartyPopper,
+  Search,
   UtensilsCrossed
 } from 'lucide-react';
 import EventDetailModal from './EventDetailModal';
@@ -560,15 +559,13 @@ const ManagerOrdersPage = () => {
             Hôm nay: <strong>24 tháng 10, 2023</strong>
           </p>
         </div>
-        <div className="orders-toolbar-actions">
-          <button className="manager-secondary-btn orders-tool-btn">
-            <Filter size={16} />
-            <span>Bộ lọc</span>
-          </button>
-          <button className="manager-secondary-btn orders-tool-btn">
-            <Download size={16} />
-            <span>Xuất báo cáo</span>
-          </button>
+        <div className="orders-search-box">
+          <Search size={18} />
+          <input 
+            type="text" 
+            placeholder="Tìm kiếm mã đơn, số bàn, tên khách..." 
+            className="orders-search-input"
+          />
         </div>
       </div>
 

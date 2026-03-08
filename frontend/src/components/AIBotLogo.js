@@ -20,137 +20,67 @@ const AIBotLogo = ({ size = 80, animated = true }) => {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         style={{
-          filter: 'drop-shadow(0 0 20px rgba(0, 217, 255, 0.8))',
+          filter: 'drop-shadow(0 0 24px rgba(118, 232, 255, 0.75))',
           position: 'relative'
         }}
       >
         <defs>
-          <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00D9FF" stopOpacity="1" />
-            <stop offset="50%" stopColor="#0099FF" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#005BFF" stopOpacity="0.8" />
+          <linearGradient id="iceBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#d8f7ff" stopOpacity="0.95" />
+            <stop offset="45%" stopColor="#8ad9ff" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#4cb7ff" stopOpacity="0.8" />
           </linearGradient>
-          <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF00FF" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#8000FF" stopOpacity="0.6" />
+          <linearGradient id="deepBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#6ad0ff" stopOpacity="0.95" />
+            <stop offset="100%" stopColor="#2e8fff" stopOpacity="0.75" />
           </linearGradient>
-          <radialGradient id="glowEffect" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#00D9FF" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#0099FF" stopOpacity="0" />
+          <radialGradient id="aura" cx="50%" cy="48%" r="56%">
+            <stop offset="0%" stopColor="#9bf1ff" stopOpacity="0.62" />
+            <stop offset="68%" stopColor="#68cfff" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#68cfff" stopOpacity="0" />
           </radialGradient>
+          <linearGradient id="lowerFade" x1="0" y1="130" x2="0" y2="180" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#95e9ff" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#95e9ff" stopOpacity="0" />
+          </linearGradient>
         </defs>
 
-        {/* Glow Background */}
-        <circle cx="60" cy="90" r="70" fill="url(#glowEffect)" opacity="0.6" />
+        <ellipse cx="60" cy="88" rx="56" ry="80" fill="url(#aura)" />
 
-        {/* ===== HEAD ===== */}
-        
-        {/* Chef Hat */}
-        <ellipse cx="60" cy="20" rx="28" ry="12" fill="#00D9FF" opacity="0.95" filter="drop-shadow(0 0 8px rgba(0, 217, 255, 0.9))" />
-        <path
-          d="M 32 20 Q 32 12 60 8 Q 88 12 88 20 L 86 30 Q 86 34 60 36 Q 34 34 34 30 Z"
-          fill="url(#bodyGradient)"
-          opacity="0.9"
-          filter="drop-shadow(0 0 6px rgba(0, 217, 255, 0.8))"
-        />
+        <ellipse cx="60" cy="25" rx="29" ry="11" fill="url(#iceBlue)" />
+        <path d="M31 25C31 15 40 9 50 8C56 4 64 4 70 8C80 9 89 15 89 25C89 34 82 38 60 38C38 38 31 34 31 25Z" fill="url(#iceBlue)" />
+        <rect x="33" y="33" width="54" height="6" rx="3" fill="#baf2ff" opacity="0.95" />
 
-        {/* Hat Band */}
-        <rect x="32" y="30" width="56" height="6" fill="#00D9FF" opacity="0.85" rx="3" filter="drop-shadow(0 0 4px rgba(0, 217, 255, 0.7))" />
+        <rect x="31" y="39" width="58" height="46" rx="14" fill="url(#deepBlue)" opacity="0.92" />
+        <path d="M31 39H89V57C82 59 74 60 60 60C46 60 38 59 31 57V39Z" fill="#cff8ff" opacity="0.22" />
 
-        {/* Head Visor */}
-        <rect x="28" y="36" width="64" height="48" rx="12" fill="url(#bodyGradient)" opacity="0.9" filter="drop-shadow(0 0 10px rgba(0, 217, 255, 0.8))" />
+        <path d="M42 54C44 50 47 49 50 54" stroke="#d7fcff" strokeWidth="2" strokeLinecap="round" />
+        <path d="M70 54C72 50 75 49 78 54" stroke="#d7fcff" strokeWidth="2" strokeLinecap="round" />
+        <path d="M45 67C50 74 70 74 75 67" stroke="#d7fcff" strokeWidth="2.5" strokeLinecap="round" />
 
-        {/* Face Visor Glow */}
-        <rect x="28" y="36" width="64" height="24" rx="12" fill="#00D9FF" opacity="0.2" />
+        <rect x="34" y="86" width="52" height="52" rx="12" fill="url(#deepBlue)" opacity="0.88" />
+        <circle cx="60" cy="106" r="12" fill="none" stroke="#d7fcff" strokeWidth="2" opacity="0.92" />
+        <circle cx="60" cy="106" r="5" fill="#d7fcff" opacity="0.9" />
 
-        {/* Eyes - Large Digital */}
-        <circle cx="42" cy="52" r="7" fill="none" stroke="#00D9FF" strokeWidth="2" opacity="0.95" filter="drop-shadow(0 0 5px rgba(0, 217, 255, 0.9))" />
-        <circle cx="78" cy="52" r="7" fill="none" stroke="#00D9FF" strokeWidth="2" opacity="0.95" filter="drop-shadow(0 0 5px rgba(0, 217, 255, 0.9))" />
-        
-        {/* Pupils */}
-        <circle cx="42" cy="52" r="3.5" fill="#00D9FF" opacity="1" filter="drop-shadow(0 0 4px rgba(0, 217, 255, 1))" />
-        <circle cx="78" cy="52" r="3.5" fill="#00D9FF" opacity="1" filter="drop-shadow(0 0 4px rgba(0, 217, 255, 1))" />
+        <rect x="23" y="90" width="10" height="47" rx="5" fill="url(#deepBlue)" opacity="0.86" />
+        <rect x="87" y="90" width="10" height="47" rx="5" fill="url(#deepBlue)" opacity="0.86" />
+        <circle cx="28" cy="88" r="6" fill="#7ad9ff" opacity="0.85" />
+        <circle cx="92" cy="88" r="6" fill="#7ad9ff" opacity="0.85" />
 
-        {/* Smile Arc */}
-        <path
-          d="M 40 66 Q 60 76 80 66"
-          stroke="#00D9FF"
-          strokeWidth="2.5"
-          fill="none"
-          strokeLinecap="round"
-          opacity="0.9"
-          filter="drop-shadow(0 0 4px rgba(0, 217, 255, 0.8))"
-        />
+        <path d="M43 138H77V150C77 160 69 167 60 167C51 167 43 160 43 150V138Z" fill="url(#deepBlue)" opacity="0.76" />
+        <ellipse cx="60" cy="166" rx="29" ry="14" fill="url(#lowerFade)" />
 
-        {/* ===== BODY ===== */}
-
-        {/* Main Body */}
-        <rect x="26" y="85" width="68" height="65" rx="10" fill="url(#bodyGradient)" opacity="0.88" filter="drop-shadow(0 0 10px rgba(0, 217, 255, 0.7))" />
-
-        {/* Chest AI Core Circle */}
-        <circle cx="60" cy="105" r="12" fill="none" stroke="#FF00FF" strokeWidth="2.5" opacity="0.85" filter="drop-shadow(0 0 6px rgba(255, 0, 255, 0.8))" />
-        <circle cx="60" cy="105" r="6" fill="#FF00FF" opacity="0.95" filter="drop-shadow(0 0 5px rgba(255, 0, 255, 1))" />
-
-        {/* Chest Tech Details */}
-        <circle cx="48" cy="90" r="2" fill="#00D9FF" opacity="0.8" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.8))" />
-        <circle cx="72" cy="90" r="2" fill="#00D9FF" opacity="0.8" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.8))" />
-        <circle cx="48" cy="120" r="2" fill="#00D9FF" opacity="0.8" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.8))" />
-        <circle cx="72" cy="120" r="2" fill="#00D9FF" opacity="0.8" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.8))" />
-
-        {/* Connection Lines to Core */}
-        <line x1="48" y1="90" x2="55" y2="101" stroke="#00D9FF" strokeWidth="1" opacity="0.5" />
-        <line x1="72" y1="90" x2="65" y2="101" stroke="#00D9FF" strokeWidth="1" opacity="0.5" />
-        <line x1="48" y1="120" x2="55" y2="109" stroke="#00D9FF" strokeWidth="1" opacity="0.5" />
-        <line x1="72" y1="120" x2="65" y2="109" stroke="#00D9FF" strokeWidth="1" opacity="0.5" />
-
-        {/* Arms */}
-        {/* Left Arm */}
-        <rect x="18" y="90" width="10" height="50" rx="5" fill="url(#bodyGradient)" opacity="0.85" filter="drop-shadow(0 0 6px rgba(0, 217, 255, 0.6))" />
-        <circle cx="23" cy="87" r="7" fill="url(#bodyGradient)" opacity="0.85" filter="drop-shadow(0 0 5px rgba(0, 217, 255, 0.6))" />
-        <circle cx="23" cy="142" r="6" fill="#FF00FF" opacity="0.7" filter="drop-shadow(0 0 4px rgba(255, 0, 255, 0.7))" />
-
-        {/* Right Arm */}
-        <rect x="92" y="90" width="10" height="50" rx="5" fill="url(#bodyGradient)" opacity="0.85" filter="drop-shadow(0 0 6px rgba(0, 217, 255, 0.6))" />
-        <circle cx="97" cy="87" r="7" fill="url(#bodyGradient)" opacity="0.85" filter="drop-shadow(0 0 5px rgba(0, 217, 255, 0.6))" />
-        <circle cx="97" cy="142" r="6" fill="#FF00FF" opacity="0.7" filter="drop-shadow(0 0 4px rgba(255, 0, 255, 0.7))" />
-
-        {/* Legs */}
-        {/* Left Leg */}
-        <rect x="38" y="150" width="11" height="35" rx="5" fill="url(#bodyGradient)" opacity="0.85" filter="drop-shadow(0 0 6px rgba(0, 217, 255, 0.6))" />
-
-        {/* Right Leg */}
-        <rect x="71" y="150" width="11" height="35" rx="5" fill="url(#bodyGradient)" opacity="0.85" filter="drop-shadow(0 0 6px rgba(0, 217, 255, 0.6))" />
-
-        {/* ===== PARTICLES / GLOW ===== */}
-        <g className="particle-glow" opacity="0.8">
-          <circle cx="55" cy="175" r="1.5" fill="#00D9FF" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.9))" />
-          <circle cx="65" cy="175" r="1.5" fill="#00D9FF" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.9))" />
-          <circle cx="50" cy="170" r="1" fill="#FF00FF" opacity="0.7" filter="drop-shadow(0 0 2px rgba(255, 0, 255, 0.8))" />
-          <circle cx="70" cy="170" r="1" fill="#FF00FF" opacity="0.7" filter="drop-shadow(0 0 2px rgba(255, 0, 255, 0.8))" />
+        <g className="particle-glow" opacity="0.85">
+          <circle cx="49" cy="158" r="1.6" fill="#d9fbff" />
+          <circle cx="60" cy="161" r="1.8" fill="#d9fbff" />
+          <circle cx="71" cy="158" r="1.6" fill="#d9fbff" />
+          <circle cx="54" cy="171" r="1.2" fill="#b3f1ff" />
+          <circle cx="66" cy="170" r="1.2" fill="#b3f1ff" />
         </g>
 
-        {/* Top Sparkles */}
-        <g className="sparkle" opacity="0.7">
-          <circle cx="95" cy="25" r="1.5" fill="#00D9FF" filter="drop-shadow(0 0 3px rgba(0, 217, 255, 0.9))" />
-          <path
-            d="M 95 22 L 95 28 M 92 25 L 98 25"
-            stroke="#00D9FF"
-            strokeWidth="0.8"
-            opacity="0.8"
-            strokeLinecap="round"
-          />
-        </g>
-
-        {/* Side Sparkles */}
-        <g className="sparkle" opacity="0.6" style={{ animationDelay: '0.5s' }}>
-          <circle cx="12" cy="60" r="1" fill="#FF00FF" filter="drop-shadow(0 0 2px rgba(255, 0, 255, 0.9))" />
-          <path
-            d="M 12 57 L 12 63 M 9 60 L 15 60"
-            stroke="#FF00FF"
-            strokeWidth="0.7"
-            opacity="0.7"
-            strokeLinecap="round"
-          />
+        <g className="sparkle" opacity="0.8">
+          <circle cx="96" cy="34" r="1.2" fill="#d9fbff" />
+          <path d="M96 31V37M93 34H99" stroke="#d9fbff" strokeWidth="0.8" strokeLinecap="round" />
         </g>
       </svg>
     </div>

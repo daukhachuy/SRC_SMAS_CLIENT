@@ -20,8 +20,9 @@
 }
 
 .topbar-search {
-  width: 360px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 480px;
+  margin-right: 70px;
   border-radius: 10px;
   background: #f1f5f9;
   display: flex;
@@ -984,6 +985,10 @@
   .inventory-footer {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+
+  .topbar-search {
+    margin-right: 0;
   }
 
   .inventory-headline {

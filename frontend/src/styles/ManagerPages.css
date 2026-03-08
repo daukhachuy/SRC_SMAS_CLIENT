@@ -235,24 +235,48 @@
 .orders-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .orders-header-row p strong {
   color: #4a2c19;
 }
 
-.orders-toolbar-actions {
+.orders-search-box {
   display: flex;
+  align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #fff;
+  border: 1px solid #e6d9ca;
+  border-radius: 12px;
+  min-width: 280px;
+  max-width: 450px;
+  flex: 1;
+  margin-right: 80px;
+  color: #8d6b53;
+  box-shadow: 0 2px 8px rgba(59, 26, 5, 0.04);
+  transition: all 0.2s ease;
 }
 
-.orders-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.orders-search-box:focus-within {
+  border-color: var(--manager-primary);
+  box-shadow: 0 2px 12px rgba(255, 122, 33, 0.15);
+}
+
+.orders-search-input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  width: 100%;
+  font-size: 14px;
+  color: #4a2c19;
+}
+
+.orders-search-input::placeholder {
+  color: #a89179;
 }
 
 .orders-tabs {
@@ -582,6 +606,13 @@
 
   .orders-header-row {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .orders-search-box {
+    min-width: 100%;
+    max-width: 100%;
+    margin-right: 0;
   }
 
   .orders-pagination {
