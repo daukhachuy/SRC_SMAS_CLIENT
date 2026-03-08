@@ -7,66 +7,59 @@ const OrderDetailModal = ({ order, onClose }) => {
 
   if (!order) return null;
 
+  // Ánh xạ dữ liệu từ API sang giao diện Modal
+  const items = order.items || [];
+  const orderDate = new Date(order.createdAt).toLocaleDateString('vi-VN');
+
   return (
     <div className="Order-Detail-Overlay" onClick={(e) => e.target.className === 'Order-Detail-Overlay' && onClose()}>
       <div className="Order-Detail-Container animate-pop">
         
-        {/* Tiêu đề & Nút đóng */}
         <div className="Detail-Header">
           <h2>Chi tiết đơn hàng</h2>
           <button className="Back-Arrow-Btn" onClick={onClose}>
-            <i className="fa-solid fa-right-from-bracket"></i>
+            <i className="fa-solid fa-xmark"></i> {/* Đổi icon thành X cho trực quan */}
           </button>
         </div>
 
         <div className="Detail-Main-Content">
           
-          {/* CỘT TRÁI: HÓA ĐƠN MÓN ĂN */}
+          {/* CỘT TRÁI: BIÊN LAI */}
           <div className="Receipt-Column">
             <div className="Shop-Brand">
               <i className="fa-solid fa-shop"></i>
-              <h3>Nhà Hàng Lẩu Nướng</h3>
-              <p><i className="fa-solid fa-location-dot"></i> 42 Trần Thủ Độ, Điện Bàn Đông, Đà Nẵng</p>
-              <p>Đơn hàng : {order.id || '20232501'}</p>
+              <h3>NHÀ HÀNG SMAS</h3>
+              <p><i className="fa-solid fa-location-dot"></i> 42 Trần Thủ Độ, Đà Nẵng</p>
+              <p>Mã đơn : <strong>{order.orderCode}</strong></p>
             </div>
 
             <div className="Items-List">
-              {/* Giả lập danh sách món nếu không có trong data */}
-              {(order.menuItems || [
-                { name: 'Cá chiên mắm', quantity: 2, price: 60000 },
-                { name: 'Cá chiên mắm', quantity: 2, price: 60000 },
-                { name: 'Cá chiên mắm', quantity: 2, price: 60000 },
-                { name: 'Cá chiên mắm', quantity: 2, price: 60000 },
-              ]).map((item, idx) => (
+              {items.length > 0 ? items.map((item, idx) => (
                 <div className="Receipt-Item" key={idx}>
                   <div className="Item-Name">
-                    <span>{idx + 1}. {item.name}</span>
+                    <span>{idx + 1}. {item.itemName}</span>
                     <small>sl : {item.quantity}</small>
                   </div>
                   <div className="Item-Price">
-                    <span>{(item.price || 0).toLocaleString()}</span>
-                    <span>{(item.quantity * item.price || 0).toLocaleString()}</span>
+                    <span>{item.unitPrice?.toLocaleString()}</span>
+                    <span>{(item.quantity * item.unitPrice).toLocaleString()}</span>
                   </div>
                 </div>
-              ))}
+              )) : <p>Không có thông tin món ăn</p>}
             </div>
 
             <div className="Receipt-Summary">
               <div className="Summary-Row">
-                <span>Tổng số lượng : {order.totalQuantity || 8}</span>
-                <span>Tổng : {(order.totalPrice || 800000).toLocaleString()} đ</span>
+                <span>Tổng số món: {items.reduce((acc, curr) => acc + curr.quantity, 0)}</span>
+                <span>Cộng: {order.totalAmount?.toLocaleString()} đ</span>
               </div>
               <div className="Summary-Row">
-                <span></span>
-                <span>VAT : 0 %</span>
-              </div>
-              <div className="Summary-Row">
-                <span></span>
-                <span>Giảm Giá : {(order.discount || 80000).toLocaleString()} đ</span>
+                <span>Thuế VAT</span>
+                <span>0 %</span>
               </div>
               <div className="Summary-Row Final-Total">
-                <span></span>
-                <span>Giá gốc : {(order.finalPrice || 880000).toLocaleString()} đ</span>
+                <span>THÀNH TIỀN</span>
+                <span>{order.totalAmount?.toLocaleString()} đ</span>
               </div>
             </div>
           </div>
@@ -74,39 +67,40 @@ const OrderDetailModal = ({ order, onClose }) => {
           {/* CỘT PHẢI: THÔNG TIN VÀ ĐÁNH GIÁ */}
           <div className="Info-Rating-Column">
             <div className="Order-Meta-Info">
-              <h3>Thông tin đơn hàng</h3>
-              <p>Ngày : <span>{order.date || '13/01/2026'}</span></p>
-              <p>Người mua : <span>{order.customer || 'nguyen van a'}</span></p>
-              <p>Mã thuế : <span>--</span></p>
-              <p>Số HD GTGT : <span>--</span></p>
-              <p>Số HD TT : <span>--</span></p>
-              <p>Mã CQT : <span>--</span></p>
-              <p>Thanh toán : <span>Tiền mặt</span></p>
+              <h3>Thông tin vận chuyển</h3>
+              <p>Ngày đặt : <span>{orderDate}</span></p>
+              <p>Người nhận : <span>{order.delivery?.recipientName || order.customer?.fullname || 'Khách hàng'}</span></p>
+              <p>Số ĐT : <span>{order.delivery?.phone || 'N/A'}</span></p>
+              <p>Thanh toán : <span>{order.paymentMethod || 'Tiền mặt'}</span></p>
+              <p>Loại đơn : <span className="Order-Type-Badge">{order.orderType}</span></p>
             </div>
 
             <div className="Rating-Section">
-              <p className="Rating-Prompt">Bạn chưa đánh giá cho đơn hàng này</p>
+              <p className="Rating-Prompt">Đánh giá trải nghiệm của bạn</p>
               <div className="Star-Rating">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <i 
                     key={star}
                     className={`fa-star ${star <= rating ? 'fa-solid' : 'fa-regular'}`}
                     onClick={() => setRating(star)}
+                    style={{color: '#FF7A21', cursor: 'pointer', fontSize: '1.5rem'}}
                   ></i>
                 ))}
               </div>
 
               <div className="Comment-Box">
-                <label>Suy nghĩ của bạn</label>
+                <label>Lời nhắn cho nhà hàng</label>
                 <textarea 
-                  rows="4" 
+                  rows="3" 
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="Nhập cảm nhận của bạn..."
+                  placeholder="Món ăn rất ngon..."
                 ></textarea>
               </div>
 
-              <button className="Submit-Rating-Btn">Đánh giá</button>
+              <button className="Submit-Rating-Btn" onClick={() => alert("Cảm ơn bạn đã đánh giá!")}>
+                Gửi đánh giá
+              </button>
             </div>
           </div>
         </div>

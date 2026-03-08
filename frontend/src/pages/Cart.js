@@ -10,8 +10,9 @@ const Cart = () => {
   
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isOrdering, setIsOrdering] = useState(false);
 
-  // --- PHẦN PHÂN TRANG ---
+  // --- PHÂN TRANG ---
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5; 
 
@@ -57,6 +58,24 @@ const Cart = () => {
   const [modalStep, setModalStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Tiền Mặt');
 
+  // --- LOGIC VALIDATE SỐ ĐIỆN THOẠI (THAY ĐỔI DUY NHẤT TẠI ĐÂY) ---
+  const handleGoToStep2 = () => {
+    const phoneRegex = /^(0|84)(3|5|7|8|9)([0-9]{8})$/;
+    if (!customerInfo.recipientPhone.trim()) {
+      alert("Vui lòng nhập số điện thoại!");
+      return;
+    }
+    if (!phoneRegex.test(customerInfo.recipientPhone.trim())) {
+      alert("Số điện thoại không hợp lệ! Vui lòng kiểm tra lại (10 số, đúng đầu số nhà mạng).");
+      return;
+    }
+    if (!customerInfo.recipientName.trim() || !customerInfo.address.trim()) {
+      alert("Vui lòng điền đầy đủ Tên và Địa chỉ!");
+      return;
+    }
+    setModalStep(2);
+  };
+
   // --- LOGIC TÍNH TOÁN PHÂN TRANG ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -100,7 +119,7 @@ const Cart = () => {
     }
   };
 
-  const totalPrice = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const totalPrice = cartItems.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
 
   const getDepositInfo = (price) => {
     if (price > 10000000) return { percent: 50, amount: price * 0.5 };
@@ -110,11 +129,15 @@ const Cart = () => {
   const deposit = getDepositInfo(totalPrice);
 
   const handleCloseModal = () => {
+    if (isOrdering) return; 
     setShowInfoModal(false);
     setModalStep(1);
   };
 
+  // --- HÀM CALL API ĐẶT HÀNG ---
   const handleFinalOrder = async () => {
+    if (isOrdering) return;
+
     try {
       if(!customerInfo.recipientName || !customerInfo.recipientPhone || !customerInfo.address) {
           alert("Vui lòng điền đầy đủ thông tin giao hàng!");
@@ -122,14 +145,26 @@ const Cart = () => {
           return;
       }
 
+      setIsOrdering(true);
+
+      const formattedItems = cartItems.map(item => {
+        const payloadItem = { quantity: Number(item.quantity) };
+        if (item.comboId && Number(item.comboId) > 0) {
+          payloadItem.comboId = Number(item.comboId);
+        } else if (item.foodId && Number(item.foodId) > 0) {
+          payloadItem.foodId = Number(item.foodId);
+        } else if (item.id && Number(item.id) > 0) {
+          const isCombo = item.name?.toLowerCase().includes('combo');
+          if (isCombo) payloadItem.comboId = Number(item.id);
+          else payloadItem.foodId = Number(item.id);
+        }
+        return payloadItem;
+      }).filter(item => item.foodId || item.comboId);
+
       const orderData = {
         discountCode: discountCode || "",
         note: customerInfo.note || "",
-        items: cartItems.map(item => ({
-          foodId: item.foodId ? Number(item.foodId) : 0,   
-          comboId: item.comboId ? Number(item.comboId) : 0, 
-          quantity: Number(item.quantity)
-        })),
+        items: formattedItems,
         deliveryInfo: {
           recipientName: customerInfo.recipientName,
           recipientPhone: customerInfo.recipientPhone,
@@ -138,23 +173,31 @@ const Cart = () => {
         }
       };
 
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
       const response = await axios.post(`${BASE_URL}/api/order/create/delivery`, orderData, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.status === 200 || response.status === 201) {
-        alert("Đặt hàng thành công!");
+        alert(`🎉 Đặt hàng thành công! Mã đơn: ${response.data.orderCode || ''}`);
         localStorage.removeItem('cart');
-        window.location.href = "/";
+        window.dispatchEvent(new Event('storage'));
+        window.location.href = "/order-history"; 
       }
     } catch (err) {
       console.error("Lỗi đặt hàng:", err);
-      alert(err.response?.data?.message || "Có lỗi xảy ra khi gọi API đặt hàng.");
+      const errorDetail = err.response?.data?.message || err.response?.data || "Có lỗi xảy ra.";
+      alert(typeof errorDetail === 'string' ? errorDetail : "Dữ liệu giỏ hàng không hợp lệ.");
+    } finally {
+      setIsOrdering(false);
     }
   };
 
-  if (loading) return <div style={{textAlign: 'center', marginTop: '50px'}}>Đang tải...</div>;
+  if (loading) return <div className="loading-spinner">Đang tải...</div>;
 
   return (
     <div className="Cart-Page-Wrapper">
@@ -177,44 +220,42 @@ const Cart = () => {
               </thead>
               <tbody>
                 {cartItems.length > 0 ? (
-                  <>
-                    {currentItems.map((item, index) => {
-                      const actualIndex = indexOfFirstItem + index; 
-                      const isActuallyCombo = (item.comboId && Number(item.comboId) > 0) || 
-                                              (item.name && item.name.toLowerCase().includes('combo'));
-                      
-                      return (
-                        <tr key={`cart-item-${actualIndex}`}>
-                          <td>
-                            <div className="Item-Info">
-                              <img src={item.image} alt={item.name} className="Item-Img" />
-                              <div className="Item-Text">
-                                <span className={`Item-Badge ${isActuallyCombo ? 'badge-combo' : 'badge-food'}`}>
-                                  {isActuallyCombo ? 'Combo' : 'Món lẻ'}
-                                </span>
-                                <div className="Item-Name">{item.name}</div>
-                              </div>
+                  currentItems.map((item, index) => {
+                    const actualIndex = indexOfFirstItem + index; 
+                    const isActuallyCombo = (item.comboId && Number(item.comboId) > 0) || 
+                                          (item.name && item.name.toLowerCase().includes('combo'));
+                    
+                    return (
+                      <tr key={`cart-item-${actualIndex}`}>
+                        <td>
+                          <div className="Item-Info">
+                            <img src={item.image} alt={item.name} className="Item-Img" />
+                            <div className="Item-Text">
+                              <span className={`Item-Badge ${isActuallyCombo ? 'badge-combo' : 'badge-food'}`}>
+                                {isActuallyCombo ? 'Combo' : 'Món lẻ'}
+                              </span>
+                              <div className="Item-Name">{item.name}</div>
                             </div>
-                          </td>
-                          <td>
-                            <div className="Quantity-Control">
-                              <button className="Qty-Btn" onClick={() => decreaseQty(actualIndex)}>-</button>
-                              <input type="text" value={item.quantity} readOnly />
-                              <button className="Qty-Btn" onClick={() => increaseQty(actualIndex)}>+</button>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="Item-Price">{(item.price * item.quantity).toLocaleString()}đ</div>
-                          </td>
-                          <td>
-                            <div className="Action-Icons">
-                              <i className="fa-regular fa-trash-can delete-icon" onClick={() => removeItem(actualIndex)}></i>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="Quantity-Control">
+                            <button className="Qty-Btn" onClick={() => decreaseQty(actualIndex)}>-</button>
+                            <input type="text" value={item.quantity} readOnly />
+                            <button className="Qty-Btn" onClick={() => increaseQty(actualIndex)}>+</button>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="Item-Price">{((item.price || 0) * item.quantity).toLocaleString()}đ</div>
+                        </td>
+                        <td>
+                          <div className="Action-Icons">
+                            <i className="fa-regular fa-trash-can delete-icon" onClick={() => removeItem(actualIndex)}></i>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan="4" className="Empty-Cart-Msg">
@@ -270,12 +311,10 @@ const Cart = () => {
         </div>
       </main>
 
-      {/* MODAL THANH TOÁN */}
+      {/* MODAL THANH TOÁN 2 BƯỚC */}
       {showInfoModal && (
         <div className="Modal-Overlay" onClick={handleCloseModal}>
           <div className={`Info-Modal-Box ${modalStep === 2 ? 'summary-modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
-            
-
             <div className="Modal-Header">
               <h3>{modalStep === 1 ? "Thông tin giao hàng" : "Tóm tắt đơn hàng"}</h3>
               <button className="Close-Modal-Btn" onClick={handleCloseModal}>
@@ -295,7 +334,7 @@ const Cart = () => {
                             type="text" 
                             placeholder="Nhập số điện thoại..." 
                             value={customerInfo.recipientPhone}
-                            onChange={(e) => setCustomerInfo({...customerInfo, recipientPhone: e.target.value})}
+                            onChange={(e) => setCustomerInfo({...customerInfo, recipientPhone: e.target.value.replace(/[^0-9]/g, '')})}
                         />
                       </div>
                     </div>
@@ -327,11 +366,10 @@ const Cart = () => {
                         onChange={(e) => setCustomerInfo({...customerInfo, note: e.target.value})}
                     ></textarea>
                   </div>
-                  <button className="Btn-Confirm-Order" onClick={() => setModalStep(2)}>Xác Nhận</button>
+                  <button className="Btn-Confirm-Order" onClick={handleGoToStep2}>Xác Nhận</button>
                 </>
               ) : (
                 <div className="Summary-Main-Layout">
-                  {/* PHẦN HÓA ĐƠN CÓ THANH CUỘN */}
                   <div className="Summary-Bill-Detail">
                     <div className="Bill-Header-Fixed">
                       <div className="Bill-Brand">NHÀ HÀNG LẨU NƯỚNG</div>
@@ -349,7 +387,7 @@ const Cart = () => {
                         {cartItems.map((item, idx) => (
                             <div key={idx} className="Bill-Row">
                                 <span>{item.name} x{item.quantity}</span>
-                                <span>{(item.price * item.quantity).toLocaleString()}đ</span>
+                                <span>{((item.price || 0) * item.quantity).toLocaleString()}đ</span>
                             </div>
                         ))}
                     </div>
@@ -383,7 +421,12 @@ const Cart = () => {
                         </div>
                       ))}
                     </div>
-                    <button className="Btn-Final-Order" onClick={handleFinalOrder}>Xác nhận đặt hàng</button>
+                    <button className="Btn-Final-Order" onClick={handleFinalOrder} disabled={isOrdering}>
+                        {isOrdering ? "Đang xử lý..." : "Xác nhận đặt hàng"}
+                    </button>
+                    <button className="Btn-Back-Step" onClick={() => setModalStep(1)} style={{marginTop: '10px', width: '100%', background: '#eee', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer'}}>
+                      Quay lại thông tin
+                    </button>
                   </div>
                 </div>
               )}
