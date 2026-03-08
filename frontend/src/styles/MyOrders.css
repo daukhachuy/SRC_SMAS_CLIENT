@@ -1,216 +1,218 @@
+/* --- BIẾN TOÀN CỤC --- */
 :root {
-  --Primary-Orange: #ff7a21;
-  --Secondary-Orange: #ff9f5e;
-  --Success-Green: #27ae60;
-  --Warning-Yellow: #f39c12;
-  --Processing-Blue: #3498db;
-  --Danger-Red: #ff3b30;
-  --Bg-Body: #f8f9fa;
+  --Primary-Orange: #FF7A21;
+  --Secondary-Orange: #FF9F5E;
+  --Success-Green: #27AE60;
+  --Warning-Yellow: #F39C12;
+  --Danger-Red: #FF3B30;
+  --Bg-Body: #F4F7F9;
+  --Transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.MyOrders-Wrapper {
-  max-width: 1200px;
-  margin: auto;
-  padding: 40px 20px;
-  background: var(--Bg-Body);
+.Order-History-Page {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 50px 20px;
+  background-color: var(--Bg-Body);
   min-height: 100vh;
 }
 
+/* --- TIÊU ĐỀ BOLD --- */
 .Page-Title {
-  font-size: 2rem;
-  font-weight: 800;
-  margin-bottom: 30px;
-  border-left: 6px solid var(--Primary-Orange);
-  padding-left: 15px;
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #1A1A1A;
+  margin-bottom: 40px;
+  border-left: 10px solid var(--Primary-Orange);
+  padding-left: 20px;
+  letter-spacing: -1px;
 }
 
-/* Tabs */
+/* --- THANH TABS STICKY --- */
 .Order-Tabs-Container {
   position: sticky;
-  top: 10px;
-  z-index: 10;
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
+  top: 0; 
+  z-index: 100;
+  background: var(--Bg-Body);
+  padding: 20px 0;
+  margin-bottom: 35px;
   display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  margin-bottom: 30px;
+  gap: 15px;
+  border-bottom: 2px solid #e0e0e0;
 }
 
 .Order-Tab-Btn {
-  padding: 10px 20px;
-  border-radius: 30px;
-  border: 1px solid #eee;
-  background: white;
-  font-weight: 600;
+  padding: 14px 30px;
+  border-radius: 12px;
+  border: 2px solid #ddd;
+  background: #fff;
+  font-weight: 800;
+  color: #555;
+  transition: var(--Transition);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
+
+.Order-Tab-Btn i { font-size: 1.1rem; }
 
 .Order-Tab-Btn.Active {
-  background: var(--Primary-Orange);
-  color: white;
-  border: none;
+  background: #1A1A1A;
+  color: #fff;
+  border-color: #1A1A1A;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
 }
 
-/* Card */
+.Order-Tab-Btn:hover:not(.Active) {
+  border-color: var(--Primary-Orange);
+  color: var(--Primary-Orange);
+}
+
+/* --- THẺ ĐƠN HÀNG BOLD CARD --- */
 .Order-Horizontal-Card {
-  background: white;
+  background: #fff;
+  border-left: 8px solid var(--Primary-Orange);
   border-radius: 16px;
-  padding: 25px;
-  margin-bottom: 25px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  transition: var(--Transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.Order-Horizontal-Card:hover {
+  transform: translateX(8px);
+  box-shadow: 15px 15px 40px rgba(0,0,0,0.1);
 }
 
 .Card-Top-Row {
   display: flex;
   justify-content: space-between;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
+  align-items: center;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #F8F9FA;
 }
 
-.orange-icon {
-  color: var(--Primary-Orange);
-  margin-right: 8px;
-}
-
-.Status-Label {
-  padding: 6px 14px;
-  border-radius: 30px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.Status-Label.Success {
-  background: #e6fbf3;
-  color: var(--Success-Green);
-}
-
-.Status-Label.Waiting {
-  background: #fff9e6;
-  color: var(--Warning-Yellow);
-}
-
-.Status-Label.Processing {
-  background: #ebf5fb;
-  color: var(--Processing-Blue);
-}
-
-.Order-Time-Badge {
-  font-size: 14px;
-  color: #666;
-}
-
-/* Grid */
-.Card-Main-Grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.Grid-Col p {
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.Grid-Col span {
-  font-weight: 400;
-  color: #555;
-}
-
-.Highlight-Address {
-  color: var(--Primary-Orange);
-  font-weight: 600;
-}
-
-.Full-Width-Note {
-  grid-column: 1 / -1;
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px dashed #eee;
-}
-
-.Note-Text {
-  color: #555;
-  word-break: break-word;
-}
-
-/* Table */
-.Order-Table-Wrapper {
-  margin-top: 15px;
-  background: #fafafa;
-  padding: 15px;
-  border-radius: 12px;
-}
-
-.Minimal-Table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.Minimal-Table th,
-.Minimal-Table td {
-  padding: 8px;
-  font-size: 14px;
-}
-
-.Minimal-Table th {
-  text-align: left;
-  color: #888;
-}
-
-/* Footer */
-.Card-Footer-Actions {
-  margin-top: 20px;
+.Type-Header {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #1A1A1A;
   display: flex;
-  justify-content: space-between;
   align-items: center;
 }
 
-.Btn-Cancel-Order {
+.Order-Code-Tag {
+  color: #999;
+  font-size: 0.9rem;
+  margin-left: 10px;
+}
+
+.orange-icon { color: var(--Primary-Orange); margin-right: 12px; }
+
+.Right-Action-Header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.Status-Label {
+  font-weight: 800;
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+
+.Status-Label.Success { background: #E8F5E9; color: var(--Success-Green); }
+.Status-Label.Waiting { background: #FFF3E0; color: var(--Warning-Yellow); }
+.Status-Label.Cancelled { background: #FFEBEE; color: var(--Danger-Red); }
+
+.Btn-View-Detail {
+  background: #fff;
+  color: #1A1A1A;
+  border: 2px solid #1A1A1A;
   padding: 8px 20px;
   border-radius: 8px;
-  border: 1px solid var(--Danger-Red);
-  background: white;
-  color: var(--Danger-Red);
+  font-weight: 900;
   cursor: pointer;
+  transition: 0.2s;
 }
 
-.Btn-Cancel-Order:hover {
-  background: var(--Danger-Red);
-  color: white;
+.Btn-View-Detail:hover {
+  background: #1A1A1A;
+  color: #fff;
 }
 
-/* Loading */
-.Loading-State {
-  text-align: center;
-  padding: 60px 0;
+/* --- GRID NỘI DUNG --- */
+.Card-Main-Grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
+.Grid-Col p {
+  font-size: 14px;
+  font-weight: 700;
+  color: #888;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.Grid-Col p span {
+  color: #222;
+  font-weight: 800;
+  display: block;
+  font-size: 15px;
+  margin-top: 4px;
+  text-transform: none; /* Trả lại chữ thường cho nội dung */
+}
+
+.Total-Col {
+  text-align: right;
+  border-left: 2px solid #F8F9FA;
+  padding-left: 20px;
+}
+
+.Price-Text {
+  color: var(--Primary-Orange);
+  font-size: 1.8rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.Card-Bottom-Address {
+  background: #F8F9FA;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.Card-Bottom-Address i { color: var(--Primary-Orange); }
+
+/* --- LOADING SPINNER --- */
+.Spinner-Wrapper { text-align: center; padding: 50px; }
 .Spinner {
-  width: 35px;
-  height: 35px;
-  border: 4px solid #eee;
-  border-top: 4px solid var(--Primary-Orange);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: auto;
+  width: 50px; height: 50px;
+  border: 6px solid #e0e0e0; border-top: 6px solid var(--Primary-Orange);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+  margin: 0 auto 20px;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.Empty-State {
-  text-align: center;
-  padding: 80px 0;
-  color: #999;
-}
-
-@media (max-width: 992px) {
-  .Card-Main-Grid {
-    grid-template-columns: 1fr;
-  }
+/* --- RESPONSIVE --- */
+@media (max-width: 850px) {
+  .Card-Main-Grid { grid-template-columns: 1fr 1fr; }
+  .Total-Col { grid-column: span 2; text-align: left; border-left: none; padding-left: 0; border-top: 2px solid #F8F9FA; padding-top: 15px; }
 }

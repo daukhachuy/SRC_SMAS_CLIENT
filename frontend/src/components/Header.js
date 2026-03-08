@@ -17,6 +17,31 @@ const Header = () => {
 
   const [activeId, setActiveId] = useState('');
   const [shrink, setShrink] = useState(false);
+  
+  // --- THÊM STATE ĐỂ LƯU TỔNG SỐ LƯỢNG GIỎ HÀNG ---
+  const [cartCount, setCartCount] = useState(0);
+
+  // Hàm tính toán tổng số lượng từ localStorage
+  const updateCartBadge = () => {
+    const savedCart = JSON.parse(localStorage.getItem('cart')) || [];
+    // Tính tổng tất cả quantity của các item trong giỏ
+    const total = savedCart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+    setCartCount(total);
+  };
+
+  useEffect(() => {
+    // Chạy lần đầu khi component mount
+    updateCartBadge();
+
+    // Lắng nghe sự kiện 'storage' (khi tab khác thay đổi localStorage)
+    // và custom event từ chính ứng dụng (khi cùng 1 tab thay đổi giỏ hàng)
+    window.addEventListener('storage', updateCartBadge);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', updateCartBadge);
+    };
+  }, []);
 
   // Map path -> id
   const pathToId = useMemo(() => {
@@ -31,7 +56,6 @@ const Header = () => {
 
     const pickActiveByScroll = () => {
       setShrink(window.scrollY > 80);
-
       const focusY = 120;
 
       for (const item of MENU_ITEMS) {
@@ -85,7 +109,7 @@ const Header = () => {
       setActiveId(matched.id);
       return;
     } else {
-      setActiveId(''); // Reset active nếu không khớp menu chính (ví dụ vào trang /cart)
+      setActiveId(''); 
     }
   }, [location.pathname, location.state, pathToId]);
 
@@ -156,7 +180,6 @@ const Header = () => {
             <span className="action-badge badge-red">5</span>
           </div>
 
-          {/* SỬA TẠI ĐÂY: Thêm onClick điều hướng tới trang Cart */}
           <div 
             className="action-icon-wrap" 
             title="Giỏ hàng"
@@ -164,7 +187,10 @@ const Header = () => {
             onClick={() => navigate('/cart')}
           >
             <ShoppingBag size={22} />
-            <span className="action-badge badge-orange">3</span>
+            {/* HIỂN THỊ cartCount TẠI ĐÂY */}
+            {cartCount > 0 && (
+                <span className="action-badge badge-orange">{cartCount}</span>
+            )}
           </div>
 
           <div
