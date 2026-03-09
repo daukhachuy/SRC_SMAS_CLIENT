@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Bell, Calendar, ChefHat, ClipboardList, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
@@ -8,6 +8,26 @@ import '../../styles/KitchenPages.css';
 const KitchenLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    fullname: 'Nhân viên bếp',
+    position: 'Bếp'
+  });
+
+  // Load user info từ localStorage
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setUserInfo({
+          fullname: user.fullname || 'Nhân viên bếp',
+          position: user.role === 'Kitchen' ? 'Bếp' : 'Nhân viên'
+        });
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+  }, []);
 
   const navItems = useMemo(
     () => [
@@ -52,14 +72,11 @@ const KitchenLayout = () => {
 
         <div className="kitchen-sidebar-footer">
           <div className="kitchen-avatar">
-            <img 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBOB91kHRbJkeI0YuZVJj5eXkR18MqBl32ffD5qC7DCC9cJUbZILvolUei_wJ3clw7xaM5wHQTx4YQ4q0mUPMQQoz29eyMBAm73fOhn1tsbbKy8UHwNvl7YGENQOBSAoy68TGbe_dqA3ff3QiT17SdPGyuLsAwH9gzWI6WgDTRWnZmxVEWSuJ8QOF5KiIA56SFW4ri9DZMw8o9_f_XOGB6W-u2lZKhjaal12UajP4qq4a8vrAN7xe-ke7gk0cGCdKrjd_GuX512cwk" 
-              alt="Nhân viên bếp"
-            />
+            <ChefHat size={24} />
           </div>
           <div>
-            <strong>Trần Văn Bếp</strong>
-            <p>Bếp trưởng</p>
+            <strong>{userInfo.fullname}</strong>
+            <p>{userInfo.position}</p>
           </div>
         </div>
       </aside>

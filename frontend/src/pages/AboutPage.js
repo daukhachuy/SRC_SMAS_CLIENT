@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
@@ -7,8 +7,6 @@ import '../styles/AboutPage.css';
 
 const AboutPage = () => {
   const navigate = useNavigate();
-  const [activeReviewIdx, setActiveReviewIdx] = useState(0);
-  const [selectedGalleryIdx, setSelectedGalleryIdx] = useState(0);
 
   const services = [
     {
@@ -56,17 +54,12 @@ const AboutPage = () => {
     },
   ];
 
-  const ratingStats = {
-    average: 4.5,
-    total: 100,
-    breakdown: [
-      { stars: 5, count: 87 },
-      { stars: 4, count: 7 },
-      { stars: 3, count: 5 },
-      { stars: 2, count: 1 },
-      { stars: 1, count: 0 }
-    ]
-  };
+  const reviewCards = [
+    { id: 1, name: 'Lan Anh', text: '"Món cua sốt trứng muối rất đậm đà, nhân viên phục vụ 10 điểm."', avatar: 'https://i.pravatar.cc/100?u=lan-anh' },
+    { id: 2, name: 'Bích Ngọc', text: '"Lẩu hải sản vị thanh ngọt tự nhiên, gia đình tôi rất thích."', avatar: 'https://i.pravatar.cc/100?u=bich-ngoc' },
+    { id: 3, name: 'Hoàng Nam', text: '"View biển đẹp, đồ ăn ra nhanh và nóng hổi. Rất đáng tiền!"', avatar: 'https://i.pravatar.cc/100?u=hoang-nam' },
+    { id: 4, name: 'Thanh Tùng', text: '"Không gian đẹp, phục vụ chuyên nghiệp và cực kỳ thân thiện."', avatar: 'https://i.pravatar.cc/100?u=thanh-tung' }
+  ];
 
   const branches = [
     {
@@ -77,13 +70,6 @@ const AboutPage = () => {
       website: 'http://abc....'
     }
   ];
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveReviewIdx(prev => (prev + 1) % reviews.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="about-page">
@@ -158,93 +144,35 @@ const AboutPage = () => {
       {/* REVIEWS SECTION */}
       <section className="reviews-section">
         <div className="reviews-container">
-          <h2 className="reviews-title">Đánh giá khách hàng</h2>
-          <p className="reviews-subtitle">
-            Chúng tôi luôn sẵn sàng lắng nghe những đánh giá của khách hàng để cải thiện nhà hàng hàng ngày
-          </p>
+          <div className="about-review-layout">
+            <div className="about-review-left">
+              <div className="about-quote-mark">❞</div>
+              <h2 className="reviews-title">
+                Khách hàng nói gì <br />
+                về chúng tôi?
+              </h2>
+              <div className="about-big-rating">4.9</div>
+              <div className="about-stars-row">★★★★★</div>
+              <p className="about-total-reviews">1,500+ ĐÁNH GIÁ THỰC TẾ</p>
+            </div>
 
-          <div className="reviews-content">
-            <div className="reviews-stats">
-              <div className="reviews-rating">
-                <div className="rating-score">
-                  <span className="rating-number">{ratingStats.average.toFixed(1)}</span>
-                  <span className="rating-slash"> / </span>
-                  <span className="rating-total">5</span>
-                </div>
-                <div className="rating-stars">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className={i < Math.floor(ratingStats.average) ? 'star-filled' : 'star-empty'}>★</span>
-                  ))}
-                </div>
-                <p className="rating-count">{ratingStats.total} lượt đánh giá</p>
-              </div>
-
-              <div className="reviews-breakdown">
-                {ratingStats.breakdown.map((item) => (
-                  <div key={item.stars} className="breakdown-item">
-                    <span className="breakdown-stars">{item.stars} ★</span>
-                    <div className="breakdown-bar">
-                      <div 
-                        className="breakdown-fill"
-                        style={{ width: `${(item.count / ratingStats.total) * 100}%` }}
-                      ></div>
+            <div className="about-review-right">
+              {reviewCards.map((item) => (
+                <article key={item.id} className="about-feedback-card">
+                  <p className="about-feedback-text">{item.text}</p>
+                  <div className="about-feedback-user">
+                    <img src={item.avatar} className="about-feedback-avatar" alt={item.name} />
+                    <div>
+                      <p className="about-feedback-name">{item.name}</p>
+                      <p className="about-feedback-status">Thực khách hài lòng</p>
                     </div>
-                    <span className="breakdown-count">{item.count}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="reviews-list">
-              <h3 className="reviews-list-title">Được đánh giá bởi các khách hàng thân thiết</h3>
-              <p className="reviews-list-subtitle">
-                Đây chính là sự ghi nhận lớn nhất đối với đội của chúng tôi có động lực cải tiến không ngừng nghỉ và dem đến trải nghiệm tốt nhất cho từng khách hàng
-              </p>
-
-              <div className="review-card">
-                <div className="review-header">
-                  <h4 className="review-name">{reviews[activeReviewIdx].name}</h4>
-                  <span className="review-rating">Đã đánh giá {reviews[activeReviewIdx].rating} ★</span>
-                </div>
-                <p className="review-comment">{reviews[activeReviewIdx].comment}</p>
-              </div>
+                </article>
+              ))}
             </div>
           </div>
         </div>
       </section>
-
-      {/* RESTAURANT INFO SECTION */}
-      <section className="restaurant-info-section">
-        <div className="restaurant-info-container">
-          <h2 className="info-section-title">Thông tin về nhà hàng</h2>
-
-          <div className="info-content">
-            <div className="info-details">
-              <div className="info-item-box">
-                <div className="info-item-icon">🍽️</div>
-                <div className="info-item-content">
-                  <h3>{branches[0].name}</h3>
-                  <ul className="info-list">
-                    <li><strong>Địa chỉ:</strong> {branches[0].address}</li>
-                    <li><strong>Thời gian mở cửa:</strong> {branches[0].hours}</li>
-                    <li><strong>Liên hệ:</strong> {branches[0].phone}</li>
-                    <li><strong>Liên kết:</strong> {branches[0].website}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div className="info-map">
-              <img 
-                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=600" 
-                alt="Map location" 
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-     
 
       <Footer />
     </div>

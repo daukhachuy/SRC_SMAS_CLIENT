@@ -1,4 +1,5 @@
 import instance from './axiosInstance';
+import { extractUserFromToken } from '../utils/jwtHelper';
 
 /* =====================================================
    HELPER: Save Auth Data
@@ -6,8 +7,16 @@ import instance from './axiosInstance';
 function saveAuthData(data) {
   if (data?.token) {
     localStorage.setItem('authToken', data.token);
+    
+    // Extract user info từ JWT token
+    const userInfo = extractUserFromToken(data.token);
+    if (userInfo) {
+      localStorage.setItem('user', JSON.stringify(userInfo));
+      console.log('✅ User info extracted from JWT:', userInfo);
+    }
   }
 
+  // Nếu backend có trả về user object riêng, ưu tiên nó
   if (data?.user) {
     localStorage.setItem('user', JSON.stringify(data.user));
   }
@@ -55,7 +64,13 @@ export async function login(email, password) {
     }
 
     saveAuthData(response.data);
-    return response.data;
+    
+    // Extract user info từ JWT token và return
+    const userInfo = extractUserFromToken(response.data.token);
+    return {
+      ...response.data,
+      user: userInfo // Thêm user object từ JWT
+    };
   } catch (error) {
     throw handleApiError(error);
   }
@@ -99,7 +114,13 @@ export async function googleLogin(token) {
     }
 
     saveAuthData(response.data);
-    return response.data;
+    
+    // Extract user info từ JWT token và return
+    const userInfo = extractUserFromToken(response.data.token);
+    return {
+      ...response.data,
+      user: userInfo
+    };
   } catch (error) {
     throw handleApiError(error);
   }

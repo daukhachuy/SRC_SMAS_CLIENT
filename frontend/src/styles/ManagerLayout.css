@@ -123,6 +123,27 @@
   color: var(--manager-muted);
 }
 
+.manager-logout-btn {
+  margin-top: 10px;
+  border: 1px solid #f1d1b7;
+  background: #fff3e8;
+  color: #9f4300;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.manager-logout-btn:hover {
+  background: #ffe8d5;
+  transform: translateY(-1px);
+}
+
 .manager-main {
   min-width: 0;
   display: flex;

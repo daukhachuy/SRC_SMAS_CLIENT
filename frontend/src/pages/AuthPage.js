@@ -99,8 +99,30 @@ const AuthPage = () => {
 
       setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
 
+      // Redirect dựa trên role
+      const userRole = response?.user?.role;
+      let redirectPath = '/';
+
+      switch (userRole) {
+        case 'Manager':
+          redirectPath = '/manager/dashboard';
+          break;
+        case 'Waiter':
+          redirectPath = '/waiter/orders';
+          break;
+        case 'Kitchen':
+          redirectPath = '/kitchen/orders';
+          break;
+        case 'Customer':
+        default:
+          redirectPath = '/profile';
+          break;
+      }
+
+      console.log(`✅ Login success - Role: ${userRole} → Redirecting to: ${redirectPath}`);
+
       timeoutRef.current = setTimeout(() => {
-        navigate('/profile');
+        navigate(redirectPath);
       }, 1200);
     } catch (err) {
       setError(parseError(err));
@@ -132,8 +154,30 @@ const AuthPage = () => {
 
       setSuccess('Đăng nhập Google thành công!');
 
+      // Redirect dựa trên role
+      const userRole = response?.user?.role;
+      let redirectPath = '/';
+
+      switch (userRole) {
+        case 'Manager':
+          redirectPath = '/manager/dashboard';
+          break;
+        case 'Waiter':
+          redirectPath = '/waiter/orders';
+          break;
+        case 'Kitchen':
+          redirectPath = '/kitchen/orders';
+          break;
+        case 'Customer':
+        default:
+          redirectPath = '/profile';
+          break;
+      }
+
+      console.log(`✅ Google Login success - Role: ${userRole} → Redirecting to: ${redirectPath}`);
+
       timeoutRef.current = setTimeout(() => {
-        navigate('/profile');
+        navigate(redirectPath);
       }, 1200);
     } catch (err) {
       setError(parseError(err));
