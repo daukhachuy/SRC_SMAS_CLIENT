@@ -77,8 +77,12 @@ const AppRoutes = () => {
         {/* Redirect old admin URLs to manager */}
         <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
 
-        {/* Manager pages */}
-        <Route path="/manager" element={<ManagerLayout />}>
+        {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
+        <Route path="/manager" element={
+          <ProtectedRoute requiredRole="Manager">
+            <ManagerLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ManagerDashboardPage />} />
           <Route path="orders" element={<ManagerOrdersPage />} />
@@ -94,16 +98,24 @@ const AppRoutes = () => {
           <Route path="salary" element={<ManagerSalaryPage />} />
         </Route>
 
-          {/* Waiter pages */}
-          <Route path="/waiter" element={<WaiterLayout />}>
+          {/* Waiter pages - BẢO VỆ BỞI ProtectedRoute với role Waiter */}
+          <Route path="/waiter" element={
+            <ProtectedRoute requiredRole="Waiter">
+              <WaiterLayout />
+            </ProtectedRoute>
+          }>
             <Route index element={<Navigate to="orders" replace />} />
             <Route path="orders" element={<WaiterOrdersPage />} />
               <Route path="schedule" element={<WaiterSchedulePage />} />
               <Route path="profile" element={<WaiterProfilePage />} />
           </Route>
 
-          {/* Kitchen pages */}
-          <Route path="/kitchen" element={<KitchenLayout />}>
+          {/* Kitchen pages - BẢO VỆ BỞI ProtectedRoute với role Kitchen */}
+          <Route path="/kitchen" element={
+            <ProtectedRoute requiredRole="Kitchen">
+              <KitchenLayout />
+            </ProtectedRoute>
+          }>
             <Route index element={<Navigate to="orders" replace />} />
             <Route path="orders" element={<KitchenOrdersPage />} />
             <Route path="schedule" element={<KitchenSchedulePage />} />

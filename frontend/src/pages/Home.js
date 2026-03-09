@@ -54,23 +54,23 @@ const REVIEWS_DATA = Array.from({ length: 20 }).map((_, i) => ({
 // --- SMALL COMPONENTS ---
 
 const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
-  <div className="product-card">
-    <div className="product-img-container">
+  <div className="home-product-card">
+    <div className="home-product-img-container">
       <img 
         src={img?.startsWith('http') ? img : `https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net${img}`} 
         alt={name} 
-        className="product-img" 
+        className="home-product-img" 
         loading="lazy" 
       />
-      <div className="product-price-tag">{typeof price === 'number' ? price.toLocaleString() + 'đ' : price}</div>
-      <div className="heart-icon">
+      <div className="home-product-price-tag">{typeof price === 'number' ? price.toLocaleString() + 'đ' : price}</div>
+      <div className="home-heart-icon">
         <Heart size={18} fill="#FF7A21" color="#FF7A21" />
       </div>
     </div>
-    <div className="product-body">
-      <h4 className="product-name">{name}</h4>
-      <p className="product-text">{desc}</p>
-      <button className={`add-to-cart-btn ${isCombo ? 'btn-combo-active' : ''}`}>
+    <div className="home-product-body">
+      <h4 className="home-product-name">{name}</h4>
+      <p className="home-product-text">{desc}</p>
+      <button className={`home-add-to-cart-btn ${isCombo ? 'home-btn-combo-active' : ''}`}>
         {isCombo ? 'ĐẶT COMBO' : 'THÊM VÀO GIỎ'}
       </button>
     </div>
@@ -333,7 +333,7 @@ const Home = () => {
         <div className="category-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
           <div>
             <h2 className="main-title">MÓN ĂN BÁN CHẠY 🔥</h2>
-            <p className="sub-title">Top hương vị đại dương được yêu thích nhất từ API</p>
+            <p className="sub-title">Top hương vị đại dương được yêu thích nhất</p>
           </div>
           <button className="view-all-link" onClick={() => navigate('/menu')}>Xem tất cả <ChevronRight size={16} /></button>
         </div>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Bell, Calendar, ClipboardList, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
@@ -8,6 +8,28 @@ import '../../styles/WaiterPages.css';
 const WaiterLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    fullname: 'Nhân viên',
+    email: 'waiter@fptres.vn',
+    userId: 'NV000'
+  });
+
+  // Load user info từ localStorage
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setUserInfo({
+          fullname: user.fullname || 'Nhân viên',
+          email: user.email || 'waiter@fptres.vn',
+          userId: user.userId ? `NV${String(user.userId).padStart(3, '0')}` : 'NV000'
+        });
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+  }, []);
 
   const navItems = useMemo(
     () => [
@@ -50,14 +72,11 @@ const WaiterLayout = () => {
 
         <div className="waiter-sidebar-footer">
           <div className="waiter-avatar">
-            <img 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsYEghUw4sjdjjQrXFODjj7DBMQpkmQmzjjkWzTK4DjWrjxIlmbJymlrgzYU2K9yJ2QYVkJ2Q2eQ4_Gu6b_k-67lFWwxvfdOmE3iPb14HN-Bf1o1eKvo5EcpyIQ15lSIr0EyTF4VsTvq05ZgPQCovguWlqYoiilvZD7BDzrkshZkxGXZY0DLt0sfZWuRjLqY7bBIgWPa-MJ-b3yAqxt5ZH5UYFKcxNCttX3ciEUD5m-ZLRtgqX2_Nj420Lc9KvY1aqP_U1n0l8skA" 
-              alt="Nhân viên phục vụ"
-            />
+            <User size={24} />
           </div>
           <div>
-            <strong>Nguyễn Văn An</strong>
-            <p>ID: NV082</p>
+            <strong>{userInfo.fullname}</strong>
+            <p>ID: {userInfo.userId}</p>
           </div>
         </div>
       </aside>

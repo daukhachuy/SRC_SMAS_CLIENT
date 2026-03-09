@@ -1,13 +1,47 @@
-import React, { useMemo, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, Menu, ShoppingCart, Users, X } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
 
 const ManagerLayout = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    fullname: 'Manager',
+    email: 'manager@fptres.vn',
+    initials: 'MG'
+  });
+
+  // Load user info từ localStorage
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        
+        // Tạo initials từ fullname (ví dụ: "Lê Quang Thức" → "LQT")
+        const getInitials = (name) => {
+          if (!name) return 'MG';
+          const words = name.trim().split(' ');
+          if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+          return words.map(w => w[0]).join('').toUpperCase();
+        };
+
+        setUserInfo({
+          fullname: user.fullname || 'Manager',
+          email: user.email || 'manager@fptres.vn',
+          initials: getInitials(user.fullname)
+        });
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+  }, []);
 
   const navItems = useMemo(
     () => [
@@ -20,6 +54,11 @@ const ManagerLayout = () => {
     ],
     []
   );
+
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
+  };
 
   return (
     <div className="manager-shell">
@@ -52,12 +91,17 @@ const ManagerLayout = () => {
         </nav>
 
         <div className="manager-sidebar-footer">
-          <div className="manager-avatar">MH</div>
+          <div className="manager-avatar">{userInfo.initials}</div>
           <div>
-            <strong>Minh Hoàng</strong>
-            <p>manager@fptres.vn</p>
+            <strong>{userInfo.fullname}</strong>
+            <p>{userInfo.email}</p>
           </div>
         </div>
+
+        <button className="manager-logout-btn" onClick={handleLogout}>
+          <LogOut size={16} />
+          <span>Đăng xuất</span>
+        </button>
       </aside>
 
       {/* Mobile Menu Button */}
