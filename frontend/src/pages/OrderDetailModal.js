@@ -1,109 +1,172 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { 
+  X, 
+  ShoppingBag, 
+  User, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  Utensils, 
+  ChevronRight,
+  Info
+} from 'lucide-react';
 import '../styles/OrderDetailModal.css';
 
 const OrderDetailModal = ({ order, onClose }) => {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
-
   if (!order) return null;
 
-  // Ánh xạ dữ liệu từ API sang giao diện Modal
+  // Xử lý dữ liệu hiển thị
   const items = order.items || [];
-  const orderDate = new Date(order.createdAt).toLocaleDateString('vi-VN');
+  const orderDate = new Date(order.createdAt).toLocaleString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const getStatusClass = (status) => {
+    const s = status?.toLowerCase();
+    if (s === 'pending' || s === 'chờ') return 'od-status-orange';
+    if (s === 'shipping' || s === 'đang giao') return 'od-status-blue';
+    if (s === 'completed' || s === 'xong' || s === 'thành công') return 'od-status-green';
+    return 'od-status-gray';
+  };
 
   return (
-    <div className="Order-Detail-Overlay" onClick={(e) => e.target.className === 'Order-Detail-Overlay' && onClose()}>
-      <div className="Order-Detail-Container animate-pop">
+    <div className="od-modal-overlay" onClick={(e) => e.target.className === 'od-modal-overlay' && onClose()}>
+      <div className="od-modal-container">
         
-        <div className="Detail-Header">
-          <h2>Chi tiết đơn hàng</h2>
-          <button className="Back-Arrow-Btn" onClick={onClose}>
-            <i className="fa-solid fa-xmark"></i> {/* Đổi icon thành X cho trực quan */}
+        {/* HEADER SECTION */}
+        <div className="od-modal-header">
+          <div className="od-header-main">
+            <div className="od-icon-wrapper">
+              <ShoppingBag size={24} />
+            </div>
+            <div className="od-title-area">
+              <div className="od-title-row">
+                <h2 className="od-modal-title">Chi tiết đơn hàng</h2>
+                <span className={`od-status-badge ${getStatusClass(order.status)}`}>
+                  {order.status || 'Đang xử lý'}
+                </span>
+              </div>
+              <p className="od-subtitle">Mã đơn: <strong>#{order.orderCode}</strong></p>
+            </div>
+          </div>
+          <button className="od-close-button" onClick={onClose}>
+            <X size={24} />
           </button>
         </div>
 
-        <div className="Detail-Main-Content">
+        {/* BODY SECTION */}
+        <div className="od-modal-body">
           
-          {/* CỘT TRÁI: BIÊN LAI */}
-          <div className="Receipt-Column">
-            <div className="Shop-Brand">
-              <i className="fa-solid fa-shop"></i>
-              <h3>NHÀ HÀNG SMAS</h3>
-              <p><i className="fa-solid fa-location-dot"></i> 42 Trần Thủ Độ, Đà Nẵng</p>
-              <p>Mã đơn : <strong>{order.orderCode}</strong></p>
+          {/* CỘT TRÁI: DANH SÁCH MÓN & TỔNG TIỀN */}
+          <div className="od-content-left">
+            <div className="od-section">
+              <h3 className="od-section-label">
+                <Utensils size={18} /> Món ăn đã đặt
+              </h3>
+              <div className="od-table-container">
+                <table className="od-items-table">
+                  <thead>
+                    <tr>
+                      <th>Sản phẩm</th>
+                      <th className="text-center">SL</th>
+                      <th className="text-right">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <div className="od-item-info">
+                            <span className="od-item-name">{item.itemName}</span>
+                            <span className="od-item-unit">{item.unitPrice?.toLocaleString()}đ</span>
+                          </div>
+                        </td>
+                        <td className="text-center">{item.quantity}</td>
+                        <td className="text-right od-item-price">
+                          {(item.quantity * item.unitPrice).toLocaleString()}đ
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="Items-List">
-              {items.length > 0 ? items.map((item, idx) => (
-                <div className="Receipt-Item" key={idx}>
-                  <div className="Item-Name">
-                    <span>{idx + 1}. {item.itemName}</span>
-                    <small>sl : {item.quantity}</small>
-                  </div>
-                  <div className="Item-Price">
-                    <span>{item.unitPrice?.toLocaleString()}</span>
-                    <span>{(item.quantity * item.unitPrice).toLocaleString()}</span>
-                  </div>
-                </div>
-              )) : <p>Không có thông tin món ăn</p>}
-            </div>
-
-            <div className="Receipt-Summary">
-              <div className="Summary-Row">
-                <span>Tổng số món: {items.reduce((acc, curr) => acc + curr.quantity, 0)}</span>
-                <span>Cộng: {order.totalAmount?.toLocaleString()} đ</span>
+            <div className="od-billing-card">
+              <div className="od-billing-row">
+                <span>Tạm tính</span>
+                <span>{order.totalAmount?.toLocaleString()}đ</span>
               </div>
-              <div className="Summary-Row">
-                <span>Thuế VAT</span>
-                <span>0 %</span>
+              <div className="od-billing-row">
+                <span>Phí vận chuyển</span>
+                <span>+0đ</span>
               </div>
-              <div className="Summary-Row Final-Total">
-                <span>THÀNH TIỀN</span>
-                <span>{order.totalAmount?.toLocaleString()} đ</span>
+              <div className="od-billing-total">
+                <span className="od-total-label">TỔNG CỘNG</span>
+                <span className="od-total-amount">{order.totalAmount?.toLocaleString()}đ</span>
               </div>
             </div>
           </div>
 
-          {/* CỘT PHẢI: THÔNG TIN VÀ ĐÁNH GIÁ */}
-          <div className="Info-Rating-Column">
-            <div className="Order-Meta-Info">
-              <h3>Thông tin vận chuyển</h3>
-              <p>Ngày đặt : <span>{orderDate}</span></p>
-              <p>Người nhận : <span>{order.delivery?.recipientName || order.customer?.fullname || 'Khách hàng'}</span></p>
-              <p>Số ĐT : <span>{order.delivery?.phone || 'N/A'}</span></p>
-              <p>Thanh toán : <span>{order.paymentMethod || 'Tiền mặt'}</span></p>
-              <p>Loại đơn : <span className="Order-Type-Badge">{order.orderType}</span></p>
+          {/* CỘT PHẢI: THÔNG TIN GIAO NHẬN */}
+          <div className="od-content-right">
+            <div className="od-section">
+              <h3 className="od-section-label">Thông tin giao nhận</h3>
+              <div className="od-details-list">
+                <div className="od-detail-item">
+                  <User size={16} className="od-detail-icon" />
+                  <div className="od-detail-text">
+                    <label>Khách hàng</label>
+                    <p>{order.delivery?.recipientName || order.customer?.fullname || 'Khách hàng'}</p>
+                  </div>
+                </div>
+                <div className="od-detail-item">
+                  <Phone size={16} className="od-detail-icon" />
+                  <div className="od-detail-text">
+                    <label>Số điện thoại</label>
+                    <p>{order.delivery?.phone || 'Chưa cập nhật'}</p>
+                  </div>
+                </div>
+                <div className="od-detail-item">
+                  <MapPin size={16} className="od-detail-icon" />
+                  <div className="od-detail-text">
+                    <label>Địa chỉ nhận</label>
+                    <p className="od-address-text">{order.delivery?.address || 'Tại nhà hàng'}</p>
+                  </div>
+                </div>
+                <div className="od-detail-item">
+                  <Calendar size={16} className="od-detail-icon" />
+                  <div className="od-detail-text">
+                    <label>Thời gian đặt</label>
+                    <p>{orderDate}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="Rating-Section">
-              <p className="Rating-Prompt">Đánh giá trải nghiệm của bạn</p>
-              <div className="Star-Rating">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <i 
-                    key={star}
-                    className={`fa-star ${star <= rating ? 'fa-solid' : 'fa-regular'}`}
-                    onClick={() => setRating(star)}
-                    style={{color: '#FF7A21', cursor: 'pointer', fontSize: '1.5rem'}}
-                  ></i>
-                ))}
+            <div className="od-note-box">
+              <div style={{ display: 'flex', gap: '8px', color: '#64748b' }}>
+                <Info size={16} />
+                <p style={{ fontSize: '0.85rem', margin: 0 }}>
+                  Bạn chỉ có thể đánh giá dịch vụ sau khi đơn hàng đã được giao và thanh toán thành công.
+                </p>
               </div>
-
-              <div className="Comment-Box">
-                <label>Lời nhắn cho nhà hàng</label>
-                <textarea 
-                  rows="3" 
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Món ăn rất ngon..."
-                ></textarea>
-              </div>
-
-              <button className="Submit-Rating-Btn" onClick={() => alert("Cảm ơn bạn đã đánh giá!")}>
-                Gửi đánh giá
-              </button>
             </div>
           </div>
         </div>
+
+        {/* FOOTER SECTION */}
+        <div className="od-modal-footer">
+          <button className="od-btn-secondary" onClick={onClose}>Đóng</button>
+          <button className="od-btn-primary" onClick={onClose}>
+            Xác nhận <ChevronRight size={16} />
+          </button>
+        </div>
+
       </div>
     </div>
   );
