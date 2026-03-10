@@ -58,7 +58,7 @@ const Cart = () => {
   const [modalStep, setModalStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Tiền Mặt');
 
-  // --- LOGIC VALIDATE SỐ ĐIỆN THOẠI (THAY ĐỔI DUY NHẤT TẠI ĐÂY) ---
+  // --- LOGIC VALIDATE SỐ ĐIỆN THOẠI ---
   const handleGoToStep2 = () => {
     const phoneRegex = /^(0|84)(3|5|7|8|9)([0-9]{8})$/;
     if (!customerInfo.recipientPhone.trim()) {
@@ -66,7 +66,7 @@ const Cart = () => {
       return;
     }
     if (!phoneRegex.test(customerInfo.recipientPhone.trim())) {
-      alert("Số điện thoại không hợp lệ! Vui lòng kiểm tra lại (10 số, đúng đầu số nhà mạng).");
+      alert("Số điện thoại không hợp lệ! Vui lòng kiểm tra lại.");
       return;
     }
     if (!customerInfo.recipientName.trim() || !customerInfo.address.trim()) {
@@ -76,7 +76,6 @@ const Cart = () => {
     setModalStep(2);
   };
 
-  // --- LOGIC TÍNH TOÁN PHÂN TRANG ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = cartItems.slice(indexOfFirstItem, indexOfLastItem);
@@ -134,67 +133,82 @@ const Cart = () => {
     setModalStep(1);
   };
 
-  // --- HÀM CALL API ĐẶT HÀNG ---
+  // --- LOGIC ĐẶT HÀNG & THANH TOÁN (THEO QUY TRÌNH 3 BƯỚC) ---
   const handleFinalOrder = async () => {
     if (isOrdering) return;
+    setIsOrdering(true);
 
     try {
-      if(!customerInfo.recipientName || !customerInfo.recipientPhone || !customerInfo.address) {
-          alert("Vui lòng điền đầy đủ thông tin giao hàng!");
-          setModalStep(1);
-          return;
-      }
-
-      setIsOrdering(true);
-
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      // BƯỚC 1: TẠO ĐƠN HÀNG (POST /api/order/create/delivery)
       const formattedItems = cartItems.map(item => {
-        const payloadItem = { quantity: Number(item.quantity) };
-        if (item.comboId && Number(item.comboId) > 0) {
-          payloadItem.comboId = Number(item.comboId);
-        } else if (item.foodId && Number(item.foodId) > 0) {
-          payloadItem.foodId = Number(item.foodId);
-        } else if (item.id && Number(item.id) > 0) {
-          const isCombo = item.name?.toLowerCase().includes('combo');
-          if (isCombo) payloadItem.comboId = Number(item.id);
-          else payloadItem.foodId = Number(item.id);
-        }
-        return payloadItem;
-      }).filter(item => item.foodId || item.comboId);
+        const isCombo = (item.comboId && Number(item.comboId) > 0) || (item.name?.toLowerCase().includes('combo'));
+        return {
+          foodId: !isCombo ? Number(item.foodId || item.id) : null,
+          comboId: isCombo ? Number(item.comboId || item.id) : null,
+          quantity: Number(item.quantity)
+        };
+      }).filter(i => i.foodId || i.comboId);
 
-      const orderData = {
-        discountCode: discountCode || "",
-        note: customerInfo.note || "",
+      const orderPayload = {
+        discountCode: discountCode || null,
+        note: customerInfo.note || null,
         items: formattedItems,
         deliveryInfo: {
           recipientName: customerInfo.recipientName,
           recipientPhone: customerInfo.recipientPhone,
           address: customerInfo.address,
-          note: customerInfo.note
+          note: customerInfo.note || null
         }
       };
 
-      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-      
-      const response = await axios.post(`${BASE_URL}/api/order/create/delivery`, orderData, {
+      const orderRes = await axios.post(`${BASE_URL}/api/order/create/delivery`, orderPayload, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
-      if (response.status === 200 || response.status === 201) {
-        alert(`🎉 Đặt hàng thành công! Mã đơn: ${response.data.orderCode || ''}`);
-        localStorage.removeItem('cart');
-        window.dispatchEvent(new Event('storage'));
-        window.location.href = "/order-history"; 
+      // Lấy orderId từ response (Cấu trúc: { success: true, orderId: 123, ... })
+      const orderId = orderRes.data.orderId || orderRes.data.id;
+
+      // BƯỚC 2: TẠO LINK THANH TOÁN NẾU KHÔNG PHẢI TIỀN MẶT
+      if (paymentMethod === 'Tiền Mặt') {
+        alert(orderRes.data.message || "Đặt hàng thành công!");
+        finishOrderSuccess();
+      } else {
+        const payRes = await axios.post(`${BASE_URL}/api/payment/create-link`, {
+          orderId: Number(orderId),
+          returnUrl: `${window.location.origin}/order-history`, 
+          cancelUrl: `${window.location.origin}/cart`
+        }, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (payRes.data.success && payRes.data.checkoutUrl) {
+          // Xóa giỏ hàng trước khi chuyển trang
+          localStorage.removeItem('cart');
+          window.dispatchEvent(new Event('storage'));
+          // Chuyển hướng sang PayOS
+          window.location.href = payRes.data.checkoutUrl;
+        } else {
+          alert("Lỗi tạo link thanh toán: " + (payRes.data.message || "Không xác định"));
+          finishOrderSuccess();
+        }
       }
     } catch (err) {
-      console.error("Lỗi đặt hàng:", err);
-      const errorDetail = err.response?.data?.message || err.response?.data || "Có lỗi xảy ra.";
-      alert(typeof errorDetail === 'string' ? errorDetail : "Dữ liệu giỏ hàng không hợp lệ.");
+      console.error("Lỗi quy trình:", err);
+      alert(err.response?.data?.message || "Có lỗi xảy ra khi xử lý đơn hàng.");
     } finally {
       setIsOrdering(false);
     }
+  };
+
+  const finishOrderSuccess = () => {
+    localStorage.removeItem('cart');
+    window.dispatchEvent(new Event('storage'));
+    window.location.href = "/order-history"; 
   };
 
   if (loading) return <div className="loading-spinner">Đang tải...</div>;
@@ -311,7 +325,7 @@ const Cart = () => {
         </div>
       </main>
 
-      {/* MODAL THANH TOÁN 2 BƯỚC */}
+      {/* MODAL THANH TOÁN 2 BƯỚC (GIỮ NGUYÊN UI CỦA BẠN) */}
       {showInfoModal && (
         <div className="Modal-Overlay" onClick={handleCloseModal}>
           <div className={`Info-Modal-Box ${modalStep === 2 ? 'summary-modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
@@ -394,11 +408,6 @@ const Cart = () => {
 
                     <div className="Bill-Footer-Fixed">
                       <div className="Bill-Divider"></div>
-                      {customerInfo.note && (
-                        <div className="Bill-Note-Preview">
-                          <strong>Ghi chú:</strong> {customerInfo.note}
-                        </div>
-                      )}
                       <div className="Bill-Row"><span>Tạm tính:</span> <span>{totalPrice.toLocaleString()}đ</span></div>
                       <div className="Bill-Row"><span>Tiền cọc ({deposit.percent}%):</span> <span className="text-orange">{deposit.amount.toLocaleString()}đ</span></div>
                       <div className="Bill-Total"><span>Tổng cộng:</span> <span>{totalPrice.toLocaleString()}đ</span></div>
@@ -422,7 +431,7 @@ const Cart = () => {
                       ))}
                     </div>
                     <button className="Btn-Final-Order" onClick={handleFinalOrder} disabled={isOrdering}>
-                        {isOrdering ? "Đang xử lý..." : "Xác nhận đặt hàng"}
+                        {isOrdering ? "Đang xử lý..." : paymentMethod === 'Tiền Mặt' ? "Xác nhận đặt hàng" : `Thanh toán qua ${paymentMethod}`}
                     </button>
                     <button className="Btn-Back-Step" onClick={() => setModalStep(1)} style={{marginTop: '10px', width: '100%', background: '#eee', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer'}}>
                       Quay lại thông tin

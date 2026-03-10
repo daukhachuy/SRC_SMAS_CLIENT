@@ -31,7 +31,7 @@ import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
-
+import PaymentResult from './pages/PaymentResult';
 import WaiterLayout from './pages/waiter/WaiterLayout';
 import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
 import WaiterSchedulePage from './pages/waiter/WaiterSchedulePage';
@@ -76,7 +76,7 @@ const AppRoutes = () => {
 
         {/* Redirect old admin URLs to manager */}
         <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
-
+        <Route path="/payment-result" element={<PaymentResult />} />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={
           <ProtectedRoute requiredRole="Manager">
