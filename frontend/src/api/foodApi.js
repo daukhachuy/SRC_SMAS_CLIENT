@@ -1,5 +1,7 @@
 import instance from './axiosInstance';
 
+const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+
 /**
  * FOOD API - Lấy danh sách món ăn theo danh mục
  * Endpoint: /api/food/category
@@ -117,5 +119,32 @@ export async function getBuffetDetail(id) {
   } catch (error) {
     console.error(`❌ Failed to fetch buffet detail ${id}:`, error.message);
     return null;
+  }
+}
+
+/**
+ * FOOD FILTER API - Lấy danh sách món ăn theo filter (category, price)
+ * Endpoint: /api/food/filter
+ * @param {URLSearchParams} params - Filter parameters
+ */
+export async function getFoodByFilter(params) {
+  try {
+    const queryString = params instanceof URLSearchParams ? params.toString() : new URLSearchParams(params).toString();
+    
+    console.log('🔍 Fetching foods with filter:', queryString);
+    const response = await instance.get(`/food/filter?${queryString}`);
+    
+    const foodArray = Array.isArray(response.data) ? response.data : response.data?.$values || [];
+    console.log(`✅ Foods loaded: ${foodArray.length} items`);
+    
+    const mappedFoods = foodArray.map(item => ({
+      ...item,
+      image: FIXED_PRODUCT_IMAGE
+    }));
+    
+    return mappedFoods;
+  } catch (error) {
+    console.error('❌ Failed to fetch foods with filter:', error.response?.data || error.message);
+    throw error;
   }
 }

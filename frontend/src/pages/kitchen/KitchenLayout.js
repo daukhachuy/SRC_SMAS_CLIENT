@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Bell, Calendar, ChefHat, ClipboardList, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
+import { getProfile } from '../../api/userApi';
 import '../../styles/KitchenLayout.css';
 import '../../styles/KitchenPages.css';
 
@@ -10,23 +11,81 @@ const KitchenLayout = () => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên bếp',
+    email: 'kitchen@fptres.vn',
     position: 'Bếp'
   });
 
-  // Load user info từ localStorage
+  // Load user info và ưu tiên dữ liệu thật từ Profile API
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserInfo({
-          fullname: user.fullname || 'Nhân viên bếp',
-          position: user.role === 'Kitchen' ? 'Bếp' : 'Nhân viên'
-        });
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+    let isMounted = true;
+
+    const loadUserInfo = async () => {
+      let fallbackUser = {
+        fullname: 'Nhân viên bếp',
+        email: 'kitchen@fptres.vn',
+        role: 'Kitchen'
+      };
+
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          fallbackUser = {
+            fullname: user.fullname || 'Nhân viên bếp',
+            email: user.email || 'kitchen@fptres.vn',
+            role: user.role || 'Kitchen'
+          };
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
       }
-    }
+
+      if (isMounted) {
+        setUserInfo({
+          fullname: fallbackUser.fullname,
+          email: fallbackUser.email,
+          position: fallbackUser.role === 'Kitchen' ? 'Bếp' : 'Nhân viên'
+        });
+      }
+
+      try {
+        const profile = await getProfile();
+        const apiFullname = profile?.fullname || profile?.fullName || fallbackUser.fullname;
+        const apiEmail = profile?.email || fallbackUser.email;
+        const apiRole = profile?.role || fallbackUser.role;
+
+        if (!isMounted) return;
+
+        setUserInfo({
+          fullname: apiFullname,
+          email: apiEmail,
+          position: apiRole === 'Kitchen' ? 'Bếp' : 'Nhân viên'
+        });
+
+        if (userStr) {
+          try {
+            const localUser = JSON.parse(userStr);
+            localStorage.setItem('user', JSON.stringify({
+              ...localUser,
+              fullname: apiFullname,
+              email: apiEmail,
+              role: apiRole || localUser.role
+            }));
+          } catch {
+            // Ignore localStorage merge errors
+          }
+        }
+      } catch (error) {
+        console.warn('Profile API unavailable, fallback to local user info:', error?.message || error);
+      }
+
+    };
+
+    loadUserInfo();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const navItems = useMemo(

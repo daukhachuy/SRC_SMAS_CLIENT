@@ -11,6 +11,8 @@ import {
 import Header from '../components/Header'; 
 import Footer from '../components/Footer';
 
+const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+
 // --- DATA CỐ ĐỊNH ---
 const HERO_DATA = [
   { id: 1, title: "Cá Mú Hoa Hấp Dưa", tag: "Best Seller", desc: "Tinh hoa biển cả với thớ cá trắng ngần, quyện cùng vị chua thanh của dưa cải, tạo nên bản giao hương vị khó cưỡng.", img: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=1000" },
@@ -53,11 +55,11 @@ const REVIEWS_DATA = Array.from({ length: 20 }).map((_, i) => ({
 
 // --- SMALL COMPONENTS ---
 
-const ProductCard = ({ name, price, desc, img, isCombo = false }) => (
+const ProductCard = ({ name, price, desc, isCombo = false }) => (
   <div className="home-product-card">
     <div className="home-product-img-container">
       <img 
-        src={img?.startsWith('http') ? img : `https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net${img}`} 
+        src={FIXED_PRODUCT_IMAGE}
         alt={name} 
         className="home-product-img" 
         loading="lazy" 
@@ -156,7 +158,7 @@ const DiscountAndInfo = ({ navigate }) => {
                 <ChevronLeft size={20}/>
               </button>
               <img 
-                src={current.image?.startsWith('http') ? current.image : `https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net${current.image}`} 
+                src={FIXED_PRODUCT_IMAGE}
                 alt={current.name} 
                 className="discount-img-new" 
               />
@@ -194,7 +196,7 @@ const DiscountAndInfo = ({ navigate }) => {
           <h2 className="main-title info-restaurant-title">THÔNG TIN NHÀ HÀNG</h2>
           <div className="res-content-new">
             <div className="res-image-wrap-new">
-              <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=600" alt="Restaurant" className="res-img-new" />
+              <img src={FIXED_PRODUCT_IMAGE} alt="Restaurant" className="res-img-new" />
               <div className="rating-overlay">
                 <Star size={14} fill="#FF7A21" color="#FF7A21" />
                 <span className="rating-text">4.9 (1.2k Đánh giá)</span>
@@ -243,7 +245,7 @@ const Home = () => {
           id: item.foodId,
           name: item.name,
           price: item.price,
-          img: item.image,
+          img: FIXED_PRODUCT_IMAGE,
           desc: item.description || "Thưởng thức hương vị hải sản thượng hạng."
         }));
         setBestSellers(mappedData);

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Bell, Calendar, ClipboardList, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
+import { getProfile } from '../../api/userApi';
 import '../../styles/WaiterLayout.css';
 import '../../styles/WaiterPages.css';
 
@@ -14,21 +15,77 @@ const WaiterLayout = () => {
     userId: 'NV000'
   });
 
-  // Load user info từ localStorage
+  // Load user info và ưu tiên dữ liệu thật từ Profile API
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserInfo({
-          fullname: user.fullname || 'Nhân viên',
-          email: user.email || 'waiter@fptres.vn',
-          userId: user.userId ? `NV${String(user.userId).padStart(3, '0')}` : 'NV000'
-        });
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+    let isMounted = true;
+
+    const loadUserInfo = async () => {
+      let fallbackUser = {
+        fullname: 'Nhân viên',
+        email: 'waiter@fptres.vn',
+        userId: null
+      };
+
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          fallbackUser = {
+            fullname: user.fullname || 'Nhân viên',
+            email: user.email || 'waiter@fptres.vn',
+            userId: user.userId || null
+          };
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
       }
-    }
+
+      if (isMounted) {
+        setUserInfo({
+          fullname: fallbackUser.fullname,
+          email: fallbackUser.email,
+          userId: fallbackUser.userId ? `NV${String(fallbackUser.userId).padStart(3, '0')}` : 'NV000'
+        });
+      }
+
+      try {
+        const profile = await getProfile();
+        const apiFullname = profile?.fullname || profile?.fullName || fallbackUser.fullname;
+        const apiEmail = profile?.email || fallbackUser.email;
+        const apiUserId = profile?.userId || fallbackUser.userId;
+
+        if (!isMounted) return;
+
+        setUserInfo({
+          fullname: apiFullname,
+          email: apiEmail,
+          userId: apiUserId ? `NV${String(apiUserId).padStart(3, '0')}` : 'NV000'
+        });
+
+        if (userStr) {
+          try {
+            const localUser = JSON.parse(userStr);
+            localStorage.setItem('user', JSON.stringify({
+              ...localUser,
+              fullname: apiFullname,
+              email: apiEmail,
+              userId: apiUserId || localUser.userId
+            }));
+          } catch {
+            // Ignore localStorage merge errors
+          }
+        }
+      } catch (error) {
+        console.warn('Profile API unavailable, fallback to local user info:', error?.message || error);
+      }
+
+    };
+
+    loadUserInfo();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const navItems = useMemo(

@@ -6,7 +6,7 @@ import { ShoppingCart, MessageSquare, ChevronLeft, ChevronRight, Search } from '
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { getAllCategories } from '../api/categoryApi';
-// Import helper kiểm tra đăng nhập từ file auth của bạn
+import { getFoodByFilter } from '../api/foodApi';
 import { isAuthenticated } from '../api/authApi'; 
 
 const FloatingChat = () => (
@@ -18,7 +18,7 @@ const FloatingChat = () => (
 
 const MenuPage = () => {
   const navigate = useNavigate();
-  const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+  const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -28,7 +28,7 @@ const MenuPage = () => {
   const [priceRange, setPriceRange] = useState({ min: null, max: null });
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const itemsPerPage = 8; // 2 hàng × 4 cột
 
   // 1. FETCH CATEGORIES (Giữ nguyên logic của bạn)
   useEffect(() => {
@@ -48,7 +48,7 @@ const MenuPage = () => {
     fetchCats();
   }, []);
 
-  // 2. FETCH FOOD (Giữ nguyên logic filter của bạn)
+  // 2. FETCH FOOD (Sử dụng wrapper function getFoodByFilter)
   useEffect(() => {
     const loadFilteredFoods = async () => {
       try {
@@ -58,22 +58,24 @@ const MenuPage = () => {
         if (priceRange.min !== null) params.append('MinPrice', priceRange.min);
         if (priceRange.max !== null) params.append('MaxPrice', priceRange.max);
 
-        const response = await axios.get(`${BASE_URL}/api/food/filter?${params.toString()}`);
-        const foodArray = Array.isArray(response.data) ? response.data : response.data?.$values || [];
+        // ✅ Sử dụng API wrapper thay vì axios trực tiếp
+        const foodArray = await getFoodByFilter(params);
 
         const mapped = foodArray.map(item => ({
           id: item.foodId,
           name: item.name,
           price: item.price,
           oldPrice: item.promotionalPrice,
-          image: item.image?.startsWith('http') ? item.image : `${BASE_URL}${item.image}`,
+          image: item.image, // Đã được validate & clean trong getFoodByFilter
           categoryName: item.categories?.[0]?.name || "Món ăn"
         }));
 
         setMenuItems(mapped);
         setCurrentPage(1);
       } catch (err) {
+        console.error('❌ Error loading foods:', err);
         setError("Không thể tải dữ liệu món ăn.");
+        setMenuItems([]);
       } finally {
         setLoading(false);
       }
@@ -219,8 +221,15 @@ const MenuPage = () => {
                   {displayedItems.map(item => (
                     <div key={item.id} className="menu-item">
                       <div className="item-image-container">
-                        <img className="item-image" src={item.image} alt={item.name} 
-                             onError={(e) => e.target.src = "https://picsum.photos/300/200"} />
+                        <img 
+                          className="item-image" 
+                          src={item.image} 
+                          alt={item.name} 
+                          onError={(e) => {
+                            console.warn(`⚠️ Image failed to load for "${item.name}":`, e.target.src);
+                            e.target.src = FIXED_PRODUCT_IMAGE;
+                          }}
+                        />
                       </div>
                       <span className="item-category">{item.categoryName}</span>
                       <h3 className="item-name">{item.name}</h3>
@@ -229,7 +238,6 @@ const MenuPage = () => {
                           {item.oldPrice && <span className="old-price">{item.oldPrice.toLocaleString()}đ</span>}
                           <span className="new-price">{item.price.toLocaleString()}đ</span>
                         </div>
-                        {/* THÊM SỰ KIỆN CLICK VÀO ICON GIỎ HÀNG */}
                         <ShoppingCart 
                           size={20} 
                           className="cart-icon" 

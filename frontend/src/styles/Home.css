@@ -185,7 +185,7 @@
 /* --- SERVICE SECTION - WHITE BACKGROUND & ORANGE BUTTONS --- */
 .service-highlight-section {
   background-color: #ffffff; /* Chuyển thành màu trắng */
-  padding: 80px 2%; /* Căn lề đồng bộ với Hero */
+  padding: 56px 2%;
   position: relative;
   /* Thêm đường kẻ ngăn cách tinh tế với component trên */
   border-top: 1px solid rgba(0, 0, 0, 0.05); 
@@ -194,7 +194,7 @@
 .service-vertical-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 40px; /* Tăng gap để thoáng hơn */
+  gap: 24px;
   max-width: 1600px; /* Nới rộng để đồng bộ với Hero 1920px */
   margin: 0 auto;
 }
@@ -202,12 +202,15 @@
 .service-vertical-card {
   background: #ffffff;
   /* Bo tròn góc card mạnh hơn để đồng bộ với ảnh Hero (60px) */
-  border-radius: 40px; 
+  border-radius: 28px;
   overflow: hidden;
   /* Đổ bóng nhẹ và mịn hơn */
   box-shadow: 0 20px 40px rgba(0,0,0,0.06);
   transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
   border: 1px solid #f0f0f0; /* Viền mờ để card nổi bật trên nền trắng */
+  max-width: 400px;
+  width: 100%;
+  justify-self: center;
 }
 
 .service-vertical-card:hover {
@@ -217,7 +220,7 @@
 
 .service-img-wrap {
   position: relative;
-  height: 280px;
+  height: 215px;
 }
 
 .service-vertical-img {
@@ -228,11 +231,11 @@
 
 .service-icon-overlay {
   position: absolute;
-  bottom: -25px;
+  bottom: -18px;
   right: 30px;
   background: var(--primary-orange); /* Đổi sang màu cam cháy */
-  width: 65px;
-  height: 65px;
+  width: 52px;
+  height: 52px;
   border-radius: 20px; /* Bo góc icon */
   display: flex;
   align-items: center;
@@ -243,22 +246,22 @@
 }
 
 .service-body {
-  padding: 45px 35px 35px;
+  padding: 30px 22px 20px;
 }
 
 .service-title-text {
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 900;
   color: var(--deep-black);
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   letter-spacing: -1px;
 }
 
 .service-desc-text {
   color: #666;
-  line-height: 1.7;
-  margin-bottom: 30px;
-  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  font-size: 14px;
 }
 
 /* --- THIẾT KẾ LẠI NÚT BẤM (CAM CHÁY & BO TRÒN) --- */
@@ -267,9 +270,9 @@
   color: #ffffff;
   border: none;
   font-weight: 700;
-  padding: 12px 30px;
+  padding: 9px 18px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 13px;
   border-radius: 50px; /* Bo tròn hoàn toàn */
   transition: all 0.3s ease;
   display: inline-block;
@@ -641,12 +644,32 @@
 .info-restaurant-title {
   position: relative;
   z-index: 3;
-  color: #FF7A21 !important;
+  color: #ffffff !important;
   font-size: 26px !important;
   font-weight: 900;
   padding: 35px;
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.rating-overlay {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.rating-text {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* Danh sách Info kiểu Glassmorphism hiện đại */
@@ -697,7 +720,7 @@
 }
 
 .info-label {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 11px;
   text-transform: uppercase;
   font-weight: 700;
@@ -709,6 +732,12 @@
   font-size: 15px;
   font-weight: 600;
   margin: 0;
+}
+
+.restaurant-card-new p,
+.restaurant-card-new h2,
+.restaurant-card-new span {
+  color: #ffffff;
 }
 
 /* --- 3. CÁC NÚT ĐIỀU HƯỚNG & ĐẶT HÀNG --- */

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { useAuth } from '../../context/AuthContext';
+import { getProfile } from '../../api/userApi';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
 
@@ -17,30 +18,80 @@ const ManagerLayout = () => {
     initials: 'MG'
   });
 
-  // Load user info từ localStorage
+  const getInitials = (name) => {
+    if (!name) return 'MG';
+    const words = name.trim().split(' ');
+    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+    return words.map(w => w[0]).join('').toUpperCase();
+  };
+
+  // Load user info và ưu tiên email thật từ Profile API
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
+    let isMounted = true;
+
+    const loadUserInfo = async () => {
+      let fallbackUser = {
+        fullname: 'Manager',
+        email: 'manager@fptres.vn'
+      };
+
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          fallbackUser = {
+            fullname: user.fullname || 'Manager',
+            email: user.email || 'manager@fptres.vn'
+          };
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
+      if (isMounted) {
+        setUserInfo({
+          fullname: fallbackUser.fullname,
+          email: fallbackUser.email,
+          initials: getInitials(fallbackUser.fullname)
+        });
+      }
+
       try {
-        const user = JSON.parse(userStr);
-        
-        // Tạo initials từ fullname (ví dụ: "Lê Quang Thức" → "LQT")
-        const getInitials = (name) => {
-          if (!name) return 'MG';
-          const words = name.trim().split(' ');
-          if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
-          return words.map(w => w[0]).join('').toUpperCase();
-        };
+        const profile = await getProfile();
+        const apiFullname = profile?.fullname || profile?.fullName || fallbackUser.fullname;
+        const apiEmail = profile?.email || fallbackUser.email;
+
+        if (!isMounted) return;
 
         setUserInfo({
-          fullname: user.fullname || 'Manager',
-          email: user.email || 'manager@fptres.vn',
-          initials: getInitials(user.fullname)
+          fullname: apiFullname,
+          email: apiEmail,
+          initials: getInitials(apiFullname)
         });
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+
+        if (userStr) {
+          try {
+            const localUser = JSON.parse(userStr);
+            localStorage.setItem('user', JSON.stringify({
+              ...localUser,
+              fullname: apiFullname,
+              email: apiEmail
+            }));
+          } catch {
+            // Ignore localStorage merge errors
+          }
+        }
+      } catch (error) {
+        console.warn('Profile API unavailable, fallback to local user info:', error?.message || error);
       }
-    }
+
+    };
+
+    loadUserInfo();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const navItems = useMemo(
