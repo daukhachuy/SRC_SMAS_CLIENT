@@ -17,7 +17,7 @@ const FloatingChat = () => (
 
 const ComboPage = () => {
   const navigate = useNavigate();
-  const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+  const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
   const [combos, setCombos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,9 +42,7 @@ const ComboPage = () => {
           name: item.name,
           description: item.description,
           price: item.price,
-          image: item.imageUrl 
-            ? (item.imageUrl.startsWith('http') ? item.imageUrl : `${BASE_URL}${item.imageUrl}`) 
-            : "https://via.placeholder.com/300x300?text=Combo+Hấp+Dẫn"
+          image: FIXED_PRODUCT_IMAGE
         }));
 
         setCombos(mapped);
@@ -186,7 +184,7 @@ const ComboPage = () => {
                           className="item-image" 
                           src={item.image} 
                           alt={item.name} 
-                          onError={(e) => e.target.src = "https://via.placeholder.com/300x300?text=Combo"}
+                          onError={(e) => e.target.src = FIXED_PRODUCT_IMAGE}
                         />
                       </div>
                       <span className="item-category">Combo Đặc Biệt</span>
