@@ -44,13 +44,13 @@ const AuthPage = () => {
     if (msgCode === 'MSG_002') return 'Mật khẩu không chính xác.';
     if (msgCode === 'MSG_003') return 'Đăng nhập thành công nhưng xảy ra lỗi.';
 
+    if (backendMessage?.includes('not found') || backendMessage?.includes('không tồn tại')) {
+      return 'Tài khoản Google chưa đăng ký. Vui lòng chọn Đăng ký bằng Google trước.';
+    }
+
     if (status === 400) return backendMessage || 'Dữ liệu không hợp lệ.';
     if (status === 401) return 'Email hoặc mật khẩu không chính xác.';
     if (status === 500) return 'Lỗi máy chủ. Vui lòng thử lại sau.';
-
-    if (backendMessage?.includes('not found') || backendMessage?.includes('không tồn tại') || msgCode === 'MSG_001') {
-      return 'Tài khoản Google chưa đăng ký. Vui lòng chọn Đăng ký bằng Google trước.';
-    }
 
     if (err?.message?.includes('Network'))
       return 'Lỗi kết nối. Vui lòng kiểm tra internet.';
