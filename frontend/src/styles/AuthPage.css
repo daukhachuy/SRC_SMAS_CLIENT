@@ -309,6 +309,21 @@ body {
   transform: translateY(0);
 }
 
+.google-auth-wrap {
+  margin: 4px auto 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.google-auth-wrap > div {
+  max-width: 100%;
+}
+
+.google-auth-wrap iframe {
+  border-radius: 999px;
+}
+
 /* ===== Divider ===== */
 .divider {
   display: flex;

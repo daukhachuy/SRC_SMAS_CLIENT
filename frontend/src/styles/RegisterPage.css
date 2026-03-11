@@ -179,6 +179,21 @@
   border-color: var(--gold);
 }
 
+.google-register-wrap {
+  margin: 6px auto 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.google-register-wrap > div {
+  max-width: 100%;
+}
+
+.google-register-wrap iframe {
+  border-radius: 999px;
+}
+
 /* DIVIDER */
 .form-divider {
   display: flex;
