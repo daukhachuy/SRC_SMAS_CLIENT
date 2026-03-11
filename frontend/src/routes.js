@@ -47,9 +47,19 @@ import Promotion from './pages/Promotion';
 
 // Google OAuth Client ID - detect hostname để chọn đúng Client ID
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const GOOGLE_CLIENT_ID = isLocalhost 
-  ? (process.env.REACT_APP_GOOGLE_CLIENT_ID_LOCAL || '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com')
-  : (process.env.REACT_APP_GOOGLE_CLIENT_ID_PROD || '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com');
+
+const normalizeClientId = (value) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('YOUR_') || trimmed.includes('_HERE')) return '';
+  return trimmed;
+};
+
+const localClientId = normalizeClientId(process.env.REACT_APP_GOOGLE_CLIENT_ID_LOCAL);
+const prodClientId = normalizeClientId(process.env.REACT_APP_GOOGLE_CLIENT_ID_PROD);
+const GOOGLE_CLIENT_ID = isLocalhost
+  ? (localClientId || prodClientId || '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com')
+  : (prodClientId || localClientId || '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com');
 
 const AppRoutes = () => {
   return (

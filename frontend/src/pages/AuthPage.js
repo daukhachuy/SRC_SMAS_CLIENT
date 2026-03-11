@@ -19,6 +19,14 @@ const AuthPage = () => {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
+    // Ensure Google shows account chooser instead of silently reusing last account
+    if (window.google?.accounts?.id?.disableAutoSelect) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+
+    // Clear GIS state cookie created for auto-select heuristics
+    document.cookie = 'g_state=; Max-Age=0; path=/';
+
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
@@ -29,7 +37,7 @@ const AuthPage = () => {
   // ==========================
   const parseError = (err) => {
     const status = err?.status;
-    const msgCode = err?.error;
+    const msgCode = err?.code || err?.error;
     const backendMessage = err?.message?.toLowerCase();
 
     if (msgCode === 'MSG_001') return 'Email không tồn tại.';
@@ -39,6 +47,10 @@ const AuthPage = () => {
     if (status === 400) return backendMessage || 'Dữ liệu không hợp lệ.';
     if (status === 401) return 'Email hoặc mật khẩu không chính xác.';
     if (status === 500) return 'Lỗi máy chủ. Vui lòng thử lại sau.';
+
+    if (backendMessage?.includes('not found') || backendMessage?.includes('không tồn tại') || msgCode === 'MSG_001') {
+      return 'Tài khoản Google chưa đăng ký. Vui lòng chọn Đăng ký bằng Google trước.';
+    }
 
     if (err?.message?.includes('Network'))
       return 'Lỗi kết nối. Vui lòng kiểm tra internet.';
@@ -187,7 +199,7 @@ const AuthPage = () => {
   };
 
   const handleGoogleLoginError = () => {
-    setError('Đăng nhập Google thất bại. Vui lòng thử lại.');
+    setError('Đăng nhập Google thất bại. Nếu chưa có tài khoản, hãy dùng Đăng ký bằng Google trước.');
   };
 
   // ==========================
@@ -235,11 +247,17 @@ const AuthPage = () => {
           <p className="auth-subtitle">Chào mừng bạn quay trở lại!</p>
 
           {/* Google */}
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="google-auth-wrap">
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
               onError={handleGoogleLoginError}
+              auto_select={false}
+              useOneTap={false}
               text="signin"
+              shape="pill"
+              size="large"
+              logo_alignment="left"
+              width="320"
               theme="outline"
               locale="vi"
             />

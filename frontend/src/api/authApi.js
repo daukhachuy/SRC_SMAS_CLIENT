@@ -1,5 +1,6 @@
 import instance from './axiosInstance';
 import { extractUserFromToken } from '../utils/jwtHelper';
+import { googleLogout } from '@react-oauth/google';
 
 /* =====================================================
    HELPER: Save Auth Data
@@ -134,8 +135,6 @@ export async function googleRegister(token) {
     const response = await instance.post('/auth/register/google', {
       token,
     });
-
-    saveAuthData(response.data);
     return response.data;
   } catch (error) {
     throw handleApiError(error);
@@ -194,6 +193,7 @@ export async function resetPassword(email, otp, newPassword) {
    AUTH HELPERS
 ===================================================== */
 export function logout() {
+  googleLogout();
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
   localStorage.removeItem('rememberMe');

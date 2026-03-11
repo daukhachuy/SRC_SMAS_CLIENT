@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import '../styles/RegisterPage.css';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
@@ -22,6 +22,27 @@ const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    // Ensure Google shows account chooser instead of silently reusing last account
+    if (window.google?.accounts?.id?.disableAutoSelect) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+
+    // Clear GIS state cookie created for auto-select heuristics
+    document.cookie = 'g_state=; Max-Age=0; path=/';
+  }, []);
+
+  const parseRegisterMessage = (msgCode, fallbackMessage = '') => {
+    if (msgCode === 'MSG_003') return 'Đăng ký thành công!';
+    if (msgCode === 'MSG_005') return 'Email đã tồn tại. Vui lòng dùng email khác hoặc đăng nhập.';
+
+    if (fallbackMessage?.trim()) {
+      return fallbackMessage;
+    }
+
+    return 'Đăng ký thất bại. Vui lòng thử lại.';
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -98,17 +119,23 @@ const RegisterPage = () => {
       const response = await register(userData);
       console.log('Register response:', response);
 
-      if (response.success === true || response.user) {
+      const hasToken = Boolean(response?.token);
+      const msgCode = response?.msgCode;
+
+      if (hasToken || msgCode === 'MSG_003') {
         setSuccessMessage('Đăng ký thành công! Chuyển hướng đến đăng nhập...');
         setTimeout(() => {
           navigate('/auth');
         }, 1500);
       } else {
-        setErrors({ submit: response.message || 'Đăng ký thất bại' });
+        setErrors({ submit: parseRegisterMessage(msgCode, response?.message) });
       }
     } catch (error) {
       console.error('Registration error:', error);
-      setErrors({ submit: error.response?.data?.message || error.message || 'Lỗi kết nối. Kiểm tra API backend.' });
+      const msgCode = error?.code || error?.response?.data?.msgCode;
+      const fallbackMessage = error?.response?.data?.message || error?.message || 'Lỗi kết nối. Kiểm tra API backend.';
+
+      setErrors({ submit: parseRegisterMessage(msgCode, fallbackMessage) });
     } finally {
       setLoading(false);
     }
@@ -120,23 +147,43 @@ const RegisterPage = () => {
     setSuccessMessage('');
 
     try {
+      if (!credentialResponse?.credential) {
+        throw new Error('Không nhận được token từ Google');
+      }
+
       const googleToken = credentialResponse.credential;
       console.log('🔐 Google token received for registration:', googleToken.substring(0, 20) + '...');
 
       // Send token to backend for Google registration
       const response = await googleRegister(googleToken);
+      const hasToken = Boolean(response?.token);
+      const msgCode = response?.msgCode;
 
-      if (response.success === true || response.user) {
-        setSuccessMessage('✅ Đăng ký Google thành công! Chuyển hướng...');
+      // Google sign-up: only create account, then direct user to sign in page
+      if (hasToken || msgCode === 'MSG_003') {
+        setSuccessMessage('✅ Đăng ký Google thành công! Vui lòng đăng nhập bằng Google.');
         setTimeout(() => {
-          navigate('/profile');
+          navigate('/auth');
         }, 1500);
-      } else {
-        setErrors({ submit: response.message || 'Đăng ký Google thất bại' });
+        return;
       }
+
+      if (msgCode === 'MSG_005') {
+        setErrors({ submit: 'Email Google đã tồn tại. Vui lòng chuyển sang Đăng nhập bằng Google.' });
+        return;
+      }
+
+      setErrors({ submit: response.message || 'Đăng ký Google thất bại' });
     } catch (error) {
       console.error('Google registration error:', error);
-      setErrors({ submit: error?.message || 'Lỗi đăng ký Google. Vui lòng thử lại hoặc đăng ký với email.' });
+      const msgCode = error?.code || error?.response?.data?.msgCode;
+      const message = error?.message?.toLowerCase() || '';
+
+      if (msgCode === 'MSG_005' || message.includes('exist') || message.includes('đã tồn tại')) {
+        setErrors({ submit: 'Email Google đã tồn tại. Vui lòng chuyển sang Đăng nhập bằng Google.' });
+      } else {
+        setErrors({ submit: error?.message || 'Lỗi đăng ký Google. Vui lòng thử lại hoặc đăng ký với email.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -154,12 +201,18 @@ const RegisterPage = () => {
           <h2 className="form-title">Đăng Ký</h2>
           <p className="form-subtitle">Chào mừng bạn tới với nhà hàng hải sản !</p>
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+          <div className="google-register-wrap">
             <GoogleLogin
               onSuccess={handleGoogleRegisterSuccess}
               onError={handleGoogleRegisterError}
+              auto_select={false}
+              useOneTap={false}
               text="signup_with"
               type="standard"
+              shape="pill"
+              size="large"
+              logo_alignment="left"
+              width="320"
               theme="outline"
               locale="vi"
             />
