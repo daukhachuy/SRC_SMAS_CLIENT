@@ -48,7 +48,7 @@ import Promotion from './pages/Promotion';
 // Google OAuth Client ID - detect hostname để chọn đúng Client ID
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const DEFAULT_GOOGLE_CLIENT_ID_LOCAL = '282641166696-q8qrpm9gptdena5n6607joje92475of6.apps.googleusercontent.com';
-const DEFAULT_GOOGLE_CLIENT_ID_PROD = '809599261625-93ghqc42jnj7515a4hk6vtlatqfde2be.apps.googleusercontent.com';
+const DEFAULT_GOOGLE_CLIENT_ID_PROD = '282641166696-q8qrpm9gptdena5n6607joje92475of6.apps.googleusercontent.com';
 
 const normalizeClientId = (value) => {
   const trimmed = value?.trim();
