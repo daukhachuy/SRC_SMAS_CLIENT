@@ -1,0 +1,489 @@
+/* Quản lý Thực đơn - Menu Management */
+
+.admin-menu-management {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.menu-management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.menu-management-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.menu-management-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.menu-btn-icon-only {
+  padding: 0.5rem;
+  color: #6b7280;
+}
+
+.menu-btn-icon-only:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.menu-management-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.25rem;
+}
+
+.menu-tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  margin-bottom: -1px;
+}
+
+.menu-tab:hover {
+  color: #374151;
+}
+
+.menu-tab.active {
+  color: #FF6C1F;
+  font-weight: 600;
+  border-bottom-color: #FF6C1F;
+}
+
+.menu-management-content {
+  min-width: 0;
+}
+
+/* Section toolbar */
+.menu-management-section {
+  min-width: 0;
+}
+
+.menu-section-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.menu-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  min-width: 220px;
+}
+
+.menu-search-wrap svg {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.menu-search-input {
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  color: #111827;
+  background: transparent;
+  min-width: 0;
+}
+
+.menu-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.menu-select-filter {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.menu-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.menu-filter-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.menu-filter-btn:hover {
+  color: #374151;
+  background: #e5e7eb;
+}
+
+.menu-filter-btn.active {
+  color: #fff;
+  background: #FF6C1F;
+}
+
+.menu-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #FF6C1F;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  margin-left: auto;
+}
+
+.menu-btn-primary:hover {
+  background: #e85a15;
+  transform: translateY(-1px);
+}
+
+/* Table card */
+.menu-table-card {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.menu-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* Header bảng: nền trắng, chữ xám (không dùng xanh) */
+.menu-table thead {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.menu-table th {
+  padding: 1rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280 !important;
+  background: #ffffff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.menu-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.menu-table tbody tr:hover {
+  background: #fafafa;
+}
+
+/* Ảnh giống buffet: vuông, bo góc */
+.menu-table-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.menu-table-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.menu-table-img span {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.menu-cell-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.menu-cell-code {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #6b7280;
+  margin-top: 0.15rem;
+}
+
+.menu-cell-desc {
+  color: #6b7280;
+  max-width: 280px;
+}
+
+.menu-cell-price {
+  font-weight: 600;
+  color: #FF6C1F;
+}
+
+.menu-category-tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #FF6C1F;
+  background: #fff7ed;
+  border-radius: 0.25rem;
+}
+
+.menu-status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+}
+
+.menu-status-pill.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.menu-status-pill.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Toggle switch */
+.menu-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #e5e7eb;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.menu-toggle.active {
+  background: #FF6C1F;
+}
+
+.menu-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.menu-toggle.active .menu-toggle-thumb {
+  transform: translateX(20px);
+}
+
+.menu-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.menu-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.menu-icon-btn:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.menu-icon-btn-danger:hover {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+/* Pagination */
+.menu-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fafbfc;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.menu-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.menu-page-btn {
+  min-width: 2rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.menu-page-btn:hover:not(:disabled) {
+  border-color: #FF6C1F;
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.menu-page-btn.active {
+  background: #FF6C1F;
+  border-color: #FF6C1F;
+  color: #fff;
+}
+
+.menu-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Buffet list (custom layout) */
+.menu-buffet-list {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+/* Header buffet: nền trắng giống các phần khác */
+.menu-buffet-header {
+  display: grid;
+  grid-template-columns: 2fr 100px 100px 100px 100px 80px;
+  gap: 1rem;
+  padding: 1rem;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.menu-buffet-row {
+  display: grid;
+  grid-template-columns: 2fr 100px 100px 100px 100px 80px;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.menu-buffet-row:hover {
+  background: #fafafa;
+}
+
+.menu-buffet-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.menu-buffet-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #f3f4f6;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-buffet-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.menu-buffet-img span {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.menu-buffet-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+@media (max-width: 768px) {
+  .menu-section-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .menu-btn-primary {
+    margin-left: 0;
+  }
+
+  .menu-buffet-header,
+  .menu-buffet-row {
+    grid-template-columns: 1fr 1fr 80px;
+  }
+}

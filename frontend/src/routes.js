@@ -45,6 +45,7 @@ import KitchenProfilePage from './pages/kitchen/KitchenProfilePage';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminTableMap from './pages/admin/AdminTableMap';
+import AdminMenuManagement from './pages/admin/menu/AdminMenuManagement';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -94,6 +95,7 @@ const AppRoutes = () => {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="tables" element={<AdminTableMap />} />
+          <Route path="menu" element={<AdminMenuManagement />} />
         </Route>
         <Route path="/payment-result" element={<PaymentResult />} />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
