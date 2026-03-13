@@ -89,12 +89,8 @@ const AppRoutes = () => {
         <Route path="/auth-test" element={<AuthTestPage />} />
         <Route path="/cart" element={<Cart />} />
 
-        {/* Admin pages - dùng role Admin (hoặc đổi requiredRole thành "Manager" để test) */}
-        <Route path="/admin" element={
-          <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-        </Route>
-        }>
+        {/* Admin pages - Không có authorization */}
+        <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
         </Route>
         <Route path="/payment-result" element={<PaymentResult />} />
