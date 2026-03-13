@@ -337,15 +337,16 @@ body {
 
 /* Header bảng: nền trắng, chữ xám (giống RE cương ADMIN) */
 .admin-table thead {
-  background: #ffffff;
+  background: #ffffff !important;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.admin-table th {
+.admin-table thead th {
+  background: #ffffff !important;
+  color: #6b7280 !important;
   padding: 1rem 1.5rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
