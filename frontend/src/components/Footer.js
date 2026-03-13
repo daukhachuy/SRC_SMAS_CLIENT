@@ -1,8 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../styles/Footer.css';
 import { Facebook, Instagram, Twitter, Mail, MapPin, Phone, Send } from 'lucide-react';
 
 const Footer = () => {
+  const navigate = useNavigate();
+
   return (
     <footer className="footer">
       <div className="footer-container">
@@ -31,11 +34,11 @@ const Footer = () => {
 
           {/* Cột 2: Khám phá */}
           <div className="footer-column">
-            <h4 className="footer-heading">KHÁM PHÁ</h4>
+            <h4 className="footer-heading footer-list-item" onClick={() => navigate('/')}>KHÁM PHÁ</h4>
             <ul className="footer-list">
-              <li className="footer-list-item">Thực đơn chính</li>
-              <li className="footer-list-item">Ưu đãi Combo</li>
-              <li className="footer-list-item">Đặt bàn ngay</li>
+              <li className="footer-list-item" onClick={() => navigate('/menu')}>Thực đơn chính</li>
+              <li className="footer-list-item" onClick={() => navigate('/combo')}>Ưu đãi Combo</li>
+              <li className="footer-list-item" onClick={() => navigate('/services')}>Đặt bàn ngay</li>
             </ul>
           </div>
 

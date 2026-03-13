@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import '../styles/ComboPage.css'; 
-import { ShoppingCart, MessageSquare, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import '../styles/ComboPage.css';
+import { ShoppingCart, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-// Import helper kiểm tra đăng nhập
-import { isAuthenticated } from '../api/authApi'; 
-
-const FloatingChat = () => (
-  <div className="fixed-chat">
-    <MessageSquare size={28} color="white" />
-    <span className="online-status"></span>
-  </div>
-);
+import AuthRequiredModal from '../components/AuthRequiredModal';
+import { getComboLists } from '../api/foodApi';
+import { isAuthenticated } from '../api/authApi';
 
 const ComboPage = () => {
   const navigate = useNavigate();
@@ -23,32 +16,39 @@ const ComboPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPricePreset, setSelectedPricePreset] = useState('all');
+  const [sortBy, setSortBy] = useState('default');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const [toast, setToast] = useState(null);
+  const [showAuthRequired, setShowAuthRequired] = useState(false);
+  const itemsPerPage = 8;
 
-  // 1. FETCH COMBOS
+  const showToast = (item) => {
+    setToast(item);
+    setTimeout(() => setToast(null), 3000);
+  };
+
   useEffect(() => {
     const fetchCombos = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${BASE_URL}/api/combo`);
-        
-        const data = Array.isArray(response.data) 
-          ? response.data 
-          : response.data?.$values || [];
+        setError(null);
+        const response = await getComboLists();
+        const data = Array.isArray(response) ? response : response?.$values || [];
 
-        const mapped = data.map(item => ({
+        const mapped = data.map((item) => ({
           id: item.comboId || item.id,
           name: item.name,
           description: item.description,
           price: item.price,
-          image: FIXED_PRODUCT_IMAGE
+          image: item.image || FIXED_PRODUCT_IMAGE,
         }));
 
         setCombos(mapped);
       } catch (err) {
-        console.error("Lỗi khi lấy dữ liệu combo:", err);
-        setError("Không thể tải dữ liệu combo lúc này.");
+        console.error('Lỗi khi lấy dữ liệu combo:', err);
+        setError('Không thể tải dữ liệu combo lúc này.');
+        setCombos([]);
       } finally {
         setLoading(false);
       }
@@ -56,20 +56,14 @@ const ComboPage = () => {
     fetchCombos();
   }, []);
 
-  // ==========================================
-  // 2. HÀM THÊM COMBO VÀO GIỎ HÀNG
-  // ==========================================
   const addToCart = (combo) => {
-    // Kiểm tra đăng nhập qua token (authToken)
     if (!isAuthenticated()) {
-      alert("Vui lòng đăng nhập để đặt Combo!");
-      navigate('/login');
+      setShowAuthRequired(true);
       return;
     }
 
     const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
-    // Tìm kiếm xem combo này đã có trong giỏ chưa (check ID và cờ isCombo)
-    const itemIndex = existingCart.findIndex(item => item.id === combo.id && item.isCombo === true);
+    const itemIndex = existingCart.findIndex((item) => item.id === combo.id && item.isCombo === true);
 
     if (itemIndex > -1) {
       existingCart[itemIndex].quantity += 1;
@@ -80,94 +74,136 @@ const ComboPage = () => {
         price: combo.price,
         image: combo.image,
         quantity: 1,
-        isCombo: true // Đánh dấu đây là COMBO để Backend xử lý riêng nếu cần
+        isCombo: true,
       });
     }
 
     localStorage.setItem('cart', JSON.stringify(existingCart));
-    
-    // Đồng bộ số lượng trên Header
-    window.dispatchEvent(new Event('storage')); 
-    alert(`Đã thêm "${combo.name}" vào giỏ hàng!`);
+    window.dispatchEvent(new Event('storage'));
+    showToast(combo);
   };
 
-  // Logic Tìm kiếm
-  const filteredCombos = combos.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const inSelectedPrice = (price) => {
+    if (selectedPricePreset === 'all') return true;
+    if (selectedPricePreset === 'under-200') return price < 200000;
+    if (selectedPricePreset === '200-500') return price >= 200000 && price <= 500000;
+    return price > 500000;
+  };
 
-  // Logic Phân trang
-  const totalPages = Math.ceil(filteredCombos.length / itemsPerPage);
-  const displayedItems = filteredCombos.slice(
+  const filteredCombos = combos.filter((item) => {
+    const keyword = searchTerm.trim().toLowerCase();
+    const matchesSearch = !keyword || item.name.toLowerCase().includes(keyword) || (item.description || '').toLowerCase().includes(keyword);
+    const matchesPrice = inSelectedPrice(item.price || 0);
+    return matchesSearch && matchesPrice;
+  });
+
+  const sortedItems = [...filteredCombos].sort((a, b) => {
+    if (sortBy === 'price-asc') return (a.price || 0) - (b.price || 0);
+    if (sortBy === 'price-desc') return (b.price || 0) - (a.price || 0);
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sortedItems.length / itemsPerPage);
+  const effectiveTotalPages = Math.max(1, totalPages);
+  const displayedItems = sortedItems.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedPricePreset, sortBy]);
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 150, behavior: 'smooth' });
+    window.scrollTo({ top: 140, behavior: 'smooth' });
   };
 
   return (
-    <div className="app">
+    <div className="combo-page-shell">
       <Header />
 
-      <div className="menu-page-container">
-        <div className="menu-control-bar">
-          <div className="control-left">
-            <button className="nav-tab" onClick={() => navigate('/menu')}>MENU</button>
-            <button className="nav-tab active" onClick={() => navigate('/combo')}>COMBO</button>
-            <button className="nav-tab" onClick={() => navigate('/buffet')}>BUFFET</button>
-          </div>
-
-          <div className="control-right">
-            <span className="sort-dropdown-label">Sắp xếp: </span>
-            <select className="sort-dropdown">
-              <option>Mặc định</option>
-              <option>Giá thấp đến cao</option>
-              <option>Giá cao đến thấp</option>
-            </select>
-          </div>
+      <div className="combo-page-container">
+        <div className="combo-tabs-row">
+          <button className="combo-tab-btn" onClick={() => navigate('/menu')}>Menu</button>
+          <button className="combo-tab-btn active" onClick={() => navigate('/combo')}>Combo</button>
+          <button className="combo-tab-btn" onClick={() => navigate('/buffet')}>Buffet</button>
         </div>
 
-        <div className="menu-content">
-          <aside className="sidebar">
-            <div className="filter-section-main">
-              <h3 className="filter-title">Lọc Combo</h3>
-              <div className="filter-group">
-                <div className="filter-header"><h4>NHÓM COMBO</h4></div>
-                <ul className="filter-list">
-                  <li><label><input type="checkbox" defaultChecked /> Tất cả Combo</label></li>
-                  <li><label><input type="checkbox" /> Combo 2 người</label></li>
-                  <li><label><input type="checkbox" /> Combo Gia đình</label></li>
-                  <li><label><input type="checkbox" /> Combo Tiết kiệm</label></li>
-                </ul>
-              </div>
+        <div className="combo-content">
+          <aside className="combo-sidebar">
+            <div className="combo-sidebar-sticky">
+              <section className="combo-filter-section">
+                <h3 className="combo-price-range-heading"><span className="combo-price-heading-bar" />Khoảng giá</h3>
+                <div className="combo-filter-options">
+                  <label className="combo-filter-option">
+                    <input type="radio" name="combo-price" className="combo-custom-radio" checked={selectedPricePreset === 'all'} onChange={() => setSelectedPricePreset('all')} />
+                    <span>Tất cả</span>
+                  </label>
+                  <label className="combo-filter-option">
+                    <input type="radio" name="combo-price" className="combo-custom-radio" checked={selectedPricePreset === 'under-200'} onChange={() => setSelectedPricePreset('under-200')} />
+                    <span>Dưới 200k</span>
+                  </label>
+                  <label className="combo-filter-option">
+                    <input type="radio" name="combo-price" className="combo-custom-radio" checked={selectedPricePreset === '200-500'} onChange={() => setSelectedPricePreset('200-500')} />
+                    <span>200k - 500k</span>
+                  </label>
+                  <label className="combo-filter-option">
+                    <input type="radio" name="combo-price" className="combo-custom-radio" checked={selectedPricePreset === 'over-500'} onChange={() => setSelectedPricePreset('over-500')} />
+                    <span>Trên 500k</span>
+                  </label>
+                </div>
 
-              <div className="filter-group">
-                <div className="filter-header"><h4>KHOẢNG GIÁ</h4></div>
-                <ul className="filter-list">
-                  <li><label><input type="radio" name="price" defaultChecked /> Tất cả</label></li>
-                  <li><label><input type="radio" name="price" /> Dưới 200k</label></li>
-                  <li><label><input type="radio" name="price" /> 200k - 500k</label></li>
-                  <li><label><input type="radio" name="price" /> Trên 500k</label></li>
-                </ul>
-              </div>
+                <button
+                  type="button"
+                  className="combo-price-reset-link"
+                  onClick={() => {
+                    setSelectedPricePreset('all');
+                  }}
+                >
+                  Đặt lại bộ lọc
+                </button>
+              </section>
             </div>
           </aside>
 
-          <main className="main-content">
-            <div className="search-row-container">
-              <div className="search-container-new">
-                <input 
-                  type="text" 
-                  placeholder="Tìm kiếm combo hấp dẫn..." 
+          <main className="combo-main-content">
+            <div className="combo-toolbar">
+              <div className="combo-search-wrapper">
+                <Search size={17} className="combo-search-icon" />
+                <input
+                  type="text"
+                  className="combo-search-input"
+                  placeholder="Tìm kiếm combo..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
                 />
-                <button className="search-icon-btn"><Search size={18}/></button>
               </div>
-              <button className="btn-tim-kiem">Tìm Kiếm</button>
+
+              <div className="combo-toolbar-right">
+                <p className="combo-result-text">Tổng {sortedItems.length} combo</p>
+                <div className="combo-sort">
+                  <label htmlFor="combo-sort-select">Sắp xếp</label>
+                  <select
+                    id="combo-sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="default">Mặc định</option>
+                    <option value="price-asc">Giá thấp đến cao</option>
+                    <option value="price-desc">Giá cao đến thấp</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {loading ? (
@@ -176,47 +212,51 @@ const ComboPage = () => {
               <p className="status-msg error">{error}</p>
             ) : (
               <>
-                <div className="menu-grid">
-                  {displayedItems.map(item => (
-                    <div key={item.id} className="menu-item">
-                      <div className="item-image-container">
-                        <img 
-                          className="item-image" 
-                          src={item.image} 
-                          alt={item.name} 
+                <div className="combo-grid">
+                  {displayedItems.map((item) => (
+                    <div key={item.id} className="combo-item">
+                      <div className="combo-item-image-wrap">
+                        <img
+                          className="combo-item-image"
+                          src={item.image}
+                          alt={item.name}
                           onError={(e) => e.target.src = FIXED_PRODUCT_IMAGE}
                         />
+                        <span className="combo-item-badge">Combo</span>
                       </div>
-                      <span className="item-category">Combo Đặc Biệt</span>
-                      <h3 className="item-name">{item.name}</h3>
-                      <p style={{ fontSize: '12px', color: '#666', height: '32px', overflow: 'hidden', marginBottom: '10px', lineHeight: '1.4' }}>
+
+                      <h3 className="combo-item-name">{item.name}</h3>
+                      <p className="combo-item-desc">
                         {item.description}
                       </p>
-                      <div className="price-info">
-                        <div className="price-box">
-                          <span className="new-price">{item.price?.toLocaleString()}đ</span>
+
+                      <div className="combo-item-footer">
+                        <div className="combo-item-prices">
+                          <span className="combo-new-price">{item.price?.toLocaleString()}đ</span>
                         </div>
-                        {/* THÊM CLICK ĐỂ CHẠY HÀM addToCart */}
-                        <ShoppingCart 
-                          size={22} 
-                          className="cart-icon" 
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => addToCart(item)}
-                        />
+                        <button className="combo-cart-btn" onClick={() => addToCart(item)} aria-label="Thêm combo vào giỏ">
+                          <ShoppingCart size={18} />
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {totalPages > 1 && (
+                {sortedItems.length > 0 && (
                   <div className="pagination-wrapper">
-                    <div className="pagination-info">Hiển thị {displayedItems.length} / {filteredCombos.length} combo</div>
+                    <div className="pagination-info">Hiển thị {displayedItems.length} / {sortedItems.length} món</div>
                     <div className="pagination-btns">
-                      <button className="p-btn" onClick={() => handlePageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1}><ChevronLeft size={16}/></button>
-                      {[...Array(totalPages)].map((_, i) => (
-                        <button key={i} className={`p-btn ${currentPage === i+1 ? 'active' : ''}`} onClick={() => handlePageChange(i+1)}>{i+1}</button>
+                      <button className="p-btn" onClick={() => handlePageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1}>
+                        <ChevronLeft size={16} />
+                      </button>
+                      {[...Array(effectiveTotalPages)].map((_, i) => (
+                        <button key={i} className={`p-btn ${currentPage === i + 1 ? 'active' : ''}`} onClick={() => handlePageChange(i + 1)}>
+                          {i + 1}
+                        </button>
                       ))}
-                      <button className="p-btn" onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}><ChevronRight size={16}/></button>
+                      <button className="p-btn" onClick={() => handlePageChange(Math.min(effectiveTotalPages, currentPage + 1))} disabled={currentPage === effectiveTotalPages}>
+                        <ChevronRight size={16} />
+                      </button>
                     </div>
                   </div>
                 )}
@@ -226,8 +266,30 @@ const ComboPage = () => {
         </div>
       </div>
 
+      {toast && (
+        <div className="combo-toast" role="status">
+          <img
+            src={toast.image || FIXED_PRODUCT_IMAGE}
+            alt={toast.name}
+            className="combo-toast-img"
+            onError={(e) => {
+              e.target.src = FIXED_PRODUCT_IMAGE;
+            }}
+          />
+          <div className="combo-toast-body">
+            <span className="combo-toast-title">Đã thêm vào giỏ hàng ✅</span>
+            <span className="combo-toast-name">{toast.name}</span>
+          </div>
+          <button className="combo-toast-close" onClick={() => setToast(null)}>×</button>
+        </div>
+      )}
+
+      <AuthRequiredModal
+        isOpen={showAuthRequired}
+        onClose={() => setShowAuthRequired(false)}
+      />
+
       <Footer />
-      <FloatingChat />
     </div>
   );
 };
