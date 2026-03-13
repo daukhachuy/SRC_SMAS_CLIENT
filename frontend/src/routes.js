@@ -46,6 +46,9 @@ import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminTableMap from './pages/admin/AdminTableMap';
 import AdminMenuManagement from './pages/admin/menu/AdminMenuManagement';
+import AdminInventoryPage from './pages/admin/AdminInventoryPage';
+import AdminRestaurantPage from './pages/admin/AdminRestaurantPage';
+import AdminStaffPage from './pages/admin/AdminStaffPage';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -98,9 +101,10 @@ const AppRoutes = () => {
           <Route path="reservations" element={<AdminDashboard />} />
           <Route path="tables" element={<AdminTableMap />} />
           <Route path="menu" element={<AdminMenuManagement />} />
-          <Route path="inventory" element={<AdminDashboard />} />
-          <Route path="staff" element={<AdminDashboard />} />
-          <Route path="restaurant" element={<AdminDashboard />} />
+          <Route path="inventory" element={<AdminInventoryPage />} />
+          <Route path="staff" element={<Navigate to="/admin/accounts" replace />} />
+          <Route path="accounts" element={<AdminStaffPage />} />
+          <Route path="restaurant" element={<AdminRestaurantPage />} />
         </Route>
         <Route path="/payment-result" element={<PaymentResult />} />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
