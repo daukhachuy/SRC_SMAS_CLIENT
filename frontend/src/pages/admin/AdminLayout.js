@@ -34,7 +34,8 @@ const AdminLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Admin User',
-    initials: 'AD'
+    initials: 'AD',
+    avatarUrl: null
   });
 
   const getInitials = (name) => {
@@ -60,9 +61,10 @@ const AdminLayout = () => {
       try {
         const profile = await getProfile();
         const name = profile?.fullname || profile?.fullName || fallback.fullname;
-        if (isMounted) setUserInfo({ fullname: name, initials: getInitials(name) });
+        const avatarUrl = profile?.avatarUrl || profile?.avatar || profile?.picture || null;
+        if (isMounted) setUserInfo({ fullname: name, initials: getInitials(name), avatarUrl });
       } catch {
-        if (isMounted) setUserInfo({ fullname: fallback.fullname, initials: getInitials(fallback.fullname) });
+        if (isMounted) setUserInfo({ fullname: fallback.fullname, initials: getInitials(fallback.fullname), avatarUrl: null });
       }
     };
     loadUserInfo();
@@ -75,24 +77,25 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="admin-shell">
       <button
-        className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md lg:hidden"
+        type="button"
+        className="admin-menu-btn"
         onClick={() => setMenuOpen((prev) => !prev)}
         aria-label="Toggle admin menu"
       >
         {menuOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {menuOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setMenuOpen(false)} />}
+      {menuOpen && <div className="admin-menu-overlay" onClick={() => setMenuOpen(false)} aria-hidden />}
 
-      <aside className={`w-[260px] bg-white border-r border-gray-100 flex flex-col fixed h-full z-40 transition-transform lg:translate-x-0 ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-8 pb-10 flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#FF6C1F] rounded-lg flex items-center justify-center text-white font-bold text-xl">R</div>
-          <span className="font-bold text-xl tracking-tight text-gray-900">RESTO ADMIN</span>
+      <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
+        <div className="admin-brand">
+          <div className="admin-brand-icon">R</div>
+          <span className="admin-brand-text">RESTO ADMIN</span>
         </div>
 
-        <nav className="flex-1 overflow-y-auto space-y-1 px-3">
+        <nav className="admin-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -100,43 +103,43 @@ const AdminLayout = () => {
                 key={item.to}
                 to={item.to}
                 end={item.end ?? false}
-                className={({ isActive }) => `flex items-center px-4 py-3.5 font-medium transition-all group ${
-                  isActive
-                    ? 'text-[#FF6C1F] border-l-4 border-[#FF6C1F] bg-orange-50'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-[#FF6C1F]'
-                }`}
+                className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
                 onClick={() => setMenuOpen(false)}
               >
-                <Icon size={18} className="mr-3" />
-                {item.label}
+                <Icon size={20} className="admin-nav-icon" />
+                <span>{item.label}</span>
               </NavLink>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 bg-white">
-          <div className="flex items-center p-2 mb-2">
-            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3">
-              <span className="text-sm font-semibold text-gray-600">{userInfo.initials}</span>
+        <div className="admin-sidebar-footer">
+          <div className="admin-user-row">
+            <div className="admin-avatar">
+              {userInfo.avatarUrl ? (
+                <img src={userInfo.avatarUrl} alt="" />
+              ) : (
+                <span>{userInfo.initials}</span>
+              )}
             </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-semibold truncate">{userInfo.fullname}</p>
-              <p className="text-xs text-gray-500 truncate">Quản trị viên</p>
+            <div className="admin-user-info">
+              <strong>{userInfo.fullname}</strong>
+              <p>Quản trị viên</p>
             </div>
           </div>
           <button
             type="button"
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="admin-logout-btn"
             onClick={handleLogout}
           >
-            <LogOut size={16} />
-            Đăng xuất
+            <LogOut size={18} />
+            <span>Đăng xuất</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-[260px]">
-        <div className="p-8">
+      <main className="admin-main">
+        <div className="admin-content">
           <Outlet />
         </div>
       </main>

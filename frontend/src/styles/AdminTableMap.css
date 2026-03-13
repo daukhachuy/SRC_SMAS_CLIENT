@@ -1,0 +1,600 @@
+/* Admin Table Map - Sơ đồ bàn (nền trắng, gọn đẹp) */
+
+.admin-tablemap {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* ----- Header ----- */
+.tablemap-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.tablemap-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.tablemap-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+}
+
+.tablemap-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tablemap-select {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff !important;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.5rem center !important;
+  background-size: 1rem !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tablemap-select:hover {
+  border-color: #d1d5db;
+}
+
+.tablemap-select:focus {
+  outline: none;
+  border-color: #FF6C1F;
+  box-shadow: 0 0 0 3px rgba(255, 108, 31, 0.12);
+}
+
+.tablemap-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.125rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #FF6C1F;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 108, 31, 0.3);
+  transition: background-color 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.tablemap-add-btn:hover {
+  background: #e85a15;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 108, 31, 0.35);
+}
+
+/* ----- Tabs ----- */
+.tablemap-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tablemap-tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  margin-bottom: -1px;
+}
+
+.tablemap-tab:hover {
+  color: #374151;
+}
+
+.tablemap-tab.active {
+  color: #FF6C1F;
+  font-weight: 600;
+  border-bottom-color: #FF6C1F;
+}
+
+/* ----- Tabs + Filters cùng một hàng ----- */
+.tablemap-tabs-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.tablemap-tabs-row .tablemap-tabs {
+  margin-bottom: 0;
+}
+
+.tablemap-tabs-row .tablemap-actions {
+  margin-bottom: -1px;
+}
+
+/* ----- Grid thẻ bàn (Bàn đang dùng / Tất cả bàn) ----- */
+.tablemap-grid-wrap {
+  min-width: 0;
+}
+
+.tablemap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
+
+.tablemap-table-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 2px solid #e5e7eb;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.tablemap-table-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.tablemap-table-card-in_use {
+  border-color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.tablemap-table-card-empty {
+  border-color: #e5e7eb;
+}
+
+.tablemap-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tablemap-card-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.tablemap-card-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tablemap-card-badge-in_use {
+  background: #FF6C1F;
+  color: #fff;
+}
+
+.tablemap-card-badge-empty {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.tablemap-card-capacity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  color: #4b5563;
+  margin-bottom: 0.5rem;
+}
+
+.tablemap-card-capacity svg {
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+.tablemap-card-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.tablemap-card-amount-empty {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+/* ----- Card & Table (bảng dạng table - giữ cho tương lai) ----- */
+.tablemap-card {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.tablemap-table-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.tablemap-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* Header bảng: nền trắng, chữ xám (không dùng xanh) */
+.tablemap-table thead {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tablemap-table th {
+  padding: 1rem 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #ffffff !important;
+}
+
+.tablemap-table td {
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+  transition: background-color 0.15s ease;
+}
+
+.tablemap-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tablemap-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.tablemap-cell-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.tablemap-guests {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #4b5563;
+}
+
+.tablemap-status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tablemap-status-in_use {
+  background: #FF6C1F;
+  color: #fff;
+}
+
+.tablemap-status-empty {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.tablemap-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tablemap-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.tablemap-icon-btn:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.tablemap-icon-btn-danger:hover {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+/* ----- Pagination ----- */
+.tablemap-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fafbfc;
+}
+
+.tablemap-pagination-info {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.tablemap-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tablemap-page-btn {
+  min-width: 2.25rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tablemap-page-btn:hover:not(:disabled) {
+  border-color: #FF6C1F;
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.tablemap-page-btn.active {
+  background: #FF6C1F;
+  border-color: #FF6C1F;
+  color: #fff;
+}
+
+.tablemap-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ----- Modal Thêm bàn mới ----- */
+.tablemap-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+
+.tablemap-modal {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.tablemap-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.tablemap-modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.tablemap-modal-close {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.tablemap-modal-close:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
+.tablemap-modal-body {
+  padding: 1.5rem;
+}
+
+.tablemap-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.tablemap-form-group:last-of-type {
+  margin-bottom: 1.5rem;
+}
+
+.tablemap-form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.375rem;
+}
+
+.tablemap-form-group input,
+.tablemap-form-group select,
+.tablemap-form-group textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #111827;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+}
+
+.tablemap-form-group textarea {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.tablemap-input-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tablemap-input-with-icon:focus-within {
+  border-color: #FF6C1F;
+  box-shadow: 0 0 0 3px rgba(255, 108, 31, 0.12);
+}
+
+.tablemap-input-with-icon svg {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.tablemap-input-with-icon input {
+  border: none;
+  padding: 0.5rem 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.tablemap-input-with-icon input:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+.tablemap-form-group input:focus,
+.tablemap-form-group select:focus,
+.tablemap-form-group textarea:focus {
+  outline: none;
+  border-color: #FF6C1F;
+  box-shadow: 0 0 0 3px rgba(255, 108, 31, 0.12);
+}
+
+.tablemap-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.tablemap-btn-secondary {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tablemap-btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.tablemap-btn-primary {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #FF6C1F;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tablemap-btn-primary:hover {
+  background: #e85a15;
+}
+
+/* ----- Responsive ----- */
+@media (max-width: 640px) {
+  .tablemap-header {
+    flex-direction: column;
+  }
+
+  .tablemap-actions {
+    width: 100%;
+  }
+
+  .tablemap-select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tablemap-add-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tablemap-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

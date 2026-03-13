@@ -6,6 +6,26 @@ body {
   color: #1f2937;
 }
 
+/* Tránh thanh cuộn xanh "dính" ở layout admin */
+.admin-dashboard {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.chart-wrapper,
+.donut-wrapper,
+.stat-card-sparkline {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.chart-wrapper canvas,
+.donut-wrapper canvas,
+.stat-card-sparkline canvas {
+  max-width: 100%;
+  display: block;
+}
+
 /* Custom Shadow */
 .custom-shadow {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
@@ -291,12 +311,19 @@ body {
   justify-content: center;
 }
 
-/* Table Card */
+/* Table Card - Giao dịch nhập kho gần đây */
 .table-card {
   background: white;
   border-radius: 1rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
   overflow: hidden;
+}
+
+.table-card-inventory {
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .table-card-header {
@@ -307,6 +334,11 @@ body {
   align-items: center;
 }
 
+.table-card-inventory .table-card-header {
+  padding: 1.5rem 1.5rem;
+  border-bottom-color: #f9fafb;
+}
+
 .table-card-header h3 {
   font-size: 1.125rem;
   font-weight: 700;
@@ -314,19 +346,50 @@ body {
   margin: 0;
 }
 
-.table-card-header a {
+.table-card-inventory .table-card-header h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.table-card-header a,
+.table-card-link {
   color: #FF6C1F;
   font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
 }
 
-.table-card-header a:hover {
+.table-card-header a:hover,
+.table-card-link:hover {
   text-decoration: underline;
 }
 
 .table-wrapper {
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* Scrollbar nhỏ, xám - tránh thanh cuộn xanh "dính" */
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f9fafb;
+  border-radius: 3px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .admin-table {
@@ -335,36 +398,71 @@ body {
   border-collapse: collapse;
 }
 
-.admin-table thead {
-  background: #f9fafb;
+.admin-table-inventory thead {
+  background: #f9fafb !important;
 }
 
-.admin-table th {
+.admin-table-inventory th {
   padding: 1rem 1.5rem;
   font-size: 0.75rem;
-  font-weight: 700;
-  color: #9ca3af;
+  font-weight: 600;
+  color: #9ca3af !important;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+  background: #f9fafb !important;
 }
 
-.admin-table td {
+.admin-table-inventory td {
   padding: 1rem 1.5rem;
   font-size: 0.875rem;
   color: #374151;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f9fafb;
+  transition: background-color 0.15s ease;
 }
 
-.admin-table tbody tr:hover {
+.admin-table-inventory tbody tr:hover {
   background: #f9fafb;
 }
 
-.admin-table .amount {
+.admin-table-code {
+  font-weight: 500;
+  color: #111827;
+}
+
+.admin-table-supplier {
+  color: #4b5563;
+}
+
+.admin-table-amount {
   font-weight: 600;
   color: #111827;
 }
 
-/* Status Badges */
+/* Status Badges - Giao dịch nhập kho */
+.admin-status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.admin-status-badge-done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.admin-status-badge-pending {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.admin-status-badge-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Legacy status classes for compatibility */
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;

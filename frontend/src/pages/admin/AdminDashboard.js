@@ -212,29 +212,29 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      <section className="table-card custom-shadow">
+      <section className="table-card table-card-inventory">
         <div className="table-card-header">
           <h3>Giao dịch nhập kho gần đây</h3>
-          <a href="/admin/inventory">Xem tất cả</a>
+          <a href="/admin/inventory" className="table-card-link">Xem tất cả</a>
         </div>
         <div className="table-wrapper">
-          <table className="admin-table">
+          <table className="admin-table admin-table-inventory">
             <thead>
               <tr>
-                <th>Mã giao dịch</th>
-                <th>Nhà cung cấp</th>
-                <th>Tổng tiền</th>
-                <th>Trạng thái</th>
+                <th>MÃ GIAO DỊCH</th>
+                <th>NHÀ CUNG CẤP</th>
+                <th>TỔNG TIỀN</th>
+                <th>TRẠNG THÁI</th>
               </tr>
             </thead>
             <tbody>
               {recentTransactions.map((row) => (
                 <tr key={row.code}>
-                  <td className="font-medium">{row.code}</td>
-                  <td>{row.supplier}</td>
-                  <td className="amount">{row.amount}</td>
+                  <td className="admin-table-code">{row.code}</td>
+                  <td className="admin-table-supplier">{row.supplier}</td>
+                  <td className="admin-table-amount">{row.amount}</td>
                   <td>
-                    <span className={`status-badge status-${row.statusClass}`}>
+                    <span className={`admin-status-badge admin-status-badge-${row.statusClass}`}>
                       {row.status}
                     </span>
                   </td>

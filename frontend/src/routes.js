@@ -44,6 +44,7 @@ import KitchenProfilePage from './pages/kitchen/KitchenProfilePage';
 
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminTableMap from './pages/admin/AdminTableMap';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -89,9 +90,10 @@ const AppRoutes = () => {
         <Route path="/auth-test" element={<AuthTestPage />} />
         <Route path="/cart" element={<Cart />} />
 
-        {/* Admin pages - Không có authorization */}
+        {/* Admin pages - Không có authorization (permissions tạm tắt) */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="tables" element={<AdminTableMap />} />
         </Route>
         <Route path="/payment-result" element={<PaymentResult />} />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
