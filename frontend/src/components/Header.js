@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, ShoppingBag, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import NotificationDropdown from './NotificationDropdown';
 import '../styles/Header.css';
 
 const MENU_ITEMS = [
@@ -17,6 +18,7 @@ const Header = () => {
 
   const [activeId, setActiveId] = useState('');
   const [shrink, setShrink] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   
   // --- THÊM STATE ĐỂ LƯU TỔNG SỐ LƯỢNG GIỎ HÀNG ---
   const [cartCount, setCartCount] = useState(0);
@@ -218,7 +220,12 @@ const Header = () => {
 
         {/* ACTIONS */}
         <div className="header-actions">
-          <div className="action-icon-wrap" title="Thông báo">
+          <div
+            className="action-icon-wrap"
+            title="Thông báo"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNotificationOpen((prev) => !prev)}
+          >
             <Bell size={22} />
             <span className="action-badge badge-red">5</span>
           </div>
@@ -247,6 +254,11 @@ const Header = () => {
             <User size={20} />
           </div>
         </div>
+
+        <NotificationDropdown
+          isOpen={notificationOpen}
+          onClose={() => setNotificationOpen(false)}
+        />
 
       </div>
     </nav>

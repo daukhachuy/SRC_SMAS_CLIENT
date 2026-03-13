@@ -84,11 +84,25 @@ const AppRoutes = () => {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/debug" element={<DebugPage />} />
         <Route path="/auth-test" element={<AuthTestPage />} />
-        <Route path="/cart" element={<Cart />} />
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute requiredRole="Customer">
+              <Cart />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Redirect old admin URLs to manager */}
         <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
-        <Route path="/payment-result" element={<PaymentResult />} />
+        <Route
+          path="/payment-result"
+          element={
+            <ProtectedRoute requiredRole="Customer">
+              <PaymentResult />
+            </ProtectedRoute>
+          }
+        />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={
           <ProtectedRoute requiredRole="Manager">
@@ -134,9 +148,9 @@ const AppRoutes = () => {
             <Route path="profile" element={<KitchenProfilePage />} />
           </Route>
 
-        {/* Các trang yêu cầu đăng nhập - Bảo vệ bằng ProtectedRoute */}
+        {/* Các trang Customer - chỉ role Customer được truy cập */}
         <Route element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="Customer">
             <UserLayout />
           </ProtectedRoute>
         }>

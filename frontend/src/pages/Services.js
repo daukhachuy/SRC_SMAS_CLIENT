@@ -5,8 +5,13 @@ import '../styles/Services.css';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
+import { isAuthenticated } from '../api/authApi';
+import { useNavigate } from 'react-router-dom';
+import AuthRequiredModal from '../components/AuthRequiredModal';
 
 const Services = () => {
+  const navigate = useNavigate();
+  const [showAuthRequired, setShowAuthRequired] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState('');
@@ -55,9 +60,31 @@ const Services = () => {
     price: 0
   });
 
+  useEffect(() => {
+    const tokenExists = isAuthenticated();
+    if (!tokenExists) {
+      setShowAuthRequired(true);
+      return;
+    }
+
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user?.role && user.role !== 'Customer') {
+        navigate('/', { replace: true });
+      }
+    } catch {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
   // Lấy dữ liệu profile người dùng khi component mount
   useEffect(() => {
     const fetchUserProfile = async () => {
+      if (!isAuthenticated()) {
+        return;
+      }
+
       try {
         console.log('📡 Đang gọi getProfile API...');
         const profile = await getProfile();
@@ -1152,6 +1179,11 @@ const Services = () => {
           <button className="primary-gold-btn large-btn">ĐẶT HÀNG NGAY</button>
         </section>
       </div>
+
+      <AuthRequiredModal
+        isOpen={showAuthRequired}
+        onClose={() => setShowAuthRequired(false)}
+      />
 
       <Footer />
     </div>

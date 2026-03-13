@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/BuffetPage.css';
-import { Search, MessageSquare, CheckCircle } from 'lucide-react';
+import { Search, MessageSquare, CheckCircle, ShoppingCart } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import AuthRequiredModal from '../components/AuthRequiredModal';
 import { getBuffetLists, getBuffetDetail } from '../api/foodApi'; // Đảm bảo import cả 2 hàm này
+import { isAuthenticated } from '../api/authApi';
 
 const BuffetPage = () => {
   const navigate = useNavigate();
   const [buffetItems, setBuffetItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [toast, setToast] = useState(null);
+  const [showAuthRequired, setShowAuthRequired] = useState(false);
+  const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+
+  const showToast = (item) => {
+    setToast(item);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     const loadBuffetData = async () => {
@@ -41,6 +51,46 @@ const BuffetPage = () => {
     loadBuffetData();
   }, []);
 
+  const filteredBuffetItems = buffetItems.filter((item) => {
+    const keyword = searchTerm.trim().toLowerCase();
+    if (!keyword) return true;
+
+    const buffetName = (item.name || '').toLowerCase();
+    const foodNames = (item.foods?.$values || item.foods || [])
+      .map((food) => (food.foodName || '').toLowerCase())
+      .join(' ');
+
+    return buffetName.includes(keyword) || foodNames.includes(keyword);
+  });
+
+  const addBuffetToCart = (item) => {
+    if (!isAuthenticated()) {
+      setShowAuthRequired(true);
+      return;
+    }
+
+    const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
+    const cartId = `buffet-${item.buffetId}`;
+    const itemIndex = existingCart.findIndex((cartItem) => cartItem.id === cartId && cartItem.isBuffet === true);
+
+    if (itemIndex > -1) {
+      existingCart[itemIndex].quantity += 1;
+    } else {
+      existingCart.push({
+        id: cartId,
+        name: item.name,
+        price: item.mainPrice,
+        image: item.image || FIXED_PRODUCT_IMAGE,
+        quantity: 1,
+        isBuffet: true,
+      });
+    }
+
+    localStorage.setItem('cart', JSON.stringify(existingCart));
+    window.dispatchEvent(new Event('storage'));
+    showToast({ name: item.name, image: item.image || FIXED_PRODUCT_IMAGE });
+  };
+
   return (
     <div className="app">
       <Header />
@@ -53,56 +103,32 @@ const BuffetPage = () => {
             <button className="nav-tab" onClick={() => navigate('/combo')}>Combo</button>
             <button className="nav-tab active">Buffet</button>
           </div>
-          
-          <div className="control-right">
-            <span className="sort-dropdown-label">Sắp xếp theo:</span>
-            <select className="sort-dropdown">
-              <option>Mặc định</option>
-              <option>Giá: Thấp đến Cao</option>
-              <option>Giá: Cao đến Thấp</option>
-            </select>
-          </div>
         </div>
 
-        <div className="menu-content">
-          {/* SIDEBAR */}
-          <aside className="sidebar">
-            <h3 className="filter-title">Bộ lọc Buffet</h3>
-            <div className="filter-group">
-              <div className="filter-header">
-                <h4>Loại sản phẩm</h4>
-              </div>
-              <ul className="filter-list">
-                <li>
-                  <label>
-                    <input type="checkbox" defaultChecked />
-                    <span>Tất cả Buffet</span>
-                  </label>
-                </li>
-              </ul>
-            </div>
-          </aside>
-
+        <div className="buffet-content">
           <main className="buffet-main-area">
             {/* THANH TÌM KIẾM */}
-            <div className="search-row-container">
-              <div className="search-container-new">
-                <Search size={20} color="#888" />
+            <div className="buffet-toolbar">
+              <div className="buffet-search-wrapper">
+                <Search size={17} className="buffet-search-icon" />
                 <input 
                   type="text" 
-                  placeholder="Tìm kiếm gói buffet cực phẩm..." 
+                  className="buffet-search-input"
+                  placeholder="Tìm kiếm gói buffet..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <button className="btn-tim-kiem">TÌM KIẾM</button>
+              <div className="buffet-toolbar-right">
+                <p className="buffet-result-text">Tổng {filteredBuffetItems.length} gói</p>
+              </div>
             </div>
 
             {loading ? (
               <div className="status-msg">Đang chuẩn bị buffet...</div>
             ) : (
               <div className="buffet-list">
-                {buffetItems.map((item) => (
+                {filteredBuffetItems.map((item) => (
                   <div key={item.buffetId} className="buffet-item-wrapper">
                     <div className="buffet-header">
                       <h1>{item.name}</h1>
@@ -155,7 +181,11 @@ const BuffetPage = () => {
                           <span className="price-num-custom">{item.childrenPrice?.toLocaleString()} đ</span>
                         </div>
                       </div>
-                      <button className="btn-order-now">ĐẶT BÀN NGAY</button>
+                      <button className="btn-order-now" onClick={() => navigate('/services')}>ĐẶT BÀN NGAY</button>
+                      <button className="btn-add-buffet-cart" onClick={() => addBuffetToCart(item)}>
+                        <ShoppingCart size={18} />
+                        <span>THÊM VÀO GIỎ</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -164,6 +194,29 @@ const BuffetPage = () => {
           </main>
         </div>
       </div>
+
+      {toast && (
+        <div className="buffet-toast" role="status">
+          <img
+            src={toast.image || FIXED_PRODUCT_IMAGE}
+            alt={toast.name}
+            className="buffet-toast-img"
+            onError={(e) => {
+              e.target.src = FIXED_PRODUCT_IMAGE;
+            }}
+          />
+          <div className="buffet-toast-body">
+            <span className="buffet-toast-title">Đã thêm vào giỏ hàng ✅</span>
+            <span className="buffet-toast-name">{toast.name}</span>
+          </div>
+          <button className="buffet-toast-close" onClick={() => setToast(null)}>×</button>
+        </div>
+      )}
+
+      <AuthRequiredModal
+        isOpen={showAuthRequired}
+        onClose={() => setShowAuthRequired(false)}
+      />
       
       <div className="fixed-chat">
         <MessageSquare size={28} color="white" />

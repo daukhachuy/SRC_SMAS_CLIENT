@@ -50,10 +50,11 @@ instance.interceptors.response.use(
     // Handle 401 - Unauthorized
     if (status === 401) {
       console.warn('⚠️ Token expired. Redirecting to login...');
+      const hadToken = !!localStorage.getItem('authToken');
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      // Chỉ redirect nếu không ở trang auth
-      if (!window.location.pathname.includes('/auth')) {
+      // Chỉ redirect khi trước đó có token (phiên hết hạn), tránh đá người dùng guest khỏi trang public
+      if (hadToken && !window.location.pathname.includes('/auth')) {
         window.location.href = '/auth';
       }
     }
