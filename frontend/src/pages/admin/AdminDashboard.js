@@ -49,11 +49,11 @@ const orderStructureData = {
 };
 
 const recentTransactions = [
-  { code: '#TK-9021', supplier: 'Nông trại xanh Đà Lạt', amount: '45,000,000 đ', status: 'Hoàn thành', statusClass: 'done' },
-  { code: '#TK-8942', supplier: 'Thủy hải sản Miền Đông', amount: '32,500,000 đ', status: 'Chờ thanh toán', statusClass: 'pending' },
-  { code: '#TK-8851', supplier: 'CP Food Logistics', amount: '12,800,000 đ', status: 'Hoàn thành', statusClass: 'done' },
-  { code: '#TK-8840', supplier: 'Rượu vang Hoàng Gia', amount: '85,200,000 đ', status: 'Đã hủy', statusClass: 'cancelled' },
-  { code: '#TK-8711', supplier: 'Công ty Bao bì Hợp Nhất', amount: '5,400,000 đ', status: 'Hoàn thành', statusClass: 'done' }
+  { code: '#TK-9021', supplier: 'Nông trại xanh Đà Lạt', amount: '45,000,000 ₫', status: 'Hoàn thành', statusClass: 'done' },
+  { code: '#TK-8942', supplier: 'Thủy hải sản Miền Đông', amount: '32,500,000 ₫', status: 'Chờ thanh toán', statusClass: 'pending' },
+  { code: '#TK-8851', supplier: 'CP Food Logistics', amount: '12,800,000 ₫', status: 'Hoàn thành', statusClass: 'done' },
+  { code: '#TK-8840', supplier: 'Rượu vang Hoàng Gia', amount: '85,200,000 ₫', status: 'Đã hủy', statusClass: 'cancelled' },
+  { code: '#TK-8711', supplier: 'Công ty Bao bì Hợp Nhất', amount: '5,400,000 ₫', status: 'Hoàn thành', statusClass: 'done' }
 ];
 
 const chartOptions = {
@@ -212,13 +212,13 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      <section className="table-card table-card-inventory">
+      <section className="table-card custom-shadow">
         <div className="table-card-header">
           <h3>Giao dịch nhập kho gần đây</h3>
-          <a href="/admin/inventory" className="table-card-link">Xem tất cả</a>
+          <a href="/admin/inventory">Xem tất cả</a>
         </div>
         <div className="table-wrapper">
-          <table className="admin-table admin-table-inventory">
+          <table className="admin-table">
             <thead>
               <tr>
                 <th>MÃ GIAO DỊCH</th>
@@ -230,11 +230,11 @@ const AdminDashboard = () => {
             <tbody>
               {recentTransactions.map((row) => (
                 <tr key={row.code}>
-                  <td className="admin-table-code">{row.code}</td>
-                  <td className="admin-table-supplier">{row.supplier}</td>
-                  <td className="admin-table-amount">{row.amount}</td>
+                  <td className="font-medium">{row.code}</td>
+                  <td>{row.supplier}</td>
+                  <td className="amount">{row.amount}</td>
                   <td>
-                    <span className={`admin-status-badge admin-status-badge-${row.statusClass}`}>
+                    <span className={`status-badge status-${row.statusClass}`}>
                       {row.status}
                     </span>
                   </td>

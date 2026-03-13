@@ -94,8 +94,13 @@ const AppRoutes = () => {
         {/* Admin pages - Không có authorization (permissions tạm tắt) */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminDashboard />} />
+          <Route path="reservations" element={<AdminDashboard />} />
           <Route path="tables" element={<AdminTableMap />} />
           <Route path="menu" element={<AdminMenuManagement />} />
+          <Route path="inventory" element={<AdminDashboard />} />
+          <Route path="staff" element={<AdminDashboard />} />
+          <Route path="restaurant" element={<AdminDashboard />} />
         </Route>
         <Route path="/payment-result" element={<PaymentResult />} />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}

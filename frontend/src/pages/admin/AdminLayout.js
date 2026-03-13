@@ -14,7 +14,6 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getProfile } from '../../api/userApi';
 import '../../styles/AdminLayout.css';
 
 const navItems = [
@@ -34,8 +33,7 @@ const AdminLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Admin User',
-    initials: 'AD',
-    avatarUrl: null
+    initials: 'AD'
   });
 
   const getInitials = (name) => {
@@ -46,29 +44,21 @@ const AdminLayout = () => {
   };
 
   useEffect(() => {
-    let isMounted = true;
-    const loadUserInfo = async () => {
-      let fallback = { fullname: 'Admin User' };
+    // Không bắt buộc đăng nhập - lấy từ localStorage nếu có
+    const loadUserInfo = () => {
       try {
         const userStr = localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
-          fallback = { fullname: user.fullname || 'Admin User' };
+          if (user?.fullname) {
+            setUserInfo({ fullname: user.fullname, initials: getInitials(user.fullname) });
+          }
         }
       } catch (e) {
-        console.error('Error parsing user:', e);
-      }
-      try {
-        const profile = await getProfile();
-        const name = profile?.fullname || profile?.fullName || fallback.fullname;
-        const avatarUrl = profile?.avatarUrl || profile?.avatar || profile?.picture || null;
-        if (isMounted) setUserInfo({ fullname: name, initials: getInitials(name), avatarUrl });
-      } catch {
-        if (isMounted) setUserInfo({ fullname: fallback.fullname, initials: getInitials(fallback.fullname), avatarUrl: null });
+        console.log('Admin - không cần đăng nhập');
       }
     };
     loadUserInfo();
-    return () => { isMounted = false; };
   }, []);
 
   const handleLogout = () => {
@@ -79,7 +69,6 @@ const AdminLayout = () => {
   return (
     <div className="admin-shell">
       <button
-        type="button"
         className="admin-menu-btn"
         onClick={() => setMenuOpen((prev) => !prev)}
         aria-label="Toggle admin menu"
@@ -87,7 +76,7 @@ const AdminLayout = () => {
         {menuOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {menuOpen && <div className="admin-menu-overlay" onClick={() => setMenuOpen(false)} aria-hidden />}
+      {menuOpen && <div className="admin-menu-overlay" onClick={() => setMenuOpen(false)} />}
 
       <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="admin-brand">
@@ -106,8 +95,8 @@ const AdminLayout = () => {
                 className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
                 onClick={() => setMenuOpen(false)}
               >
-                <Icon size={20} className="admin-nav-icon" />
-                <span>{item.label}</span>
+                <Icon size={18} />
+                {item.label}
               </NavLink>
             );
           })}
@@ -116,11 +105,7 @@ const AdminLayout = () => {
         <div className="admin-sidebar-footer">
           <div className="admin-user-row">
             <div className="admin-avatar">
-              {userInfo.avatarUrl ? (
-                <img src={userInfo.avatarUrl} alt="" />
-              ) : (
-                <span>{userInfo.initials}</span>
-              )}
+              <span className="text-sm font-semibold text-gray-600">{userInfo.initials}</span>
             </div>
             <div className="admin-user-info">
               <strong>{userInfo.fullname}</strong>
@@ -132,8 +117,8 @@ const AdminLayout = () => {
             className="admin-logout-btn"
             onClick={handleLogout}
           >
-            <LogOut size={18} />
-            <span>Đăng xuất</span>
+            <LogOut size={16} />
+            Đăng xuất
           </button>
         </div>
       </aside>
