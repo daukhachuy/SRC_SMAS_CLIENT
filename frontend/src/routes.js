@@ -42,6 +42,9 @@ import KitchenOrdersPage from './pages/kitchen/KitchenOrdersPage';
 import KitchenSchedulePage from './pages/kitchen/KitchenSchedulePage';
 import KitchenProfilePage from './pages/kitchen/KitchenProfilePage';
 
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+
 // Import trang Promotion
 import Promotion from './pages/Promotion';
 
@@ -86,8 +89,14 @@ const AppRoutes = () => {
         <Route path="/auth-test" element={<AuthTestPage />} />
         <Route path="/cart" element={<Cart />} />
 
-        {/* Redirect old admin URLs to manager */}
-        <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
+        {/* Admin pages - dùng role Admin (hoặc đổi requiredRole thành "Manager" để test) */}
+        <Route path="/admin" element={
+          <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+        </Route>
+        }>
+          <Route index element={<AdminDashboard />} />
+        </Route>
         <Route path="/payment-result" element={<PaymentResult />} />
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={
