@@ -335,15 +335,15 @@ body {
   border-collapse: collapse;
 }
 
-/* Header bảng: nền trắng, chữ xám (giống RE cương ADMIN) */
+/* Header bảng: nền xanh, chữ trắng */
 .admin-table thead {
-  background: #ffffff !important;
+  background: #3B82F6;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .admin-table thead th {
-  background: #ffffff !important;
-  color: #6b7280 !important;
+  background: #3B82F6;
+  color: #ffffff;
   padding: 1rem 1.5rem;
   font-size: 0.75rem;
   font-weight: 600;
