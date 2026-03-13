@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarClock, User, Phone, Mail, Users, UtensilsCrossed, MapPin, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, CreditCard, Wallet, Bell, Tag } from 'lucide-react';
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
 
@@ -43,16 +43,21 @@ const Services = () => {
   const [selectedEvent, setSelectedEvent] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [menuDishes, setMenuDishes] = useState([
-    { id: 1, type: 'Menu', name: 'Cá điều hồng hấp', quantity: 1, price: 150000, notes: '', subtotal: 150000 },
-    { id: 2, type: 'Combo', name: 'Combo FPT', quantity: 2, price: 150000, notes: 'Cho ít cay', subtotal: 300000 }
+    { id: 1, type: 'Menu', name: 'Súp bào ngư vây cá', quantity: 10, price: 500000, notes: 'Phục vụ nóng', subtotal: 5000000, categoryLabel: 'Khai vị' },
+    { id: 2, type: 'Menu', name: 'Tôm hùm bỏ lò phô mai', quantity: 10, price: 1200000, notes: 'Không cay cho trẻ em', subtotal: 12000000, categoryLabel: 'Món chính' },
+    { id: 3, type: 'Menu', name: 'Chè tổ yến hạt sen', quantity: 10, price: 300000, notes: 'Ít đường', subtotal: 3000000, categoryLabel: 'Tráng miệng' }
   ]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('payos');
+  const [discountCode, setDiscountCode] = useState('');
+  const [showAllServicesModal, setShowAllServicesModal] = useState(false);
   const [newDishForm, setNewDishForm] = useState({
     type: 'Menu',
     name: '',
     quantity: 1,
     notes: '',
-    price: 0
+    price: 0,
+    categoryLabel: 'Món chính'
   });
 
   // Lấy dữ liệu profile người dùng khi component mount
@@ -251,14 +256,16 @@ const Services = () => {
     }
   };
 
-  // Menu và Combo options
+  // Menu và Combo options (categoryLabel dùng cho tag màu: Khai vị, Món chính, Tráng miệng)
   const menuOptions = [
-    { type: 'Menu', name: 'Cá điều hồng hấp', price: 150000 },
-    { type: 'Menu', name: 'Tôm sú hấp', price: 180000 },
-    { type: 'Menu', name: 'Mực nướng', price: 200000 },
-    { type: 'Combo', name: 'Combo FPT', price: 150000 },
-    { type: 'Combo', name: 'Combo VIP', price: 250000 },
-    { type: 'Combo', name: 'Combo Family', price: 350000 }
+    { type: 'Menu', name: 'Súp bào ngư vây cá', price: 500000, categoryLabel: 'Khai vị' },
+    { type: 'Menu', name: 'Cá điều hồng hấp', price: 150000, categoryLabel: 'Món chính' },
+    { type: 'Menu', name: 'Tôm sú hấp', price: 180000, categoryLabel: 'Món chính' },
+    { type: 'Menu', name: 'Mực nướng', price: 200000, categoryLabel: 'Món chính' },
+    { type: 'Menu', name: 'Chè tổ yến hạt sen', price: 300000, categoryLabel: 'Tráng miệng' },
+    { type: 'Combo', name: 'Combo FPT', price: 150000, categoryLabel: 'Món chính' },
+    { type: 'Combo', name: 'Combo VIP', price: 250000, categoryLabel: 'Món chính' },
+    { type: 'Combo', name: 'Combo Family', price: 350000, categoryLabel: 'Món chính' }
   ];
 
   // Event Types
@@ -636,435 +643,417 @@ const Services = () => {
             </div>
           )}
 
-          {/* EVENT FORM - Placeholder for now */}
+          {/* EVENT FORM - Theo thiết kế ảnh */}
           {bookingTab === 'event' && (
-            <div className="glass-card event-booking-container">
-              <div className="event-header">
-                <h3 className="event-title">Đặt lịch Sự Kiện</h3>
-                <p className="event-subtitle">Sự kiện dành cho 30 người trở lên bắt buộc phải ký hợp đồng</p>
-              </div>
-
-              {/* PROGRESS STEPS */}
-              <div className="event-progress-steps">
-                <div className={`progress-step ${eventStep >= 1 ? 'active' : ''}`}>
-                  <div className="step-circle">
-                    <span>{eventStep > 1 ? '✓' : '1'}</span>
+            <div className="event-booking-wrap">
+              {/* Header bar: icon + title | user */}
+              <div className="event-new-header">
+                <div className="event-header-left">
+                  <div className="event-header-icon">
+                    <CalendarClock size={22} strokeWidth={2.2} />
                   </div>
-                  <p className="step-label">Thông Tin</p>
+                  <h3 className="event-header-title">Đặt Lịch Sự Kiện</h3>
                 </div>
-                <div className="progress-line"></div>
-                <div className={`progress-step ${eventStep >= 2 ? 'active' : ''}`}>
-                  <div className="step-circle">
-                    <span>{eventStep > 2 ? '✓' : '2'}</span>
-                  </div>
-                  <p className="step-label">Sự kiện & Dịch vụ</p>
-                </div>
-                <div className="progress-line"></div>
-                <div className={`progress-step ${eventStep >= 3 ? 'active' : ''}`}>
-                  <div className="step-circle">
-                    <span>{eventStep > 3 ? '✓' : '3'}</span>
-                  </div>
-                  <p className="step-label">Lên thực đơn</p>
+                <div className="event-header-user">
+                  <User size={20} />
                 </div>
               </div>
 
-              {/* STEP 1: INFO */}
+              {/* Progress: Bước N + thanh % + nhãn bước (có Thanh toán ở cột trên) */}
+              <div className="event-progress-block">
+                <div className="event-progress-top">
+                  <span className="event-step-caption">
+                    Bước {eventStep}: {eventStep === 1 ? 'Thông Tin Khách Hàng' : eventStep === 2 ? 'Sự kiện & Dịch vụ' : eventStep === 3 ? 'Lên thực đơn' : 'Thanh toán'}
+                  </span>
+                  <span className="event-percent">{Math.round((eventStep / 4) * 100)}% Hoàn thành</span>
+                </div>
+                <div className="event-progress-bar-bg">
+                  <div className="event-progress-bar-fill" style={{ width: `${(eventStep / 4) * 100}%` }} />
+                </div>
+                <div className="event-step-labels">
+                  <span className={eventStep >= 1 ? 'active' : ''}>Thông Tin</span>
+                  <span className={eventStep >= 2 ? 'active' : ''}>Sự kiện & Dịch vụ</span>
+                  <span className={eventStep >= 3 ? 'active' : ''}>Lên thực đơn</span>
+                  <span className={eventStep >= 4 ? 'active' : ''}>Thanh toán</span>
+                </div>
+              </div>
+
+              {/* STEP 1: Thông tin liên hệ & yêu cầu */}
               {eventStep === 1 && (
                 <div className="event-form-step">
-                  <div className="form-row-two-col">
-                    <div className="form-col">
-                      <label>Họ và tên:</label>
-                      <input 
-                        type="text" 
-                        value={eventForm.fullName}
-                        onChange={(e) => setEventForm({...eventForm, fullName: e.target.value})}
-                      />
+                  <div className="event-form-card">
+                    <h4 className="event-form-card-title">Thông Tin Liên Hệ & Yêu Cầu</h4>
+                    <p className="event-form-card-desc">Vui lòng điền đầy đủ thông tin để chúng tôi có thể hỗ trợ bạn tốt nhất.</p>
+                    <div className="event-form-fields">
+                      <div className="event-form-row event-form-row-2">
+                        <div className="event-field-with-icon">
+                          <label><User size={16} className="icon-orange" /> Họ và tên</label>
+                          <input type="text" value={eventForm.fullName} onChange={(e) => setEventForm({ ...eventForm, fullName: e.target.value })} placeholder="Nguyễn Văn A" />
+                        </div>
+                        <div className="event-field-with-icon">
+                          <label><Phone size={16} className="icon-orange" /> Số điện thoại</label>
+                          <input type="text" value={eventForm.phone} onChange={(e) => setEventForm({ ...eventForm, phone: e.target.value })} placeholder="090x xxx xxx" />
+                        </div>
+                      </div>
+                      <div className="event-field-with-icon event-form-row-full">
+                        <label><Mail size={16} className="icon-orange" /> Email</label>
+                        <input type="email" value={eventForm.email} onChange={(e) => setEventForm({ ...eventForm, email: e.target.value })} placeholder="example@gmail.com" />
+                      </div>
+                      <div className="event-form-row event-form-row-2">
+                        <div className="event-field-with-icon">
+                          <label><Users size={16} className="icon-orange" /> Số lượng khách</label>
+                          <input type="number" value={eventForm.numGuests} onChange={(e) => setEventForm({ ...eventForm, numGuests: e.target.value })} placeholder="Ví dụ: 50" />
+                        </div>
+                        <div className="event-field-with-icon">
+                          <label><UtensilsCrossed size={16} className="icon-orange" /> Số lượng bàn</label>
+                          <input type="number" value={eventForm.numTables} onChange={(e) => setEventForm({ ...eventForm, numTables: e.target.value })} placeholder="Ví dụ: 5" />
+                        </div>
+                      </div>
+                      <div className="event-field-with-icon event-form-row-full">
+                        <label><MapPin size={16} className="icon-orange" /> Khu vực tổ chức</label>
+                        <select value={eventForm.location} onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}>
+                          <option value="">Chọn khu vực</option>
+                          <option>Trong nhà (Máy lạnh)</option>
+                          <option>Ngoài trời (Sân vườn)</option>
+                        </select>
+                      </div>
+                      <div className="event-field-with-icon event-form-row-full">
+                        <label><FileText size={16} className="icon-orange" /> Ghi chú thêm</label>
+                        <textarea value={eventForm.note} onChange={(e) => setEventForm({ ...eventForm, note: e.target.value })} rows={4} placeholder="Mô tả các yêu cầu đặc biệt của bạn..." />
+                      </div>
                     </div>
-                    <div className="form-col">
-                      <label>Số điện thoại:</label>
-                      <input 
-                        type="text" 
-                        value={eventForm.phone}
-                        onChange={(e) => setEventForm({...eventForm, phone: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-row-two-col">
-                    <div className="form-col">
-                      <label>Email :</label>
-                      <input 
-                        type="email" 
-                        value={eventForm.email}
-                        onChange={(e) => setEventForm({...eventForm, email: e.target.value})}
-                      />
-                    </div>
-                    <div className="form-col">
-                      <label>Số lượng khách:</label>
-                      <input 
-                        type="number" 
-                        value={eventForm.numGuests}
-                        onChange={(e) => setEventForm({...eventForm, numGuests: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-row-two-col">
-                    <div className="form-col">
-                      <label>Số Lượng bàn:</label>
-                      <input 
-                        type="number" 
-                        value={eventForm.numTables}
-                        onChange={(e) => setEventForm({...eventForm, numTables: e.target.value})}
-                      />
-                    </div>
-                    <div className="form-col">
-                      <label>Khu vực:</label>
-                      <select 
-                        value={eventForm.location}
-                        onChange={(e) => setEventForm({...eventForm, location: e.target.value})}
-                      >
-                        <option>Trong nhà (Máy lạnh)</option>
-                        <option>Ngoài trời (Sân vườn)</option>
-                      </select>
+                    <div className="event-form-card-actions">
+                      <button type="button" className="event-btn-primary" onClick={handleNextStep}>Tiếp Tục →</button>
+                      <button type="button" className="event-btn-secondary" onClick={() => setBookingTab('booking')}>Chọn Sự Kiện</button>
                     </div>
                   </div>
-
-                  <div className="form-row-full">
-                    <label>Ghi chú:</label>
-                    <textarea 
-                      rows="5"
-                      value={eventForm.note}
-                      onChange={(e) => setEventForm({...eventForm, note: e.target.value})}
-                      placeholder="Ghi chú thêm về sự kiện..."
-                    ></textarea>
-                  </div>
-
-                  <button className="primary-gold-btn event-next-btn" onClick={handleNextStep}>
-                    Tiếp Tục → Chọn Sự Kiện
-                  </button>
                 </div>
               )}
 
-              {/* STEP 2: SERVICES */}
+              {/* STEP 2: Sự kiện & Dịch vụ */}
               {eventStep === 2 && (
                 <div className="event-form-step">
-                  <button className="primary-gold-btn event-back-btn-top" onClick={() => setEventStep(1)} style={{marginBottom: '25px', alignSelf: 'flex-start'}}>
-                    ← Quay lại
-                  </button>
-                  <div className="event-services-wrapper">
-                    {/* Event Type Selector */}
-                    <div className="services-section">
-                      <label className="services-label">Sự kiện :</label>
-                      <select 
-                        className="event-type-dropdown"
-                        value={selectedEvent}
-                        onChange={(e) => setSelectedEvent(e.target.value)}
-                      >
+                  <div className="event-step2-form-card">
+                    <div className="event-step2-field">
+                      <label className="event-label-asterisk">Chọn loại sự kiện của bạn</label>
+                      <select className="event-select-event" value={selectedEvent} onChange={(e) => setSelectedEvent(e.target.value)}>
                         <option value="">Chọn loại sự kiện</option>
-                        {eventTypes.map(event => (
-                          <option key={event.id} value={event.name}>
-                            {event.name}
-                          </option>
-                        ))}
+                        {eventTypes.map(ev => <option key={ev.id} value={ev.name}>{ev.name}</option>)}
                       </select>
                     </div>
+                    <div className="event-step2-services">
+                      <div className="event-step2-services-head">
+                        <label className="event-label-asterisk">Dịch vụ đi kèm phổ biến</label>
+                        <button type="button" className="event-view-all" onClick={() => setShowAllServicesModal(true)}>Xem tất cả</button>
+                      </div>
+                      <div className="event-service-cards-grid">
+                        {eventServices.slice(0, 6).map(service => (
+                          <div
+                            key={service.id}
+                            className={`event-service-card-v2 ${selectedServices.includes(service.id) ? 'selected' : ''}`}
+                            onClick={() => toggleService(service.id)}
+                          >
+                            <div className="event-service-card-v2-img">
+                              <img src={service.image} alt={service.name} />
+                              {selectedServices.includes(service.id) && (
+                                <div className="event-service-card-v2-check"><Check size={18} strokeWidth={3} /></div>
+                              )}
+                            </div>
+                            <h5 className="event-service-card-v2-title">{service.name}</h5>
+                            <p className="event-service-card-v2-price">{formatCurrency(service.price).replace('₫', '')} đ</p>
+                            <p className="event-service-card-v2-desc">{service.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="event-step2-actions">
+                    <button type="button" className="event-btn-back" onClick={() => setEventStep(1)}>← Quay lại</button>
+                    <button type="button" className="event-btn-primary event-btn-continue" onClick={() => setEventStep(3)}>Tiếp Tục → Lên Thực Đơn</button>
+                  </div>
+                </div>
+              )}
 
-                    {/* Service Cards Grid - Grouped by Category */}
-                    <div className="services-section-cards">
+              {/* STEP 3: Lên thực đơn */}
+              {eventStep === 3 && (
+                <div className="event-form-step">
+                  <div className="event-menu-detail-card">
+                    <h4 className="event-menu-detail-title">Chi tiết thực đơn đã chọn</h4>
+                    <p className="event-menu-detail-desc">Vui lòng kiểm tra kỹ danh sách món ăn và số lượng trước khi tiếp tục đặt lịch.</p>
+                    <div className="event-menu-table-wrap">
+                      <table className="event-menu-table">
+                        <thead>
+                          <tr>
+                            <th>STT</th>
+                            <th>Loại</th>
+                            <th>Tên món</th>
+                            <th>Số lượng</th>
+                            <th>Đơn giá</th>
+                            <th>Ghi chú</th>
+                            <th>Thành tiền</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {menuDishes.map((dish, idx) => (
+                            <tr key={dish.id}>
+                              <td>{String(idx + 1).padStart(2, '0')}</td>
+                              <td><span className={`event-menu-tag tag-${(dish.categoryLabel || dish.type) === 'Khai vị' ? 'orange' : (dish.categoryLabel || dish.type) === 'Món chính' ? 'blue' : 'green'}`}>{dish.categoryLabel || dish.type}</span></td>
+                              <td>{dish.name}</td>
+                              <td>{dish.quantity}</td>
+                              <td>{formatCurrency(dish.price)}</td>
+                              <td className="event-menu-notes">{dish.notes || '—'}</td>
+                              <td className="event-menu-subtotal"><strong>{formatCurrency(dish.subtotal)}</strong></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {(() => {
+                      const subtotal = menuDishes.reduce((s, d) => s + d.subtotal, 0);
+                      const serviceFee = Math.round(subtotal * 0.05);
+                      const total = subtotal + serviceFee;
+                      return (
+                        <div className="event-menu-summary">
+                          <div className="event-menu-summary-row"><span>Tạm tính:</span><span>{formatCurrency(subtotal)}</span></div>
+                          <div className="event-menu-summary-row"><span>Phí dịch vụ (5%):</span><span>{formatCurrency(serviceFee)}</span></div>
+                          <div className="event-menu-summary-row event-menu-summary-total"><span>TỔNG CỘNG:</span><span>{formatCurrency(total)}</span></div>
+                          <div className="event-menu-summary-actions">
+                            <button type="button" className="event-btn-edit-menu" onClick={() => setIsEditingMenu(true)}><Utensils size={18} /> Chỉnh sửa thực đơn</button>
+                            <button type="button" className="event-btn-book-now" onClick={() => setEventStep(4)}><Check size={18} /> ĐẶT LỊCH NGAY</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="event-guarantee-cards">
+                    <div className="event-guarantee-card">
+                      <div className="event-guarantee-icon"><Utensils size={24} /></div>
+                      <h5>Chất lượng cao</h5>
+                      <p>Nguyên liệu tươi sạch được tuyển chọn mỗi ngày.</p>
+                    </div>
+                    <div className="event-guarantee-card">
+                      <div className="event-guarantee-icon"><Headphones size={24} /></div>
+                      <h5>Hỗ trợ 24/7</h5>
+                      <p>Đội ngũ tư vấn sẵn sàng giải đáp mọi thắc mắc.</p>
+                    </div>
+                    <div className="event-guarantee-card">
+                      <div className="event-guarantee-icon"><ShieldCheck size={24} /></div>
+                      <h5>Đảm bảo an toàn</h5>
+                      <p>Chứng nhận an toàn thực phẩm tiêu chuẩn quốc tế</p>
+                    </div>
+                  </div>
+
+                  <button type="button" className="event-btn-back event-btn-back-step3" onClick={() => setEventStep(2)}>← Quay lại</button>
+                </div>
+              )}
+
+              {/* STEP 4: Thanh toán - một thẻ trắng lớn căn giữa như ảnh */}
+              {eventStep === 4 && (
+                <div className="event-form-step event-payment-step">
+                  <div className="event-payment-outer-card">
+                    <div className="event-payment-columns">
+                    <div className="event-payment-card event-payment-summary">
+                      <h4 className="event-payment-card-title"><Tag size={18} className="icon-orange" /> Tóm tắt đơn hàng</h4>
                       {(() => {
-                        // Group services by category
-                        const groupedServices = eventServices.reduce((acc, service) => {
-                          if (!acc[service.category]) {
-                            acc[service.category] = [];
-                          }
-                          acc[service.category].push(service);
-                          return acc;
-                        }, {});
-
-                        const categoryOrder = ['mc', 'sound', 'photo', 'backdrop', 'lighting', 'flower'];
-                        
-                        return categoryOrder.map(category => 
-                          groupedServices[category] ? (
-                            <div key={category} className="service-category-group">
-                              <h4 className="service-category-title">
-                                {groupedServices[category][0].categoryLabel}
-                              </h4>
-                              <div className="services-grid-2col">
-                                {groupedServices[category].map(service => (
-                                  <div 
-                                    key={service.id} 
-                                    className={`service-card-horizontal ${selectedServices.includes(service.id) ? 'selected' : ''}`}
-                                    onClick={() => toggleService(service.id)}
-                                  >
-                                    <div className="service-card-img-small">
-                                      <img src={service.image} alt={service.name} />
-                                    </div>
-                                    <div className="service-card-text">
-                                      <h5 className="service-card-title">{service.name}</h5>
-                                      <p className="service-card-desc">{service.description}</p>
-                                      <p className="service-card-price-small">{formatCurrency(service.price)}</p>
-                                    </div>
-                                    <button 
-                                      className={`service-select-check ${selectedServices.includes(service.id) ? 'active' : ''}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleService(service.id);
-                                      }}
-                                    >
-                                      ✓
-                                    </button>
-                                  </div>
-                                ))}
+                        const bookingFee = 2500000;
+                        const decorationFee = selectedServices.length > 0 ? calculateServiceTotal() : 1000000;
+                        const serviceFeePercent = 0.1;
+                        const subtotalBeforeFee = bookingFee + decorationFee;
+                        const serviceFeeAmount = Math.round(subtotalBeforeFee * serviceFeePercent);
+                        const totalPayment = subtotalBeforeFee + serviceFeeAmount;
+                        return (
+                          <>
+                            <div className="event-payment-line"><span>Dịch vụ đặt lịch</span><span>{formatCurrency(bookingFee)}</span></div>
+                            <div className="event-payment-line"><span>Phí trang trí</span><span>{formatCurrency(decorationFee)}</span></div>
+                            <div className="event-payment-line"><span>Phí phục vụ (10%)</span><span>{formatCurrency(serviceFeeAmount)}</span></div>
+                            <div className="event-payment-total-row"><span>Tổng cộng</span><span className="event-payment-total-amount">{formatCurrency(totalPayment)}</span></div>
+                            <div className="event-payment-discount">
+                              <label>Mã giảm giá</label>
+                              <div className="event-payment-discount-row">
+                                <input type="text" value={discountCode} onChange={(e) => setDiscountCode(e.target.value)} placeholder="Nhập mã khuyến mãi" />
+                                <button type="button" className="event-payment-apply-btn">Áp dụng</button>
                               </div>
                             </div>
-                          ) : null
+                          </>
                         );
                       })()}
                     </div>
+                    <div className="event-payment-card event-payment-methods">
+                      <h4 className="event-payment-card-title"><Tag size={18} className="icon-orange" /> Phương thức thanh toán</h4>
+                      <div className="event-payment-options">
+                        <label className={`event-payment-option ${paymentMethod === 'payos' ? 'selected' : ''}`} onClick={() => setPaymentMethod('payos')}>
+                          <input type="radio" name="paymentMethod" checked={paymentMethod === 'payos'} readOnly />
+                          <div className="event-payment-option-icon"><CreditCard size={22} /></div>
+                          <div className="event-payment-option-text">
+                            <strong>PayOS</strong>
+                            <span>Thanh toán nhanh qua cổng PayOS</span>
+                          </div>
+                        </label>
+                        <label className={`event-payment-option ${paymentMethod === 'cash' ? 'selected' : ''}`} onClick={() => setPaymentMethod('cash')}>
+                          <input type="radio" name="paymentMethod" checked={paymentMethod === 'cash'} readOnly />
+                          <div className="event-payment-option-icon"><Wallet size={22} /></div>
+                          <div className="event-payment-option-text">
+                            <strong>Tiền mặt</strong>
+                            <span>Thanh toán trực tiếp khi nhận dịch vụ</span>
+                          </div>
+                        </label>
+                      </div>
+                      <div className="event-payment-security">
+                        <ShieldCheck size={18} className="event-payment-security-icon" />
+                        <p>Thông tin thanh toán của bạn được mã hóa và bảo mật tuyệt đối theo tiêu chuẩn quốc tế. Chúng tôi không lưu trữ thông tin thẻ của bạn.</p>
+                      </div>
+                    </div>
+                    </div>
 
-                    {/* Selected Services Summary */}
-                    {selectedServices.length > 0 && (
-                      <div className="selected-services-summary">
-                        <h4 className="summary-title">📋 Dịch vụ đã chọn ({selectedServices.length})</h4>
-                        <div className="selected-items-list">
-                          {selectedServices.map(serviceId => {
-                            const service = eventServices.find(s => s.id === serviceId);
-                            return (
-                              <div key={service.id} className="selected-item">
-                                <span className="item-name">{service.name}</span>
-                                <span className="item-price">{formatCurrency(service.price)}</span>
-                                <button 
-                                  className="item-remove-btn"
-                                  onClick={() => toggleService(service.id)}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="summary-total" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 15px', background: 'linear-gradient(135deg, #fff0e6, #ffe8d6)', borderRadius: '10px', marginTop: '16px', borderTop: '2px solid #FFE8D6'}}>
-                          <span style={{fontWeight: 700, fontSize: '15px', color: 'var(--deep-black)'}}>Tổng dịch vụ:</span>
-                          <span style={{fontWeight: 700, fontSize: '16px', color: 'var(--primary-orange)'}}>{formatCurrency(calculateServiceTotal())}</span>
+                    <button type="button" className="event-btn-confirm-payment">Xác nhận thanh toán →</button>
+                    <p className="event-payment-terms">Bằng cách nhấn nút, bạn đồng ý với <a href="#terms">Điều khoản dịch vụ</a> của chúng tôi.</p>
+                    <button type="button" className="event-btn-back event-btn-back-payment-link" onClick={() => setEventStep(3)}>← Quay lại</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Thêm Món */}
+              {isEditingMenu && (
+                <div className="event-add-dish-modal-overlay" onClick={() => setIsEditingMenu(false)}>
+                  <div className="event-add-dish-modal" onClick={e => e.stopPropagation()}>
+                    <div className="event-add-dish-modal-header">
+                      <h4><Utensils size={22} className="icon-orange" /> Thêm Món</h4>
+                      <button type="button" className="event-modal-close" onClick={() => setIsEditingMenu(false)} aria-label="Đóng">×</button>
+                    </div>
+                    <div className="event-add-dish-body">
+                      <div className="event-add-dish-section">
+                        <label>THỰC ĐƠN THEO NGÀY</label>
+                        <div className="event-add-dish-row">
+                          <select
+                            value={newDishForm.type === 'Menu' ? newDishForm.name : ''}
+                            onChange={(e) => {
+                              const opt = menuOptions.find(o => o.type === 'Menu' && o.name === e.target.value);
+                              if (opt) setNewDishForm({ ...newDishForm, type: 'Menu', name: opt.name, price: opt.price, categoryLabel: opt.categoryLabel });
+                            }}
+                          >
+                            <option value="">Chọn Thực Đơn</option>
+                            {menuOptions.filter(o => o.type === 'Menu').map(o => <option key={o.name} value={o.name}>{o.name}</option>)}
+                          </select>
+                          <div className="event-qty-selector">
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: Math.max(1, newDishForm.quantity - 1) })}>−</button>
+                            <span>{newDishForm.quantity}</span>
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: newDishForm.quantity + 1 })}>+</button>
+                          </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-
-                  <div style={{display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '40px'}}>
-                    <button className="primary-gold-btn event-next-btn" onClick={() => setEventStep(3)} style={{width: '100%', maxWidth: '400px'}}>
-                      Tiếp Tục → Lên Thực Đơn
+                      <div className="event-add-dish-section">
+                        <label>GÓI COMBO</label>
+                        <div className="event-add-dish-row">
+                          <select
+                            value={newDishForm.type === 'Combo' ? newDishForm.name : ''}
+                            onChange={(e) => {
+                              const opt = menuOptions.find(o => o.type === 'Combo' && o.name === e.target.value);
+                              if (opt) setNewDishForm({ ...newDishForm, type: 'Combo', name: opt.name, price: opt.price, categoryLabel: opt.categoryLabel });
+                            }}
+                          >
+                            <option value="">Chọn Gói Combo</option>
+                            {menuOptions.filter(o => o.type === 'Combo').map(o => <option key={o.name} value={o.name}>{o.name}</option>)}
+                          </select>
+                          <div className="event-qty-selector">
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: Math.max(1, newDishForm.quantity - 1) })}>−</button>
+                            <span>{newDishForm.quantity}</span>
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: newDishForm.quantity + 1 })}>+</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="event-add-dish-section">
+                        <label>GHI CHÚ THÊM</label>
+                        <input type="text" value={newDishForm.notes} onChange={(e) => setNewDishForm({ ...newDishForm, notes: e.target.value })} placeholder="Ví dụ: Không hành, ít cay..." />
+                      </div>
+                      <button
+                        type="button"
+                        className="event-btn-add-dish"
+                        onClick={() => {
+                          if (!newDishForm.name) return;
+                          const opt = menuOptions.find(o => o.name === newDishForm.name);
+                          const price = opt ? opt.price : newDishForm.price;
+                          const categoryLabel = opt ? opt.categoryLabel : (newDishForm.categoryLabel || 'Món chính');
+                          const newDish = {
+                            id: menuDishes.length ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1,
+                            type: newDishForm.type,
+                            name: newDishForm.name,
+                            quantity: newDishForm.quantity,
+                            price,
+                            notes: newDishForm.notes,
+                            subtotal: newDishForm.quantity * price,
+                            categoryLabel
+                          };
+                          setMenuDishes([...menuDishes, newDish]);
+                          setNewDishForm({ type: 'Menu', name: '', quantity: 1, notes: '', price: 0, categoryLabel: 'Món chính' });
+                        }}
+                      >
+                        Thêm vào danh sách
+                      </button>
+                      <div className="event-add-dish-selected">
+                        <h4><List size={18} className="icon-orange" /> Danh sách đã chọn</h4>
+                        <span className="event-add-dish-count">{menuDishes.length} Món</span>
+                        <div className="event-add-dish-list">
+                          {menuDishes.map(d => (
+                            <div key={d.id} className="event-add-dish-item">
+                              <div className="event-add-dish-item-info">
+                                <strong>{d.name}</strong>
+                                <span>Số lượng: {String(d.quantity).padStart(2, '0')}</span>
+                              </div>
+                              <button type="button" className="event-add-dish-remove" onClick={() => setMenuDishes(menuDishes.filter(x => x.id !== d.id))}>🗑</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="event-add-dish-footer">
+                      <span>Tổng cộng tạm tính:</span>
+                      <strong>{formatCurrency(menuDishes.reduce((s, d) => s + d.subtotal, 0))}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="event-btn-complete-menu"
+                      onClick={() => setIsEditingMenu(false)}
+                    >
+                      <Check size={18} /> Hoàn Thành Thực Đơn
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* STEP 3: MENU - Placeholder */}
-              {eventStep === 3 && (
-                <div className="event-form-step">
-                  <button className="primary-gold-btn event-back-btn-top" onClick={() => setEventStep(2)} style={{marginBottom: '25px', alignSelf: 'flex-start'}}>
-                    ← Quay lại
-                  </button>
-
-                  {/* Edit Menu Section */}
-                  {isEditingMenu && (
-                    <div className="edit-menu-section">
-                      <h4 className="edit-menu-title">Thêm Món</h4>
-                      <div className="add-dish-form">
-                        <div className="form-row-edit">
-                          <div className="form-group">
-                            <label>Loại</label>
-                            <select 
-                              value={newDishForm.type}
-                              onChange={(e) => setNewDishForm({...newDishForm, type: e.target.value})}
-                              className="dropdown-dish-type"
-                              title="Loại"
-                            >
-                              <option value="Menu">Menu</option>
-                              <option value="Combo">Combo</option>
-                            </select>
-                          </div>
-
-                          <div className="form-group">
-                            <label>Tên Món</label>
-                            <select 
-                              value={newDishForm.name}
-                              onChange={(e) => {
-                                const selected = menuOptions.find(opt => opt.name === e.target.value && opt.type === newDishForm.type);
-                                setNewDishForm({
-                                  ...newDishForm, 
-                                  name: e.target.value,
-                                  price: selected?.price || 0
-                                });
-                              }}
-                              className="dropdown-dish-name"
-                              title="Tên Món"
-                            >
-                              <option value="">Chọn món</option>
-                              {menuOptions.filter(opt => opt.type === newDishForm.type).map(opt => (
-                                <option key={opt.name} value={opt.name}>{opt.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="form-group">
-                            <label>Ghi chú</label>
-                            <input 
-                              type="text" 
-                              value={newDishForm.notes}
-                              onChange={(e) => setNewDishForm({...newDishForm, notes: e.target.value})}
-                              placeholder="Ghi chú..."
-                              className="input-notes-edit"
-                            />
-                          </div>
-
-                          <div className="form-group-qty">
-                            <label>SL</label>
-                            <div className="qty-control">
-                              <button 
-                                className="qty-btn minus"
-                                onClick={() => setNewDishForm({...newDishForm, quantity: Math.max(1, newDishForm.quantity - 1)})}
-                                title="Giảm"
-                              >−</button>
-                              <input 
-                                type="number" 
-                                min="1"
-                                value={newDishForm.quantity}
-                                onChange={(e) => setNewDishForm({...newDishForm, quantity: parseInt(e.target.value) || 1})}
-                                className="input-qty"
-                                placeholder="1"
-                              />
-                              <button 
-                                className="qty-btn plus"
-                                onClick={() => setNewDishForm({...newDishForm, quantity: newDishForm.quantity + 1})}
-                                title="Tăng"
-                              >+</button>
+              {/* Modal Xem tất cả dịch vụ */}
+              {showAllServicesModal && (
+                <div className="event-all-services-modal-overlay" onClick={() => setShowAllServicesModal(false)}>
+                  <div className="event-all-services-modal" onClick={e => e.stopPropagation()}>
+                    <div className="event-all-services-modal-header">
+                      <h4>Dịch vụ đi kèm phổ biến</h4>
+                      <button type="button" className="event-modal-close" onClick={() => setShowAllServicesModal(false)} aria-label="Đóng">×</button>
+                    </div>
+                    <div className="event-all-services-modal-body">
+                      <div className="event-service-cards-grid event-all-services-grid">
+                        {eventServices.map(service => (
+                          <div
+                            key={service.id}
+                            className={`event-service-card-v2 ${selectedServices.includes(service.id) ? 'selected' : ''}`}
+                            onClick={() => toggleService(service.id)}
+                          >
+                            <div className="event-service-card-v2-img">
+                              <img src={service.image} alt={service.name} />
+                              {selectedServices.includes(service.id) && (
+                                <div className="event-service-card-v2-check"><Check size={18} strokeWidth={3} /></div>
+                              )}
                             </div>
+                            <h5 className="event-service-card-v2-title">{service.name}</h5>
+                            <p className="event-service-card-v2-price">{formatCurrency(service.price).replace('₫', '')} đ</p>
+                            <p className="event-service-card-v2-desc">{service.description}</p>
                           </div>
-
-                          <div className="price-display">
-                            <span className="price-label">Giá:</span>
-                            <span className="price-value">{formatCurrency(newDishForm.price)}</span>
-                          </div>
-
-                          <button 
-                            className="btn-save-dish"
-                            onClick={() => {
-                              if (newDishForm.name) {
-                                const newDish = {
-                                  id: menuDishes.length > 0 ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1,
-                                  type: newDishForm.type,
-                                  name: newDishForm.name,
-                                  quantity: newDishForm.quantity,
-                                  price: newDishForm.price,
-                                  notes: newDishForm.notes,
-                                  subtotal: newDishForm.quantity * newDishForm.price
-                                };
-                                setMenuDishes([...menuDishes, newDish]);
-                                setNewDishForm({ type: 'Menu', name: '', quantity: 1, notes: '', price: 0 });
-                              }
-                            }}
-                          >
-                            Lưu
-                          </button>
-
-                          <button 
-                            className="btn-delete-dish"
-                            onClick={() => setIsEditingMenu(false)}
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Menu Header */}
-                  <div className="menu-header">
-                    <h4 className="menu-title">Các món ăn trên mỗi bàn</h4>
-                    <p className="menu-description">Nếu khách hàng không muốn đặt món trước xin bỏ qua</p>
-                  </div>
-
-                  {/* Menu Table */}
-                  <div className="menu-table-container">
-                    <table className="menu-table">
-                      <thead>
-                        <tr>
-                          <th className="col-stt">STT</th>
-                          <th className="col-loai">Loại</th>
-                          <th className="col-tenmon">Tên Món</th>
-                          <th className="col-soluong">Số Lượng</th>
-                          <th className="col-gia">Giá</th>
-                          <th className="col-ghichu">Ghi chú</th>
-                          <th className="col-tong">Tổng</th>
-                          <th className="col-action">Xóa</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {menuDishes.map((dish, idx) => (
-                          <tr key={dish.id} className="menu-row">
-                            <td className="col-stt">{idx + 1}</td>
-                            <td className="col-loai">{dish.type}</td>
-                            <td className="col-tenmon">{dish.name}</td>
-                            <td className="col-soluong">
-                              <input 
-                                type="number" 
-                                min="1" 
-                                value={dish.quantity}
-                                onChange={(e) => {
-                                  const newQty = parseInt(e.target.value) || 1;
-                                  const newDishes = [...menuDishes];
-                                  newDishes[idx].quantity = newQty;
-                                  newDishes[idx].subtotal = newQty * newDishes[idx].price;
-                                  setMenuDishes(newDishes);
-                                }}
-                                className="input-number"
-                              />
-                            </td>
-                            <td className="col-gia">{formatCurrency(dish.price)}</td>
-                            <td className="col-ghichu">
-                              <input 
-                                type="text" 
-                                value={dish.notes}
-                                onChange={(e) => {
-                                  const newDishes = [...menuDishes];
-                                  newDishes[idx].notes = e.target.value;
-                                  setMenuDishes(newDishes);
-                                }}
-                                placeholder="Ghi chú..."
-                                className="input-notes"
-                              />
-                            </td>
-                            <td className="col-tong">{formatCurrency(dish.subtotal)}</td>
-                            <td className="col-action">
-                              <button 
-                                className="btn-remove-row"
-                                onClick={() => setMenuDishes(menuDishes.filter(d => d.id !== dish.id))}
-                              >
-                                Xóa
-                              </button>
-                            </td>
-                          </tr>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Menu Total */}
-                  <div className="menu-footer">
-                    <div className="menu-footer-left">
-                      <div className="menu-total">
-                        <span className="total-label">Tổng giá mỗi bàn :</span>
-                        <span className="total-amount">{formatCurrency(menuDishes.reduce((sum, dish) => sum + dish.subtotal, 0))}</span>
                       </div>
-                      <a href="#" onClick={(e) => { e.preventDefault(); setIsEditingMenu(!isEditingMenu); }} className="edit-menu-link">
-                        {isEditingMenu ? 'Đóng' : 'Lấy món trong giỏ hàng'}
-                      </a>
                     </div>
-                    <button className="primary-gold-btn event-booking-btn" onClick={() => setIsEditingMenu(false)}>
-                      Hoàn Thành Thực Đơn
-                    </button>
+                    <div className="event-all-services-modal-footer">
+                      <span>Đã chọn {selectedServices.length} dịch vụ</span>
+                      <button type="button" className="event-btn-primary" onClick={() => setShowAllServicesModal(false)}>Đóng</button>
+                    </div>
                   </div>
                 </div>
               )}
