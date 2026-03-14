@@ -95,7 +95,7 @@ const Promotion = () => {
                         </button>
                     </div>
                     <div className="Voucher-Grid-ImageStyle">
-                        {vouchers.slice(0, 4).map(v => (
+                        {vouchers.slice(0, 3).map(v => (
                             <div className="Voucher-Card-New" key={v.discountId}>
                                 <div className="V-Icon">🎁</div>
                                 <h3>{v.description}</h3>
@@ -142,23 +142,19 @@ const Promotion = () => {
                     <div className="Blog-Header-Center">
                         <h2><BookOpen size={24} /> Blog Ẩm Thực</h2>
                     </div>
-                    <div className="Blog-Slider-Outer">
-                        <button className="blog-nav-btn left" onClick={() => scrollHandler(blogRef, 'left')}><ChevronLeft size={30}/></button>
-                        <div className="Blog-Scroll-Container" ref={blogRef}>
-                            {blogs.map(blog => (
-                                <div className="Blog-Item-Card" key={blog.blogId}>
-                                    <div className="Blog-Img-Holder">
-                                        <img src={blog.image || "https://via.placeholder.com/500"} alt="Blog" />
-                                    </div>
-                                    <div className="Blog-Text-Content">
-                                        <span className="Blog-Tag-Red">{blog.fullname}</span>
-                                        <h4>{blog.title}</h4>
-                                        <p>{blog.content?.substring(0, 100)}...</p>
-                                    </div>
+                    <div className="Blog-Grid-Container">
+                        {blogs.slice(0, 3).map(blog => (
+                            <div className="Blog-Item-Card" key={blog.blogId}>
+                                <div className="Blog-Img-Holder">
+                                    <img src={blog.image || "https://via.placeholder.com/500"} alt="Blog" />
                                 </div>
-                            ))}
-                        </div>
-                        <button className="blog-nav-btn right" onClick={() => scrollHandler(blogRef, 'right')}><ChevronRight size={30}/></button>
+                                <div className="Blog-Text-Content">
+                                    <span className="Blog-Tag-Red">{blog.fullname}</span>
+                                    <h4>{blog.title}</h4>
+                                    <p>{blog.content?.substring(0, 100)}...</p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </section>
 

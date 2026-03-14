@@ -33,7 +33,8 @@ export async function updateProfile(profileData) {
       avatar: profileData.avatar
     };
 
-    // Thêm newPassword nếu có (confirmPassword được gửi như newPassword)
+    // Đổi mật khẩu: gửi oldPassword + newPassword nếu có
+    if (profileData.oldPassword !== undefined) updateData.oldPassword = profileData.oldPassword;
     if (profileData.confirmPassword && profileData.confirmPassword.trim()) {
       updateData.newPassword = profileData.confirmPassword;
     }

@@ -1,77 +1,136 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../styles/Profile.css';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 import { getProfile, updateProfile } from '../api/userApi';
 
-const Profile = () => {
-  // Tọa độ nhà hàng (Thay đổi theo tọa độ thực tế của nhà hàng bạn)
-  const RESTAURANT_COORDS = { lat: 16.0544, lng: 108.2022 }; 
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBHDr0B4X2T13T1nVBQczGvKkS8VQZmwc";
 
-  // State quản lý thông tin người dùng
+const Profile = () => {
   const [userInfo, setUserInfo] = useState({
     fullname: '',
-    gender: '',
+    gender: 'Nam',
     phone: '',
     email: '',
-    oldPassword: '',
-    confirmPassword: '',
     address: '',
-    avatar: '',
     dob: ''
   });
 
-  const [mapPosition, setMapPosition] = useState({ lat: 15.9753, lng: 108.2524 });
-  const [showPass, setShowPass] = useState(false);
+  const [addresses, setAddresses] = useState([]);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [distanceInfo, setDistanceInfo] = useState(null);
-
-  // Khởi tạo Google Maps
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "YOUR_GOOGLE_MAPS_API_KEY" 
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    street: '',
+    district: '',
+    city: 'Hồ Chí Minh',
+    addressType: 'Nhà riêng',
+    memorableName: '',
+    phone: '',
+    setAsDefault: false
   });
 
-  // Hàm tính khoảng cách để kiểm tra điều kiện 20km
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Bán kính trái đất km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+  // Google Maps
+  const defaultCenter = { lat: 10.8231, lng: 106.6297 }; // TP.HCM
+  const [mapCenter, setMapCenter] = useState(defaultCenter);
+  const [markerPos, setMarkerPos] = useState(null);
+  const { isLoaded: isMapLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+  });
+
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const newPos = { lat: latitude, lng: longitude };
+          setMapCenter(newPos);
+          setMarkerPos(newPos);
+          console.log('GPS lấy được:', newPos);
+          // Tự động điền địa chỉ từ tọa độ
+          reverseGeocode(latitude, longitude);
+        },
+        (err) => {
+          console.error('Geolocation error:', err);
+          alert('Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền truy cập vị trí.');
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      alert('Trình duyệt không hỗ trợ định vị.');
+    }
   };
 
-  
+  const handleMapClick = (e) => {
+    if (e.latLng) {
+      const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      setMarkerPos(newPos);
+      console.log('Đã chọn vị trí:', newPos);
+      // Tự động điền địa chỉ
+      reverseGeocode(newPos.lat, newPos.lng);
+    }
+  };
 
-  // Fetch profile data từ API
+  // Reverse geocoding: lấy địa chỉ từ tọa độ
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      const data = await response.json();
+      if (data.address) {
+        const parts = [];
+        if (data.address.house_number) parts.push(data.address.house_number);
+        if (data.address.road) parts.push(data.address.road);
+        if (data.address.suburb) parts.push(data.address.suburb);
+        if (data.address.city_district) parts.push(data.address.city_district);
+        if (data.address.city) parts.push(data.address.city);
+        const fullAddr = parts.join(', ');
+        setNewAddress(prev => ({ ...prev, street: fullAddr }));
+      }
+    } catch (err) {
+      console.error('Reverse geocode error:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
-        setError(null);
+        setError('');
         const profileData = await getProfile();
-        
-        const initialInfo = {
-          fullname: (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '',
-          gender: (profileData.gender && profileData.gender !== 'string') ? profileData.gender : '',
-          phone: (profileData.phone && profileData.phone !== 'string') ? profileData.phone.replace('+84', '0') : '',
+        const fullname = (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '';
+        const phone = (profileData.phone && profileData.phone !== 'string') ? (profileData.phone || '').replace('+84', '0') : '';
+        const address = (profileData.address && profileData.address !== 'string') ? profileData.address : '';
+        const dob = profileData.dob ? profileData.dob.split('T')[0] : '';
+        const gender = (profileData.gender && profileData.gender !== 'string') ? profileData.gender : 'Nam';
+
+        setUserInfo({
+          fullname,
+          gender: gender === 'Nữ' ? 'Nữ' : 'Nam',
+          phone,
           email: profileData.email || '',
-          address: (profileData.address && profileData.address !== 'string') ? profileData.address : '',
-          avatar: (profileData.avatar && profileData.avatar !== 'string') ? profileData.avatar : '',
-          dob: profileData.dob ? profileData.dob.split('T')[0] : '', 
-          oldPassword: '',
-          confirmPassword: ''
-        };
+          address,
+          dob
+        });
 
-        setUserInfo(initialInfo);
-
-        if (initialInfo.address) {
-          await handleUpdateAddressMap(initialInfo.address);
+        if (address || phone) {
+          setAddresses([
+            { id: 'default', label: 'Nhà riêng', address: address || '—', phone: phone || '—', isDefault: true },
+            { id: 'office', label: 'Văn phòng', address: 'Tòa nhà Bitexco, 2 Hải Triều, Phường Bến Nghé, Quận 1, TP. HCM', phone: '028 12345678', isDefault: false }
+          ]);
+        } else {
+          setAddresses([
+            { id: 'default', label: 'Nhà riêng', address: '—', phone: '—', isDefault: true }
+          ]);
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -80,79 +139,64 @@ const Profile = () => {
         setLoading(false);
       }
     };
-
     fetchProfile();
   }, []);
+
+  const formatDobForDisplay = (isoDate) => {
+    if (!isoDate) return '';
+    const d = (typeof isoDate === 'string' && isoDate.includes('T')) ? isoDate.split('T')[0] : isoDate;
+    const parts = d.split('-');
+    if (parts.length !== 3) return d;
+    const [y, m, day] = parts;
+    return `${day.padStart(2, '0')}/${m}/${y}`;
+  };
+  const parseDobToISO = (input) => {
+    if (!input) return '';
+    const parts = input.replace(/\D/g, ' ').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 3) {
+      const [a, b, c] = parts;
+      if (a.length <= 2 && b.length <= 2 && c.length === 4) {
+        const day = a.padStart(2, '0');
+        const month = b.padStart(2, '0');
+        return `${c}-${month}-${day}`;
+      }
+    }
+    return '';
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name === 'phone') {
-      const phoneValue = value.replace(/[^0-9]/g, '');
-      setUserInfo({ ...userInfo, [name]: phoneValue });
+      setUserInfo({ ...userInfo, [name]: value.replace(/[^0-9]/g, '') });
+    } else if (name === 'dob') {
+      const iso = parseDobToISO(value) || value;
+      setUserInfo({ ...userInfo, dob: iso });
     } else {
       setUserInfo({ ...userInfo, [name]: value });
     }
   };
 
-  const validateVietnamesePhone = (phone) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (!/^0\d{9}$/.test(cleanPhone)) {
-      return { valid: false, message: 'Số điện thoại Vietnam phải có 10 chữ số, bắt đầu bằng 0' };
-    }
-    return { valid: true, message: '' };
-  };
-
-  const formatPhoneToInternational = (phone) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (/^0\d{9}$/.test(cleanPhone)) {
-      return '+84' + cleanPhone.substring(1);
-    }
-    return cleanPhone;
-  };
-
-  useEffect(() => {
-    if (successMessage || error) {
-      const timer = setTimeout(() => {
-        setSuccessMessage('');
-        setError('');
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage, error]);
-
-  const handleSubmitProfile = async (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setSuccessMessage('');
     setError('');
-
-    if (!userInfo.fullname.trim() || !userInfo.phone.trim()) {
-      setError('Vui lòng nhập đầy đủ họ tên và số điện thoại!');
+    setSuccessMessage('');
+    if (!userInfo.fullname.trim()) {
+      setError('Vui lòng nhập họ và tên.');
       return;
     }
-
-    const phoneValidation = validateVietnamesePhone(userInfo.phone);
-    if (!phoneValidation.valid) {
-      setError(phoneValidation.message);
+    if (!userInfo.phone.trim()) {
+      setError('Vui lòng nhập số điện thoại.');
       return;
     }
-
-    // Kiểm tra khoảng cách trước khi cho phép lưu (Chặn lỗi 20km sớm)
-    if (distanceInfo && distanceInfo > 20) {
-      setError(`Không thể lưu! Địa chỉ này cách nhà hàng ${distanceInfo.toFixed(1)}km, vượt quá giới hạn 20km.`);
-      return;
-    }
-
+    const phone = userInfo.phone.startsWith('0') ? '+84' + userInfo.phone.slice(1) : userInfo.phone;
+    const defaultAddr = addresses.find(a => a.isDefault);
     try {
       setIsSubmitting(true);
-      const formattedPhone = formatPhoneToInternational(userInfo.phone);
-      
-      const payload = { ...userInfo, phone: formattedPhone };
-      if (!payload.oldPassword) delete payload.oldPassword;
-      if (!payload.confirmPassword) delete payload.confirmPassword;
-
-      await updateProfile(payload);
-      
-      setUserInfo(prev => ({ ...prev, oldPassword: '', confirmPassword: '' }));
+      await updateProfile({
+        ...userInfo,
+        phone,
+        address: defaultAddr ? defaultAddr.address : userInfo.address
+      });
       setSuccessMessage('Cập nhật thông tin thành công!');
     } catch (err) {
       setError(err.message || 'Cập nhật thông tin thất bại.');
@@ -161,162 +205,393 @@ const Profile = () => {
     }
   };
 
-  const handleUpdateAddressMap = async (addressToUpdate = null) => {
-    const addressValue = addressToUpdate || userInfo.address;
-    
-    if (!addressValue) {
-      alert("Vui lòng nhập địa chỉ!");
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    const { currentPassword, newPassword, confirmPassword } = passwordForm;
+    if (!newPassword || newPassword.length < 8) {
+      setError('Mật khẩu mới phải dài ít nhất 8 ký tự.');
       return;
     }
-
+    if (newPassword !== confirmPassword) {
+      setError('Xác nhận mật khẩu không khớp.');
+      return;
+    }
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressValue)}`
-      );
-      const data = await response.json();
-      if (data && data.length > 0) {
-        const newLat = parseFloat(data[0].lat);
-        const newLng = parseFloat(data[0].lon);
-        
-        setMapPosition({ lat: newLat, lng: newLng });
-
-        // Tính toán khoảng cách và lưu vào state
-        const dist = calculateDistance(RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng, newLat, newLng);
-        setDistanceInfo(dist);
-
-        if (dist > 20) {
-          setError(`Cảnh báo: Vị trí này cách cửa hàng ${dist.toFixed(1)}km (Vượt giới hạn 20km).`);
-        }
-      } else {
-        alert("Không tìm thấy vị trí chính xác trên bản đồ!");
-      }
-    } catch (error) {
-      console.error("Lỗi cập nhật bản đồ:", error);
+      setIsPasswordSubmitting(true);
+      await updateProfile({
+        ...userInfo,
+        oldPassword: currentPassword,
+        confirmPassword: newPassword
+      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setSuccessMessage('Cập nhật mật khẩu thành công!');
+    } catch (err) {
+      setError(err.message || 'Cập nhật mật khẩu thất bại.');
+    } finally {
+      setIsPasswordSubmitting(false);
     }
   };
 
+  const DISTRICTS_HCM = ['Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10', 'Quận 11', 'Quận 12', 'Bình Thạnh', 'Phú Nhuận', 'Gò Vấp', 'Tân Bình', 'Tân Phú', 'Bình Tân', 'Thủ Đức', 'Củ Chi', 'Hóc Môn', 'Bình Chánh', 'Nhà Bè', 'Cần Giờ'];
+
+  const handleAddAddress = () => {
+    setNewAddress({
+      street: '',
+      district: '',
+      city: 'Hồ Chí Minh',
+      addressType: 'Nhà riêng',
+      memorableName: '',
+      phone: userInfo.phone || '',
+      setAsDefault: false
+    });
+    setShowAddAddressModal(true);
+  };
+
+  const handleCloseAddAddressModal = () => {
+    setShowAddAddressModal(false);
+  };
+
+  const handleSaveNewAddress = (e) => {
+    e.preventDefault();
+    const fullAddress = [newAddress.street, newAddress.district, newAddress.city].filter(Boolean).join(', ');
+    const label = newAddress.addressType;
+    const name = newAddress.memorableName.trim() || label;
+    const isDefault = newAddress.setAsDefault || addresses.length === 0;
+    let next = [...addresses];
+    if (isDefault) next = next.map(a => ({ ...a, isDefault: false }));
+    next.push({
+      id: Date.now(),
+      label: name,
+      address: fullAddress || '—',
+      phone: newAddress.phone || userInfo.phone || '—',
+      isDefault
+    });
+    setAddresses(next);
+    setShowAddAddressModal(false);
+    setSuccessMessage('Đã thêm địa chỉ mới.');
+  };
+
+  const setDefaultAddress = (id) => {
+    setAddresses(addresses.map(a => ({ ...a, isDefault: a.id === id })));
+  };
+
+  const removeAddress = (id) => {
+    const next = addresses.filter(a => a.id !== id);
+    if (next.length === 0) return;
+    const hadDefault = addresses.find(a => a.id === id)?.isDefault;
+    if (hadDefault && next.length > 0) next[0].isDefault = true;
+    setAddresses(next);
+  };
+
+  useEffect(() => {
+    if (successMessage || error) {
+      const t = setTimeout(() => { setSuccessMessage(''); setError(''); }, 5000);
+      return () => clearTimeout(t);
+    }
+  }, [successMessage, error]);
+
+  if (loading) {
+    return (
+      <div className="Profile-New-Wrapper">
+        <div className="Profile-New-Card">
+          <p className="Profile-Loading">Đang tải thông tin cá nhân...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="Content-Card animate-fade-in">
-      <h1 className="Content-Title">Thông Tin Cá Nhân</h1>
+    <div className="Profile-New-Wrapper">
+      {error && <div className="Profile-Alert error">{error}</div>}
+      {successMessage && <div className="Profile-Alert success">{successMessage}</div>}
 
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#ff6600' }}>
-          <p>Đang tải thông tin cá nhân...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="alert-box error">
-          <p><strong>❌ Thông báo:</strong> {error}</p>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="alert-box success">
-          <p><strong>✅ Thành công:</strong> {successMessage}</p>
-        </div>
-      )}
-
-      {!loading && (
-      <form className="Profile-Form" onSubmit={handleSubmitProfile}>
-        <div className="Form-Grid">
-          <div className="Form-Group">
-            <label>Họ Và Tên</label>
-            <input type="text" name="fullname" value={userInfo.fullname} onChange={handleInputChange} />
-          </div>
-
-          <div className="Form-Group">
-            <label>Ngày Sinh</label>
-            <input type="date" name="dob" value={userInfo.dob} onChange={handleInputChange} />
-          </div>
-
-          <div className="Form-Group">
-            <label>Giới Tính :</label>
-            <div className="Radio-Group">
-              <label>
-                <input type="radio" name="gender" checked={userInfo.gender === 'Nam'} onChange={() => setUserInfo({...userInfo, gender: 'Nam'})} /> 
-                Nam
-              </label>
-              <label>
-                <input type="radio" name="gender" checked={userInfo.gender === 'Nữ'} onChange={() => setUserInfo({...userInfo, gender: 'Nữ'})} /> 
-                Nữ
-              </label>
+      {/* 1. Thông tin cá nhân */}
+      <section className="Profile-Section">
+        <h2 className="Profile-Section-Title">
+          <i className="fa-solid fa-location-dot Profile-Section-Icon"></i>
+          Thông tin cá nhân
+        </h2>
+        <form onSubmit={handleSaveProfile} className="Profile-Form-Block">
+          <div className="Profile-Form-Grid">
+            <div className="Profile-Field">
+              <label>Họ và tên</label>
+              <input type="text" name="fullname" value={userInfo.fullname} onChange={handleInputChange} placeholder="Họ và tên" />
+            </div>
+            <div className="Profile-Field">
+              <label>Ngày sinh</label>
+              <div className="Profile-Input-With-Icon">
+                <input
+                  type="text"
+                  value={formatDobForDisplay(userInfo.dob)}
+                  onChange={(e) => setUserInfo({ ...userInfo, dob: parseDobToISO(e.target.value) })}
+                  placeholder="DD/MM/YYYY"
+                  maxLength={10}
+                />
+                <i className="fa-regular fa-calendar Profile-Field-Icon"></i>
+              </div>
+            </div>
+            <div className="Profile-Field">
+              <label>Giới tính</label>
+              <div className="Profile-Radio-Group">
+                <label className={userInfo.gender === 'Nam' ? 'active' : ''}>
+                  <input type="radio" name="gender" checked={userInfo.gender === 'Nam'} onChange={() => setUserInfo({ ...userInfo, gender: 'Nam' })} />
+                  Nam
+                </label>
+                <label className={userInfo.gender === 'Nữ' ? 'active' : ''}>
+                  <input type="radio" name="gender" checked={userInfo.gender === 'Nữ'} onChange={() => setUserInfo({ ...userInfo, gender: 'Nữ' })} />
+                  Nữ
+                </label>
+              </div>
+            </div>
+            <div className="Profile-Field">
+              <label>Số điện thoại</label>
+              <input type="text" name="phone" value={userInfo.phone} onChange={handleInputChange} placeholder="0901234567" maxLength={11} />
+            </div>
+            <div className="Profile-Field Profile-Field-Full">
+              <label>Email</label>
+              <input type="email" value={userInfo.email} readOnly className="Profile-Input-Readonly" />
             </div>
           </div>
-
-          <div className="Form-Group">
-            <label>Số Điện Thoại</label>
-            <input 
-              type="text" 
-              name="phone" 
-              value={userInfo.phone} 
-              onChange={handleInputChange} 
-              placeholder="0123456789" 
-              maxLength="10"
-            />
+          <div className="Profile-Form-Actions">
+            <button type="submit" className="Profile-Btn Primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </button>
           </div>
+        </form>
+      </section>
 
-          <div className="Form-Group">
-            <label>Mật Khẩu Mới</label>
-            <div className="Input-With-Icon">
-              <input type={showPass ? "text" : "password"} name="oldPassword" value={userInfo.oldPassword} onChange={handleInputChange} />
-              <i className={`fa-solid ${showPass ? 'fa-eye' : 'fa-eye-slash'}`} onClick={() => setShowPass(!showPass)}></i>
-            </div>
-          </div>
-
-          <div className="Form-Group">
-            <label>Địa Chỉ Email</label>
-            <input type="email" value={userInfo.email} readOnly style={{ backgroundColor: '#f5f5f5' }} />
-          </div>
-
-          <div className="Form-Group">
-            <label>Xác Nhận Mật Khẩu</label>
-            <div className="Input-With-Icon">
-              <input type={showPass ? "text" : "password"} name="confirmPassword" value={userInfo.confirmPassword} onChange={handleInputChange} placeholder="Nhập Xác Nhận Mật Khẩu" />
-            </div>
-          </div>
-        </div>
-
-        <div className="Address-Section" style={{ marginTop: '20px' }}>
-          <h2 className="Section-Title">Địa Chỉ Giao Hàng</h2>
-          <div className="Form-Group">
-            <label>Địa Chỉ Chi Tiết (Dùng để tính khoảng cách giao hàng)</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
-                <input type="text" name="address" value={userInfo.address} onChange={handleInputChange} className="Full-Width" placeholder="VD: 254 Nguyễn Văn Linh, Đà Nẵng" />
-                <button type="button" className="Btn-Check-Map" onClick={() => handleUpdateAddressMap()}>Check Map</button>
-            </div>
-            {distanceInfo !== null && (
-                <p style={{ marginTop: '5px', color: distanceInfo > 20 ? 'red' : 'green', fontWeight: 'bold' }}>
-                    Khoảng cách đến nhà hàng: {distanceInfo.toFixed(2)} km 
-                    {distanceInfo > 20 ? ' (Ngoài phạm vi phục vụ)' : ' (Hợp lệ)'}
-                </p>
-            )}
-          </div>
-          
-          <div className="Map-Preview" style={{ height: '350px', marginTop: '15px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #ddd' }}>
-            {isLoaded ? (
-              <GoogleMap
-                mapContainerStyle={{ width: '100%', height: '100%' }}
-                center={mapPosition}
-                zoom={15}
-              >
-                <MarkerF position={mapPosition} />
-              </GoogleMap>
-            ) : <div>Đang tải bản đồ...</div>}
-          </div>
-        </div>
-
-        <div className="Form-Actions" style={{ marginTop: '30px' }}>
-          <button 
-            type="submit" 
-            className="Btn-Submit"
-            disabled={isSubmitting}
-            style={{ width: '100%', height: '50px', fontSize: '1.1rem' }}
-          >
-            {isSubmitting ? 'Đang cập nhật...' : 'Lưu Tất Cả Thông Tin'}
+      {/* 2. Địa chỉ giao hàng */}
+      <section className="Profile-Section">
+        <div className="Profile-Section-Header">
+          <h2 className="Profile-Section-Title">
+            <i className="fa-solid fa-location-dot Profile-Section-Icon"></i>
+            Địa chỉ giao hàng
+          </h2>
+          <button type="button" className="Profile-Link-Add" onClick={handleAddAddress}>
+            <i className="fa-solid fa-location-dot"></i> Thêm địa chỉ mới
           </button>
         </div>
-      </form>
+        <div className="Profile-Address-List">
+          {addresses.map((addr) => (
+            <div key={addr.id} className={`Profile-Address-Card ${addr.isDefault ? 'Default' : ''}`}>
+              <div className="Profile-Address-Icon">
+                <i className={addr.label === 'Văn phòng' ? 'fa-solid fa-briefcase' : addr.label === 'Khác' ? 'fa-solid fa-location-dot' : 'fa-solid fa-house'}></i>
+              </div>
+              <div className="Profile-Address-Body">
+                <div className="Profile-Address-Row">
+                  <span className="Profile-Address-Label">{addr.label}</span>
+                  {addr.isDefault && <span className="Profile-Address-Default">MẶC ĐỊNH</span>}
+                </div>
+                <p className="Profile-Address-Text">{addr.address}</p>
+                <p className="Profile-Address-Phone">SĐT: {addr.phone}</p>
+              </div>
+              <div className="Profile-Address-Actions">
+                <button type="button" className="Profile-Address-Action" title="Sửa" onClick={() => setDefaultAddress(addr.id)}><i className="fa-solid fa-pencil"></i></button>
+                <button type="button" className="Profile-Address-Action" title="Xóa" onClick={() => removeAddress(addr.id)}><i className="fa-regular fa-trash-can"></i></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3. Đổi mật khẩu */}
+      <section className="Profile-Section">
+        <h2 className="Profile-Section-Title">
+          <i className="fa-solid fa-lock Profile-Section-Icon"></i>
+          Đổi mật khẩu
+        </h2>
+        <form onSubmit={handleChangePassword} className="Profile-Form-Block">
+          <div className="Profile-Password-Fields">
+            <div className="Profile-Field">
+              <label>Mật khẩu hiện tại</label>
+              <div className="Profile-Input-With-Icon">
+                <input
+                  type={showPass.current ? 'text' : 'password'}
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  placeholder="********"
+                />
+                <i className={`fa-solid ${showPass.current ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, current: !showPass.current })}></i>
+              </div>
+            </div>
+            <div className="Profile-Field">
+              <label>Mật khẩu mới</label>
+              <div className="Profile-Input-With-Icon">
+                <input
+                  type={showPass.new ? 'text' : 'password'}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="********"
+                />
+                <i className={`fa-solid ${showPass.new ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, new: !showPass.new })}></i>
+              </div>
+            </div>
+            <div className="Profile-Field">
+              <label>Xác nhận mật khẩu</label>
+              <div className="Profile-Input-With-Icon">
+                <input
+                  type={showPass.confirm ? 'text' : 'password'}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="********"
+                />
+                <i className={`fa-solid ${showPass.confirm ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, confirm: !showPass.confirm })}></i>
+              </div>
+            </div>
+          </div>
+          <p className="Profile-Password-Hint">Mật khẩu phải dài ít nhất 8 ký tự, bao gồm chữ cái và số.</p>
+          <div className="Profile-Form-Actions">
+            <button type="submit" className="Profile-Btn Primary" disabled={isPasswordSubmitting}>
+              {isPasswordSubmitting ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* Modal Thêm địa chỉ mới - layout rộng cho máy tính */}
+      {showAddAddressModal && (
+        <div className="AddressModal-Overlay" onClick={handleCloseAddAddressModal}>
+          <div className="AddressModal-Box" onClick={(e) => e.stopPropagation()}>
+            <div className="AddressModal-Header">
+              <button type="button" className="AddressModal-Back" onClick={handleCloseAddAddressModal} aria-label="Đóng">
+                <i className="fa-solid fa-arrow-left"></i>
+              </button>
+              <h2 className="AddressModal-Title">Thêm địa chỉ mới</h2>
+              <button type="button" className="AddressModal-Help">Trợ giúp</button>
+            </div>
+            <form onSubmit={handleSaveNewAddress}>
+              <div className="AddressModal-Body">
+                <div className="AddressModal-MapCol">
+                  <div className="AddressModal-MapWrap">
+                    {loadError ? (
+                      <div>Lỗi tải bản đồ. Vui lòng thử lại sau.</div>
+                    ) : !isMapLoaded ? (
+                      <div>Đang tải bản đồ...</div>
+                    ) : (
+                      <GoogleMap
+                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                        center={mapCenter}
+                        zoom={14}
+                        onClick={handleMapClick}
+                      >
+                        {markerPos && <MarkerF position={markerPos} />}
+                      </GoogleMap>
+                    )}
+                  </div>
+                  <button type="button" className="AddressModal-ConfirmMap" onClick={getCurrentLocation}>
+                    <i className="fa-solid fa-crosshairs"></i> Xác nhận vị trí trên bản đồ
+                  </button>
+                </div>
+                <div className="AddressModal-FormCol">
+                  <div className="AddressModal-Field">
+                    <label>SỐ NHÀ, TÊN ĐƯỜNG</label>
+                    <div className="AddressModal-InputWrap">
+                      <i className="fa-solid fa-house AddressModal-InputIcon"></i>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: 123 Nguyễn Huệ"
+                        value={newAddress.street}
+                        onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="AddressModal-Row">
+                    <div className="AddressModal-Field">
+                      <label>QUẬN / HUYỆN</label>
+                      <select
+                        value={newAddress.district}
+                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
+                      >
+                        <option value="">Chọn Quận</option>
+                        {DISTRICTS_HCM.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="AddressModal-Field">
+                      <label>THÀNH PHỐ</label>
+                      <select
+                        value={newAddress.city}
+                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                      >
+                        <option value="Hồ Chí Minh">Hồ Chí Minh</option>
+                        <option value="Đà Nẵng">Đà Nẵng</option>
+                        <option value="Hà Nội">Hà Nội</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="AddressModal-Field">
+                    <label>TÊN ĐỊA CHỈ</label>
+                    <div className="AddressModal-TypeGroup">
+                      <button
+                        type="button"
+                        className={`AddressModal-TypeBtn ${newAddress.addressType === 'Nhà riêng' ? 'active' : ''}`}
+                        onClick={() => setNewAddress({ ...newAddress, addressType: 'Nhà riêng' })}
+                      >
+                        <i className="fa-solid fa-house"></i> Nhà riêng
+                      </button>
+                      <button
+                        type="button"
+                        className={`AddressModal-TypeBtn ${newAddress.addressType === 'Văn phòng' ? 'active' : ''}`}
+                        onClick={() => setNewAddress({ ...newAddress, addressType: 'Văn phòng' })}
+                      >
+                        <i className="fa-solid fa-briefcase"></i> Văn phòng
+                      </button>
+                      <button
+                        type="button"
+                        className={`AddressModal-TypeBtn ${newAddress.addressType === 'Khác' ? 'active' : ''}`}
+                        onClick={() => setNewAddress({ ...newAddress, addressType: 'Khác' })}
+                      >
+                        <i className="fa-solid fa-plus"></i> Khác
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Tên gợi nhớ (Ví dụ: Nhà nội, Studio...)"
+                      value={newAddress.memorableName}
+                      onChange={(e) => setNewAddress({ ...newAddress, memorableName: e.target.value })}
+                      className="AddressModal-InputNoIcon"
+                    />
+                  </div>
+                  <div className="AddressModal-Field">
+                    <label>SỐ ĐIỆN THOẠI NGƯỜI NHẬN</label>
+                    <div className="AddressModal-InputWrap">
+                      <i className="fa-solid fa-phone AddressModal-InputIcon"></i>
+                      <input
+                        type="text"
+                        placeholder="09xx xxx xxx"
+                        value={newAddress.phone}
+                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value.replace(/\D/g, '') })}
+                        maxLength={11}
+                      />
+                    </div>
+                    <p className="AddressModal-Hint">
+                      Tài xế sẽ liên hệ số này khi giao hàng
+                    </p>
+                  </div>
+                  <label className="AddressModal-Checkbox">
+                    <input
+                      type="checkbox"
+                      checked={newAddress.setAsDefault}
+                      onChange={(e) => setNewAddress({ ...newAddress, setAsDefault: e.target.checked })}
+                    />
+                    Đặt làm địa chỉ mặc định
+                  </label>
+                </div>
+              </div>
+              <div className="AddressModal-Footer">
+                <button type="button" className="AddressModal-BtnCancel" onClick={handleCloseAddAddressModal}>
+                  Hủy bỏ
+                </button>
+                <button type="submit" className="AddressModal-BtnSave">
+                  Lưu địa chỉ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

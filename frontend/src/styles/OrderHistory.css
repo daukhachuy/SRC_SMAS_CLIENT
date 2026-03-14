@@ -1,184 +1,490 @@
-/* --- BIẾN TOÀN CỤC --- */
+/* OrderHistory & MyOrders - Compact Version */
+/* Nền thống nhất, tab cam/trắng, nhãn xám, giá trị đen */
+
 :root {
-  --Primary-Orange: #FF7A21;
+  --Primary-Orange: #ec5b13;
   --Secondary-Orange: #FF9F5E;
-  --Primary-Blue: #3498DB;
   --Success-Green: #27AE60;
   --Warning-Yellow: #F39C12;
   --Danger-Red: #FF3B30;
-  --Bg-Body: #F8F9FA;
-  --Header-Height: 80px; /* Độ cao header trang web của bạn */
-  --Transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --Bg-Body: #F9FAFB;
+  --label-gray: #94a3b8;
+  --value-black: #1e293b;
+  --border-color: #e2e8f0;
+  --white: #ffffff;
+  --Transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* --- CONTAINER TỔNG --- */
+/* Trang chính - chiều ngang giống Profile (full width vùng nội dung) */
 .Order-History-Page {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 20px;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px 1rem 1rem 1rem;
   background-color: var(--Bg-Body);
+  min-height: 100vh;
   box-sizing: border-box;
-  /* Đảm bảo tiêu đề không bị dính vào mép trên trình duyệt */
-  display: flex;
-  flex-direction: column;
 }
 
-/* --- TIÊU ĐỀ (Đã sửa lỗi bị đè) --- */
+/* Vùng danh sách đơn - cùng chiều rộng, không bị lệch */
+.Orders-List-Container,
+.Orders-List-Flow {
+  width: 100%;
+  min-height: 200px;
+  background-color: var(--Bg-Body);
+}
+
+/* Tiêu đề - cùng kích thước */
 .Page-Title {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 900;
-  color: #2C3E50;
-  margin-top: 0;
-  margin-bottom: 30px;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: #1A1A1A;
+  margin-bottom: 1rem;
+  padding-left: 15px;
   border-left: 8px solid var(--Primary-Orange);
-  padding-left: 20px;
-  /* Tránh bị ảnh hưởng bởi sticky của phần tử bên dưới */
-  position: relative; 
-  z-index: 10;
+  line-height: 1.2;
 }
 
-/* --- THANH TABS STICKY --- */
+/* Tabs - cùng chiều rộng, cùng padding */
 .Order-Tabs-Container {
   position: sticky;
-  /* top này phải lớn hơn độ cao của Header cố định (nếu có) */
-  top: 10px; 
+  top: 0;
   z-index: 100;
-  background: var(--Bg-Body); /* Quan trọng: Phải có màu nền để che nội dung khi cuộn */
-  padding: 15px 0; /* Khoảng cách trên dưới cho thanh tabs */
-  margin-bottom: 30px;
-  display: flex;
-  gap: 15px;
   width: 100%;
+  background: var(--Bg-Body);
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .Order-Tab-Btn {
-  padding: 12px 35px;
-  border-radius: 50px;
-  border: 2px solid #eee;
-  background: #fff;
-  font-weight: 800;
-  color: #666;
-  font-size: 15px;
-  transition: var(--Transition);
+  padding: 10px 20px;
+  border-radius: 9999px;
+  border: none;
+  font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  background-color: var(--white);
+  color: var(--value-black);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  font-size: 0.85rem;
+}
+
+.Order-Tab-Btn i {
+  font-size: 0.9rem;
+}
+
+.Order-Tab-Btn:hover:not(.Active) {
+  background-color: #fff5f0;
+  color: var(--Primary-Orange);
 }
 
 .Order-Tab-Btn.Active {
-  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
-  color: white;
-  border-color: transparent;
-  box-shadow: 0 8px 20px rgba(255, 122, 33, 0.4);
-  transform: scale(1.05);
+  background-color: var(--Primary-Orange);
+  color: var(--white);
+  box-shadow: 0 2px 4px rgba(236, 91, 19, 0.3);
 }
 
-/* --- THẺ ĐƠN HÀNG --- */
+.Order-Tab-Btn.Active:hover {
+  background-color: #d94e10;
+  color: var(--white);
+}
+
+/* Thẻ đơn hàng - compact */
 .Order-Horizontal-Card {
-  background: #fff;
-  border-left: 8px solid var(--Primary-Orange);
-  border-radius: 20px;
-  padding: 30px 40px;
-  margin-bottom: 25px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--white);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   transition: var(--Transition);
-  border: 1px solid #f0f0f0;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
 .Order-Horizontal-Card:hover {
-  transform: translateX(10px);
-  box-shadow: 0 15px 45px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
+/* Hàng trên cùng */
 .Card-Top-Row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid #f9f9f9;
-  padding-bottom: 20px;
-  margin-bottom: 25px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #F8F9FA;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
+/* Icon loại đơn */
 .Type-Header {
-  font-size: 1.3rem;
+  font-size: 1rem;
   font-weight: 900;
-  color: #2C3E50;
+  color: #1A1A1A;
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.Type-Icon-Wrap {
+  width: 36px;
+  height: 36px;
+  background-color: rgba(236, 91, 19, 0.1);
+  border-radius: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--Primary-Orange);
+  font-size: 1.1rem;
+}
+
+.Type-Text strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--value-black);
+  margin-bottom: 2px;
+}
+
+.Type-Text .Order-Code-Tag {
+  display: block;
+  margin-left: 0;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--label-gray);
+}
+
+.Order-Code-Tag {
+  color: #999;
+  font-size: 0.8rem;
+  margin-left: 8px;
 }
 
 .orange-icon {
   color: var(--Primary-Orange);
-  margin-right: 12px;
+  margin-right: 10px;
 }
 
-.Status-Label {
-  font-weight: 800;
-  font-size: 13px;
-  padding: 8px 18px;
-  border-radius: 50px;
+.Right-Action-Header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
-.Status-Label.Success { background: #E6FBF3; color: var(--Success-Green); }
-.Status-Label.Waiting { background: #FFF9E6; color: var(--Warning-Yellow); }
+/* Status */
+.Status-Label {
+  font-weight: 800;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
 
+.Status-Label.Success,
+.Status-Label.Completed {
+  background: #E8F5E9;
+  color: var(--Success-Green);
+}
+
+.Status-Label.Waiting,
+.Status-Label.Pending {
+  background: #FFF3E0;
+  color: var(--Warning-Yellow);
+}
+
+.Status-Label.Cancelled {
+  background: #FFEBEE;
+  color: var(--Danger-Red);
+}
+
+.Status-Label.Processing {
+  background: #E3F2FD;
+  color: #1976D2;
+}
+
+.Status-Label.Cancel {
+  background: #FFEBEE;
+  color: var(--Danger-Red);
+}
+
+/* Nút xem chi tiết */
 .Btn-View-Detail {
-  background: #fff;
+  background: var(--white);
   color: var(--Primary-Orange);
-  border: 2px solid var(--Primary-Orange);
-  padding: 8px 25px;
-  border-radius: 12px;
-  font-weight: 900;
+  border: 1px solid var(--Primary-Orange);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 700;
   cursor: pointer;
-  transition: var(--Transition);
+  transition: 0.2s;
+  font-size: 0.8rem;
 }
 
 .Btn-View-Detail:hover {
   background: var(--Primary-Orange);
-  color: white;
-  transform: translateY(-3px);
+  color: var(--white);
 }
 
-/* --- GRID THÔNG TIN --- */
+/* Grid nội dung - compact */
 .Card-Main-Grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
-  gap: 30px;
+  grid-template-columns: 1.2fr 1.2fr 1fr;
+  gap: 12px 16px;
+  margin-bottom: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* Nhãn: xám */
 .Grid-Col p {
-  font-size: 15px;
+  font-size: 9px;
   font-weight: 700;
-  color: #7F8C8D; /* Màu xám cho label */
-  margin-bottom: 10px;
+  color: var(--label-gray);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.Grid-Col p span {
-  color: #333; /* Màu đen cho giá trị thực tế */
-  font-weight: 600;
-  margin-left: 5px;
+.Grid-Col p .Grid-Label,
+.Grid-Label {
+  color: var(--label-gray) !important;
 }
 
-/* --- LOADING --- */
+/* Giá trị: đen */
+.Grid-Col p span,
+.Grid-Value {
+  color: var(--value-black);
+  font-weight: 700;
+  display: block;
+  font-size: 13px;
+  margin-top: 2px;
+  text-transform: none;
+}
+
+/* Cột tổng tiền */
+.Total-Col {
+  text-align: right;
+  border-left: 2px solid #F8F9FA;
+  padding-left: 12px;
+}
+
+.Total-Col p {
+  color: var(--label-gray);
+}
+
+/* Giá tiền: cam */
+.Price-Text {
+  color: var(--Primary-Orange);
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 4px 0 0 0;
+  letter-spacing: -0.02em;
+}
+
+/* Địa chỉ */
+.Card-Bottom-Address {
+  background: #F8F9FA;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.Card-Bottom-Address i {
+  color: var(--Primary-Orange);
+}
+
+/* Loading */
+.Spinner-Wrapper,
+.Loading-State {
+  text-align: center;
+  padding: 30px;
+  background-color: var(--Bg-Body);
+}
+
 .Spinner {
-  width: 40px; height: 40px;
-  border: 4px solid #f3f3f3; border-top: 4px solid var(--Primary-Orange);
-  border-radius: 50%; animation: spin 1s linear infinite;
-  margin: 50px auto;
+  width: 36px;
+  height: 36px;
+  border: 4px rgba(236, 91, 19, 0.1);
+  border-top: 4px solid var(--Primary-Orange);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 15px;
 }
 
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-/* --- RESPONSIVE --- */
-@media (max-width: 992px) {
-  .Card-Main-Grid { grid-template-columns: 1fr 1fr; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@media (max-width: 650px) {
-  .Card-Main-Grid { grid-template-columns: 1fr; }
-  .Card-Top-Row { flex-direction: column; align-items: flex-start; gap: 15px; }
-  .Order-Tabs-Container { overflow-x: auto; padding-bottom: 10px; }
+/* Empty state */
+.Empty-Box {
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--white);
+  border-radius: 12px;
+  color: #999;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Pagination */
+.Order-History-Pagination {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: var(--Bg-Body);
+}
+
+.Pagination-Info {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.Pagination-Controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.Page-Nav-Btn,
+.Page-Number {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--white);
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s;
+  font-size: 0.8rem;
+}
+
+.Page-Nav-Btn:hover:not(:disabled),
+.Page-Number:hover {
+  border-color: var(--Primary-Orange);
+  color: var(--Primary-Orange);
+}
+
+.Page-Number.Active {
+  background-color: var(--Primary-Orange);
+  color: var(--white);
+  border-color: var(--Primary-Orange);
+}
+
+.Page-Nav-Btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.Page-Ellipsis {
+  color: #64748b;
+  padding: 0 0.2rem;
+}
+
+/* Responsive - đồng nhất breakpoint & layout */
+@media (max-width: 768px) {
+  .Order-History-Page {
+    padding: 1rem 0.75rem;
+  }
+  .Card-Main-Grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .Total-Col {
+    grid-column: span 2;
+    text-align: left;
+    border-left: none;
+    padding-left: 0;
+    border-top: 2px solid #F8F9FA;
+    padding-top: 10px;
+  }
+  .Order-Horizontal-Card {
+    padding: 14px 16px;
+  }
+}
+
+/* Search Bar */
+.Order-Search-Bar {
+  display: flex;
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 1rem;
+  gap: 10px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.Order-Search-Bar i {
+  color: var(--label-gray);
+  font-size: 1rem;
+}
+
+.Order-Search-Bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.9rem;
+  color: var(--value-black);
+  background: transparent;
+}
+
+.Order-Search-Bar input::placeholder {
+  color: var(--label-gray);
+}
+
+.Search-Clear-Btn {
+  background: none;
+  border: none;
+  color: var(--label-gray);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.Search-Clear-Btn:hover {
+  background: #f0f0f0;
+  color: var(--value-black);
+}
+
+@media (max-width: 480px) {
+  .Card-Main-Grid {
+    grid-template-columns: 1fr;
+  }
+  .Total-Col {
+    grid-column: span 1;
+  }
 }

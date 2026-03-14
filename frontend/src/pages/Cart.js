@@ -3,10 +3,14 @@ import axios from 'axios';
 import Header from '../components/Header'; 
 import Footer from '../components/Footer'; 
 import { getProfile } from '../api/userApi'; 
+import { myOrderAPI } from '../api/myOrderApi';
+import { discountAPI } from '../api/discountApi';
+import { useNavigate } from 'react-router-dom';
 import '../styles/Cart.css';
 
 const Cart = () => {
   const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+  const navigate = useNavigate();
   
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,9 +58,13 @@ const Cart = () => {
   }, []);
 
   const [discountCode, setDiscountCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [discountError, setDiscountError] = useState('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [modalStep, setModalStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Tiền Mặt');
+  const [paymentError, setPaymentError] = useState('');
 
   // --- LOGIC VALIDATE SỐ ĐIỆN THOẠI ---
   const handleGoToStep2 = () => {
@@ -125,13 +133,67 @@ const Cart = () => {
     if (price > 3000000) return { percent: 10, amount: price * 0.1 };
     return { percent: 0, amount: 0 };
   };
-  const deposit = getDepositInfo(totalPrice);
 
   const handleCloseModal = () => {
     if (isOrdering) return; 
     setShowInfoModal(false);
     setModalStep(1);
+    setPaymentError('');
+    setDiscountError('');
   };
+
+  // --- LOGIC APPLY DISCOUNT CODE ---
+  const handleApplyDiscount = async () => {
+    if (!discountCode.trim()) {
+      setDiscountError("Vui lòng nhập mã giảm giá");
+      return;
+    }
+
+    setDiscountLoading(true);
+    setDiscountError('');
+
+    try {
+      const result = await discountAPI.validateDiscount(discountCode);
+      
+      // Check minimum order amount
+      if (result.minOrderAmount && totalPrice < result.minOrderAmount) {
+        setDiscountError(`Đơn hàng tối thiểu ${result.minOrderAmount.toLocaleString()}đ để áp dụng mã này`);
+        setAppliedDiscount(null);
+        return;
+      }
+
+      setAppliedDiscount(result);
+      setDiscountError('');
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Mã giảm giá không hợp lệ hoặc đã hết hạn";
+      setDiscountError(errorMsg);
+      setAppliedDiscount(null);
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
+  // Calculate discount amount
+  const calculateDiscount = () => {
+    if (!appliedDiscount) return 0;
+    
+    let discountAmount = 0;
+    if (appliedDiscount.discountType === 'Percentage') {
+      discountAmount = (totalPrice * appliedDiscount.value) / 100;
+      // Apply max discount cap if exists
+      if (appliedDiscount.maxDiscountAmount) {
+        discountAmount = Math.min(discountAmount, appliedDiscount.maxDiscountAmount);
+      }
+    } else if (appliedDiscount.discountType === 'Fixed') {
+      discountAmount = appliedDiscount.value;
+    }
+    
+    return discountAmount;
+  };
+
+  const discountAmount = calculateDiscount();
+  const finalPrice = totalPrice - discountAmount;
+  const deposit = getDepositInfo(finalPrice);
 
   // --- LOGIC ĐẶT HÀNG & THANH TOÁN (THEO QUY TRÌNH 3 BƯỚC) ---
   const handleFinalOrder = async () => {
@@ -152,7 +214,7 @@ const Cart = () => {
       }).filter(i => i.foodId || i.comboId);
 
       const orderPayload = {
-        discountCode: discountCode || null,
+        discountCode: appliedDiscount?.code || discountCode || null,
         note: customerInfo.note || null,
         items: formattedItems,
         deliveryInfo: {
@@ -180,26 +242,40 @@ const Cart = () => {
       } else {
         const payRes = await axios.post(`${BASE_URL}/api/payment/create-link`, {
           orderId: Number(orderId),
-          returnUrl: `${window.location.origin}/order-history`, 
-          cancelUrl: `${window.location.origin}/cart`
+          returnUrl: `${window.location.origin}/payment-result?success=true&orderId=${orderId}`,
+          cancelUrl: `${window.location.origin}/payment-result?success=false&orderId=${orderId}`
         }, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (payRes.data.success && payRes.data.checkoutUrl) {
-          // Xóa giỏ hàng trước khi chuyển trang
-          localStorage.removeItem('cart');
-          window.dispatchEvent(new Event('storage'));
-          // Chuyển hướng sang PayOS
+          // Lưu orderId vào sessionStorage để xử lý sau khi thanh toán
+          sessionStorage.setItem('pendingOrderId', orderId);
+          // Chuyển hướng sang PayOS - KHÔNG xóa giỏ hàng ở đây
+          // Giỏ hàng sẽ được xóa khi thanh toán thành công tại PaymentResult
           window.location.href = payRes.data.checkoutUrl;
         } else {
-          alert("Lỗi tạo link thanh toán: " + (payRes.data.message || "Không xác định"));
-          finishOrderSuccess();
+          // Failed to create payment link - cancel the order and stay on cart
+          try {
+            await myOrderAPI.cancelOrder(orderId);
+          } catch (cancelErr) {
+            console.error("Failed to cancel order:", cancelErr);
+          }
+          setPaymentError("Lỗi tạo link thanh toán: " + (payRes.data.message || "Không xác định"));
+          setModalStep(2); // Stay on order summary
         }
       }
     } catch (err) {
       console.error("Lỗi quy trình:", err);
-      alert(err.response?.data?.message || "Có lỗi xảy ra khi xử lý đơn hàng.");
+      const errorMessage = err.response?.data?.message || "Có lỗi xảy ra khi xử lý đơn hàng.";
+      
+      // Check if this is a payment failure
+      if (err.response?.status === 400 && errorMessage.toLowerCase().includes('payment')) {
+        setPaymentError("Payment failed, please choose another payment method.");
+        setModalStep(2); // Stay on order summary
+      } else {
+        alert(errorMessage);
+      }
     } finally {
       setIsOrdering(false);
     }
@@ -208,7 +284,7 @@ const Cart = () => {
   const finishOrderSuccess = () => {
     localStorage.removeItem('cart');
     window.dispatchEvent(new Event('storage'));
-    window.location.href = "/order-history"; 
+    navigate('/my-orders');
   };
 
   if (loading) return <div className="loading-spinner">Đang tải...</div>;
@@ -315,7 +391,15 @@ const Cart = () => {
             <div className="Summary-Left">
               <div className="Sum-Item">Tất cả: <strong>{cartItems.length} Món</strong></div>
               <div className="Sum-Item">Tạm tính: <strong>{totalPrice.toLocaleString()} đ</strong></div>
+              {appliedDiscount && (
+                <div className="Sum-Item" style={{ color: 'green' }}>
+                  Giảm giá: <strong>-{discountAmount.toLocaleString()} đ</strong>
+                </div>
+              )}
               <div className="Sum-Item">Tiền cọc ({deposit.percent}%): <strong className="text-orange">{deposit.amount.toLocaleString()} đ</strong></div>
+              <div className="Sum-Item" style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                Tổng cộng: <strong className="text-orange">{finalPrice.toLocaleString()} đ</strong>
+              </div>
             </div>
             <div className="Summary-Right">
               <p className="Deposit-Policy">Chính sách cọc: 10% cho đơn trên 3tr, 50% cho đơn trên 10tr.</p>
@@ -397,7 +481,7 @@ const Cart = () => {
                       <div className="Bill-Divider"></div>
                     </div>
 
-                    <div className="Bill-Items-Scroll-Area">
+                    <div className="Bill-Items-Scroll-Area" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                         {cartItems.map((item, idx) => (
                             <div key={idx} className="Bill-Row">
                                 <span>{item.name} x{item.quantity}</span>
@@ -408,23 +492,59 @@ const Cart = () => {
 
                     <div className="Bill-Footer-Fixed">
                       <div className="Bill-Divider"></div>
+                      {appliedDiscount && (
+                        <div className="Bill-Row" style={{ color: 'green' }}>
+                          <span>Giảm giá ({appliedDiscount.code}):</span> <span>-{discountAmount.toLocaleString()}đ</span>
+                        </div>
+                      )}
                       <div className="Bill-Row"><span>Tạm tính:</span> <span>{totalPrice.toLocaleString()}đ</span></div>
                       <div className="Bill-Row"><span>Tiền cọc ({deposit.percent}%):</span> <span className="text-orange">{deposit.amount.toLocaleString()}đ</span></div>
-                      <div className="Bill-Total"><span>Tổng cộng:</span> <span>{totalPrice.toLocaleString()}đ</span></div>
+                      <div className="Bill-Total"><span>Tổng cộng:</span> <span>{finalPrice.toLocaleString()}đ</span></div>
                     </div>
                   </div>
 
                   <div className="Summary-Payment-Section">
+                    {paymentError && (
+                      <div className="Payment-Error-Message" style={{ color: 'red', marginBottom: '10px', padding: '10px', background: '#ffe6e6', borderRadius: '8px' }}>
+                        {paymentError}
+                      </div>
+                    )}
                     <div className="Promo-Input-Box">
                       <label>Mã giảm giá :</label>
                       <div className="Input-With-Icon">
-                        <input type="text" placeholder="Nhập mã..." value={discountCode} onChange={(e) => setDiscountCode(e.target.value)} />
-                        <button className="Apply-Btn">Áp dụng</button>
+                        <input 
+                          type="text" 
+                          placeholder="Nhập mã..." 
+                          value={discountCode} 
+                          onChange={(e) => setDiscountCode(e.target.value)} 
+                        />
+                        <button 
+                          className="Apply-Btn" 
+                          onClick={handleApplyDiscount}
+                          disabled={discountLoading}
+                        >
+                          {discountLoading ? '...' : 'Áp dụng'}
+                        </button>
                       </div>
+                      {discountError && (
+                        <p style={{ color: 'red', fontSize: '12px', marginTop: '5px' }}>{discountError}</p>
+                      )}
+                      {appliedDiscount && (
+                        <div style={{ color: 'green', fontSize: '12px', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <i className="fa-solid fa-check-circle"></i>
+                          <span>Đã áp dụng: {appliedDiscount.code} (-{discountAmount.toLocaleString()}đ)</span>
+                          <button 
+                            onClick={() => { setAppliedDiscount(null); setDiscountCode(''); }} 
+                            style={{ border: 'none', background: 'none', color: 'red', cursor: 'pointer', padding: '0 5px' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <h5 className="Section-Title">Lựa chọn thanh toán</h5>
                     <div className="Payment-Grid">
-                      {['Tiền Mặt', 'VietQR', 'VNPAY', 'ZaloPay'].map((method) => (
+                      {['Tiền Mặt', 'PayOS'].map((method) => (
                         <div key={method} className={`Payment-Card ${paymentMethod === method ? 'active' : ''}`} onClick={() => setPaymentMethod(method)} >
                           <span>{method}</span>
                         </div>

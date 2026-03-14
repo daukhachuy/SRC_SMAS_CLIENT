@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import OrderDetailModal from './OrderDetailModal'; 
+import { myOrderAPI } from '../api/myOrderApi';
+import OrderDetailModal from './OrderDetailModal';
 import '../styles/OrderHistory.css';
 
 const OrderHistory = () => {
   const [activeTab, setActiveTab] = useState('all');
-  const [history, setHistory] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+  const [searchQuery, setSearchQuery] = useState('');
 
   const tabs = [
     { id: 'all', label: 'Tất cả' },
@@ -14,46 +19,121 @@ const OrderHistory = () => {
     { id: 'cancelled', label: 'Đã hủy' }
   ];
 
-  const fetchHistory = async () => {
-    setLoading(true);
-    const mockApi = () => new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([
-          { 
-            id: 'EVT-001', type: 'completed', typeName: 'Đặt sự kiện tại cửa hàng', 
-            statusName: 'Đã thanh toán', statusClass: 'Success', 
-            customer: 'Nguyen Van A', email: 'abc123@gmail.com', eventName: 'Họp lớp',
-            guests: 30, tables: 5, phone: '0123456789', date: '09/11/2025'
-          },
-          { 
-            id: 'EVT-002', type: 'pending', typeName: 'Đặt sự kiện tại cửa hàng', 
-            statusName: 'Đang chờ ký hợp đồng', statusClass: 'Waiting', 
-            customer: 'Nguyen Van B', email: 'vanb@gmail.com', eventName: 'Sinh nhật',
-            guests: 30, tables: 5, phone: '0987654321', date: '10/11/2025'
-          }
-        ]);
-      }, 600);
-    });
-
-    const allData = await mockApi();
-    const filtered = activeTab === 'all' ? allData : allData.filter(i => {
-        if(activeTab === 'completed') return i.statusClass === 'Success';
-        if(activeTab === 'cancelled') return i.statusClass === 'Cancel';
-        return true;
-    });
-    setHistory(filtered);
-    setLoading(false);
+  const getIconForType = (typeName) => {
+    if (typeName?.includes('sự kiện')) return 'fa-solid fa-carrot';
+    if (typeName?.includes('bàn ăn')) return 'fa-solid fa-utensils';
+    if (typeName?.includes('buffet')) return 'fa-solid fa-calendar-xmark';
+    return 'fa-solid fa-calendar-star';
   };
 
-  useEffect(() => { fetchHistory(); }, [activeTab]);
+  const getStatusDisplay = (status) => {
+    const config = {
+      'Pending': { text: 'Chờ xác nhận', class: 'Waiting' },
+      'Confirmed': { text: 'Đã xác nhận', class: 'Success' },
+      'Processing': { text: 'Đang xử lý', class: 'Processing' },
+      'Completed': { text: 'Hoàn thành', class: 'Success' },
+      'Cancelled': { text: 'Đã hủy', class: 'Cancelled' }
+    };
+    return config[status] || { text: status || 'Chờ xác nhận', class: 'Waiting' };
+  };
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const [orderData, reservationData] = await Promise.all([
+        myOrderAPI.getOrders('All', ['Pending', 'Confirmed', 'Processing', 'Completed', 'Cancelled']),
+        myOrderAPI.getReservations()
+      ]);
+
+      const processedOrders = (orderData || []).map(order => ({
+        ...order,
+        itemType: 'order',
+        displayId: order.orderCode,
+        displayStatus: order.orderStatus,
+        displayDate: order.createdAt,
+        displayCustomer: order.delivery?.recipientName || order.customer?.fullname || 'Khách hàng',
+        displayPhone: order.delivery?.recipientPhone || order.customer?.phone,
+        displayGuests: order.numberOfGuests,
+        displayTable: order.tableNumber,
+        displayEvent: order.eventName,
+        displayTotal: order.totalAmount,
+        typeName: order.orderType === 'Delivery' ? 'Giao hàng' :
+                   order.orderType === 'Event' ? 'Đặt sự kiện tại cửa hàng' : 'Đặt chỗ'
+      }));
+
+      const processedReservations = (reservationData || []).map(res => ({
+        ...res,
+        itemType: 'reservation',
+        displayId: res.reservationCode,
+        displayStatus: res.status,
+        displayDate: res.reservationDate,
+        displayCustomer: res.fullname,
+        displayPhone: res.phone,
+        displayGuests: res.numberOfGuests,
+        displayTable: res.tableNumber || '—',
+        displayEvent: res.specialRequests || '—',
+        displayTotal: 0,
+        typeName: 'Đặt bàn ăn'
+      }));
+
+      setOrders(processedOrders);
+      setReservations(processedReservations);
+    } catch (err) {
+      console.error('Lỗi khi lấy lịch sử đơn hàng:', err);
+      setOrders([]);
+      setReservations([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { 
+    fetchHistory();
+    setCurrentPage(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
+
+  const allHistory = [...orders, ...reservations];
+
+  const filteredHistory = allHistory.filter(item => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'completed') return item.displayStatus === 'Completed';
+    if (activeTab === 'cancelled') return item.displayStatus === 'Cancelled';
+    return true;
+  }).filter(item => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase().trim();
+    return item.displayId?.toLowerCase().includes(query);
+  });
+
+  const totalItems = filteredHistory.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredHistory.length);
+  const paginatedHistory = filteredHistory.slice(startIndex, endIndex);
 
   return (
     <div className="Order-History-Page">
-      <h1 className="Page-Title">Lịch Sử Giao Dịch</h1>
+      <h1 className="Page-Title">Lịch sử đơn hàng</h1>
+
+      <div className="Order-Search-Bar">
+        <i className="fa-solid fa-magnifying-glass"></i>
+        <input
+          type="text"
+          placeholder="Tìm theo mã giao dịch..."
+          value={searchQuery}
+          onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+        />
+        {searchQuery && (
+          <button className="Search-Clear-Btn" onClick={() => setSearchQuery('')}>
+            <i className="fa-solid fa-times"></i>
+          </button>
+        )}
+      </div>
 
       <div className="Order-Tabs-Container">
         {tabs.map(tab => (
-          <button 
+          <button
             key={tab.id}
             className={`Order-Tab-Btn ${activeTab === tab.id ? 'Active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
@@ -66,42 +146,95 @@ const OrderHistory = () => {
       <div className="Orders-List-Container">
         {loading ? (
           <div className="Loading-State"><div className="Spinner"></div></div>
+        ) : paginatedHistory.length === 0 ? (
+          <div className="Empty-Box">Bạn chưa có đơn hàng nào.</div>
         ) : (
-          history.map(item => (
-            <div key={item.id} className="Order-Horizontal-Card">
-              <div className="Card-Top-Row">
-                <div className="Type-Header">
-                  <i className="fa-solid fa-house-chimney orange-icon"></i>
-                  <strong>{item.typeName}</strong>
+          paginatedHistory.map(item => {
+            const status = getStatusDisplay(item.displayStatus);
+            const formattedDate = item.displayDate ? new Date(item.displayDate).toLocaleDateString('vi-VN') : '—';
+            
+            return (
+              <div key={item.displayId} className="Order-Horizontal-Card">
+                <div className="Card-Top-Row">
+                  <div className="Type-Header">
+                    <div className="Type-Icon-Wrap">
+                      <i className={getIconForType(item.typeName)}></i>
+                    </div>
+                    <div className="Type-Text">
+                      <strong>{item.typeName}</strong>
+                      <small className="Order-Code-Tag">Mã giao dịch #{item.displayId}</small>
+                    </div>
+                  </div>
+                  <div className="Right-Action-Header">
+                    <div className={`Status-Label ${status.class}`}>{status.text}</div>
+                    {item.itemType === 'order' && (
+                      <button className="Btn-View-Detail" onClick={() => setSelectedOrder(item)}>
+                        Chi tiết
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className={`Status-Label ${item.statusClass}`}>
-                  <i className={`fa-solid ${item.statusClass === 'Success' ? 'fa-circle-check' : 'fa-circle-dot'}`}></i>
-                  {item.statusName}
-                </div>
-                <button className="Btn-View-Detail" onClick={() => setSelectedOrder(item)}>
-                  Chi tiết
-                </button>
-              </div>
 
-              <div className="Card-Main-Grid">
-                <div className="Grid-Col">
-                  <p>Người đặt : <span>{item.customer}</span></p>
-                  <p>Email: <span>{item.email}</span></p>
-                  <p>Sự kiện : <span>{item.eventName}</span></p>
-                </div>
-                <div className="Grid-Col">
-                  <p>Số người : <span>{item.guests}</span></p>
-                  <p>Liên Hệ : <span>{item.phone}</span></p>
-                </div>
-                <div className="Grid-Col">
-                  <p>Số bàn : <span>{item.tables}</span></p>
-                  <p>Đặt Ngày : <span>{item.date}</span></p>
+                <div className="Card-Main-Grid">
+                  <div className="Grid-Col">
+                    <p><span className="Grid-Label">NGƯỜI ĐẶT</span><br /><span className="Grid-Value">{item.displayCustomer}</span></p>
+                    <p><span className="Grid-Label">LIÊN HỆ</span><br /><span className="Grid-Value">{item.displayPhone || '—'}</span></p>
+                  </div>
+                  <div className="Grid-Col">
+                    <p><span className="Grid-Label">SỐ NGƯỜI</span><br /><span className="Grid-Value">{item.displayGuests || '—'} người</span></p>
+                    <p><span className="Grid-Label">ĐẶT NGÀY</span><br /><span className="Grid-Value">{formattedDate}</span></p>
+                  </div>
+                  <div className="Grid-Col">
+                    <p><span className="Grid-Label">SỐ BÀN</span><br /><span className="Grid-Value">{item.displayTable || '—'}</span></p>
+                    <p><span className="Grid-Label">SỰ KIỆN</span><br /><span className="Grid-Value">{item.displayEvent || '—'}</span></p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
+
+      {!loading && filteredHistory.length > 0 && (
+        <div className="Order-History-Pagination">
+          <p className="Pagination-Info">Hiển thị {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredHistory.length)} của {filteredHistory.length} đơn hàng</p>
+          <div className="Pagination-Controls">
+            <button
+              type="button"
+              className="Page-Nav-Btn"
+              disabled={currentPage === 1}
+              onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            >
+              <i className="fa-solid fa-chevron-left"></i>
+            </button>
+            {[...Array(totalPages)].map((_, i) => {
+              const page = i + 1;
+              if (page === 1 || page === 2 || page === 3 || page === totalPages) {
+                return (
+                  <button
+                    key={page}
+                    type="button"
+                    className={`Page-Number ${currentPage === page ? 'Active' : ''}`}
+                    onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  >
+                    {page}
+                  </button>
+                );
+              }
+              if (page === 4) return <span key={page} className="Page-Ellipsis">...</span>;
+              return null;
+            })}
+            <button
+              type="button"
+              className="Page-Nav-Btn"
+              disabled={currentPage === totalPages}
+              onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            >
+              <i className="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      )}
 
       {selectedOrder && (
         <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />

@@ -1,19 +1,17 @@
-/* CHỈ GIỮ LẠI BIẾN CẦN THIẾT CHO HEADER 
-   Sử dụng tiền tố --hd- để tránh trùng với các biến ở Home.css
-*/
+/* HEADER STYLES - Using hd- prefix to avoid conflicts */
 :root {
   --hd-primary-orange: #FF9F43;
   --hd-height: 85px;
   --hd-height-shrink: 65px;
 }
 
-/* ================= CUSTOM HEADER ================= */
-.custom-header {
+/* ================= HD WRAPPER ================= */
+.hd-wrapper {
   width: 100%;
   height: var(--hd-height);
   background-color: rgba(0, 0, 0, 0.92);
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px); /* Hỗ trợ Safari */
+  -webkit-backdrop-filter: blur(10px);
 
   display: flex;
   align-items: center;
@@ -22,7 +20,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 9999; /* Giữ Header luôn nằm trên cùng */
+  z-index: 9999;
 
   border-bottom: 1px solid #1A1A1A;
   padding: 0 40px;
@@ -31,11 +29,11 @@
   transition: height 0.28s ease, background-color 0.28s ease, backdrop-filter 0.28s ease;
 }
 
-.custom-header.is-shrink {
+.hd-wrapper.is-shrink {
   height: var(--hd-height-shrink);
 }
 
-.header-container {
+.hd-container {
   width: 100%;
   max-width: 1800px;
   display: flex;
@@ -45,14 +43,14 @@
 }
 
 /* --- LOGO & BRAND --- */
-.header-logo-section {
+.hd-logo-section {
   display: flex;
   align-items: center;
   gap: 15px;
   cursor: pointer;
 }
 
-.header-logo-img {
+.hd-logo-img {
   height: 52px;
   width: 52px;
   border-radius: 50%;
@@ -61,25 +59,25 @@
   transition: width 0.28s ease, height 0.28s ease;
 }
 
-.custom-header.is-shrink .header-logo-img {
+.hd-wrapper.is-shrink .hd-logo-img {
   width: 45px;
   height: 45px;
 }
 
-.header-brand-text {
+.hd-brand-text {
   display: flex;
   flex-direction: column;
   line-height: 1.2;
 }
 
-.brand-sub {
+.hd-brand-sub {
   color: #FFFFFF;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 2px;
 }
 
-.brand-main {
+.hd-brand-main {
   color: var(--hd-primary-orange);
   font-size: 22px;
   font-weight: 900;
@@ -87,12 +85,12 @@
 }
 
 /* --- NAV LINKS --- */
-.header-nav {
+.hd-nav {
   display: flex;
   gap: 40px;
 }
 
-.nav-link-item {
+.hd-nav-link {
   color: #fff;
   font-size: 14px;
   font-weight: 700;
@@ -103,17 +101,17 @@
   padding-bottom: 12px;
 }
 
-.nav-link-item:hover {
+.hd-nav-link:hover {
   color: var(--hd-primary-orange);
 }
 
-.nav-link-item.is-active {
+.hd-nav-link.is-active {
   color: var(--hd-primary-orange);
   font-weight: 800;
 }
 
 /* Underline Animation */
-.nav-underline {
+.hd-underline {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -123,7 +121,7 @@
   border-radius: 2px;
 }
 
-.nav-glow {
+.hd-glow {
   position: absolute;
   left: 50%;
   bottom: -7px;
@@ -137,13 +135,13 @@
 }
 
 /* --- ACTIONS --- */
-.header-actions {
+.hd-actions {
   display: flex;
   align-items: center;
   gap: 18px;
 }
 
-.action-icon-wrap {
+.hd-icon-wrap {
   position: relative;
   cursor: pointer;
   color: #fff;
@@ -152,15 +150,15 @@
   align-items: center;
 }
 
-.action-icon-wrap:hover {
+.hd-icon-wrap:hover {
   color: var(--hd-primary-orange);
   transform: translateY(-1px);
 }
 
-.action-badge {
+.hd-badge {
   position: absolute;
   top: -5px;
-  right: -8px; /* Chỉnh lại một chút để không đè lên icon */
+  right: -8px;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 10px;
@@ -168,17 +166,17 @@
   line-height: 1;
 }
 
-.badge-red {
+.hd-badge.badge-red {
   background-color: #FF4D4F;
   color: #fff;
 }
 
-.badge-orange {
+.hd-badge.badge-orange {
   background-color: var(--hd-primary-orange);
   color: #000;
 }
 
-.user-avatar-btn {
+.hd-user-btn {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -191,16 +189,16 @@
   transition: transform 0.2s ease;
 }
 
-.user-avatar-btn:hover {
+.hd-user-btn:hover {
   transform: scale(1.05);
 }
 
 /* --- RESPONSIVE --- */
 @media (max-width: 1024px) {
-  .header-nav { gap: 20px; }
-  .custom-header { padding: 0 20px; }
+  .hd-nav { gap: 20px; }
+  .hd-wrapper { padding: 0 20px; }
 }
 
 @media (max-width: 820px) {
-  .header-nav { display: none; } /* Có thể thay thế bằng Hamburger Menu sau này */
+  .hd-nav { display: none; }
 }
