@@ -2,26 +2,51 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import '../styles/PaymentResult.css'; // Bạn có thể tạo thêm file CSS này
+import { myOrderAPI } from '../api/myOrderApi';
+import '../styles/PaymentResult.css';
 
 const PaymentResult = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState('loading'); // loading, success, fail
+  const [status, setStatus] = useState('loading');
 
-  // Lấy các tham số từ URL (Ví dụ: ?success=true&orderId=123)
   const isSuccess = searchParams.get('success') === 'true';
   const orderId = searchParams.get('orderId');
-  const errorCode = searchParams.get('errorCode'); // Nếu có từ cổng thanh toán
+  const errorCode = searchParams.get('errorCode');
+  const errorDesc = searchParams.get('errorDesc');
 
   useEffect(() => {
-    // Giả lập kiểm tra hoặc đợi phản hồi từ server
-    if (isSuccess) {
-      setStatus('success');
-    } else {
-      setStatus('fail');
-    }
-  }, [isSuccess]);
+    const handlePaymentResult = async () => {
+      if (isSuccess) {
+        // Clear cart only on successful payment
+        localStorage.removeItem('cart');
+        window.dispatchEvent(new Event('storage'));
+        setStatus('success');
+      } else {
+        // On payment failure - cancel the order so it doesn't appear in MyOrders
+        if (orderId) {
+          try {
+            console.log("Cancelling order:", orderId);
+            await myOrderAPI.cancelOrder(orderId);
+            console.log("Order cancelled successfully");
+          } catch (err) {
+            console.error("Failed to cancel order:", err.response || err.message);
+          }
+        }
+        setStatus('fail');
+      }
+    };
+
+    handlePaymentResult();
+  }, [isSuccess, orderId]);
+
+  const handleGoToMyOrders = () => {
+    navigate('/my-orders');
+  };
+
+  const handleGoBackToCart = () => {
+    navigate('/cart');
+  };
 
   return (
     <div className="Payment-Result-Page">
@@ -40,7 +65,7 @@ const PaymentResult = () => {
               <p>Nhà hàng sẽ sớm liên hệ xác nhận và giao hàng cho bạn.</p>
               <div className="Action-Btns">
                 <button className="Btn-Home" onClick={() => navigate('/')}>Về trang chủ</button>
-                <button className="Btn-History" onClick={() => navigate('/order-history')}>Xem lịch sử đơn</button>
+                <button className="Btn-History" onClick={handleGoToMyOrders}>Xem lịch sử đơn</button>
               </div>
             </div>
           ) : (
@@ -49,12 +74,12 @@ const PaymentResult = () => {
                 <i className="fa-solid fa-xmark"></i>
               </div>
               <h1>Thanh Toán Thất Bại</h1>
-              <p>Rất tiếc, quá trình giao dịch đã bị gián đoạn hoặc bị hủy.</p>
+              <p>Payment failed, please choose another payment method.</p>
               {errorCode && <p>Mã lỗi: {errorCode}</p>}
-              <p>Vui lòng thử lại hoặc chọn phương thức thanh toán khác.</p>
+              {errorDesc && <p>{errorDesc}</p>}
               <div className="Action-Btns">
-                <button className="Btn-Retry" onClick={() => navigate('/cart')}>Quay lại giỏ hàng</button>
-                <button className="Btn-Support">Liên hệ hỗ trợ</button>
+                <button className="Btn-Retry" onClick={handleGoBackToCart}>Quay lại giỏ hàng</button>
+                <button className="Btn-Support" onClick={() => navigate('/')}>Liên hệ hỗ trợ</button>
               </div>
             </div>
           )}

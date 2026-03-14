@@ -159,38 +159,38 @@ const Header = () => {
   }, [location.pathname, location.state, pathToId]);
 
   return (
-    <nav className={`custom-header ${shrink ? 'is-shrink' : ''}`}>
-      <div className="header-container">
+    <nav className={`hd-wrapper ${shrink ? 'is-shrink' : ''}`}>
+      <div className="hd-container">
 
         {/* LOGO */}
         <div
-          className="header-logo-section"
+          className="hd-logo-section"
           onClick={() => navigate('/')}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
         >
           <img
-            className="header-logo-img"
+            className="hd-logo-img"
             src="https://res.cloudinary.com/dmzuier4p/image/upload/v1772344074/image_nxgnsu.webp"
             alt="Logo"
           />
 
-          <div className="header-brand-text">
-            <span className="brand-sub">NHÀ HÀNG</span>
-            <span className="brand-main">FPT</span>
+          <div className="hd-brand-text">
+            <span className="hd-brand-sub">NHÀ HÀNG</span>
+            <span className="hd-brand-main">FPT</span>
           </div>
         </div>
 
         {/* NAV */}
-        <div className="header-nav">
+        <div className="hd-nav">
           {MENU_ITEMS.map((item) => {
             const isActive = activeId === item.id;
 
             return (
               <div
                 key={item.id}
-                className={`nav-link-item ${isActive ? 'is-active' : ''}`}
+                className={`hd-nav-link ${isActive ? 'is-active' : ''}`}
                 onClick={() => {
                   if (item.id !== 'combo' && item.id !== 'buffet') {
                     navigate(item.path);
@@ -206,11 +206,11 @@ const Header = () => {
                 {isActive && (
                   <>
                     <motion.div
-                      layoutId="ultra-underline"
-                      className="nav-underline"
+                      layoutId="hd-underline"
+                      className="hd-underline"
                       transition={{ type: 'spring', stiffness: 520, damping: 32 }}
                     />
-                    <div className="nav-glow" />
+                    <div className="hd-glow" />
                   </>
                 )}
               </div>
@@ -219,32 +219,31 @@ const Header = () => {
         </div>
 
         {/* ACTIONS */}
-        <div className="header-actions">
+        <div className="hd-actions">
           <div
-            className="action-icon-wrap"
+            className="hd-icon-wrap"
             title="Thông báo"
             style={{ cursor: 'pointer' }}
             onClick={() => setNotificationOpen((prev) => !prev)}
           >
             <Bell size={22} />
-            <span className="action-badge badge-red">5</span>
+            <span className="hd-badge badge-red">5</span>
           </div>
 
           <div 
-            className="action-icon-wrap" 
+            className="hd-icon-wrap" 
             title="Giỏ hàng"
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/cart')}
           >
             <ShoppingBag size={22} />
-            {/* HIỂN THỊ cartCount TẠI ĐÂY */}
             {cartCount > 0 && (
-                <span className="action-badge badge-orange">{cartCount}</span>
+                <span className="hd-badge badge-orange">{cartCount}</span>
             )}
           </div>
 
           <div
-            className="user-avatar-btn"
+            className="hd-user-btn"
             onClick={handleUserIconClick}
             role="button"
             tabIndex={0}

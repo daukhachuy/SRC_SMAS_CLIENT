@@ -25,6 +25,26 @@ export const myOrderAPI = {
     return response.data;
   },
 
+  /** GET /api/reservation/my?userId=... - Lấy danh sách đặt bàn theo ID tài khoản đang đăng nhập */
+  getReservations: async () => {
+    const userStr = localStorage.getItem('user');
+    let userId = null;
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        userId = user.userId ?? user.id ?? null;
+      } catch (_) {}
+    }
+    if (!userId) {
+      return [];
+    }
+    const response = await api.get(`/reservation/my`, { params: { userId } });
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && !Array.isArray(data)) return [data];
+    return data?.data ?? [];
+  },
+
   cancelOrder: async (orderId) => {
     const response = await api.post(`/order/cancel/${orderId}`);
     return response.data;

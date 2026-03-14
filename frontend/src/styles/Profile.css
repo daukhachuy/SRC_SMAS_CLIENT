@@ -1,197 +1,685 @@
-/* Sử dụng lại biến số từ MyOrders để đảm bảo đồng bộ 100% */
+/* Profile Page - Design như mockup */
 :root {
-  --Primary-Orange: #FF7A21;
-  --Secondary-Orange: #FF9F5E;
-  --Deep-Black: #2C3E50;
-  --Success-Green: #27AE60;
-  --Bg-Body: #F8F9FA;
-  --Border-Color: #F0F0F0;
-  --Transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --pf-primary: #ec5b13;
+  --pf-primary-light: #FF9F5E;
+  --pf-success: #27AE60;
+  --pf-danger: #FF3B30;
+  --pf-bg: #F9FAFB;
+  --pf-white: #FFFFFF;
+  --pf-text: #1A1A1A;
+  --pf-text-muted: #64748B;
+  --pf-border: #E2E8F0;
+  --pf-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --pf-transition: all 0.3s ease;
 }
 
-/* Thẻ chứa nội dung chính */
-.Content-Card {
-  background: #fff;
-  border-radius: 25px; /* Bo góc giống Order-Horizontal-Card */
-  padding: 40px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
-  border: 1px solid var(--Border-Color);
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-/* Tiêu đề "Thông Tin Cá Nhân" khớp 100% với "Đơn Hàng Của Tôi" */
-.Content-Title {
-  font-size: 2.2rem;
-  font-weight: 900;
-  color: var(--Deep-Black);
-  margin-bottom: 40px;
-  border-left: 10px solid var(--Primary-Orange);
-  padding-left: 20px;
-  letter-spacing: -1px;
-}
-
-/* Cấu trúc Grid cho Form */
-.Form-Grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-}
-
-.Form-Group {
+/* Wrapper chính */
+.Profile-New-Wrapper {
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  position: relative;
+  gap: 24px;
 }
 
-.Form-Group label {
+/* Card loading */
+.Profile-New-Card {
+  background: var(--pf-white);
+  border-radius: 24px;
+  padding: 60px;
+  box-shadow: var(--pf-shadow);
+}
+
+.Profile-Loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--pf-primary);
+  font-weight: 600;
+}
+
+/* Alert */
+.Profile-Alert {
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.Profile-Alert.error {
+  background: #FEF2F2;
+  color: var(--pf-danger);
+  border: 1px solid #FECACA;
+}
+
+.Profile-Alert.success {
+  background: #F0FDF4;
+  color: var(--pf-success);
+  border: 1px solid #BBF7D0;
+}
+
+/* Mỗi section là 1 card trắng */
+.Profile-Section {
+  background: var(--pf-white);
+  border-radius: 24px;
+  padding: 32px 40px;
+  box-shadow: var(--pf-shadow);
+  border: 1px solid var(--pf-border);
+}
+
+/* Tiêu đề section */
+.Profile-Section-Title {
+  font-size: 1.25rem;
   font-weight: 800;
-  font-size: 13px;
+  color: var(--pf-text);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.Profile-Section-Icon {
+  color: var(--pf-primary);
+  font-size: 1.2rem;
+}
+
+/* Header section có 2 cột: title + nút Thêm */
+.Profile-Section-Header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.Profile-Section-Header .Profile-Section-Title {
+  margin-bottom: 0;
+}
+
+.Profile-Link-Add {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--pf-primary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
+}
+
+.Profile-Link-Add:hover {
+  color: var(--pf-primary-light);
+}
+
+.Profile-Link-Add i {
+  font-size: 1rem;
+}
+
+/* Form */
+.Profile-Form-Block {
+  width: 100%;
+}
+
+.Profile-Form-Grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 24px;
+}
+
+.Profile-Field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.Profile-Field-Full {
+  grid-column: 1 / -1;
+}
+
+.Profile-Field label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--pf-text-muted);
   text-transform: uppercase;
-  color: #666;
   letter-spacing: 0.5px;
 }
 
-/* Input đồng bộ với các trang trước */
-.Form-Group input:not([type="radio"]) {
+.Profile-Field input:not([type="radio"]) {
   width: 100%;
-  padding: 15px 20px;
-  border: 2px solid var(--Border-Color);
-  border-radius: 15px;
-  font-size: 16px;
-  font-family: inherit;
-  background: #fafafa;
-  transition: var(--Transition);
-  color: #333;
+  padding: 14px 18px;
+  border: 2px solid var(--pf-border);
+  border-radius: 12px;
+  font-size: 1rem;
+  background: var(--pf-bg);
+  transition: var(--pf-transition);
+  color: var(--pf-text);
 }
 
-.Form-Group input:focus {
+.Profile-Field input:focus {
   outline: none;
-  border-color: var(--Primary-Orange);
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(255, 122, 33, 0.1);
+  border-color: var(--pf-primary);
+  background: var(--pf-white);
+  box-shadow: 0 0 0 4px rgba(236, 91, 19, 0.1);
 }
 
-/* Giới tính - Radio buttons */
-.Radio-Group {
+.Profile-Input-Readonly {
+  background: #F1F5F9 !important;
+  color: var(--pf-text-muted) !important;
+  cursor: not-allowed;
+}
+
+.Profile-Input-With-Icon {
+  position: relative;
+}
+
+.Profile-Input-With-Icon input {
+  padding-right: 45px;
+}
+
+.Profile-Field-Icon,
+.Profile-TogglePass {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pf-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
+}
+
+.Profile-TogglePass:hover,
+.Profile-Field-Icon:hover {
+  color: var(--pf-primary);
+}
+
+/* Radio giới tính */
+.Profile-Radio-Group {
   display: flex;
-  gap: 30px;
-  padding: 12px 0;
+  gap: 24px;
+  padding: 8px 0;
 }
 
-.Radio-Group label {
+.Profile-Radio-Group label {
   display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  text-transform: none; /* Không viết hoa cho nhãn giới tính */
-  color: var(--Deep-Black);
-  font-weight: 700;
-  font-size: 16px;
+  text-transform: none;
+  font-weight: 600;
+  color: var(--pf-text);
 }
 
-.Radio-Group input[type="radio"] {
-  accent-color: var(--Primary-Orange);
+.Profile-Radio-Group label.active {
+  color: var(--pf-primary);
+}
+
+.Profile-Radio-Group input[type="radio"] {
+  accent-color: var(--pf-primary);
   width: 18px;
   height: 18px;
 }
 
-/* Trạng thái xác minh (Badge xanh) */
-.Input-With-Status {
+/* Nút Lưu thay đổi / Cập nhật mật khẩu */
+.Profile-Form-Actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 28px;
+}
+
+.Profile-Btn.Primary {
+  background: linear-gradient(135deg, var(--pf-primary), var(--pf-primary-light));
+  color: var(--pf-white);
+  border: none;
+  padding: 14px 36px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(236, 91, 19, 0.35);
+  transition: var(--pf-transition);
+}
+
+.Profile-Btn.Primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(236, 91, 19, 0.45);
+}
+
+.Profile-Btn.Primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Địa chỉ - List card */
+.Profile-Address-List {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.Profile-Address-Card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--pf-bg);
+  border: 2px solid var(--pf-border);
+  border-radius: 16px;
+  padding: 20px;
+  transition: var(--pf-transition);
   position: relative;
+}
+
+.Profile-Address-Card:hover {
+  border-color: var(--pf-primary-light);
+}
+
+.Profile-Address-Card.Default {
+  border-color: var(--pf-primary);
+  background: linear-gradient(135deg, rgba(236, 91, 19, 0.05), rgba(255, 159, 94, 0.08));
+}
+
+.Profile-Address-Icon {
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
-}
-
-.Status-Verified {
-  position: absolute;
-  right: 15px;
-  background: #E6FBF3;
-  color: var(--Success-Green);
-  font-weight: 800;
-  font-size: 11px;
-  padding: 5px 12px;
-  border-radius: 50px;
-}
-
-/* Icon con mắt cho mật khẩu */
-.Input-With-Icon i {
-  position: absolute;
-  right: 20px;
-  color: #888;
-  cursor: pointer;
-  font-size: 18px;
-  transition: 0.3s;
-}
-
-.Input-With-Icon i:hover {
-  color: var(--Primary-Orange);
-}
-
-/* Nút bấm đồng bộ với Tabs Active */
-.Form-Actions {
-  display: flex;
   justify-content: center;
-  margin-top: 40px;
+  background: #E2E8F0;
+  border-radius: 12px;
+  color: #64748B;
+  font-size: 1.2rem;
+  flex-shrink: 0;
 }
 
-.Btn-Submit {
-  background: linear-gradient(135deg, var(--Primary-Orange), var(--Secondary-Orange));
-  color: white;
-  border: none;
-  padding: 18px 60px;
+.Profile-Address-Body {
+  flex: 1;
+  min-width: 0;
+}
+
+.Profile-Address-Row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.Profile-Address-Label {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--pf-text);
+}
+
+.Profile-Address-Default {
+  background: var(--pf-primary);
+  color: var(--pf-white);
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 4px 10px;
   border-radius: 50px;
-  font-weight: 900;
-  font-size: 16px;
   text-transform: uppercase;
+}
+
+.Profile-Address-Text {
+  font-size: 0.95rem;
+  color: var(--pf-text-muted);
+  line-height: 1.5;
+  margin: 0 0 4px 0;
+}
+
+.Profile-Address-Phone {
+  font-size: 0.9rem;
+  color: var(--pf-text-muted);
+  margin: 0;
+}
+
+.Profile-Address-Actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.Profile-Address-Action {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--pf-text-muted);
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(255, 122, 33, 0.4);
-  transition: var(--Transition);
+  border-radius: 10px;
+  transition: var(--pf-transition);
 }
 
-.Btn-Submit:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 25px rgba(255, 122, 33, 0.5);
+.Profile-Address-Action:hover {
+  background: #E2E8F0;
+  color: var(--pf-primary);
 }
 
-/* Phần địa chỉ giao hàng */
-.Address-Section {
-  margin-top: 50px;
-  padding-top: 40px;
-  border-top: 2px dashed #EEE;
+/* Đổi mật khẩu */
+.Profile-Password-Fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 480px;
 }
 
-.Section-Title {
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--Deep-Black);
-  margin-bottom: 30px;
+.Profile-Password-Hint {
+  font-size: 0.85rem;
+  color: var(--pf-text-muted);
+  margin: 8px 0 0 0;
 }
 
-.Map-Preview {
-  margin: 30px 0;
-  border-radius: 20px;
+/* ========== ADDRESS MODAL - Thêm địa chỉ mới ========== */
+.AddressModal-Overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.AddressModal-Box {
+  background: var(--pf-white);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 95vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.AddressModal-Header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--pf-border);
+  background: var(--pf-white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.AddressModal-Back {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--pf-text);
+  cursor: pointer;
+  border-radius: 10px;
+  transition: var(--pf-transition);
+}
+
+.AddressModal-Back:hover {
+  background: var(--pf-bg);
+  color: var(--pf-primary);
+}
+
+.AddressModal-Title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--pf-text);
+}
+
+.AddressModal-Help {
+  background: none;
+  border: none;
+  color: var(--pf-primary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.AddressModal-Body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 24px;
+}
+
+.AddressModal-MapCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.AddressModal-MapWrap {
+  height: 320px;
+  border-radius: 16px;
   overflow: hidden;
-  height: 400px;
-  border: 1px solid var(--Border-Color);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  border: 2px solid var(--pf-border);
 }
 
-/* Hiệu ứng Fade In giống MyOrders */
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
+.AddressModal-ConfirmMap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, rgba(236, 91, 19, 0.15), rgba(255, 159, 94, 0.2));
+  border: 2px solid var(--pf-primary-light);
+  border-radius: 12px;
+  color: var(--pf-primary);
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.AddressModal-ConfirmMap:hover {
+  background: linear-gradient(135deg, rgba(236, 91, 19, 0.25), rgba(255, 159, 94, 0.3));
+}
+
+.AddressModal-ConfirmMap i {
+  font-size: 1.1rem;
+}
+
+.AddressModal-FormCol {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.AddressModal-Field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.AddressModal-Field label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--pf-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.AddressModal-InputWrap {
+  position: relative;
+}
+
+.AddressModal-InputWrap input,
+.AddressModal-Field select {
+  width: 100%;
+  padding: 14px 18px 14px 44px;
+  border: 2px solid var(--pf-border);
+  border-radius: 12px;
+  font-size: 1rem;
+  background: var(--pf-bg);
+  transition: var(--pf-transition);
+  color: var(--pf-text);
+}
+
+.AddressModal-InputIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pf-text-muted);
+  font-size: 1rem;
+}
+
+.AddressModal-Field select {
+  padding-left: 18px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748B' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
+}
+
+.AddressModal-Row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.AddressModal-TypeGroup {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.AddressModal-TypeBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 2px solid var(--pf-border);
+  border-radius: 12px;
+  background: var(--pf-bg);
+  color: var(--pf-text-muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
+}
+
+.AddressModal-TypeBtn:hover {
+  border-color: var(--pf-primary-light);
+  color: var(--pf-primary);
+}
+
+.AddressModal-TypeBtn.active {
+  background: var(--pf-primary);
+  border-color: var(--pf-primary);
+  color: var(--pf-white);
+}
+
+.AddressModal-TypeBtn i {
+  font-size: 1rem;
+}
+
+.AddressModal-InputNoIcon {
+  padding: 14px 18px !important;
+}
+
+.AddressModal-Checkbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--pf-text);
+}
+
+.AddressModal-Checkbox input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--pf-primary);
+}
+
+.AddressModal-Hint {
+  font-size: 0.8rem;
+  color: var(--pf-text-muted);
+  margin: 6px 0 0 0;
+}
+
+.AddressModal-Footer {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding: 20px 24px;
+  border-top: 1px solid var(--pf-border);
+  background: #FAFAFA;
+}
+
+.AddressModal-BtnCancel {
+  padding: 14px 28px;
+  border: 2px solid var(--pf-border);
+  border-radius: 12px;
+  background: var(--pf-white);
+  color: var(--pf-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--pf-transition);
+}
+
+.AddressModal-BtnCancel:hover {
+  border-color: var(--pf-text-muted);
+  color: var(--pf-text);
+}
+
+.AddressModal-BtnSave {
+  padding: 14px 32px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--pf-primary), var(--pf-primary-light));
+  color: var(--pf-white);
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(236, 91, 19, 0.35);
+  transition: var(--pf-transition);
+}
+
+.AddressModal-BtnSave:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(236, 91, 19, 0.45);
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .AddressModal-Body {
+    grid-template-columns: 1fr;
+  }
+  
+  .AddressModal-MapWrap {
+    height: 250px;
+  }
+}
+
 @media (max-width: 768px) {
-  .Form-Grid { grid-template-columns: 1fr; }
-  .Content-Card { padding: 25px; }
-  .Content-Title { font-size: 1.8rem; }
-  .Btn-Submit { width: 100%; }
+  .Profile-Form-Grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .Profile-Section {
+    padding: 24px 20px;
+  }
+  
+  .Profile-Section-Header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .AddressModal-Row {
+    grid-template-columns: 1fr;
+  }
+  
+  .AddressModal-TypeGroup {
+    flex-wrap: wrap;
+  }
 }
