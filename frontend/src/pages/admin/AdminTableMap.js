@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import '../../styles/AdminTableMap.css';
 
 const TABLE_TYPES = [
@@ -24,6 +24,7 @@ const AdminTableMap = () => {
   const [activeTab, setActiveTab] = useState('in-use');
   const [floorFilter, setFloorFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [modalMode, setModalMode] = useState(null); // 'add' | 'edit'
   const [editingTable, setEditingTable] = useState(null);
@@ -99,6 +100,11 @@ const AdminTableMap = () => {
     }
   };
 
+  const filteredTables = tables.filter((t) => {
+    const matchSearch = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchSearch;
+  });
+
   return (
     <div className="admin-tablemap">
       <header className="tablemap-header">
@@ -107,6 +113,16 @@ const AdminTableMap = () => {
           <p className="tablemap-subtitle">Quản lý vị trí và tình trạng bàn thời gian thực</p>
         </div>
         <div className="tablemap-actions">
+          <div className="tablemap-search-wrap">
+            <Search size={18} className="tablemap-search-icon" />
+            <input
+              type="text"
+              className="tablemap-search"
+              placeholder="Tìm kiếm theo số bàn..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <select className="tablemap-select" value={floorFilter} onChange={(e) => setFloorFilter(e.target.value)}>
             <option value="all">Tất cả các khu vực</option>
             <option value="1">Tầng 1</option>
@@ -144,7 +160,7 @@ const AdminTableMap = () => {
 
       {activeTab === 'in-use' ? (
         <div className="tablemap-cards">
-          {tables.map((t) => (
+          {filteredTables.map((t) => (
             <div
               key={t.id}
               className={`tablemap-card ${t.status === 'in-use' ? 'in-use' : 'empty'}`}
@@ -186,7 +202,7 @@ const AdminTableMap = () => {
                 </tr>
               </thead>
               <tbody>
-                {tables.map((t) => (
+                {filteredTables.map((t) => (
                   <tr key={t.id}>
                     <td className="font-medium">{t.name}{t.isVip ? ' (VIP)' : ''}</td>
                     <td>{t.area}</td>
@@ -223,7 +239,7 @@ const AdminTableMap = () => {
           </div>
           <div className="tablemap-pagination">
             <span className="tablemap-pagination-info">
-              Hiển thị 1-{tables.length} của {totalTables} bàn
+              Hiển thị 1-{filteredTables.length} của {totalTables} bàn
             </span>
             <div className="tablemap-pagination-btns">
               <button type="button" className="tablemap-page-btn">Trước</button>

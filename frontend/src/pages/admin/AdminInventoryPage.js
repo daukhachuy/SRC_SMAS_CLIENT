@@ -241,24 +241,6 @@ const AdminInventoryPage = () => {
         </>
       ) : (
         <section className="inv-card">
-          <div className="inv-card-head inv-card-head-tabs">
-            <div className="inv-tabs-sub">
-              <button
-                type="button"
-                className={`inv-tab-sub ${categoryTab === 'danh-muc' ? 'active' : ''}`}
-                onClick={() => setCategoryTab('danh-muc')}
-              >
-                Danh mục hàng
-              </button>
-              <button
-                type="button"
-                className={`inv-tab-sub ${categoryTab === 'lo-hang' ? 'active' : ''}`}
-                onClick={() => setCategoryTab('lo-hang')}
-              >
-                Lô hàng
-              </button>
-            </div>
-          </div>
           {categoryTab === 'danh-muc' && (
             <>
               <div className="inv-filter-bar">
