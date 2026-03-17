@@ -1,6 +1,6 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
-const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+const BASE_URL = "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net";
 
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,

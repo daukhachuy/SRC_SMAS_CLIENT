@@ -1,4 +1,4 @@
-const API_BASE_URL = window.__API_BASE_URL__ || 'https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api';
+﻿const API_BASE_URL = window.__API_BASE_URL__ || 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api';
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {

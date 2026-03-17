@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Home.css';
@@ -64,7 +64,7 @@ const Home = () => {
   const [showAuthRequired, setShowAuthRequired] = useState(false);
 
   useEffect(() => {
-    axios.get('https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/food/best-sellers?top=8')
+    axios.get('https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/food/best-sellers?top=8')
       .then(res => {
         const mapped = res.data.map(item => ({
           id: item.foodId,
@@ -80,7 +80,7 @@ const Home = () => {
       })
       .catch(err => console.error('Best sellers error:', err));
 
-    axios.get('https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/food/discount')
+    axios.get('https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/food/discount')
       .then(res => setDiscounts(res.data))
       .catch(err => console.error('Discounts error:', err));
   }, []);

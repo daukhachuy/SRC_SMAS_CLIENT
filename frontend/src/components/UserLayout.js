@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
@@ -73,7 +73,7 @@ const UserLayout = () => {
       
       try {
         await axios.put(
-          "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/User/profile",
+          "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/User/profile",
           {
             fullname: "Khánh Hồ",
             avatar: imageUrlOnCloud,

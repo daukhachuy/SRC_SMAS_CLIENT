@@ -1,6 +1,6 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
-const API_URL = 'https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api';
+const API_URL = 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api';
 
 const getAuthHeader = () => {
     const token = localStorage.getItem('token');
