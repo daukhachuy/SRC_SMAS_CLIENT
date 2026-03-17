@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+const BASE_URL = "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net";
 
 export const fetchUserOrders = async (orderType = 'Delivery', status = 'Pending') => {
   try {

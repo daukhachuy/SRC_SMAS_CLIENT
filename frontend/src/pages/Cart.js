@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Header from '../components/Header'; 
 import Footer from '../components/Footer'; 
@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/Cart.css';
 
 const Cart = () => {
-  const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
+  const BASE_URL = "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net";
   const navigate = useNavigate();
   
   const [cartItems, setCartItems] = useState([]);

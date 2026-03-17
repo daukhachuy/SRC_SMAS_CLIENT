@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import axios from 'axios';
 
 const ProfileUpdate = () => {
@@ -26,7 +26,7 @@ const ProfileUpdate = () => {
       // 2. Gửi URL về Backend C#
       const token = localStorage.getItem("token"); 
       await axios.put(
-        "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api/User/profile",
+        "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/User/profile",
         {
           fullname: "Tên của bạn", // Bạn nên lấy từ state hoặc input
           avatar: imageUrl,
