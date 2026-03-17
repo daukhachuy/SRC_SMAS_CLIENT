@@ -1,0 +1,731 @@
+/* Admin - Quản lý Nhà hàng */
+
+.admin-restaurant {
+  min-height: 100%;
+  color: #1f2937;
+}
+
+.rest-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.rest-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.rest-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0;
+}
+
+.rest-bell-btn {
+  padding: 0.5rem;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.rest-bell-btn:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.rest-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.25rem;
+}
+
+.rest-tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.rest-tab:hover {
+  color: #374151;
+}
+
+.rest-tab.active {
+  color: #111827;
+  font-weight: 600;
+  border-bottom-color: #FF6C1F;
+}
+
+.rest-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.rest-toolbar-end {
+  justify-content: flex-end;
+}
+
+.rest-search-wrap {
+  position: relative;
+}
+
+.rest-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.rest-search {
+  width: 260px;
+  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.rest-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #FF6C1F;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.rest-btn-primary:hover {
+  background: #e85a15;
+}
+
+.rest-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.rest-table-wrap {
+  overflow-x: auto;
+}
+
+.rest-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* Header bảng: nền xám, chữ xám đậm (không xanh) */
+.rest-table thead {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rest-table thead th {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.rest-table th {
+  padding: 0.875rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rest-table td {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.rest-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.rest-code {
+  font-weight: 600;
+  color: #111827;
+}
+
+.rest-title-cell {
+  font-weight: 500;
+  color: #111827;
+}
+
+.rest-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.rest-badge-running {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.rest-badge-upcoming {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.rest-badge-expired {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.rest-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #e5e7eb;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  transition: background 0.2s;
+}
+
+.rest-toggle.active {
+  background: #FF6C1F;
+}
+
+.rest-toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.rest-toggle.active .rest-toggle-slider {
+  transform: translateX(20px);
+}
+
+.rest-status-text {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.rest-icon-btn {
+  padding: 0.375rem;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  margin-right: 0.25rem;
+  transition: color 0.2s, background 0.2s;
+}
+
+.rest-icon-btn:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.rest-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.rest-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rest-page-btn {
+  min-width: 2rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rest-page-btn:hover {
+  background: #f9fafb;
+}
+
+.rest-page-btn.active {
+  background: #FF6C1F;
+  color: #fff;
+  border-color: #FF6C1F;
+}
+
+/* Đánh giá */
+.rest-reviews-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+}
+
+.rest-reviews-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rest-rating-card,
+.rest-sentiment-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rest-rating-title,
+.rest-sentiment-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.75rem;
+}
+
+.rest-rating-score {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.rest-rating-stars {
+  color: #f59e0b;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+}
+
+.rest-rating-count {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0.25rem 0 1rem;
+}
+
+.rest-rating-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rest-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.rest-bar-row span:first-child {
+  min-width: 3rem;
+}
+
+.rest-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rest-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.rest-bar-5 { background: #22c55e; }
+.rest-bar-4 { background: #22c55e; }
+.rest-bar-3 { background: #f59e0b; }
+.rest-bar-2 { background: #ef4444; }
+.rest-bar-1 { background: #ef4444; }
+
+.rest-sentiment-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.rest-sentiment-positive {
+  flex: 1;
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 0.5rem;
+}
+
+.rest-sentiment-negative {
+  flex: 1;
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 0.5rem;
+}
+
+.rest-reviews-right {
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rest-reviews-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.rest-reviews-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.rest-select-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background: #fff;
+}
+
+.rest-review-card {
+  padding: 1rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.rest-review-card:last-of-type {
+  border-bottom: none;
+}
+
+.rest-review-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.rest-review-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #FF6C1F;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.rest-review-card:nth-child(3) .rest-review-avatar {
+  background: #9ca3af;
+}
+
+.rest-review-time {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: normal;
+}
+
+.rest-review-stars {
+  color: #f59e0b;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.rest-review-comment {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.rest-view-all {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #FF6C1F;
+  text-decoration: none;
+}
+
+.rest-view-all:hover {
+  text-decoration: underline;
+}
+
+/* Modal */
+.rest-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.rest-modal {
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.rest-modal-lg {
+  max-width: 560px;
+}
+
+.rest-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.rest-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.rest-modal-close {
+  padding: 0.25rem;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.rest-modal-close:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
+.rest-modal-desc {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  padding: 0 1.5rem 1rem;
+}
+
+.rest-modal-form {
+  padding: 1.5rem;
+}
+
+.rest-form-group {
+  margin-bottom: 1rem;
+}
+
+.rest-form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.375rem;
+}
+
+.rest-required {
+  color: #dc2626;
+}
+
+.rest-form-group input,
+.rest-form-group select,
+.rest-form-group textarea {
+  width: 100%;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  color: #111827;
+  background: #fff;
+}
+
+.rest-form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.rest-form-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.rest-form-suffix {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.rest-form-suffix input {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+}
+
+.rest-suffix {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.rest-upload-zone {
+  border: 2px dashed #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  background: #fafafa;
+}
+
+.rest-upload-zone span {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.rest-upload-zone small {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.rest-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.rest-modal-btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.rest-modal-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.rest-modal-cancel:hover {
+  background: #e5e7eb;
+}
+
+.rest-modal-submit {
+  background: #FF6C1F;
+  color: #fff;
+  border: none;
+}
+
+.rest-modal-submit:hover {
+  background: #e85a15;
+}
+
+.rest-select {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #374151;
+}
+
+@media (max-width: 768px) {
+  .rest-reviews-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .rest-form-row2 {
+    grid-template-columns: 1fr;
+  }
+
+  .rest-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rest-search {
+    width: 100%;
+  }
+
+  .rest-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .rest-pagination-btns {
+    justify-content: center;
+  }
+}

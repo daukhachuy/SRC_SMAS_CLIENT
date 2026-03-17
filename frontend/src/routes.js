@@ -29,6 +29,7 @@ import ContractSigningPage from './pages/manager/ContractSigningPage';
 import ManagerStaffPage from './pages/manager/ManagerStaffPage';
 import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
+import ManagerProfilePage from './pages/manager/ManagerProfilePage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 import PaymentResult from './pages/PaymentResult';
@@ -41,6 +42,14 @@ import KitchenLayout from './pages/kitchen/KitchenLayout';
 import KitchenOrdersPage from './pages/kitchen/KitchenOrdersPage';
 import KitchenSchedulePage from './pages/kitchen/KitchenSchedulePage';
 import KitchenProfilePage from './pages/kitchen/KitchenProfilePage';
+
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminTableMap from './pages/admin/AdminTableMap';
+import AdminMenuManagement from './pages/admin/menu/AdminMenuManagement';
+import AdminInventoryPage from './pages/admin/AdminInventoryPage';
+import AdminRestaurantPage from './pages/admin/AdminRestaurantPage';
+import AdminStaffPage from './pages/admin/AdminStaffPage';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -87,7 +96,7 @@ const AppRoutes = () => {
         <Route
           path="/cart"
           element={
-            <ProtectedRoute requiredRole="Customer">
+            <ProtectedRoute>
               <Cart />
             </ProtectedRoute>
           }
@@ -95,14 +104,22 @@ const AppRoutes = () => {
 
         {/* Redirect old admin URLs to manager */}
         <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
-        <Route
-          path="/payment-result"
-          element={
-            <ProtectedRoute requiredRole="Customer">
-              <PaymentResult />
-            </ProtectedRoute>
-          }
-        />
+
+        {/* Admin pages - Không có authorization (permissions tạm tắt) */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminDashboard />} />
+          <Route path="reservations" element={<AdminDashboard />} />
+          <Route path="tables" element={<AdminTableMap />} />
+          <Route path="menu" element={<AdminMenuManagement />} />
+          <Route path="inventory" element={<AdminInventoryPage />} />
+          <Route path="staff" element={<Navigate to="/admin/accounts" replace />} />
+          <Route path="accounts" element={<AdminStaffPage />} />
+          <Route path="restaurant" element={<AdminRestaurantPage />} />
+        </Route>
+
+        <Route path="/payment-result" element={<PaymentResult />} />
+
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={
           <ProtectedRoute requiredRole="Manager">
@@ -122,6 +139,7 @@ const AppRoutes = () => {
           <Route path="staff" element={<ManagerStaffPage />} />
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
+          <Route path="profile" element={<ManagerProfilePage />} />
         </Route>
 
           {/* Waiter pages - BẢO VỆ BỞI ProtectedRoute với role Waiter */}
@@ -148,9 +166,9 @@ const AppRoutes = () => {
             <Route path="profile" element={<KitchenProfilePage />} />
           </Route>
 
-        {/* Các trang Customer - chỉ role Customer được truy cập */}
+        {/* Các trang User - chỉ cần đăng nhập là được truy cập */}
         <Route element={
-          <ProtectedRoute requiredRole="Customer">
+          <ProtectedRoute>
             <UserLayout />
           </ProtectedRoute>
         }>
