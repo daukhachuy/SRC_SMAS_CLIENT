@@ -62,37 +62,8 @@ const Header = () => {
       return;
     }
 
-    // Nếu đã login → lấy role và redirect
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        const role = user.role;
-
-        // Redirect dựa trên role
-        switch (role) {
-          case 'Manager':
-            navigate('/manager/dashboard');
-            break;
-          case 'Waiter':
-            navigate('/waiter/orders');
-            break;
-          case 'Kitchen':
-            navigate('/kitchen/orders');
-            break;
-          case 'Customer':
-          default:
-            navigate('/profile');
-            break;
-        }
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-        navigate('/profile');
-      }
-    } else {
-      // Token có nhưng không có user info → mặc định profile
-      navigate('/profile');
-    }
+    // Luôn vào trang Profile.js
+    navigate('/profile');
   };
 
   /* ================= ULTRA++: SHRINK + ACTIVE BY SCROLL ================= */
