@@ -6,7 +6,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: #f8f6f5;
+  background: #fff8f1;
 }
 
 /* ===========================
@@ -30,7 +30,7 @@
   margin: 0;
   font-size: 28px;
   font-weight: 900;
-  color: #23160f;
+  color: #25160d;
   letter-spacing: -0.02em;
 }
 
@@ -51,19 +51,19 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6d9ca;
   border-radius: 8px;
   background: white;
   font-size: 14px;
   font-weight: 700;
-  color: #374151;
+  color: #25160d;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-secondary:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: #fff8f1;
+  border-color: #FF6C1F;
 }
 
 .btn-primary {
@@ -73,12 +73,12 @@
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
-  background: #ff6d1f;
+  background: #FF6C1F;
   font-size: 14px;
   font-weight: 700;
   color: white;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(255, 109, 31, 0.2);
+  box-shadow: 0 4px 12px rgba(255, 108, 31, 0.2);
   transition: all 0.2s;
 }
 
@@ -104,7 +104,7 @@
   display: flex;
   gap: 8px;
   padding: 4px;
-  background: #f1f5f9;
+  background: #fff8f1;
   border-radius: 12px;
 }
 
@@ -115,24 +115,24 @@
   background: transparent;
   font-size: 14px;
   font-weight: 600;
-  color: #64748b;
+  color: #7a6352;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .filter-btn:hover {
-  color: #334155;
+  color: #25160d;
 }
 
 .filter-btn.active {
   background: white;
-  color: #ff6d1f;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #FF6C1F;
+  box-shadow: 0 1px 3px rgba(59, 26, 5, 0.1);
 }
 
 .staff-tabs {
   display: flex;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid #e6d9ca;
 }
 
 .tab-btn {
@@ -142,19 +142,19 @@
   background: transparent;
   font-size: 14px;
   font-weight: 600;
-  color: #9ca3af;
+  color: #91684a;
   cursor: pointer;
   transition: all 0.2s;
   margin-bottom: -2px;
 }
 
 .tab-btn:hover {
-  color: #6b7280;
+  color: #7a6352;
 }
 
 .tab-btn.active {
-  color: #ff6d1f;
-  border-bottom-color: #ff6d1f;
+  color: #FF6C1F;
+  border-bottom-color: #FF6C1F;
 }
 
 /* ===========================
@@ -187,23 +187,23 @@
 .week-header {
   display: grid;
   grid-template-columns: 140px repeat(7, 1fr);
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #ecdcca;
 }
 
 .week-cell {
   padding: 16px;
-  background: rgba(248, 250, 252, 0.5);
+  background: rgba(255, 248, 241, 0.5);
 }
 
 .week-day-cell {
   padding: 16px;
   text-align: center;
-  border-left: 1px solid #f1f5f9;
+  border-left: 1px solid #ecdcca;
   background: white;
 }
 
 .week-day-cell.today {
-  background: rgba(255, 109, 31, 0.03);
+  background: rgba(255, 108, 31, 0.03);
 }
 
 .day-name {
@@ -211,23 +211,23 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: #91684a;
   letter-spacing: 0.05em;
 }
 
 .week-day-cell.today .day-name {
-  color: #ff6d1f;
+  color: #FF6C1F;
 }
 
 .day-date {
   margin: 4px 0 0;
   font-size: 18px;
   font-weight: 900;
-  color: #1f2937;
+  color: #25160d;
 }
 
 .week-day-cell.today .day-date {
-  color: #ff6d1f;
+  color: #FF6C1F;
 }
 
 /* ===========================
@@ -236,7 +236,7 @@
 .shift-row {
   display: grid;
   grid-template-columns: 140px repeat(7, 1fr);
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #ecdcca;
   min-height: 120px;
 }
 
@@ -246,7 +246,7 @@
 
 .shift-label {
   padding: 24px;
-  background: rgba(248, 250, 252, 0.5);
+  background: rgba(255, 248, 241, 0.5);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -260,33 +260,33 @@
 }
 
 .shift-icon.morning {
-  color: #fb923c;
+  color: #FF6C1F;
 }
 
 .shift-icon.afternoon {
-  color: #f59e0b;
+  color: #FF6C1F;
 }
 
 .shift-icon.evening {
-  color: #818cf8;
+  color: #FF6C1F;
 }
 
 .shift-name {
   margin: 0;
   font-size: 12px;
   font-weight: 700;
-  color: #64748b;
+  color: #7a6352;
 }
 
 .shift-time {
   margin: 0;
   font-size: 10px;
-  color: #9ca3af;
+  color: #91684a;
 }
 
 .shift-cell {
   padding: 8px;
-  border-left: 1px solid #f1f5f9;
+  border-left: 1px solid #ecdcca;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -295,7 +295,7 @@
 }
 
 .shift-cell.today {
-  background: rgba(255, 109, 31, 0.03);
+  background: rgba(255, 108, 31, 0.03);
 }
 
 /* ===========================

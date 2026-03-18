@@ -12,6 +12,8 @@ const MENU_ITEMS = [
   { label: 'VỀ CHÚNG TÔI', path: '/about', id: 'about' }
 ];
 
+const normalizeRole = (role) => String(role || '').trim().toLowerCase();
+
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,14 +57,32 @@ const Header = () => {
   /* ================= FUNCTION: Handle User Icon Click ================= */
   const handleUserIconClick = () => {
     const token = localStorage.getItem('authToken');
-    
-    // Nếu chưa login → redirect to login page
     if (!token) {
-      navigate('/auth');
+      navigate('/profile');
       return;
     }
 
-    // Luôn vào trang Profile.js
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const role = normalizeRole(user?.role);
+
+      if (role === 'manager') {
+        navigate('/manager/profile');
+        return;
+      }
+      if (role === 'waiter') {
+        navigate('/waiter/profile');
+        return;
+      }
+      if (role === 'kitchen') {
+        navigate('/kitchen/profile');
+        return;
+      }
+    } catch (error) {
+      console.error('Cannot parse user role in header:', error);
+    }
+
     navigate('/profile');
   };
 

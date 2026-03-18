@@ -56,7 +56,8 @@ const Home = () => {
   const [bestSellers, setBestSellers] = useState([]);
   const [hotStart, setHotStart] = useState(0);
   const [discounts, setDiscounts] = useState([]);
-  const [discountIdx, setDiscountIdx] = useState(0);
+  const [dealStart, setDealStart] = useState(0);
+  const [dealVisibleCount, setDealVisibleCount] = useState(4);
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('19:00');
   const [bookingGuests, setBookingGuests] = useState(2);
@@ -83,6 +84,29 @@ const Home = () => {
     axios.get('https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/food/discount')
       .then(res => setDiscounts(res.data))
       .catch(err => console.error('Discounts error:', err));
+  }, []);
+
+  useEffect(() => {
+    const updateDealVisibleCount = () => {
+      const width = window.innerWidth;
+      if (width <= 480) {
+        setDealVisibleCount(1);
+        return;
+      }
+      if (width <= 768) {
+        setDealVisibleCount(2);
+        return;
+      }
+      if (width <= 1024) {
+        setDealVisibleCount(2);
+        return;
+      }
+      setDealVisibleCount(4);
+    };
+
+    updateDealVisibleCount();
+    window.addEventListener('resize', updateDealVisibleCount);
+    return () => window.removeEventListener('resize', updateDealVisibleCount);
   }, []);
 
   const showToast = (item) => {
@@ -112,8 +136,6 @@ const Home = () => {
     navigate('/services');
   };
 
-  const discountPrev = () => setDiscountIdx(p => (p === 0 ? discounts.length - 1 : p - 1));
-  const discountNext = () => setDiscountIdx(p => (p === discounts.length - 1 ? 0 : p + 1));
   const reviewColumnA = [...REVIEWS_DATA, ...REVIEWS_DATA, ...REVIEWS_DATA];
   const reviewColumnB = [...REVIEWS_DATA].reverse();
   const reviewColumnBLoop = [...reviewColumnB, ...reviewColumnB, ...reviewColumnB];
@@ -143,6 +165,24 @@ const Home = () => {
   const hotPrev = () => {
     if (!canSlideHot) return;
     setHotStart(prev => (prev - HOT_VISIBLE_COUNT + bestSellers.length) % bestSellers.length);
+  };
+
+  const canSlideDeals = discounts.length > dealVisibleCount;
+  const visibleDeals = discounts.length > 0
+    ? Array.from({ length: Math.min(dealVisibleCount, discounts.length) }, (_, offset) => {
+        const index = (dealStart + offset) % discounts.length;
+        return discounts[index];
+      })
+    : [];
+
+  const dealNext = () => {
+    if (!canSlideDeals) return;
+    setDealStart(prev => (prev + dealVisibleCount) % discounts.length);
+  };
+
+  const dealPrev = () => {
+    if (!canSlideDeals) return;
+    setDealStart(prev => (prev - dealVisibleCount + discounts.length) % discounts.length);
   };
 
   return (
@@ -274,8 +314,18 @@ const Home = () => {
                 Xem tất cả <ChevronRight size={16} />
               </button>
             </div>
-            <div className="h-deals-grid">
-              {discounts.map((item) => {
+            <div className="h-hot-slider-shell" aria-label="Điều hướng ưu đãi hôm nay">
+              <button
+                className="h-hot-nav-btn h-hot-nav-btn-side h-hot-nav-left"
+                onClick={dealPrev}
+                disabled={!canSlideDeals}
+                aria-label="Hiển thị ưu đãi trước"
+              >
+                <ChevronLeft size={24} />
+              </button>
+
+              <div className="h-grid-4 h-deals-grid">
+              {visibleDeals.map((item) => {
                 const pct = item.price > 0
                   ? Math.round(((item.price - item.promotionalPrice) / item.price) * 100)
                   : 0;
@@ -307,6 +357,16 @@ const Home = () => {
                   </div>
                 );
               })}
+              </div>
+
+              <button
+                className="h-hot-nav-btn h-hot-nav-btn-side h-hot-nav-right"
+                onClick={dealNext}
+                disabled={!canSlideDeals}
+                aria-label="Hiển thị ưu đãi tiếp theo"
+              >
+                <ChevronRight size={24} />
+              </button>
             </div>
           </div>
         </section>

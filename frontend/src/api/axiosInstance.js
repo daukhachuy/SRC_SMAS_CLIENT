@@ -22,7 +22,7 @@ const instance = axios.create({
 // Request Interceptor - Thêm token vào tất cả requests
 instance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

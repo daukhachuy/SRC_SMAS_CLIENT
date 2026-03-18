@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -18,210 +18,163 @@ import {
   Info,
   Check,
   XCircle,
-  Clock3
+  Clock3,
 } from 'lucide-react';
+import {
+  reservationAPI,
+  eventBookingAPI,
+  mapReservationToUI,
+  mapEventToUI,
+} from '../../api/managerApi';
 import '../../styles/ManagerReservationsPage.css';
-
-// Sample events data
-const eventsData = [
-  {
-    id: 1,
-    customer: 'Công ty Công nghệ Alpha',
-    contact: 'Mr. Nam',
-    phone: '0909 111 222',
-    eventType: 'Tiệc tất niên',
-    eventTypeColor: 'blue',
-    guests: 120,
-    date: '15/01/2024',
-    time: '18:00 - 22:00',
-    status: 'signed',
-    statusText: 'Đã ký kết',
-    revenue: 85000000
-  },
-  {
-    id: 2,
-    customer: 'Hội thảo Quốc tế Delta',
-    contact: 'Ms. Linh',
-    phone: '0911 333 444',
-    eventType: 'Hội thảo & Buffet',
-    eventTypeColor: 'purple',
-    guests: 80,
-    date: '20/01/2024',
-    time: '08:00 - 12:00',
-    status: 'pending',
-    statusText: 'Chưa có hợp đồng',
-    revenue: 45000000,
-    urgent: true
-  },
-  {
-    id: 3,
-    customer: 'Tiệc cưới Minh Quân & Thảo My',
-    contact: 'Gia đình',
-    phone: '0988 777 666',
-    eventType: 'Tiệc cưới',
-    eventTypeColor: 'rose',
-    guests: 450,
-    date: '05/02/2024',
-    time: '17:00 - 21:30',
-    status: 'signed',
-    statusText: 'Đã ký kết',
-    revenue: 320000000
-  },
-  {
-    id: 4,
-    customer: 'Sinh nhật Gia Bảo (1 tuổi)',
-    contact: 'Phụ huynh',
-    phone: '0944 555 444',
-    eventType: 'Tiệc sinh nhật',
-    eventTypeColor: 'cyan',
-    guests: 60,
-    date: '12/02/2024',
-    time: '11:00 - 14:00',
-    status: 'deposit',
-    statusText: 'Chờ đặt cọc',
-    revenue: 28000000
-  }
-];
-
-const regularBookingsData = [
-  {
-    id: 'BK-201',
-    customer: 'Trần Thanh Tùng',
-    phone: '0905 123 456',
-    guests: 4,
-    time: '19:30',
-    date: '12/10/2023',
-    table: 'Bàn 08',
-    status: 'dining',
-    statusText: 'Đang dùng bữa'
-  },
-  {
-    id: 'BK-202',
-    customer: 'Lê Thị Mai',
-    phone: '0388 999 111',
-    guests: 2,
-    time: '20:00',
-    date: '12/10/2023',
-    table: '',
-    status: 'pending',
-    statusText: 'Chờ xác nhận'
-  },
-  {
-    id: 'BK-203',
-    customer: 'Hoàng Minh Quân',
-    phone: '0912 345 678',
-    guests: 6,
-    time: '18:45',
-    date: '12/10/2023',
-    table: 'Bàn 12, 14',
-    status: 'confirmed',
-    statusText: 'Đã xác nhận'
-  },
-  {
-    id: 'BK-204',
-    customer: 'Nguyễn Anh Đào',
-    phone: '0707 555 666',
-    guests: 2,
-    time: '12:00',
-    date: '12/10/2023',
-    table: '',
-    status: 'cancelled',
-    statusText: 'Đã hủy'
-  }
-];
 
 const ManagerReservationsPage = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('regular');
   const [searchQuery, setSearchQuery] = useState('');
   const currentPage = 1;
+
+  const [regularBookings, setRegularBookings] = useState([]);
+  const [eventsData, setEventsData] = useState([]);
+  const [totalTodayBookings, setTotalTodayBookings] = useState(0);
+  const [pendingBookings, setPendingBookings] = useState(0);
+  const [activeTables, setActiveTables] = useState(0);
+  const [pendingContracts, setPendingContracts] = useState(0);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [processingCode, setProcessingCode] = useState('');
 
-  // Event tab statistics
-  const upcomingEvents = eventsData.length;
-  const pendingContracts = eventsData.filter(e => e.status === 'pending' || e.status === 'deposit').length;
-  const urgentCount = eventsData.filter(e => e.urgent).length;
-  const totalRevenue = eventsData.reduce((sum, e) => sum + e.revenue, 0);
+  const loadReservationData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [listRes, sumTodayRes, waitConfirmRes] = await Promise.allSettled([
+        reservationAPI.getAllDescCreatedAt(),
+        reservationAPI.getSumToday(),
+        reservationAPI.getWaitingConfirm(),
+      ]);
 
-  // Regular booking tab statistics
-  const totalTodayBookings = 24;
-  const pendingBookings = 8;
-  const activeTables = 15;
+      if (listRes.status !== 'fulfilled') {
+        const status = listRes.reason?.response?.status;
+        const msg = listRes.reason?.response?.data?.message || 'Không tải được danh sách đặt bàn';
+        throw new Error(`Lỗi ${status ?? ''} ${msg}`.trim());
+      }
 
-  const filteredRegularBookings = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return regularBookingsData;
+      const reservationRaw = Array.isArray(listRes.value.data)
+        ? listRes.value.data
+        : listRes.value.data?.data ?? listRes.value.data?.items ?? [];
+
+      const mappedReservations = reservationRaw.map(mapReservationToUI);
+      setRegularBookings(mappedReservations);
+
+      const activeDiningCount = mappedReservations.filter((booking) => booking.status === 'dining').length;
+      setActiveTables(activeDiningCount);
+
+      if (sumTodayRes.status === 'fulfilled') {
+        const sumData = sumTodayRes.value.data;
+        const sumValue = typeof sumData === 'number'
+          ? sumData
+          : sumData?.count ?? sumData?.total ?? sumData?.value ?? 0;
+        setTotalTodayBookings(Number(sumValue) || mappedReservations.length);
+      } else {
+        setTotalTodayBookings(mappedReservations.length);
+      }
+
+      if (waitConfirmRes.status === 'fulfilled') {
+        const waitData = waitConfirmRes.value.data;
+        const waitCount = Array.isArray(waitData)
+          ? waitData.length
+          : waitData?.count ?? waitData?.total ?? waitData?.value ?? 0;
+        setPendingBookings(Number(waitCount) || 0);
+      } else {
+        setPendingBookings(mappedReservations.filter((booking) => booking.status === 'pending').length);
+      }
+    } catch (err) {
+      console.error('Lỗi tải đặt bàn:', err);
+      setError(err.message || 'Không thể tải dữ liệu đặt bàn');
+      setRegularBookings([]);
+      setTotalTodayBookings(0);
+      setPendingBookings(0);
+      setActiveTables(0);
+    } finally {
+      setLoading(false);
     }
-    return regularBookingsData.filter((booking) => (
-      booking.customer.toLowerCase().includes(query) || booking.phone.includes(query)
-    ));
-  }, [searchQuery]);
+  }, []);
 
-  // Filter events by search query
-  const filteredEvents = eventsData.filter((event) => (
-    event.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.contact.toLowerCase().includes(searchQuery.toLowerCase())
-  ));
+  const loadEventsData = useCallback(async () => {
+    try {
+      const [activeRes, upcomingRes, ascRes, historyRes, pendingContractRes] = await Promise.allSettled([
+        eventBookingAPI.getActive(),
+        eventBookingAPI.getUpcomingEvents(),
+        eventBookingAPI.getAllAscCreatedAt(),
+        eventBookingAPI.getHistory(),
+        eventBookingAPI.getContractsNeedSigned(),
+      ]);
 
-  const getEventTypeColor = (color) => {
-    const colors = {
-      blue: 'bg-blue-50 text-blue-700',
-      purple: 'bg-purple-50 text-purple-700',
-      rose: 'bg-rose-50 text-rose-700',
-      cyan: 'bg-cyan-50 text-cyan-700',
-      green: 'bg-green-50 text-green-700',
-      amber: 'bg-amber-50 text-amber-700'
-    };
-    return colors[color] || colors.blue;
-  };
+      const extractArray = (payload) => {
+        if (Array.isArray(payload)) return payload;
+        return payload?.data ?? payload?.items ?? payload?.events ?? payload?.bookEvents ?? [];
+      };
 
-  const getStatusConfig = (status) => {
-    const configs = {
-      signed: {
-        bgColor: 'bg-green-100',
-        textColor: 'text-green-700',
-        icon: <CheckCircle size={14} />
-      },
-      pending: {
-        bgColor: 'bg-amber-100',
-        textColor: 'text-amber-700',
-        icon: <AlertCircle size={14} />
-      },
-      deposit: {
-        bgColor: 'bg-amber-100',
-        textColor: 'text-amber-700',
-        icon: <AlertCircle size={14} />
+      const merged = [];
+      const pushIfArray = (result) => {
+        if (result.status !== 'fulfilled') return;
+        const rows = extractArray(result.value.data);
+        if (Array.isArray(rows) && rows.length > 0) merged.push(...rows);
+      };
+
+      pushIfArray(activeRes);
+      pushIfArray(upcomingRes);
+      pushIfArray(ascRes);
+      pushIfArray(historyRes);
+
+      // Deduplicate by best available identifier
+      const seen = new Set();
+      const deduped = merged.filter((item) => {
+        const key = item?.bookEventId ?? item?.eventId ?? item?.bookingCode ?? item?.id ?? JSON.stringify(item);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      setEventsData(deduped.map(mapEventToUI));
+
+      if (pendingContractRes.status === 'fulfilled') {
+        const data = pendingContractRes.value.data;
+        const count = typeof data === 'number' ? data : data?.count ?? data?.total ?? data?.value ?? 0;
+        setPendingContracts(Number(count) || 0);
+      } else {
+        setPendingContracts(0);
       }
-    };
-    return configs[status] || configs.pending;
-  };
+    } catch (err) {
+      console.error('Lỗi tải dữ liệu sự kiện:', err);
+      setEventsData([]);
+      setPendingContracts(0);
+    }
+  }, []);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
-  };
+  useEffect(() => {
+    loadReservationData();
+    loadEventsData();
+  }, [loadReservationData, loadEventsData]);
 
-  const getRegularStatusConfig = (status) => {
-    const configs = {
-      dining: {
-        className: 'regular-status dining',
-        icon: <Utensils size={14} />
-      },
-      pending: {
-        className: 'regular-status pending',
-        icon: <Clock3 size={14} />
-      },
-      confirmed: {
-        className: 'regular-status confirmed',
-        icon: <CheckCircle size={14} />
-      },
-      cancelled: {
-        className: 'regular-status cancelled',
-        icon: <XCircle size={14} />
-      }
-    };
-    return configs[status] || configs.pending;
+  const handleConfirmReservation = async (booking) => {
+    if (!booking?.reservationCode) return;
+    setProcessingCode(booking.reservationCode);
+    try {
+      await reservationAPI.confirm(booking.reservationCode);
+      await loadReservationData();
+    } catch (err) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || 'Xác nhận đặt bàn thất bại';
+      setError(`Lỗi ${status ?? ''} ${msg}`.trim());
+    } finally {
+      setProcessingCode('');
+    }
   };
 
   const openCancelModal = (booking) => {
@@ -234,9 +187,106 @@ const ManagerReservationsPage = () => {
     setCancelReason('');
   };
 
+  const handleCancelReservation = async () => {
+    if (!cancelTarget?.reservationCode || !cancelReason.trim()) return;
+    setProcessingCode(cancelTarget.reservationCode);
+    try {
+      await reservationAPI.cancel(cancelTarget.reservationCode);
+      closeCancelModal();
+      await loadReservationData();
+    } catch (err) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || 'Hủy đặt bàn thất bại';
+      setError(`Lỗi ${status ?? ''} ${msg}`.trim());
+    } finally {
+      setProcessingCode('');
+    }
+  };
+
+  const filteredRegularBookings = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return regularBookings;
+    return regularBookings.filter((booking) => (
+      booking.customer.toLowerCase().includes(query)
+      || booking.phone.includes(query)
+      || String(booking.reservationCode).toLowerCase().includes(query)
+    ));
+  }, [searchQuery, regularBookings]);
+
+  const filteredEvents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return eventsData;
+    return eventsData.filter((event) => (
+      event.customer.toLowerCase().includes(query)
+      || event.contact.toLowerCase().includes(query)
+      || event.phone.includes(query)
+      || String(event.bookingCode).toLowerCase().includes(query)
+    ));
+  }, [searchQuery, eventsData]);
+
+  const upcomingEvents = eventsData.length;
+  const urgentCount = pendingContracts;
+  const totalRevenue = eventsData.reduce((sum, e) => sum + (Number(e.revenue) || 0), 0);
+
+  const getEventTypeColor = (color) => {
+    const colors = {
+      blue: 'bg-blue-50 text-blue-700',
+      purple: 'bg-purple-50 text-purple-700',
+      rose: 'bg-rose-50 text-rose-700',
+      cyan: 'bg-cyan-50 text-cyan-700',
+      green: 'bg-green-50 text-green-700',
+      amber: 'bg-amber-50 text-amber-700',
+    };
+    return colors[color] || colors.blue;
+  };
+
+  const getStatusConfig = (status) => {
+    const configs = {
+      signed: {
+        bgColor: 'bg-green-100',
+        textColor: 'text-green-700',
+        icon: <CheckCircle size={14} />,
+      },
+      pending: {
+        bgColor: 'bg-amber-100',
+        textColor: 'text-amber-700',
+        icon: <AlertCircle size={14} />,
+      },
+      deposit: {
+        bgColor: 'bg-amber-100',
+        textColor: 'text-amber-700',
+        icon: <AlertCircle size={14} />,
+      },
+    };
+    return configs[status] || configs.pending;
+  };
+
+  const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN').format(amount || 0) + ' đ';
+
+  const getRegularStatusConfig = (status) => {
+    const configs = {
+      dining: {
+        className: 'regular-status dining',
+        icon: <Utensils size={14} />,
+      },
+      pending: {
+        className: 'regular-status pending',
+        icon: <Clock3 size={14} />,
+      },
+      confirmed: {
+        className: 'regular-status confirmed',
+        icon: <CheckCircle size={14} />,
+      },
+      cancelled: {
+        className: 'regular-status cancelled',
+        icon: <XCircle size={14} />,
+      },
+    };
+    return configs[status] || configs.pending;
+  };
+
   return (
     <div className="reservations-page-container">
-      {/* Header */}
       <header className="reservations-header">
         <div className="header-content">
           <div className="header-text">
@@ -258,7 +308,7 @@ const ManagerReservationsPage = () => {
                 className="search-input"
               />
             </div>
-            <button className="btn-create-event">
+            <button className="btn-create-event" type="button">
               <Plus size={20} />
               {activeTab === 'regular' ? 'Đặt bàn mới' : 'Tạo sự kiện mới'}
             </button>
@@ -266,7 +316,12 @@ const ManagerReservationsPage = () => {
         </div>
       </header>
 
-      {/* Statistics Cards */}
+      {error && (
+        <div style={{ background: '#fff1f0', color: '#cf1322', border: '1px solid #ffccc7', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+          ⚠ {error}
+        </div>
+      )}
+
       {activeTab === 'regular' ? (
         <div className="stats-grid">
           <div className="stat-card stat-card-blue">
@@ -293,7 +348,7 @@ const ManagerReservationsPage = () => {
               <Utensils className="stat-icon text-green-600" size={24} />
             </div>
             <p className="stat-value text-green-600">{activeTables}</p>
-            <p className="stat-info">Công suất 75%</p>
+            <p className="stat-info">Đang hoạt động</p>
           </div>
         </div>
       ) : (
@@ -304,7 +359,7 @@ const ManagerReservationsPage = () => {
               <Calendar className="stat-icon text-primary" size={24} />
             </div>
             <p className="stat-value">{upcomingEvents}</p>
-            <p className="stat-change positive">+2 so với tuần trước</p>
+            <p className="stat-change positive">Dữ liệu realtime</p>
           </div>
 
           <div className="stat-card">
@@ -322,18 +377,17 @@ const ManagerReservationsPage = () => {
               <FileText className="stat-icon text-green-600" size={24} />
             </div>
             <p className="stat-value">{formatCurrency(totalRevenue)}</p>
-            <p className="stat-info">Tháng hiện tại</p>
+            <p className="stat-info">Từ sự kiện active</p>
           </div>
         </div>
       )}
 
-      {/* Main Content */}
       <div className="content-card">
-        {/* Tabs */}
         <div className="tabs-container">
           <button
             className={`tab-btn ${activeTab === 'regular' ? 'active' : ''}`}
             onClick={() => setActiveTab('regular')}
+            type="button"
           >
             <Calendar size={18} />
             Lịch đặt bàn thường
@@ -341,15 +395,17 @@ const ManagerReservationsPage = () => {
           <button
             className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`}
             onClick={() => setActiveTab('events')}
+            type="button"
           >
             <Users size={18} />
             Đặt tiệc / Sự kiện
           </button>
         </div>
 
-        {/* Table */}
         <div className="table-container">
-          {activeTab === 'regular' ? (
+          {loading ? (
+            <div style={{ padding: 24, color: '#64748b' }}>Đang tải dữ liệu...</div>
+          ) : activeTab === 'regular' ? (
             <table className="events-table regular-table">
               <thead>
                 <tr>
@@ -362,8 +418,16 @@ const ManagerReservationsPage = () => {
                 </tr>
               </thead>
               <tbody>
+                {filteredRegularBookings.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                      Không có dữ liệu đặt bàn
+                    </td>
+                  </tr>
+                )}
                 {filteredRegularBookings.map((booking) => {
                   const regularStatus = getRegularStatusConfig(booking.status);
+                  const isProcessing = processingCode === booking.reservationCode;
                   return (
                     <tr key={booking.id} className={booking.status === 'cancelled' ? 'muted-row' : ''}>
                       <td>
@@ -396,25 +460,25 @@ const ManagerReservationsPage = () => {
                         <div className="action-buttons">
                           {booking.status === 'pending' ? (
                             <>
-                              <button className="btn-confirm-inline">
+                              <button className="btn-confirm-inline" onClick={() => handleConfirmReservation(booking)} disabled={isProcessing} type="button">
                                 <Check size={14} />
-                                Xác nhận
+                                {isProcessing ? 'Đang xử lý...' : 'Xác nhận'}
                               </button>
-                              <button className="btn-cancel-inline" onClick={() => openCancelModal(booking)}>
+                              <button className="btn-cancel-inline" onClick={() => openCancelModal(booking)} disabled={isProcessing} type="button">
                                 <X size={14} />
                                 Hủy
                               </button>
                             </>
                           ) : booking.status === 'cancelled' ? (
-                            <button className="btn-icon-only" title="Chi tiết">
+                            <button className="btn-icon-only" title="Chi tiết" type="button">
                               <Info size={16} />
                             </button>
                           ) : (
                             <>
-                              <button className="btn-icon-only" title="Chỉnh sửa">
+                              <button className="btn-icon-only" title="Chỉnh sửa" type="button">
                                 <Edit size={16} />
                               </button>
-                              <button className="btn-icon-only danger" title="Hủy đặt bàn" onClick={() => openCancelModal(booking)}>
+                              <button className="btn-icon-only danger" title="Hủy đặt bàn" onClick={() => openCancelModal(booking)} type="button">
                                 <Trash2 size={16} />
                               </button>
                             </>
@@ -439,19 +503,21 @@ const ManagerReservationsPage = () => {
                 </tr>
               </thead>
               <tbody>
+                {filteredEvents.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                      Không có dữ liệu sự kiện
+                    </td>
+                  </tr>
+                )}
                 {filteredEvents.map((event) => {
                   const statusConfig = getStatusConfig(event.status);
                   return (
-                    <tr
-                      key={event.id}
-                      className={event.urgent ? 'urgent-row' : ''}
-                    >
+                    <tr key={event.id} className={event.urgent ? 'urgent-row' : ''}>
                       <td>
                         <div className="customer-info">
                           <div className="customer-name">{event.customer}</div>
-                          <div className="customer-contact">
-                            Người liên hệ: {event.contact} ({event.phone})
-                          </div>
+                          <div className="customer-contact">Người liên hệ: {event.contact} ({event.phone})</div>
                         </div>
                       </td>
                       <td>
@@ -481,14 +547,16 @@ const ManagerReservationsPage = () => {
                         <div className="action-buttons">
                           <button
                             className="btn-detail"
-                            onClick={() => navigate('/manager/reservations/SK-2024-001')}
+                            onClick={() => navigate(`/manager/reservations/${event.eventId || event.bookingCode || 'detail'}`)}
+                            type="button"
                           >
                             <Eye size={14} />
                             Chi tiết
                           </button>
                           <button
                             className="btn-contract"
-                            onClick={() => navigate('/manager/reservations/SK-2024-001/contract')}
+                            onClick={() => navigate(`/manager/reservations/${event.eventId || event.bookingCode || 'detail'}/contract`)}
+                            type="button"
                           >
                             <FileText size={14} />
                             Hợp đồng
@@ -503,24 +571,20 @@ const ManagerReservationsPage = () => {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="table-footer">
           <p className="pagination-info">
             {activeTab === 'regular'
               ? `Hiển thị ${filteredRegularBookings.length} trên ${totalTodayBookings} lượt đặt bàn`
-              : `Hiển thị ${filteredEvents.length} trong số ${eventsData.length} sự kiện sắp tới`}
+              : `Hiển thị ${filteredEvents.length} trong số ${eventsData.length} sự kiện`}
           </p>
           <div className="pagination-controls">
-            <button
-              className="pagination-btn"
-              disabled={currentPage === 1}
-            >
+            <button className="pagination-btn" disabled={currentPage === 1} type="button">
               <ChevronLeft size={16} />
             </button>
-            <button className="pagination-btn active">1</button>
-            <button className="pagination-btn">2</button>
-            <button className="pagination-btn">3</button>
-            <button className="pagination-btn">
+            <button className="pagination-btn active" type="button">1</button>
+            <button className="pagination-btn" type="button">2</button>
+            <button className="pagination-btn" type="button">3</button>
+            <button className="pagination-btn" type="button">
               <ChevronRight size={16} />
             </button>
           </div>
@@ -537,22 +601,19 @@ const ManagerReservationsPage = () => {
                 </div>
                 <h3 className="cancel-modal-title">Xác nhận hủy đặt bàn</h3>
               </div>
-              <button className="cancel-close-btn" onClick={closeCancelModal}>
+              <button className="cancel-close-btn" onClick={closeCancelModal} type="button">
                 <X size={18} />
               </button>
             </div>
 
             <div className="cancel-modal-body">
               <p className="cancel-modal-text">
-                Bạn có chắc chắn muốn hủy lượt đặt bàn của khách hàng{' '}
-                <strong>{cancelTarget.customer}</strong> không?
+                Bạn có chắc chắn muốn hủy lượt đặt bàn của khách hàng <strong>{cancelTarget.customer}</strong> không?
               </p>
 
               <div className="cancel-warning-box">
                 <AlertCircle size={18} />
-                <p>
-                  Hành động này không thể hoàn tác. Lịch đặt bàn sẽ được chuyển sang trạng thái "Đã hủy".
-                </p>
+                <p>Hành động này không thể hoàn tác. Lịch đặt bàn sẽ được chuyển sang trạng thái Đã hủy.</p>
               </div>
 
               <label className="cancel-label" htmlFor="cancel-reason">
@@ -566,20 +627,21 @@ const ManagerReservationsPage = () => {
                 value={cancelReason}
                 onChange={(event) => setCancelReason(event.target.value)}
               />
-              <p className="cancel-note">Thông tin này sẽ được lưu vào lịch sử đặt bàn.</p>
+              <p className="cancel-note">Thông tin này sẽ được lưu vào lịch sử đặt bàn nội bộ.</p>
             </div>
 
             <div className="cancel-modal-footer">
-              <button className="btn-cancel-secondary" onClick={closeCancelModal}>
+              <button className="btn-cancel-secondary" onClick={closeCancelModal} type="button">
                 Hủy bỏ
               </button>
               <button
                 className="btn-cancel-danger"
-                disabled={!cancelReason.trim()}
-                onClick={closeCancelModal}
+                disabled={!cancelReason.trim() || processingCode === cancelTarget.reservationCode}
+                onClick={handleCancelReservation}
+                type="button"
               >
                 <Trash2 size={14} />
-                Xác nhận hủy
+                {processingCode === cancelTarget.reservationCode ? 'Đang hủy...' : 'Xác nhận hủy'}
               </button>
             </div>
           </div>
