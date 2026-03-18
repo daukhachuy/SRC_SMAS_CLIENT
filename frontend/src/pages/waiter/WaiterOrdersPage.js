@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -22,8 +22,89 @@ import {
   X
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
+import { orderAPI } from '../../api/managerApi';
+
+const asArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.$values)) return payload.$values;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.orders)) return payload.orders;
+  return [];
+};
+
+const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
+
+const mapOrderStatus = (status) => {
+  const s = normalizeStatus(status);
+  if (s === 'ready' || s === 'confirmed') return { status: 'ready', statusLabel: 'Sẵn sàng' };
+  if (s === 'delivering' || s === 'shipping') return { status: 'delivering', statusLabel: 'Đang giao' };
+  if (s === 'completed' || s === 'done') return { status: 'ready', statusLabel: 'Hoàn thành' };
+  if (s === 'cancelled' || s === 'canceled') return { status: 'preparing', statusLabel: 'Đã hủy' };
+  return { status: 'preparing', statusLabel: 'Đang làm' };
+};
+
+const mapDishStatus = (status) => {
+  const s = normalizeStatus(status);
+  if (s === 'ready' || s === 'completed') return 'ready';
+  if (s === 'served' || s === 'delivered') return 'served';
+  if (s === 'preparing' || s === 'processing' || s === 'cooking') return 'preparing';
+  return 'pending';
+};
+
+const toCurrencyNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const toOrderItem = (item, idx) => ({
+  name: item?.foodName || item?.name || item?.itemName || `Món ${idx + 1}`,
+  quantity: Number(item?.quantity || item?.qty || 1),
+  price: toCurrencyNumber(item?.unitPrice ?? item?.price ?? item?.totalPrice ?? 0),
+  dishStatus: mapDishStatus(item?.status),
+  note: item?.note || ''
+});
+
+const mapApiOrderToWaiter = (order) => {
+  const orderCode = order?.orderCode || order?.code || `DH-${order?.orderId || order?.id || '---'}`;
+  const mappedStatus = mapOrderStatus(order?.status);
+  const orderItems = asArray(order?.orderItems).map(toOrderItem);
+  const totalAmount = toCurrencyNumber(order?.totalAmount ?? order?.total ?? 0);
+
+  const orderType = String(order?.orderType || '').toLowerCase();
+  const tableName = order?.tableName || order?.tableCode || order?.tableNumber;
+  const isDineIn = orderType === 'dinein';
+  const customerName =
+    order?.customerName ||
+    order?.guestName ||
+    order?.receiverName ||
+    (isDineIn ? (tableName ? `Khách tại ${tableName}` : 'Khách tại bàn') : 'Khách hàng');
+
+  return {
+    id: orderCode,
+    time: order?.createdAt
+      ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      : '--:--',
+    status: mappedStatus.status,
+    statusLabel: mappedStatus.statusLabel,
+    tableNumber: isDineIn ? (tableName || 'Bàn --') : '',
+    guests: Number(order?.numberOfGuests || order?.guestCount || order?.guests || 0),
+    customerName,
+    channel: isDineIn ? 'dineIn' : orderType === 'takeaway' ? 'takeaway' : 'delivery',
+    items: orderItems,
+    address: order?.deliveryAddress || order?.address || '',
+    phone: order?.customerPhone || order?.phone || order?.receiverPhone || '',
+    note: order?.note || order?.customerNote || '',
+    deliveryFee: toCurrencyNumber(order?.deliveryFee),
+    discount: toCurrencyNumber(order?.discount),
+    totalAmount
+  };
+};
 
 const WaiterOrdersPage = () => {
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState('');
   const [activeTab, setActiveTab] = useState('dineIn');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showOrderInfoModal, setShowOrderInfoModal] = useState(false);
@@ -94,137 +175,88 @@ const WaiterOrdersPage = () => {
     []
   );
 
-  const deliveryOrders = useMemo(
-    () => [
-      {
-        id: 'GIAO-442',
-        time: '10:45 AM',
-        status: 'ready',
-        statusLabel: 'Đã nấu xong',
-        customerName: 'Lê Thị Thu Thảo',
-        customerTier: 'Thành viên thân thiết',
-        address: '123 Đường Lê Lợi, Quận 1, TP.HCM',
-        phone: '0901 234 567',
-        note: 'Vui lòng gọi điện trước khi giao. Khách đang bận họp.',
-        items: [
-          { name: 'Phở đặc biệt', quantity: 2, price: 65000 },
-          { name: 'Quẩy', quantity: 4, price: 5000 },
-          { name: 'Trà đá', quantity: 2, price: 5000 }
-        ],
-        deliveryFee: 20000,
-        discount: 0
-      },
-      {
-        id: 'GIAO-445',
-        time: '11:15 AM',
-        status: 'ready',
-        statusLabel: 'Đã nấu xong',
-        customerName: 'Trần Minh Quân',
-        customerTier: 'Khách vãng lai',
-        address: '45 Nguyễn Huệ, Quận 1, TP.HCM',
-        phone: '0912 567 333',
-        note: 'Giao qua lễ tân tòa nhà.',
-        items: [
-          { name: 'Bún chả Hà Nội', quantity: 3, price: 50000 },
-          { name: 'Nem rán', quantity: 2, price: 25000 },
-          { name: 'Coca', quantity: 3, price: 15000 }
-        ],
-        deliveryFee: 18000,
-        discount: 0
-      },
-      {
-        id: 'GIAO-448',
-        time: '11:30 AM',
-        status: 'preparing',
-        statusLabel: 'Đang chuẩn bị',
-        customerName: 'Phạm Hải Yến',
-        customerTier: 'Thành viên thân thiết',
-        address: 'Vinhomes Central Park, Bình Thạnh',
-        phone: '0907 111 222',
-        note: 'Không hành lá.',
-        items: [
-          { name: 'Cơm tấm sườn bì chả', quantity: 1, price: 55000 },
-          { name: 'Canh khổ qua', quantity: 1, price: 30000 }
-        ],
-        deliveryFee: 20000,
-        discount: 0
-      },
-      {
-        id: 'GIAO-450',
-        time: '11:45 AM',
-        status: 'preparing',
-        statusLabel: 'Đang chuẩn bị',
-        customerName: 'Hoàng Anh Đức',
-        customerTier: 'Khách vãng lai',
-        address: 'Chung cư Masteri, Thảo Điền, Quận 2',
-        phone: '0933 222 111',
-        note: '',
-        items: [
-          { name: 'Gỏi cuốn', quantity: 10, price: 10000 },
-          { name: 'Bún bò Huế', quantity: 1, price: 65000 }
-        ],
-        deliveryFee: 25000,
-        discount: 0
-      }
-    ],
-    []
-  );
+  const [deliveryOrders, setDeliveryOrders] = useState([]);
+  const [dineInOrders, setDineInOrders] = useState([]);
+  const [takeawayOrders, setTakeawayOrders] = useState([]);
+  const [serviceHistory, setServiceHistory] = useState([]);
 
-  const dineInOrders = useMemo(
-    () => [
-      {
-        id: 'DH-10293',
-        time: '10:30',
-        status: 'preparing',
-        statusLabel: 'Đang làm',
-        tableNumber: 'Bàn 05',
-        guests: 4,
-        customerName: 'Khách tại bàn 05',
-        channel: 'dineIn',
-        items: [
-          { name: 'Bánh mì bơ tỏi', quantity: 1, price: 45000, dishStatus: 'pending', note: '' },
-          { name: 'Cà phê sữa đá', quantity: 2, price: 35000, dishStatus: 'preparing', note: '' },
-          {
-            name: 'Phở bò đặc biệt',
-            quantity: 2,
-            price: 75000,
-            dishStatus: 'ready',
-            note: 'Nhiều hành, không béo'
-          },
-          { name: 'Chả giò tôm thịt', quantity: 1, price: 65000, dishStatus: 'served', note: '' }
-        ],
-        address: '',
-        phone: '',
-        note: '',
-        deliveryFee: 0,
-        discount: 0
-      }
-    ],
-    []
-  );
+  const fetchWaiterOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    setOrdersError('');
 
-  const takeawayOrders = useMemo(
-    () => [
-      {
-        id: 'MANG-221',
-        time: '11:05',
-        status: 'preparing',
-        statusLabel: 'Đang làm',
-        customerName: 'Khách mang đi',
-        channel: 'takeaway',
-        items: [
-          { name: 'Bún bò Huế', quantity: 1, price: 65000 },
-          { name: 'Trà tắc', quantity: 1, price: 20000 }
-        ],
-        address: '',
-        phone: '0905 888 999',
-        note: 'Lấy lúc 11:30',
-        deliveryFee: 0,
-        discount: 0
+    try {
+      const [activeResult, historyResult] = await Promise.allSettled([
+        orderAPI.getActive(),
+        orderAPI.getHistory()
+      ]);
+
+      let activeOrders = [];
+
+      if (activeResult.status === 'fulfilled') {
+        activeOrders = asArray(activeResult.value?.data).map(mapApiOrderToWaiter);
+      } else {
+        const status = activeResult.reason?.response?.status;
+
+        // Một số backend không cấp quyền /order/active cho Waiter.
+        // Thử fallback endpoint hôm nay trước khi báo lỗi.
+        if (status === 403) {
+          const todayResult = await Promise.allSettled([orderAPI.getToday()]);
+          if (todayResult[0].status === 'fulfilled') {
+            activeOrders = asArray(todayResult[0].value?.data).map(mapApiOrderToWaiter);
+          } else {
+            throw new Error('Lỗi 403: Tài khoản Waiter không có quyền gọi API đơn hàng hiện tại. Vui lòng cấp quyền endpoint order cho Waiter hoặc cung cấp endpoint riêng cho waiter.');
+          }
+        } else {
+          const message = activeResult.reason?.response?.data?.message || activeResult.reason?.message;
+          throw new Error(`Lỗi ${status || 'kết nối'}: ${message || 'Không thể tải danh sách đơn hàng.'}`);
+        }
       }
-    ],
-    []
-  );
+
+      setDineInOrders(activeOrders.filter((order) => order.channel === 'dineIn'));
+      setTakeawayOrders(activeOrders.filter((order) => order.channel === 'takeaway'));
+      setDeliveryOrders(activeOrders.filter((order) => order.channel === 'delivery'));
+
+      if (historyResult.status === 'fulfilled') {
+        const historyOrders = asArray(historyResult.value?.data);
+        const groupedByDate = historyOrders.reduce((acc, order) => {
+          const rawDate = order?.createdAt || order?.updatedAt || order?.orderDate;
+          const dateKey = rawDate ? new Date(rawDate).toLocaleDateString('vi-VN') : 'Không xác định';
+          const current = acc[dateKey] || { totalOrders: 0, revenue: 0 };
+          current.totalOrders += 1;
+          current.revenue += toCurrencyNumber(order?.totalAmount ?? order?.total ?? 0);
+          acc[dateKey] = current;
+          return acc;
+        }, {});
+
+        const historyRows = Object.entries(groupedByDate)
+          .slice(0, 7)
+          .map(([date, metrics]) => ({
+            date,
+            totalOrders: `${metrics.totalOrders} đơn`,
+            revenue: `${metrics.revenue.toLocaleString('vi-VN')}đ`,
+            rating: 5,
+            status: 'Hoàn thành'
+          }));
+
+        setServiceHistory(historyRows);
+      } else {
+        setServiceHistory([]);
+      }
+    } catch (error) {
+      console.error('Không thể tải dữ liệu đơn hàng waiter:', error);
+      setOrdersError(error?.message || 'Không thể tải dữ liệu đơn hàng.');
+      setDineInOrders([]);
+      setTakeawayOrders([]);
+      setDeliveryOrders([]);
+      setServiceHistory([]);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWaiterOrders();
+  }, [fetchWaiterOrders]);
 
   const currentOrders =
     activeTab === 'delivery'
@@ -234,7 +266,7 @@ const WaiterOrdersPage = () => {
         : dineInOrders;
   const deliveryCount = deliveryOrders.length;
   const takeawayCount = takeawayOrders.length;
-  const dineInCount = dineInOrders.length || 12;
+  const dineInCount = dineInOrders.length;
 
   const getStatusClass = (status) => {
     switch (status) {
@@ -267,7 +299,7 @@ const WaiterOrdersPage = () => {
   const formatCurrency = (value) => `${value.toLocaleString('vi-VN')}đ`;
 
   const getOrderItemsSummary = (order) =>
-    (order.items || [])
+    ((order.items || []).length ? (order.items || []) : [{ name: 'Chưa có món', quantity: 0 }])
       .map((item) => `${item.name} (${item.quantity})`)
       .join(', ');
 
@@ -348,23 +380,6 @@ const WaiterOrdersPage = () => {
     tips: '450.000đ'
   };
 
-  const serviceHistory = [
-    {
-      date: 'Hôm nay',
-      totalOrders: '18 đơn',
-      revenue: '4.250.000đ',
-      rating: 4.5,
-      status: 'Hoàn thành'
-    },
-    {
-      date: '23/05/2024',
-      totalOrders: '24 đơn',
-      revenue: '6.100.000đ',
-      rating: 5,
-      status: 'Hoàn thành'
-    }
-  ];
-
   const pendingDeliveries = deliveryOrders.filter((order) => order.status === 'ready').slice(0, 2);
 
   return (
@@ -381,6 +396,26 @@ const WaiterOrdersPage = () => {
           Tạo đơn hàng mới
         </button>
       </header>
+
+      {ordersError && (
+        <div style={{
+          marginBottom: '16px',
+          border: '1px solid #ffccc7',
+          background: '#fff2f0',
+          color: '#cf1322',
+          padding: '10px 12px',
+          borderRadius: '10px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <span>{ordersError}</span>
+          <button className="btn-order-detail" type="button" onClick={fetchWaiterOrders}>
+            Tải lại
+          </button>
+        </div>
+      )}
 
       <div className="waiter-orders-layout">
         <section className="orders-main-section">
@@ -406,7 +441,11 @@ const WaiterOrdersPage = () => {
           </div>
 
           <div className="orders-grid">
-            {currentOrders.map((order) => (
+            {loadingOrders && <p className="order-items">Đang tải danh sách đơn hàng...</p>}
+            {!loadingOrders && currentOrders.length === 0 && (
+              <p className="order-items">Chưa có đơn hàng nào trong mục này.</p>
+            )}
+            {!loadingOrders && currentOrders.map((order) => (
               <div key={order.id} className="order-card">
                 <div className="order-card-header">
                   <div>
@@ -484,6 +523,13 @@ const WaiterOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {serviceHistory.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', color: '#888' }}>
+                        Chưa có dữ liệu lịch sử từ API.
+                      </td>
+                    </tr>
+                  )}
                   {serviceHistory.map((record, index) => (
                     <tr key={index}>
                       <td>{record.date}</td>

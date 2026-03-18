@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X } from 'lucide-react';
+import { Bell, Boxes, Calendar, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { useAuth } from '../../context/AuthContext';
 import { getProfile } from '../../api/userApi';
@@ -98,6 +98,7 @@ const ManagerLayout = () => {
     () => [
       { to: '/manager/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
       { to: '/manager/orders', label: 'Đơn hàng', icon: ShoppingCart },
+      { to: '/manager/tables', label: 'Bàn', icon: Calendar },
       { to: '/manager/reservations', label: 'Đặt bàn', icon: CalendarRange },
       { to: '/manager/staff', label: 'Nhân viên', icon: Users },
       { to: '/manager/inventory', label: 'Kho hàng', icon: Boxes },
@@ -141,7 +142,13 @@ const ManagerLayout = () => {
           })}
         </nav>
 
-        <div className="manager-sidebar-footer">
+
+        <div
+          className="manager-sidebar-footer manager-sidebar-footer--clickable"
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate('/manager/profile')}
+          title="Xem trang cá nhân"
+        >
           <div className="manager-avatar">{userInfo.initials}</div>
           <div>
             <strong>{userInfo.fullname}</strong>

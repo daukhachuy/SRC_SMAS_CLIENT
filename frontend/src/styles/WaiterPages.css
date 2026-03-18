@@ -1124,6 +1124,1115 @@
   font-size: 13px;
 }
 
+/* Waiter Schedule Page */
+.waiter-schedule-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.waiter-schedule-refresh {
+  border: 1px solid #e0dcd8;
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #5c4e45;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.waiter-schedule-refresh:hover {
+  border-color: #ff6d1f;
+  color: #ff6d1f;
+}
+
+.waiter-schedule-error {
+  margin-bottom: 18px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #be123c;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.waiter-schedule-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 24px;
+}
+
+.waiter-schedule-main {
+  background: #fff;
+  border: 1px solid #e0dcd8;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.waiter-week-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e0dcd8;
+  background: rgba(255, 109, 31, 0.05);
+}
+
+.waiter-week-toolbar h3 {
+  margin: 0;
+  color: #2e241e;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.waiter-week-nav-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ffd5bb;
+  border-radius: 10px;
+  background: #fff;
+  color: #ff6d1f;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.waiter-week-nav-btn:hover {
+  background: rgba(255, 109, 31, 0.08);
+}
+
+.waiter-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-height: 460px;
+}
+
+.waiter-day-column {
+  border-right: 1px solid #f0ece9;
+  display: flex;
+  flex-direction: column;
+}
+
+.waiter-day-column:last-child {
+  border-right: 0;
+}
+
+.waiter-day-column.is-today {
+  background: rgba(255, 109, 31, 0.04);
+}
+
+.waiter-day-head {
+  padding: 12px 8px;
+  text-align: center;
+  border-bottom: 1px solid #f0ece9;
+  background: rgba(248, 248, 248, 0.7);
+}
+
+.waiter-day-column.is-today .waiter-day-head {
+  background: rgba(255, 109, 31, 0.1);
+}
+
+.waiter-day-head span {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b7e73;
+  font-weight: 700;
+}
+
+.waiter-day-head strong {
+  font-size: 22px;
+  color: #23160f;
+  line-height: 1.2;
+}
+
+.waiter-day-content {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+}
+
+.waiter-day-empty {
+  margin: auto 0;
+  text-align: center;
+  color: #c2b8b0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.waiter-shift-chip {
+  border-radius: 10px;
+  border-left: 4px solid #94a3b8;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.waiter-shift-chip.morning {
+  border-left-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.waiter-shift-chip.afternoon {
+  border-left-color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.waiter-shift-chip.evening {
+  border-left-color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.waiter-shift-name {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1f2937;
+  text-transform: uppercase;
+}
+
+.waiter-shift-time {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #4b5563;
+  font-weight: 700;
+}
+
+.waiter-shift-note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.waiter-schedule-loading {
+  padding: 12px 16px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #7a6f66;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.waiter-schedule-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.waiter-request-switch-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ff6d1f, #ff8a4a);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 109, 31, 0.25);
+}
+
+.waiter-request-switch-btn:hover {
+  transform: translateY(-1px);
+}
+
+.waiter-request-note {
+  margin: -6px 2px 2px;
+  color: #8b7e73;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.waiter-swap-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 22, 15, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.waiter-swap-modal {
+  width: 100%;
+  max-width: 620px;
+  background: #fff;
+  border: 1px solid rgba(255, 109, 31, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.waiter-swap-modal-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid #efe9e4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.waiter-swap-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.waiter-swap-modal-title h3 {
+  margin: 0;
+  color: #23160f;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.waiter-swap-modal-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 109, 31, 0.1);
+  color: #ff6d1f;
+  display: grid;
+  place-items: center;
+}
+
+.waiter-swap-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  color: #7d7168;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.waiter-swap-close-btn:hover {
+  background: #f5f1ed;
+  color: #24170f;
+}
+
+.waiter-swap-form {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.waiter-swap-field {
+  display: grid;
+  gap: 7px;
+}
+
+.waiter-swap-field label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4d4036;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.waiter-swap-field select,
+.waiter-swap-field textarea {
+  width: 100%;
+  border: 1px solid #e4dcd4;
+  background: #faf8f6;
+  color: #23160f;
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 14px;
+}
+
+.waiter-swap-field select:focus,
+.waiter-swap-field textarea:focus {
+  outline: none;
+  border-color: #ff6d1f;
+  box-shadow: 0 0 0 3px rgba(255, 109, 31, 0.12);
+}
+
+.waiter-swap-feedback {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+
+.waiter-swap-feedback.error {
+  color: #be123c;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+}
+
+.waiter-swap-feedback.success {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.waiter-swap-submit-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: #ff6d1f;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  padding: 13px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(255, 109, 31, 0.3);
+}
+
+.waiter-swap-submit-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.waiter-schedule-card {
+  background: #fff;
+  border: 1px solid #e0dcd8;
+  border-radius: 14px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.waiter-schedule-card-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee8e3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.waiter-schedule-card-head h4 {
+  margin: 0;
+  color: #23160f;
+  font-size: 15px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.waiter-schedule-card-head span {
+  background: rgba(255, 109, 31, 0.12);
+  color: #ff6d1f;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.waiter-notification-list {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waiter-notification-item {
+  border-radius: 10px;
+  border: 1px solid #efe8e2;
+  padding: 10px;
+  background: #fff;
+}
+
+.waiter-notification-item.primary {
+  background: rgba(255, 109, 31, 0.08);
+  border-color: rgba(255, 109, 31, 0.2);
+}
+
+.waiter-notification-item.success strong {
+  color: #15803d;
+}
+
+.waiter-notification-item.info strong {
+  color: #2563eb;
+}
+
+.waiter-notification-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.waiter-notification-top strong {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ff6d1f;
+}
+
+.waiter-notification-top small {
+  color: #9a8f87;
+  font-size: 10px;
+}
+
+.waiter-notification-item p {
+  margin: 0;
+  font-size: 12px;
+  color: #3f342d;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.waiter-week-stats-card {
+  padding: 14px 16px;
+}
+
+.waiter-week-stats-card h4 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #84786f;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.waiter-week-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.waiter-week-stats-grid div {
+  border: 1px solid #f0e9e2;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fffaf7;
+}
+
+.waiter-week-stats-grid p {
+  margin: 0 0 5px;
+  font-size: 11px;
+  color: #8f8278;
+}
+
+.waiter-week-stats-grid strong {
+  color: #23160f;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.waiter-spin {
+  animation: waiterSpin 1s linear infinite;
+}
+
+@keyframes waiterSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1200px) {
+  .waiter-schedule-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .waiter-week-grid {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .waiter-day-column {
+    min-width: 180px;
+    border-right: 1px solid #f0ece9;
+  }
+
+  .waiter-week-toolbar h3 {
+    font-size: 15px;
+  }
+}
+
+/* Waiter Profile Page */
+.waiter-profile-page {
+  padding-bottom: 20px;
+}
+
+.waiter-profile-loading {
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #6f6258;
+  font-weight: 700;
+}
+
+.waiter-profile-card {
+  background: #fff;
+  border: 1px solid #eae3dc;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.waiter-profile-avatar-wrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 4px solid rgba(255, 109, 31, 0.14);
+}
+
+.waiter-profile-avatar-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.waiter-profile-verified {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #ff6d1f;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.waiter-profile-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.waiter-profile-info-grid .full-row {
+  grid-column: 1 / -1;
+}
+
+.waiter-profile-info-grid p {
+  margin: 0 0 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9b8e84;
+  font-weight: 700;
+}
+
+.waiter-profile-info-grid strong {
+  color: #23160f;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.waiter-profile-edit-btn {
+  border: 0;
+  border-radius: 12px;
+  background: #ff6d1f;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 8px 20px rgba(255, 109, 31, 0.28);
+  cursor: pointer;
+}
+
+.waiter-profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.waiter-profile-stat-card {
+  border: 1px solid #ebe4de;
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.waiter-profile-stat-card .icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+
+.waiter-profile-stat-card .icon.orange {
+  color: #ff6d1f;
+  background: rgba(255, 109, 31, 0.14);
+}
+
+.waiter-profile-stat-card .icon.blue {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.waiter-profile-stat-card .icon.green {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.14);
+}
+
+.waiter-profile-stat-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #7f7369;
+  font-weight: 600;
+}
+
+.waiter-profile-stat-card h4 {
+  margin: 6px 0 8px;
+  color: #23160f;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.waiter-profile-stat-card .trend {
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.waiter-profile-stat-card .trend.up {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.waiter-profile-stat-card .trend.down {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.waiter-profile-chart-card {
+  background: #fff;
+  border: 1px solid #ebe4de;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.waiter-profile-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.waiter-profile-chart-head h3 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #23160f;
+  font-weight: 800;
+}
+
+.waiter-profile-chart-head .legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.waiter-profile-chart-head .legend .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ff6d1f;
+}
+
+.waiter-profile-chart-head .legend small {
+  color: #91837a;
+  font-size: 12px;
+}
+
+.waiter-salary-bars {
+  height: 290px;
+  border-bottom: 1px solid #f0e9e2;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 0 4px 8px;
+}
+
+.waiter-salary-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.waiter-salary-bar {
+  width: 100%;
+  max-width: 74px;
+  min-height: 30px;
+  border-radius: 10px 10px 0 0;
+  background: rgba(249, 111, 36, 0.45);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.waiter-salary-bar.is-current {
+  background: #ff6d1f;
+}
+
+.waiter-salary-bar:hover {
+  filter: brightness(1.03);
+}
+
+.waiter-salary-bar span {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 800;
+  color: #f97316;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.waiter-salary-bar:hover span {
+  opacity: 1;
+}
+
+.waiter-salary-bar-col p {
+  margin: 0;
+  color: #9c8f85;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.waiter-salary-bar-col p.is-current {
+  color: #ff6d1f;
+}
+
+.waiter-profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(35, 22, 15, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.waiter-profile-modal {
+  width: 100%;
+  max-width: 980px;
+  background: #fff;
+  border: 1px solid rgba(255, 109, 31, 0.2);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.waiter-profile-modal-head {
+  padding: 22px 28px;
+  border-bottom: 1px solid #eee7e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.waiter-profile-modal-head h3 {
+  margin: 0;
+  color: #23160f;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.waiter-profile-modal-head button {
+  border: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: transparent;
+  color: #7a6f66;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.waiter-profile-modal-head button:hover {
+  background: #f5f1ed;
+}
+
+.waiter-profile-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.waiter-profile-form-content {
+  padding: 24px 28px;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 28px;
+  overflow-y: auto;
+}
+
+.waiter-profile-form-avatar-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.waiter-profile-form-avatar {
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 4px solid #fff;
+  box-shadow: 0 0 0 4px rgba(255, 109, 31, 0.12);
+  position: relative;
+}
+
+.waiter-profile-form-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.waiter-profile-avatar-camera-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 3px solid #fff;
+  background: #ff6d1f;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.waiter-profile-form-avatar-panel p {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  color: #94867a;
+  font-weight: 700;
+}
+
+.waiter-profile-form-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.waiter-profile-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.waiter-profile-form-section h4 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2e241e;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.waiter-profile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.waiter-profile-form-grid .full-row {
+  grid-column: 1 / -1;
+}
+
+.waiter-profile-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.waiter-profile-form label span {
+  font-size: 12px;
+  color: #6f6258;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.waiter-profile-form input,
+.waiter-profile-form select,
+.waiter-profile-form textarea {
+  width: 100%;
+  border: 1px solid #e4dcd4;
+  border-radius: 12px;
+  background: #faf8f6;
+  color: #23160f;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.waiter-profile-form textarea {
+  resize: vertical;
+  min-height: 68px;
+}
+
+.waiter-profile-form input:focus,
+.waiter-profile-form select:focus,
+.waiter-profile-form textarea:focus {
+  outline: none;
+  border-color: #ff6d1f;
+  box-shadow: 0 0 0 3px rgba(255, 109, 31, 0.12);
+}
+
+.waiter-profile-form-section.salary-block {
+  border: 1px solid rgba(255, 109, 31, 0.1);
+  background: rgba(245, 240, 232, 0.6);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.waiter-profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 0;
+  padding: 16px 28px;
+  border-top: 1px solid #eee7e1;
+  background: #faf8f6;
+}
+
+.waiter-profile-form-actions button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  min-width: 110px;
+}
+
+.waiter-profile-form-actions .ghost {
+  background: #f5f1ed;
+  color: #4f4339;
+}
+
+.waiter-profile-form-actions .primary {
+  background: #ff6d1f;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+@media (max-width: 1024px) {
+  .waiter-profile-card {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-profile-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-salary-bars {
+    height: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .waiter-profile-avatar-wrap {
+    width: 110px;
+    height: 110px;
+  }
+
+  .waiter-profile-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-profile-form {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-profile-form-content {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .waiter-profile-form-avatar {
+    width: 120px;
+    height: 120px;
+  }
+
+  .waiter-profile-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-profile-form-actions {
+    padding: 14px 16px;
+  }
+
+  .waiter-profile-chart-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 .order-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);

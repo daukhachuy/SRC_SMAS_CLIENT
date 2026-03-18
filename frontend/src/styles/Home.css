@@ -422,8 +422,6 @@
 
 /* ── DEALS GRID (light bg) ── */
 .h-deals-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 .h-deal-card {
@@ -461,9 +459,7 @@
 .h-deal-old { font-size: 0.75rem; color: var(--h-muted); text-decoration: line-through; }
 .h-deal-new { font-size: 1rem; font-weight: 800; color: var(--h-primary); }
 
-@media (max-width: 1024px) { .h-deals-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 768px)  { .h-deals-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px)  { .h-deals-grid { grid-template-columns: 1fr; } }
+
 
 /* ── SERVICES SHOWCASE ── */
 .h-services-showcase {
