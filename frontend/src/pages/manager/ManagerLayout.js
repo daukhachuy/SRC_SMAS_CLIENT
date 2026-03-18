@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X } from 'lucide-react';
+import { Bell, Boxes, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X, User, Camera, IdCard } from 'lucide-react';
+import axios from 'axios';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { useAuth } from '../../context/AuthContext';
-import { getProfile } from '../../api/userApi';
+import { getProfile, updateProfile } from '../../api/userApi';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
 
@@ -12,6 +13,25 @@ const ManagerLayout = () => {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [formData, setFormData] = useState({
+    fullname: '',
+    gender: '',
+    dob: '',
+    phone: '',
+    address: '',
+    avatar: ''
+  });
+  const [passwordData, setPasswordData] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+
   const [userInfo, setUserInfo] = useState({
     fullname: 'Manager',
     email: 'manager@fptres.vn',
@@ -23,6 +43,39 @@ const ManagerLayout = () => {
     const words = name.trim().split(' ');
     if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
     return words.map(w => w[0]).join('').toUpperCase();
+  };
+
+  // Cấu hình Cloudinary
+  const cloudName = "dmzuier4p";
+  const uploadPreset = "Image_profile";
+  const folderName = "image_SEP490";
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Hiển thị ảnh tạm thời để người dùng thấy thay đổi ngay lập tức
+    const localUrl = URL.createObjectURL(file);
+    setFormData({ ...formData, avatar: localUrl });
+
+    // Upload lên Cloudinary
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+    formDataUpload.append('upload_preset', uploadPreset);
+    formDataUpload.append('folder', folderName);
+
+    try {
+      const cloudinaryRes = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        formDataUpload
+      );
+
+      const imageUrl = cloudinaryRes.data.secure_url;
+      setFormData({ ...formData, avatar: imageUrl });
+    } catch (error) {
+      console.error("Lỗi upload avatar:", error);
+      alert("Không thể tải ảnh lên. Hãy kiểm tra lại kết nối!");
+    }
   };
 
   // Load user info và ưu tiên email thật từ Profile API
@@ -111,6 +164,96 @@ const ManagerLayout = () => {
     navigate('/auth');
   };
 
+  const openProfileModal = async () => {
+    setProfileOpen(true);
+    setProfileError('');
+    setProfileSuccess('');
+    setShowPasswordForm(false);
+    setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+
+    try {
+      const profile = await getProfile();
+      setFormData({
+        fullname: profile.fullname || profile.fullName || '',
+        gender: profile.gender || '',
+        dob: profile.dob ? profile.dob.split('T')[0] : '',
+        phone: profile.phone || '',
+        address: profile.address || '',
+        avatar: profile.avatar || ''
+      });
+    } catch (error) {
+      setProfileError('Không tải được thông tin profile');
+    }
+  };
+
+  const closeProfileModal = () => {
+    setProfileOpen(false);
+    setProfileError('');
+    setProfileSuccess('');
+    setShowPasswordForm(false);
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    setProfileError('');
+    setProfileSuccess('');
+
+    try {
+      await updateProfile(formData);
+      setProfileSuccess('Cập nhật thông tin thành công!');
+
+      const newInitials = getInitials(formData.fullname);
+      setUserInfo({
+        fullname: formData.fullname,
+        email: userInfo.email,
+        initials: newInitials,
+        avatar: formData.avatar
+      });
+
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const localUser = JSON.parse(userStr);
+        localStorage.setItem('user', JSON.stringify({ ...localUser, fullname: formData.fullname, avatar: formData.avatar }));
+      }
+
+      setTimeout(() => {
+        setProfileSuccess('');
+      }, 3000);
+    } catch (error) {
+      setProfileError(error.message || 'Cập nhật thất bại');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setProfileError('Mật khẩu mới không khớp');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      setProfileError('Mật khẩu mới phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    setProfileLoading(true);
+    setProfileError('');
+
+    try {
+      await updateProfile({ ...formData, ...passwordData });
+      setProfileSuccess('Đổi mật khẩu thành công!');
+      setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setShowPasswordForm(false);
+      setTimeout(() => setProfileSuccess(''), 3000);
+    } catch (error) {
+      setProfileError(error.message || 'Đổi mật khẩu thất bại');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   return (
     <div className="manager-shell">
       <aside className={`manager-sidebar ${menuOpen ? 'open' : ''}`}>
@@ -141,13 +284,19 @@ const ManagerLayout = () => {
           })}
         </nav>
 
-        <div className="manager-sidebar-footer">
-          <div className="manager-avatar">{userInfo.initials}</div>
+        <button className="manager-sidebar-footer" onClick={openProfileModal}>
+          <div className="manager-avatar">
+            {userInfo.avatar ? (
+              <img src={userInfo.avatar} alt="Avatar" />
+            ) : (
+              userInfo.initials
+            )}
+          </div>
           <div>
             <strong>{userInfo.fullname}</strong>
             <p>{userInfo.email}</p>
           </div>
-        </div>
+        </button>
 
         <button className="manager-logout-btn" onClick={handleLogout}>
           <LogOut size={16} />
@@ -183,10 +332,164 @@ const ManagerLayout = () => {
       </button>
 
       {/* Notification Dropdown */}
-      <NotificationDropdown 
+      <NotificationDropdown
         isOpen={notificationOpen}
         onClose={() => setNotificationOpen(false)}
       />
+
+      {/* Profile Modal */}
+      {profileOpen && (
+        <div className="modal-overlay" onClick={closeProfileModal}>
+          <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="profile-modal-header">
+              <h2>
+                <IdCard size={20} />
+                Hồ sơ cá nhân
+              </h2>
+              <button className="modal-close" onClick={closeProfileModal}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="profile-modal-body">
+              {profileError && <div className="profile-error">{profileError}</div>}
+              {profileSuccess && <div className="profile-success">{profileSuccess}</div>}
+
+              {!showPasswordForm ? (
+                <form onSubmit={handleUpdateProfile}>
+                  <div className="profile-avatar-section">
+                    <div className="profile-avatar-large">
+                      {formData.avatar ? (
+                        <img src={formData.avatar} alt="Avatar" />
+                      ) : (
+                        <span>{formData.fullname ? getInitials(formData.fullname) : 'U'}</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        style={{ display: 'none' }}
+                        id="avatar-upload"
+                      />
+                      <button type="button" className="avatar-camera-btn" onClick={() => document.getElementById('avatar-upload').click()}>
+                        <Camera size={14} />
+                      </button>
+                    </div>
+                    <p className="profile-name-display">{formData.fullname || 'Chưa có tên'}</p>
+                  </div>
+
+                  <div className="profile-form-grid">
+                    <div className="form-group">
+                      <label>Họ và tên</label>
+                      <input
+                        type="text"
+                        value={formData.fullname}
+                        onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Giới tính</label>
+                      <select
+                        value={formData.gender}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                      >
+                        <option value="">Chọn giới tính</option>
+                        <option value="Male">Nam</option>
+                        <option value="Female">Nữ</option>
+                        <option value="Other">Khác</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Ngày sinh</label>
+                      <input
+                        type="date"
+                        value={formData.dob}
+                        onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Số điện thoại</label>
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="form-group full-width">
+                      <label>Địa chỉ</label>
+                      <input
+                        type="text"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="profile-modal-actions">
+                    <button type="button" className="btn-password" onClick={() => setShowPasswordForm(true)}>
+                      Đổi mật khẩu
+                    </button>
+                    <button type="submit" className="btn-save" disabled={profileLoading}>
+                      {profileLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleChangePassword}>
+                  <h3 className="password-form-title">Đổi mật khẩu</h3>
+
+                  <div className="password-form-grid">
+                    <div className="form-group">
+                      <label>Mật khẩu hiện tại</label>
+                      <input
+                        type="password"
+                        value={passwordData.oldPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Nhập lại mật khẩu mới</label>
+                      <input
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="profile-modal-actions">
+                    <button type="button" className="btn-cancel" onClick={() => setShowPasswordForm(false)}>
+                      Hủy
+                    </button>
+                    <button type="submit" className="btn-save" disabled={profileLoading}>
+                      {profileLoading ? 'Đang lưu...' : 'Xác nhận'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
