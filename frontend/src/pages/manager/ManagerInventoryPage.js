@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -18,9 +18,20 @@ import {
   Beef,
   Fish,
   Check,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
 import '../../styles/ManagerInventoryPage.css';
+import {
+  getMaterials,
+  getBatches,
+  getInventoryLogs,
+  getIngredients,
+  createInventory,
+  createExport,
+  createImport,
+  getNewBatchCode
+} from '../../api/inventoryApi';
 
 const materialsData = [
   {
@@ -148,30 +159,436 @@ const ManagerInventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnTargetBatch, setReturnTargetBatch] = useState(null);
+  const [returnQty, setReturnQty] = useState('');
+  const [returnReason, setReturnReason] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [menuModalTab, setMenuModalTab] = useState('menu');
-  const [exportQty, setExportQty] = useState('16');
+  const [exportQty, setExportQty] = useState('');
   const [exportReason, setExportReason] = useState('');
+  const [exportTargetBatch, setExportTargetBatch] = useState(null);
+  const [exportSubmitting, setExportSubmitting] = useState(false);
+  const [showImportBatchModal, setShowImportBatchModal] = useState(false);
+  const [importBatchTarget, setImportBatchTarget] = useState(null);
+  const [importBatchQty, setImportBatchQty] = useState('');
+  const [importBatchReason, setImportBatchReason] = useState('');
+  const [importBatchSubmitting, setImportBatchSubmitting] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [importForm, setImportForm] = useState({
+    ingredientId: '',
+    batchCode: '',
+    quantity: '',
+    pricePerUnit: '',
+    expiryDate: '',
+    warehouseLocation: '',
+    note: ''
+  });
 
-  const isExportInvalid = Number(exportQty) > 15.5;
+  // API Data State
+  const [materialsData, setMaterialsData] = useState([]);
+  const [batchesData, setBatchesData] = useState([]);
+  const [logsData, setLogsData] = useState([]);
+  const [ingredientsList, setIngredientsList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch data from API - dùng allSettled để 1 API lỗi (vd logs 404) không làm mất hết data
+  const fetchAllData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [materialsResult, batchesResult, logsResult, ingredientsResult] = await Promise.allSettled([
+        getMaterials(),
+        getBatches(),
+        getInventoryLogs(),
+        getIngredients()
+      ]);
+
+      const materials = materialsResult.status === 'fulfilled' ? materialsResult.value : null;
+      const batches = batchesResult.status === 'fulfilled' ? batchesResult.value : null;
+      const logs = logsResult.status === 'fulfilled' ? logsResult.value : [];
+      console.log('📜 Logs fetched:', logs);
+      const ingredientsRaw = ingredientsResult.status === 'fulfilled' ? ingredientsResult.value : null;
+      const arr = Array.isArray(ingredientsRaw) ? ingredientsRaw : (ingredientsRaw?.$values || []);
+      setIngredientsList(arr.map((i) => ({ id: i.ingredientId ?? i.id, name: i.ingredientName || i.name || '' })));
+
+      setMaterialsData(transformMaterials(materials));
+      setBatchesData(transformBatches(batches));
+      setLogsData(transformLogs(logs));
+
+      const failed = [materialsResult, batchesResult, logsResult].filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        const msg = failed[0].reason?.message || 'Failed to load some inventory data';
+        setError(failed.length === 3 ? msg : null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch inventory data:', err);
+      setError(err.message || 'Failed to load inventory data');
+      setMaterialsData([]);
+      setBatchesData([]);
+      setLogsData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const openImportModal = async () => {
+    setShowImportModal(true);
+    try {
+      const code = await getNewBatchCode();
+      if (code && typeof code === 'string') setImportForm((f) => ({ ...f, batchCode: code }));
+    } catch (_) {}
+  };
+
+  const handleCreateInventory = async (e) => {
+    e.preventDefault();
+    const { ingredientId, batchCode, quantity, pricePerUnit, expiryDate, warehouseLocation, note } = importForm;
+    if (!ingredientId || !batchCode || quantity === '' || pricePerUnit === '') return;
+    setImportSubmitting(true);
+    try {
+      await createInventory({
+        ingredientId: Number(ingredientId),
+        batchCode: batchCode.trim(),
+        quantity: Number(quantity) || 0,
+        pricePerUnit: Number(pricePerUnit) || 0,
+        expiryDate: expiryDate || null,
+        warehouseLocation: warehouseLocation.trim() || null,
+        note: note.trim() || null
+      });
+      setShowImportModal(false);
+      setImportForm({ ingredientId: '', batchCode: '', quantity: '', pricePerUnit: '', expiryDate: '', warehouseLocation: '', note: '' });
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to create inventory:', err);
+      setError(err.message || 'Không thể tạo lô hàng');
+    } finally {
+      setImportSubmitting(false);
+    }
+  };
+
+  // Transform functions to match component format
+  const transformMaterials = (data) => {
+    if (!data) return [];
+    const arr = Array.isArray(data) ? data : data.$values || [];
+    return arr.map(item => ({
+      id: item.ingredientId || item.inventoryId || '',
+      name: item.ingredientName || '',
+      unit: item.unitOfMeasurement || 'kg',
+      current: item.quantityOnHand || item.currentStock || 0,
+      max: 100,
+      alert: item.warningLevel || 10,
+      level: (item.quantityOnHand || 0) <= (item.warningLevel || 10) ? 'danger' : 'normal'
+    }));
+  };
+
+  const transformBatches = (data) => {
+    if (!data) return [];
+    const arr = Array.isArray(data) ? data : data.$values || [];
+    return arr.map(item => ({
+      inventoryId: item.inventoryId,
+      batchCode: item.batchCode || `#BATCH-${item.inventoryId || ''}`,
+      material: item.ingredientName || '',
+      quantityOnHand: item.quantityOnHand ?? 0,
+      unit: item.unitOfMeasurement || 'kg',
+      stockText: `Tồn: ${item.quantityOnHand ?? 0} ${item.unitOfMeasurement || 'kg'}`,
+      expiryDate: item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('vi-VN') : '',
+      status: item.status === 'expired' || (item.expiryDate && new Date(item.expiryDate) < new Date()) ? 'expiring' : 'valid'
+    }));
+  };
+
+  const transformLogs = (data) => {
+    if (!data) return [];
+    const arr = Array.isArray(data) ? data : data.$values || [];
+    return arr.map(item => ({
+      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '',
+      time: item.createdAt ? new Date(item.createdAt).toLocaleTimeString('vi-VN') : '',
+      type: item.action === 'Import' ? 'import' : 'export',
+      material: item.ingredientName || '',
+      quantity: (item.action === 'Import' ? '+' : '-') + (Math.abs((item.newQuantity || 0) - (item.oldQuantity || 0))),
+      unit: item.unitOfMeasurement || 'kg',
+      reason: item.note || '',
+      operator: 'NV. Staff',
+      avatar: 'S'
+    }));
+  };
+
+  // Mock data fallback
+  const MOCK_MATERIALS = [
+    {
+      id: 'NL-001',
+      name: 'Thịt bò Thăn',
+      unit: 'kg',
+      current: 42,
+      max: 100,
+      alert: 20,
+      level: 'normal'
+    },
+    {
+      id: 'NL-042',
+      name: 'Cá hồi Nauy',
+      unit: 'kg',
+      current: 8,
+      max: 50,
+      alert: 10,
+      level: 'danger'
+    },
+    {
+      id: 'NL-105',
+      name: 'Gạo ST25',
+      unit: 'bao',
+      current: 15,
+      max: 20,
+      alert: 5,
+      level: 'normal'
+    }
+  ];
+
+  const MOCK_BATCHES = [
+    {
+      batchCode: '#BCH-2024-001',
+      material: 'Thịt bò Thăn',
+      stockText: 'Tồn: 15.5 kg',
+      expiryDate: '15/10/2024',
+      status: 'valid'
+    },
+    {
+      batchCode: '#BCH-2024-042',
+      material: 'Cá hồi Nauy',
+      stockText: 'Tồn: 8.0 kg',
+      expiryDate: '28/09/2024',
+      status: 'expiring'
+    },
+    {
+      batchCode: '#BCH-2024-105',
+      material: 'Gạo ST25',
+      stockText: 'Tồn: 15 bao',
+      expiryDate: '20/12/2024',
+      status: 'valid'
+    }
+  ];
+
+  const MOCK_LOGS = [
+    {
+      date: '20/10/2024',
+      time: '10:45:12',
+      type: 'import',
+      material: 'Thịt bò Thăn',
+      quantity: '+20.0',
+      unit: 'kg',
+      reason: 'Nhập hàng định kỳ tháng 10',
+      operator: 'NV. Tuấn',
+      avatar: 'T'
+    },
+    {
+      date: '20/10/2024',
+      time: '09:30:45',
+      type: 'export',
+      material: 'Cá hồi Nauy',
+      quantity: '-2.5',
+      unit: 'kg',
+      reason: 'Xuất chế biến Buffet trưa',
+      operator: 'NV. Lan',
+      avatar: 'L'
+    },
+    {
+      date: '19/10/2024',
+      time: '18:15:00',
+      type: 'import',
+      material: 'Gạo ST25',
+      quantity: '+5',
+      unit: 'bao',
+      reason: 'Hoàn kho cuối ngày (dư)',
+      operator: 'QL. An',
+      avatar: 'A'
+    },
+    {
+      date: '19/10/2024',
+      time: '14:20:10',
+      type: 'export',
+      material: 'Rượu Vang Đỏ',
+      quantity: '-12',
+      unit: 'chai',
+      reason: 'Xuất cho tiệc cưới sảnh A',
+      operator: 'NV. Tuấn',
+      avatar: 'T'
+    }
+  ];
+
+  const openExportModal = (batch) => {
+    setExportTargetBatch(batch);
+    setExportQty('');
+    setExportReason('');
+    setShowExportModal(true);
+  };
+
+  const closeExportModal = () => {
+    setShowExportModal(false);
+    setExportTargetBatch(null);
+    setExportQty('');
+    setExportReason('');
+  };
+
+  const maxExportQty = exportTargetBatch?.quantityOnHand ?? 0;
+  const exportQtyNum = Number(exportQty);
+  const hasQty = exportQty !== '' && !isNaN(exportQtyNum);
+  const isExportInvalid = hasQty && (exportQtyNum > maxExportQty || exportQtyNum <= 0);
+
+  const handleConfirmExport = async (e) => {
+    e.preventDefault();
+    if (!exportTargetBatch?.inventoryId || !hasQty || isExportInvalid || !exportReason.trim()) return;
+    setExportSubmitting(true);
+    try {
+      await createExport({
+        inventoryId: exportTargetBatch.inventoryId,
+        quantity: Math.round(Number(exportQty)) || 0,
+        reason: exportReason.trim()
+      });
+      console.log('✅ Export created, reloading logs...');
+      closeExportModal();
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to create export:', err);
+      setError(err.message || 'Không thể tạo phiếu xuất kho');
+    } finally {
+      setExportSubmitting(false);
+    }
+  };
+
+  const openImportBatchModal = (batch) => {
+    setImportBatchTarget(batch);
+    setImportBatchQty('');
+    setImportBatchReason('');
+    setShowImportBatchModal(true);
+  };
+
+  const closeImportBatchModal = () => {
+    setShowImportBatchModal(false);
+    setImportBatchTarget(null);
+    setImportBatchQty('');
+    setImportBatchReason('');
+  };
+
+  const importBatchQtyNum = Number(importBatchQty);
+  const hasImportQty = importBatchQty !== '' && !isNaN(importBatchQtyNum);
+  const isImportBatchInvalid = hasImportQty && importBatchQtyNum <= 0;
+
+  const handleConfirmImportBatch = async (e) => {
+    e.preventDefault();
+    if (!importBatchTarget?.inventoryId || !hasImportQty || isImportBatchInvalid || !importBatchReason.trim()) return;
+    setImportBatchSubmitting(true);
+    try {
+      await createImport({
+        inventoryId: importBatchTarget.inventoryId,
+        quantity: Math.round(importBatchQtyNum) || 0,
+        reason: importBatchReason.trim()
+      });
+      closeImportBatchModal();
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to create import:', err);
+      setError(err.message || 'Không thể tạo phiếu nhập kho');
+    } finally {
+      setImportBatchSubmitting(false);
+    }
+  };
+
+  const openReturnModal = (batch) => {
+    setReturnTargetBatch(batch);
+    setReturnQty('');
+    setReturnReason('');
+    setShowReturnModal(true);
+  };
+
+  const closeReturnModal = () => {
+    setShowReturnModal(false);
+    setReturnTargetBatch(null);
+    setReturnQty('');
+    setReturnReason('');
+  };
+
+  const returnQtyNum = Number(returnQty);
+  const hasReturnQty = returnQty !== '' && !isNaN(returnQtyNum);
+  const isReturnInvalid = hasReturnQty && returnQtyNum <= 0;
+
+  const handleConfirmReturn = async (e) => {
+    e.preventDefault();
+    if (!returnTargetBatch?.inventoryId || !hasReturnQty || isReturnInvalid || !returnReason.trim()) return;
+    setReturnSubmitting(true);
+    try {
+      await createImport({
+        inventoryId: returnTargetBatch.inventoryId,
+        quantity: Math.round(returnQtyNum) || 0,
+        reason: returnReason.trim()
+      });
+      closeReturnModal();
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to create return:', err);
+      setError(err.message || 'Không thể tạo phiếu hoàn kho');
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
+  const exportLogsToCSV = () => {
+    if (!logsData || logsData.length === 0) return;
+    
+    const headers = ['Thời gian', 'Ngày', 'Loại', 'Nguyên liệu', 'Số lượng', 'Đơn vị', 'Lý do', 'Người thực hiện'];
+    const rows = logsData.map(log => [
+      log.time,
+      log.date,
+      log.type === 'import' ? 'Nhập kho' : 'Xuất kho',
+      log.material,
+      log.quantity,
+      log.unit,
+      log.reason,
+      log.operator
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(','))
+    ].join('\n');
+
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `BaoCaoTonKho_${timestamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const filteredMaterials = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return materialsData;
     return materialsData.filter((item) => item.name.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
-  }, [searchQuery]);
+  }, [searchQuery, materialsData]);
 
   const filteredBatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return batchesData;
     return batchesData.filter((item) => item.material.toLowerCase().includes(q) || item.batchCode.toLowerCase().includes(q));
-  }, [searchQuery]);
+  }, [searchQuery, batchesData]);
 
   const filteredLogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return logsData;
     return logsData.filter((item) => item.material.toLowerCase().includes(q) || item.reason.toLowerCase().includes(q));
-  }, [searchQuery]);
+  }, [searchQuery, logsData]);
+
+  /** Chỉ 2 log mới nhất cho sidebar "Nhật ký Kho gần đây" */
+  const recentLogs = useMemo(() => filteredLogs.slice(0, 2), [filteredLogs]);
 
   const renderMaterialsTable = () => (
     <div className="inventory-table-wrap">
@@ -248,12 +665,12 @@ const ManagerInventoryPage = () => {
               </td>
               <td className="text-right">
                 <div className="action-inline">
-                  <button className="action-btn export" onClick={() => setShowExportModal(true)}>
+                  <button className="action-btn export" onClick={() => openExportModal(item)}>
                     <ArrowUpToLine size={14} />
                     Xuất chế biến
                   </button>
-                  <button className="action-btn restore" onClick={() => setShowReturnModal(true)}>
-                    <ArrowDownToLine size={14} />
+                  <button className="action-btn restore" onClick={() => openReturnModal(item)}>
+                    <RotateCcw size={14} />
                     Hoàn kho
                   </button>
                 </div>
@@ -345,18 +762,12 @@ const ManagerInventoryPage = () => {
             </p>
           </div>
           {activeTab === 'history' ? (
-            <div className="history-actions">
-              <button className="secondary-btn">
-                <Filter size={16} />
-                Lọc dữ liệu
-              </button>
-              <button className="primary-btn">
-                <Download size={16} />
-                Xuất báo cáo
-              </button>
-            </div>
+            <button className="btn-export-report" onClick={exportLogsToCSV}>
+              <Download size={16} />
+              Xuất báo cáo
+            </button>
           ) : (
-            <button className="primary-btn">
+            <button className="primary-btn" onClick={openImportModal}>
               <Plus size={16} />
               Nhập kho mới
             </button>
@@ -404,9 +815,24 @@ const ManagerInventoryPage = () => {
               </div>
             )}
 
-            {activeTab === 'materials' && renderMaterialsTable()}
-            {activeTab === 'batches' && renderBatchesTable()}
-            {activeTab === 'history' && renderLogsTable()}
+            {loading && (
+              <div className="loading-container">
+                <Loader2 size={32} className="spin" />
+                <p>Đang tải dữ liệu kho hàng...</p>
+              </div>
+            )}
+
+            {!loading && error && (
+              <div className="error-banner">
+                <CircleAlert size={16} />
+                <span>{error}</span>
+                <button onClick={fetchAllData}>Thử lại</button>
+              </div>
+            )}
+
+            {!loading && activeTab === 'materials' && renderMaterialsTable()}
+            {!loading && activeTab === 'batches' && renderBatchesTable()}
+            {!loading && activeTab === 'history' && renderLogsTable()}
           </section>
 
           <aside className="inventory-side">
@@ -457,121 +883,239 @@ const ManagerInventoryPage = () => {
               </div>
 
               <div className="recent-log-list">
-                <div className="recent-log import">
-                  <span className="dot" />
-                  <div>
-                    <strong>Nhập +20kg Thịt bò</strong>
-                    <p>Lý do: Nhập hàng định kỳ</p>
-                    <small>10:45 AM • NV. Tuấn</small>
-                  </div>
-                </div>
-
-                <div className="recent-log export">
-                  <span className="dot" />
-                  <div>
-                    <strong>Xuất -2kg Cá hồi</strong>
-                    <p>Lý do: Chế biến món ăn</p>
-                    <small>09:15 AM • NV. Lan</small>
-                  </div>
-                </div>
+                {recentLogs.length === 0 ? (
+                  <p className="recent-log-empty">Chưa có nhật ký</p>
+                ) : (
+                  recentLogs.map((log, idx) => (
+                    <div key={`recent-${idx}-${log.material}-${log.time}`} className={`recent-log ${log.type}`}>
+                      <span className="dot" />
+                      <div>
+                        <strong>
+                          {log.type === 'import' ? 'Nhập' : 'Xuất'} {log.quantity}{log.unit} {log.material}
+                        </strong>
+                        <p>Lý do: {log.reason || '—'}</p>
+                        <small>{log.time} • {log.operator}</small>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </aside>
         </div>
       </div>
 
-      {showExportModal && (
-        <div className="inv-modal-overlay" onClick={() => setShowExportModal(false)}>
-          <div className="inv-modal" onClick={(event) => event.stopPropagation()}>
+      {showImportModal && (
+        <div className="inv-modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="inv-modal" onClick={(e) => e.stopPropagation()}>
             <div className="inv-modal-head">
               <h3>
                 <ArrowUpToLine size={18} />
-                Xác nhận Xuất kho - Thịt bò Thăn
+                Nhập kho mới (Tạo lô hàng)
               </h3>
-              <button onClick={() => setShowExportModal(false)}><X size={18} /></button>
+              <button type="button" onClick={() => setShowImportModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleCreateInventory} className="inv-modal-body">
+              <label>Nguyên liệu <span className="inv-required">*</span></label>
+              <select
+                value={importForm.ingredientId}
+                onChange={(e) => setImportForm((f) => ({ ...f, ingredientId: e.target.value }))}
+                required
+              >
+                <option value="">Chọn nguyên liệu</option>
+                {ingredientsList.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <label>Mã lô <span className="inv-required">*</span></label>
+              <input
+                type="text"
+                placeholder="VD: BATCH20240105802"
+                value={importForm.batchCode}
+                onChange={(e) => setImportForm((f) => ({ ...f, batchCode: e.target.value }))}
+                required
+              />
+              <label>Số lượng <span className="inv-required">*</span></label>
+              <input
+                type="number"
+                step="0.0001"
+                min="0"
+                placeholder="0"
+                value={importForm.quantity}
+                onChange={(e) => setImportForm((f) => ({ ...f, quantity: e.target.value }))}
+                required
+              />
+              <label>Đơn giá (VNĐ/đơn vị) <span className="inv-required">*</span></label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0"
+                value={importForm.pricePerUnit}
+                onChange={(e) => setImportForm((f) => ({ ...f, pricePerUnit: e.target.value }))}
+                required
+              />
+              <label>Hạn sử dụng</label>
+              <input
+                type="date"
+                value={importForm.expiryDate}
+                onChange={(e) => setImportForm((f) => ({ ...f, expiryDate: e.target.value }))}
+              />
+              <label>Vị trí kho</label>
+              <input
+                type="text"
+                placeholder="VD: Kho Lạnh A2"
+                value={importForm.warehouseLocation}
+                onChange={(e) => setImportForm((f) => ({ ...f, warehouseLocation: e.target.value }))}
+              />
+              <label>Ghi chú</label>
+              <input
+                type="text"
+                placeholder="VD: Thịt heo VietGAP"
+                value={importForm.note}
+                onChange={(e) => setImportForm((f) => ({ ...f, note: e.target.value }))}
+              />
+              <div className="inv-modal-foot" style={{ marginTop: '1rem' }}>
+                <button type="button" className="ghost" onClick={() => setShowImportModal(false)}>Hủy</button>
+                <button type="submit" className="primary" disabled={importSubmitting}>
+                  {importSubmitting ? <Loader2 size={18} className="spin" /> : 'Tạo lô hàng'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showExportModal && exportTargetBatch && (
+        <div className="inv-modal-overlay" onClick={closeExportModal}>
+          <div className="inv-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="inv-modal-head">
+              <h3>
+                <ArrowUpToLine size={18} />
+                Xác nhận Xuất kho - {exportTargetBatch.material}
+              </h3>
+              <button type="button" onClick={closeExportModal}><X size={18} /></button>
             </div>
 
-            <div className="inv-modal-body">
+            <form onSubmit={handleConfirmExport} className="inv-modal-body">
               <div className="batch-info-box">
                 <div>
                   <span>Thông tin lô hàng</span>
-                  <strong>#BCH-2024-001</strong>
+                  <strong>{exportTargetBatch.batchCode}</strong>
                 </div>
                 <div className="right">
                   <span>Tồn kho hiện tại</span>
-                  <strong>15.5 kg</strong>
+                  <strong>{exportTargetBatch.quantityOnHand} {exportTargetBatch.unit}</strong>
                 </div>
               </div>
 
-              <label>Số lượng xuất (kg)</label>
-              <input type="number" value={exportQty} onChange={(event) => setExportQty(event.target.value)} />
-              {isExportInvalid && (
+              <label>Số lượng xuất ({exportTargetBatch.unit}) <span className="inv-required">*</span></label>
+              <input
+                type="number"
+                step="0.0001"
+                min="0"
+                max={maxExportQty}
+                placeholder="0"
+                value={exportQty}
+                onChange={(e) => setExportQty(e.target.value)}
+                required
+              />
+              {hasQty && isExportInvalid && (
                 <p className="error-text">
                   <CircleAlert size={14} />
-                  Số lượng xuất vượt quá tồn kho hiện tại (15.5 kg).
+                  Số lượng xuất phải lớn hơn 0 và không vượt quá tồn kho ({maxExportQty} {exportTargetBatch.unit}).
                 </p>
               )}
 
-              <label>Ghi chú</label>
+              <label>Lý do xuất kho <span className="inv-required">*</span></label>
               <textarea
                 rows={3}
-                placeholder="Ví dụ: Xuất cho ca sáng..."
+                placeholder="Ví dụ: Xuất cho ca sáng, chế biến món..."
                 value={exportReason}
-                onChange={(event) => setExportReason(event.target.value)}
+                onChange={(e) => setExportReason(e.target.value)}
+                required
               />
-            </div>
+            </form>
 
             <div className="inv-modal-foot">
-              <button className="ghost" onClick={() => setShowExportModal(false)}>Hủy</button>
-              <button className="danger" disabled={isExportInvalid || !exportReason.trim()}>Xác nhận xuất</button>
+              <button type="button" className="ghost" onClick={closeExportModal}>Hủy</button>
+              <button
+                type="button"
+                className="danger"
+                disabled={!hasQty || isExportInvalid || !exportReason.trim() || exportSubmitting}
+                onClick={handleConfirmExport}
+              >
+                {exportSubmitting ? <Loader2 size={18} className="spin" /> : 'Xác nhận xuất'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {showReturnModal && (
-        <div className="inv-modal-overlay" onClick={() => setShowReturnModal(false)}>
-          <div className="inv-modal small" onClick={(event) => event.stopPropagation()}>
+      {showReturnModal && returnTargetBatch && (
+        <div className="inv-modal-overlay" onClick={closeReturnModal}>
+          <div className="inv-modal small" onClick={(e) => e.stopPropagation()}>
             <div className="inv-modal-head">
               <h3>
                 <RotateCcw size={18} />
-                Xác nhận Hoàn kho
+                Xác nhận Hoàn kho - {returnTargetBatch.material}
               </h3>
-              <button onClick={() => setShowReturnModal(false)}><X size={18} /></button>
+              <button type="button" onClick={closeReturnModal}><X size={18} /></button>
             </div>
 
-            <div className="inv-modal-body">
+            <form onSubmit={handleConfirmReturn} className="inv-modal-body">
               <div className="batch-info-box neutral">
                 <div>
                   <span>Thông tin lô hàng</span>
-                  <strong>#BCH-2024-042</strong>
+                  <strong>{returnTargetBatch.batchCode}</strong>
                 </div>
                 <div className="right">
                   <span>Tồn kho hiện tại</span>
-                  <strong>8.0 kg</strong>
+                  <strong>{returnTargetBatch.quantityOnHand} {returnTargetBatch.unit}</strong>
                 </div>
               </div>
 
-              <label>Số lượng hoàn trả (kg)</label>
-              <input type="number" placeholder="0.0" />
+              <label>Số lượng hoàn trả ({returnTargetBatch.unit}) <span className="inv-required">*</span></label>
+              <input
+                type="number"
+                step="0.0001"
+                min="0.0001"
+                placeholder="0"
+                value={returnQty}
+                onChange={(e) => setReturnQty(e.target.value)}
+                required
+              />
+              {hasReturnQty && isReturnInvalid && (
+                <p className="error-text">
+                  <CircleAlert size={14} />
+                  Số lượng hoàn trả phải lớn hơn 0.
+                </p>
+              )}
 
-              <label>Lý do hoàn kho</label>
-              <select>
-                <option>Dư thừa cuối ngày</option>
-                <option>Đổi trả NCC</option>
-                <option>Sai sót nhập liệu</option>
-                <option>Lý do khác</option>
+              <label>Lý do hoàn kho <span className="inv-required">*</span></label>
+              <select
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                required
+              >
+                <option value="">Chọn lý do</option>
+                <option value="Dư thừa cuối ngày">Dư thừa cuối ngày</option>
+                <option value="Đổi trả NCC">Đổi trả NCC</option>
+                <option value="Sai sót nhập liệu">Sai sót nhập liệu</option>
+                <option value="Lý do khác">Lý do khác</option>
               </select>
-
-              <div className="operator-info">
-                <User size={14} />
-                Người thực hiện: <strong>Nguyễn Văn An</strong>
-              </div>
-            </div>
+            </form>
 
             <div className="inv-modal-foot">
-              <button className="ghost" onClick={() => setShowReturnModal(false)}>Đóng</button>
-              <button className="primary" onClick={() => setShowReturnModal(false)}>Hoàn tất</button>
+              <button type="button" className="ghost" onClick={closeReturnModal}>Đóng</button>
+              <button
+                type="button"
+                className="primary"
+                disabled={!hasReturnQty || isReturnInvalid || !returnReason.trim() || returnSubmitting}
+                onClick={handleConfirmReturn}
+              >
+                {returnSubmitting ? <Loader2 size={18} className="spin" /> : 'Hoàn tất'}
+              </button>
             </div>
           </div>
         </div>

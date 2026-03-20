@@ -30,7 +30,9 @@ export async function updateProfile(profileData) {
       dob: profileData.dob,
       phone: profileData.phone,
       address: profileData.address,
-      avatar: profileData.avatar
+      avatar: profileData.avatar,
+      ...(profileData.bankAccount !== undefined && { bankAccount: profileData.bankAccount }),
+      ...(profileData.bankName !== undefined && { bankName: profileData.bankName })
     };
 
     // Đổi mật khẩu: gửi oldPassword + newPassword nếu có
