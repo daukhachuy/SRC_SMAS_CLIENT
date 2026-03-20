@@ -1,6 +1,7 @@
 import instance from './axiosInstance';
 import { extractUserFromToken } from '../utils/jwtHelper';
 import { googleLogout } from '@react-oauth/google';
+import { isTokenValid } from '../utils/authGuard';
 
 /* =====================================================
    HELPER: Save Auth Data
@@ -200,7 +201,7 @@ export function logout() {
 }
 
 export function isAuthenticated() {
-  return !!localStorage.getItem('authToken');
+  return isTokenValid();
 }
 
 export function getAuthToken() {

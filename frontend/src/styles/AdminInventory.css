@@ -1,0 +1,634 @@
+/* Admin - Quản lý Kho hàng */
+
+.admin-inventory {
+  min-height: 100%;
+  color: #1f2937;
+}
+
+.inv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.inv-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.inv-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0;
+}
+
+.inv-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.inv-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inv-search-wrap .inv-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.inv-search {
+  width: 260px;
+  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #374151;
+}
+
+.inv-search::placeholder {
+  color: #9ca3af;
+}
+
+.inv-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #FF6C1F;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.inv-btn-primary:hover {
+  background: #e85a15;
+}
+
+/* Tabs chính */
+.inv-tabs-main {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.inv-tab-main {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.inv-tab-main:hover {
+  color: #374151;
+}
+
+.inv-tab-main.active {
+  color: #fff;
+  background: #FF6C1F;
+  border-bottom-color: #FF6C1F;
+  border-radius: 0.375rem 0.375rem 0 0;
+}
+
+/* Card & Table */
+.inv-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.inv-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.inv-card-head-tabs {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.inv-card-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.inv-card-links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.inv-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #374151;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.inv-link-btn:hover {
+  background: #f3f4f6;
+}
+
+.inv-link-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #FF6C1F;
+  text-decoration: none;
+}
+
+.inv-link-text:hover {
+  text-decoration: underline;
+}
+
+.inv-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inv-filter-date input,
+.inv-input {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  min-width: 160px;
+}
+
+.inv-select {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #374151;
+}
+
+.inv-table-wrap {
+  overflow-x: auto;
+}
+
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* Header bảng: nền xám, chữ xám đậm */
+.inv-table thead {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.inv-table thead th {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.inv-table th {
+  padding: 0.875rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.inv-table td {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.inv-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.inv-stock-low {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.inv-pill {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.inv-pill-warning {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.inv-pill-normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.inv-type-import {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.inv-type-export {
+  color: #ea580c;
+  font-weight: 500;
+}
+
+.inv-qty-import {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.inv-qty-export {
+  color: #ea580c;
+  font-weight: 500;
+}
+
+/* Danh mục: filter bar, toggle, name/desc */
+.inv-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.inv-search-wrap-inline .inv-search {
+  width: 240px;
+}
+
+.inv-status-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.inv-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.inv-desc {
+  max-width: 320px;
+  color: #6b7280;
+}
+
+.inv-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #e5e7eb;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  transition: background 0.2s;
+}
+
+.inv-toggle.active {
+  background: #FF6C1F;
+}
+
+.inv-toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.inv-toggle.active .inv-toggle-slider {
+  transform: translateX(20px);
+}
+
+.inv-status-label {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.inv-icon-btn {
+  padding: 0.375rem;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.inv-icon-btn:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+/* Tabs con (Danh mục hàng / Lô hàng) */
+.inv-tabs-sub {
+  display: flex;
+  gap: 0;
+}
+
+.inv-tab-sub {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 0.375rem 0.375rem 0 0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.inv-tab-sub:hover {
+  color: #374151;
+}
+
+.inv-tab-sub.active {
+  color: #fff;
+  background: #FF6C1F;
+}
+
+.inv-placeholder {
+  padding: 2rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* Pagination - Footer bảng: nền trắng, viền xám nhạt (giống ảnh) */
+.inv-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.inv-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.inv-page-btn {
+  min-width: 2rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.inv-page-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.inv-page-btn.active {
+  background: #FF6C1F;
+  color: #fff;
+  border-color: #FF6C1F;
+}
+
+/* Modal Thêm nguyên liệu */
+.inv-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.inv-modal {
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.inv-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.inv-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.inv-modal-close {
+  padding: 0.25rem;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.inv-modal-close:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
+.inv-modal-form {
+  padding: 1.5rem;
+}
+
+.inv-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.inv-form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.375rem;
+}
+
+.inv-required {
+  color: #dc2626;
+}
+
+.inv-form-group input,
+.inv-form-group select,
+.inv-form-group textarea {
+  width: 100%;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  color: #111827;
+  background: #fff;
+}
+
+.inv-form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.inv-form-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inv-form-row input {
+  width: auto;
+  min-width: 80px;
+}
+
+.inv-form-unit {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.inv-form-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0;
+}
+
+.inv-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.inv-modal-btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.inv-modal-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.inv-modal-cancel:hover {
+  background: #e5e7eb;
+}
+
+.inv-modal-confirm {
+  background: #FF6C1F;
+  color: #fff;
+  border: none;
+}
+
+.inv-modal-confirm:hover {
+  background: #e85a15;
+}
+
+@media (max-width: 768px) {
+  .inv-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inv-search {
+    width: 100%;
+  }
+
+  .inv-search-wrap-inline .inv-search {
+    width: 100%;
+  }
+
+  .inv-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .inv-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inv-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .inv-pagination-btns {
+    justify-content: center;
+  }
+}

@@ -21,7 +21,8 @@ const PaymentResult = () => {
         // Clear cart only on successful payment
         localStorage.removeItem('cart');
         window.dispatchEvent(new Event('storage'));
-        setStatus('success');
+        // Tự động chuyển về trang đơn hàng
+        navigate('/my-orders');
       } else {
         // On payment failure - cancel the order so it doesn't appear in MyOrders
         if (orderId) {

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+﻿import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Ticket, Copy, BookOpen, Utensils, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Header from '../components/Header';
@@ -17,7 +17,7 @@ const Promotion = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const API_BASE = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net/api";
+    const API_BASE = "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api";
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -200,7 +200,7 @@ const Promotion = () => {
                                     <div className="Product-Card-Modern" key={`${food.foodId}-${index}`}>
                                         <div className="img-holder">
                                             <img 
-                                                src={food.image?.startsWith('http') ? food.image : `https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net${food.image}`} 
+                                                src={food.image?.startsWith('http') ? food.image : `https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net${food.image}`} 
                                                 alt={food.name} 
                                             />
                                         </div>

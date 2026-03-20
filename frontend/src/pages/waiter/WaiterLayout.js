@@ -1,19 +1,30 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { Bell, Calendar, ClipboardList, Menu, User, X } from 'lucide-react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X, QrCode } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { getProfile } from '../../api/userApi';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/WaiterLayout.css';
 import '../../styles/WaiterPages.css';
 
 const WaiterLayout = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên',
     email: 'waiter@fptres.vn',
-    userId: 'NV000'
+    userId: 'NV000',
+    initials: 'NV'
   });
+
+  const getInitials = (name) => {
+    if (!name) return 'NV';
+    const words = String(name).trim().split(' ').filter(Boolean);
+    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+    return words.slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  };
 
   // Load user info và ưu tiên dữ liệu thật từ Profile API
   useEffect(() => {
@@ -44,7 +55,8 @@ const WaiterLayout = () => {
         setUserInfo({
           fullname: fallbackUser.fullname,
           email: fallbackUser.email,
-          userId: fallbackUser.userId ? `NV${String(fallbackUser.userId).padStart(3, '0')}` : 'NV000'
+          userId: fallbackUser.userId ? `NV${String(fallbackUser.userId).padStart(3, '0')}` : 'NV000',
+          initials: getInitials(fallbackUser.fullname)
         });
       }
 
@@ -59,7 +71,8 @@ const WaiterLayout = () => {
         setUserInfo({
           fullname: apiFullname,
           email: apiEmail,
-          userId: apiUserId ? `NV${String(apiUserId).padStart(3, '0')}` : 'NV000'
+          userId: apiUserId ? `NV${String(apiUserId).padStart(3, '0')}` : 'NV000',
+          initials: getInitials(apiFullname)
         });
 
         if (userStr) {
@@ -88,9 +101,15 @@ const WaiterLayout = () => {
     };
   }, []);
 
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
+  };
+
   const navItems = useMemo(
     () => [
       { to: '/waiter/orders', label: 'Đơn hàng', icon: ClipboardList },
+      { to: '/waiter/qr-scanner', label: 'Mở bàn', icon: QrCode },
       { to: '/waiter/schedule', label: 'Lịch làm việc', icon: Calendar },
       { to: '/waiter/profile', label: 'Hồ sơ', icon: User }
     ],
@@ -128,14 +147,17 @@ const WaiterLayout = () => {
         </nav>
 
         <div className="waiter-sidebar-footer">
-          <div className="waiter-avatar">
-            <User size={24} />
-          </div>
+          <div className="waiter-avatar">{userInfo.initials}</div>
           <div>
             <strong>{userInfo.fullname}</strong>
-            <p>ID: {userInfo.userId}</p>
+            <p>{userInfo.email || `ID: ${userInfo.userId}`}</p>
           </div>
         </div>
+
+        <button className="waiter-logout-btn" onClick={handleLogout}>
+          <LogOut size={16} />
+          <span>Đăng xuất</span>
+        </button>
       </aside>
 
       {/* Mobile Menu Button */}

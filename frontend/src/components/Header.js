@@ -12,6 +12,8 @@ const MENU_ITEMS = [
   { label: 'VỀ CHÚNG TÔI', path: '/about', id: 'about' }
 ];
 
+const normalizeRole = (role) => String(role || '').trim().toLowerCase();
+
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,44 +57,33 @@ const Header = () => {
   /* ================= FUNCTION: Handle User Icon Click ================= */
   const handleUserIconClick = () => {
     const token = localStorage.getItem('authToken');
-    
-    // Nếu chưa login → redirect to login page
     if (!token) {
-      navigate('/auth');
+      navigate('/profile');
       return;
     }
 
-    // Nếu đã login → lấy role và redirect
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        const role = user.role;
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const role = normalizeRole(user?.role);
 
-        // Redirect dựa trên role
-        switch (role) {
-          case 'Manager':
-            navigate('/manager/dashboard');
-            break;
-          case 'Waiter':
-            navigate('/waiter/orders');
-            break;
-          case 'Kitchen':
-            navigate('/kitchen/orders');
-            break;
-          case 'Customer':
-          default:
-            navigate('/profile');
-            break;
-        }
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-        navigate('/profile');
+      if (role === 'manager') {
+        navigate('/manager/profile');
+        return;
       }
-    } else {
-      // Token có nhưng không có user info → mặc định profile
-      navigate('/profile');
+      if (role === 'waiter') {
+        navigate('/waiter/profile');
+        return;
+      }
+      if (role === 'kitchen') {
+        navigate('/kitchen/profile');
+        return;
+      }
+    } catch (error) {
+      console.error('Cannot parse user role in header:', error);
     }
+
+    navigate('/profile');
   };
 
   /* ================= ULTRA++: SHRINK + ACTIVE BY SCROLL ================= */

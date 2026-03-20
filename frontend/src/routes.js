@@ -29,6 +29,8 @@ import ContractSigningPage from './pages/manager/ContractSigningPage';
 import ManagerStaffPage from './pages/manager/ManagerStaffPage';
 import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
+import ManagerProfilePage from './pages/manager/ManagerProfilePage';
+import ManagerTablesPage from './pages/manager/ManagerTablesPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 import PaymentResult from './pages/PaymentResult';
@@ -36,11 +38,22 @@ import WaiterLayout from './pages/waiter/WaiterLayout';
 import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
 import WaiterSchedulePage from './pages/waiter/WaiterSchedulePage';
 import WaiterProfilePage from './pages/waiter/WaiterProfilePage';
+import QrScannerPage from './pages/waiter/QrScannerPage';
+
+import TableSessionPage from './pages/TableSessionPage';
 
 import KitchenLayout from './pages/kitchen/KitchenLayout';
 import KitchenOrdersPage from './pages/kitchen/KitchenOrdersPage';
 import KitchenSchedulePage from './pages/kitchen/KitchenSchedulePage';
 import KitchenProfilePage from './pages/kitchen/KitchenProfilePage';
+
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminTableMap from './pages/admin/AdminTableMap';
+import AdminMenuManagement from './pages/admin/menu/AdminMenuManagement';
+import AdminInventoryPage from './pages/admin/AdminInventoryPage';
+import AdminRestaurantPage from './pages/admin/AdminRestaurantPage';
+import AdminStaffPage from './pages/admin/AdminStaffPage';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -63,21 +76,61 @@ const GOOGLE_CLIENT_ID = isLocalhost
   ? (localClientId || DEFAULT_GOOGLE_CLIENT_ID_LOCAL)
   : (prodClientId || DEFAULT_GOOGLE_CLIENT_ID_PROD);
 
+const normalizeRole = (role) => String(role || '').trim().toLowerCase();
+
+const getRoleHomePath = (role) => {
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole === 'manager') return '/manager';
+  if (normalizedRole === 'waiter') return '/waiter';
+  if (normalizedRole === 'kitchen') return '/kitchen';
+  if (normalizedRole === 'admin') return '/admin';
+  return '/';
+};
+
+const getCurrentUserRole = () => {
+  try {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return '';
+    const user = JSON.parse(userStr);
+    return normalizeRole(user?.role);
+  } catch (error) {
+    console.error('Cannot parse user for role guard:', error);
+    return '';
+  }
+};
+
+const CustomerPublicRoute = ({ children }) => {
+  const token = localStorage.getItem('authToken');
+  if (!token) return children;
+
+  const role = getCurrentUserRole();
+  if (!role || role === 'customer') return children;
+
+  return <Navigate to={getRoleHomePath(role)} replace />;
+};
+
 const AppRoutes = () => {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <Router>
       <Routes>
         {/* Các trang công khai */}
-        <Route path="/" element={<Home />} />
-        <Route path="/menu" element={<MenuPage menuItems={BEST_SELLERS_DATA} />} />
-        <Route path="/combo" element={<ComboPage combos={COMBOS_DATA} />} />
-        <Route path="/buffet" element={<BuffetPage />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/about" element={<AboutPage />} />
+        <Route path="/" element={<CustomerPublicRoute><Home /></CustomerPublicRoute>} />
+        <Route path="/menu" element={<CustomerPublicRoute><MenuPage menuItems={BEST_SELLERS_DATA} /></CustomerPublicRoute>} />
+        <Route path="/combo" element={<CustomerPublicRoute><ComboPage combos={COMBOS_DATA} /></CustomerPublicRoute>} />
+        <Route path="/buffet" element={<CustomerPublicRoute><BuffetPage /></CustomerPublicRoute>} />
+        <Route
+          path="/services"
+          element={
+            <ProtectedRoute>
+              <Services />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/about" element={<CustomerPublicRoute><AboutPage /></CustomerPublicRoute>} />
         
         {/* 2. Thêm Route cho trang Khuyến mãi */}
-        <Route path="/promotion" element={<Promotion />} />
+        <Route path="/promotion" element={<CustomerPublicRoute><Promotion /></CustomerPublicRoute>} />
 
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -95,14 +148,22 @@ const AppRoutes = () => {
 
         {/* Redirect old admin URLs to manager */}
         <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
-        <Route
-          path="/payment-result"
-          element={
-            <ProtectedRoute requiredRole="Customer">
-              <PaymentResult />
-            </ProtectedRoute>
-          }
-        />
+
+        {/* Admin pages - Không có authorization (permissions tạm tắt) */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminDashboard />} />
+          <Route path="reservations" element={<AdminDashboard />} />
+          <Route path="tables" element={<AdminTableMap />} />
+          <Route path="menu" element={<AdminMenuManagement />} />
+          <Route path="inventory" element={<AdminInventoryPage />} />
+          <Route path="staff" element={<Navigate to="/admin/accounts" replace />} />
+          <Route path="accounts" element={<AdminStaffPage />} />
+          <Route path="restaurant" element={<AdminRestaurantPage />} />
+        </Route>
+
+        <Route path="/payment-result" element={<PaymentResult />} />
+
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={
           <ProtectedRoute requiredRole="Manager">
@@ -116,12 +177,14 @@ const AppRoutes = () => {
           <Route path="orders/takeaway/:id" element={<TakeawayOrderDetailPage />} />
           <Route path="dine-in" element={<DineInOrdersPage />} />
           <Route path="takeaway" element={<TakeawayOrdersPage />} />
+          <Route path="tables" element={<ManagerTablesPage />} />
           <Route path="reservations" element={<ManagerReservationsPage />} />
           <Route path="reservations/:eventId" element={<EventDetailPage />} />
           <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
           <Route path="staff" element={<ManagerStaffPage />} />
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
+          <Route path="profile" element={<ManagerProfilePage />} />
         </Route>
 
           {/* Waiter pages - BẢO VỆ BỞI ProtectedRoute với role Waiter */}
@@ -132,6 +195,7 @@ const AppRoutes = () => {
           }>
             <Route index element={<Navigate to="orders" replace />} />
             <Route path="orders" element={<WaiterOrdersPage />} />
+            <Route path="qr-scanner" element={<QrScannerPage />} />
               <Route path="schedule" element={<WaiterSchedulePage />} />
               <Route path="profile" element={<WaiterProfilePage />} />
           </Route>
@@ -148,7 +212,7 @@ const AppRoutes = () => {
             <Route path="profile" element={<KitchenProfilePage />} />
           </Route>
 
-        {/* Các trang Customer - chỉ role Customer được truy cập */}
+        {/* Các trang User - chỉ cần đăng nhập là được truy cập */}
         <Route element={
           <ProtectedRoute requiredRole="Customer">
             <UserLayout />
@@ -158,6 +222,9 @@ const AppRoutes = () => {
           <Route path="/my-orders" element={<MyOrders />} />
           <Route path="/order-history" element={<OrderHistory />} /> 
         </Route>
+
+        {/* Table Session Page - Trang gọi món online tại bàn (công khai cho khách) */}
+        <Route path="/table/:tableCode/session" element={<TableSessionPage />} />
       </Routes>
       </Router>
     </GoogleOAuthProvider>

@@ -1,0 +1,503 @@
+/* Sơ đồ bàn - Table Map */
+
+.admin-tablemap {
+  min-height: 100%;
+  color: #1f2937;
+}
+
+.tablemap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tablemap-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.tablemap-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0;
+}
+
+.tablemap-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tablemap-select {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #374151;
+  min-width: 160px;
+}
+
+.tablemap-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tablemap-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.tablemap-search {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #374151;
+  min-width: 200px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tablemap-search:focus {
+  outline: none;
+  border-color: #FF6C1F;
+  box-shadow: 0 0 0 3px rgba(255, 108, 31, 0.1);
+}
+
+.tablemap-search::placeholder {
+  color: #9ca3af;
+}
+
+.tablemap-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #FF6C1F;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tablemap-add-btn:hover {
+  background: #e85a15;
+}
+
+/* Tabs */
+.tablemap-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.tablemap-tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tablemap-tab:hover {
+  color: #374151;
+}
+
+.tablemap-tab.active {
+  color: #FF6C1F;
+  font-weight: 600;
+  border-bottom-color: #FF6C1F;
+}
+
+/* Card grid - Bàn đang dùng */
+.tablemap-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.tablemap-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s;
+}
+
+.tablemap-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tablemap-card.in-use {
+  border-color: #FF6C1F;
+  background: #fff;
+}
+
+.tablemap-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.tablemap-card-number {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.tablemap-card-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.tablemap-card-badge.in-use {
+  background: #FF6C1F;
+  color: #fff;
+}
+
+.tablemap-card-badge.empty {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.tablemap-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tablemap-card-capacity {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.tablemap-card-amount {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Table view - Tất cả bàn */
+.tablemap-table-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.tablemap-table-wrap {
+  overflow-x: auto;
+}
+
+.tablemap-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* Header bảng: nền trắng, chữ xám (không dùng xanh) */
+.tablemap-table thead {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tablemap-table thead th {
+  background: #ffffff;
+  color: #374151;
+}
+
+.tablemap-table th {
+  padding: 0.875rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tablemap-table td {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.tablemap-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.tablemap-table .font-medium {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Status pills in table */
+.tablemap-status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.tablemap-status-pill.in-use {
+  background: #FF6C1F;
+  color: #fff;
+}
+
+.tablemap-status-pill.empty {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.tablemap-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tablemap-icon-btn {
+  padding: 0.375rem;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.tablemap-icon-btn:hover {
+  color: #FF6C1F;
+  background: #fff7ed;
+}
+
+/* Pagination */
+.tablemap-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fff;
+}
+
+.tablemap-pagination-info {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.tablemap-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tablemap-page-btn {
+  min-width: 2.25rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tablemap-page-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.tablemap-page-btn.active {
+  background: #FF6C1F;
+  color: #fff;
+  border-color: #FF6C1F;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tablemap-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tablemap-actions {
+    flex-direction: column;
+  }
+
+  .tablemap-search-wrap {
+    width: 100%;
+  }
+
+  .tablemap-search {
+    min-width: 100%;
+  }
+
+  .tablemap-select {
+    min-width: 100%;
+  }
+
+  .tablemap-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .tablemap-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .tablemap-pagination-btns {
+    justify-content: center;
+  }
+}
+
+/* Modal Thêm / Chỉnh sửa bàn */
+.tablemap-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.tablemap-modal {
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.tablemap-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.tablemap-modal-form {
+  padding: 1.5rem;
+}
+
+.tablemap-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.tablemap-form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.375rem;
+}
+
+.tablemap-form-group input,
+.tablemap-form-group select,
+.tablemap-form-group textarea {
+  width: 100%;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  color: #111827;
+  background: #fff;
+}
+
+.tablemap-form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.tablemap-input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tablemap-input-with-icon .tablemap-input-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.tablemap-input-with-icon input {
+  padding-left: 2.5rem;
+}
+
+.tablemap-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.tablemap-modal-btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.tablemap-modal-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.tablemap-modal-cancel:hover {
+  background: #e5e7eb;
+}
+
+.tablemap-modal-save {
+  background: #FF6C1F;
+  color: #fff;
+  border: none;
+}
+
+.tablemap-modal-save:hover {
+  background: #e85a15;
+}

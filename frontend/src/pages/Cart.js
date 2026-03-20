@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import instance from '../api/axiosInstance';
 import Header from '../components/Header'; 
 import Footer from '../components/Footer'; 
 import { getProfile } from '../api/userApi'; 
@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/Cart.css';
 
 const Cart = () => {
-  const BASE_URL = "https://smas-api-hrapc0b0f3gsb2e7.eastasia-01.azurewebsites.net";
   const navigate = useNavigate();
   
   const [cartItems, setCartItems] = useState([]);
@@ -225,12 +224,7 @@ const Cart = () => {
         }
       };
 
-      const orderRes = await axios.post(`${BASE_URL}/api/order/create/delivery`, orderPayload, {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const orderRes = await instance.post('/order/create/delivery', orderPayload);
 
       // Lấy orderId từ response (Cấu trúc: { success: true, orderId: 123, ... })
       const orderId = orderRes.data.orderId || orderRes.data.id;
@@ -240,12 +234,10 @@ const Cart = () => {
         alert(orderRes.data.message || "Đặt hàng thành công!");
         finishOrderSuccess();
       } else {
-        const payRes = await axios.post(`${BASE_URL}/api/payment/create-link`, {
+        const payRes = await instance.post('/payment/create-link', {
           orderId: Number(orderId),
           returnUrl: `${window.location.origin}/payment-result?success=true&orderId=${orderId}`,
           cancelUrl: `${window.location.origin}/payment-result?success=false&orderId=${orderId}`
-        }, {
-          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (payRes.data.success && payRes.data.checkoutUrl) {
