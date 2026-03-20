@@ -158,8 +158,11 @@
 
 .section-subhead {
   padding: 0.9rem 1rem;
-  border-bottom: 1px solid #e6d9ca;
-  background: #fff8f1;
+  border-bottom: 1px solid #e2e8f0;
+  background: #faf8f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .section-subhead h3 {
@@ -326,14 +329,50 @@
   cursor: pointer;
 }
 
+.action-btn.import {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.action-btn.import:hover {
+  background: #d1fae5;
+}
+
 .action-btn.export {
   background: #ffedd5;
   color: #8b5e38;
 }
 
+.action-btn.export:hover {
+  background: #ffedd5;
+}
+
 .action-btn.restore {
   background: #fff8f1;
   color: #FF6C1F;
+}
+
+.action-btn.restore:hover {
+  background: #dbeafe;
+}
+
+/* Nút Xuất báo cáo - cam, bo tròn */
+.btn-export-report {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: #ea580c;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btn-export-report:hover {
+  background: #c2410c;
 }
 
 .qty-in {

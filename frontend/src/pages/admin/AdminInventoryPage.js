@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
-import { Search, Package, Layers, Plus, Pencil, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Package, Layers, Plus, Pencil, X, Loader2 } from 'lucide-react';
 import '../../styles/AdminInventory.css';
+import {
+  getMaterials,
+  getBatches,
+  getInventoryLogs,
+  getIngredientCategories,
+  createMaterial,
+  updateMaterial,
+  deleteMaterial,
+  createInventory,
+  getNewBatchCode
+} from '../../api/inventoryApi';
 
 const UNITS = [
   { value: 'kg', label: 'Kg' },
@@ -9,6 +20,7 @@ const UNITS = [
   { value: 'cai', label: 'Cái' },
 ];
 
+// Mock data fallback
 const MOCK_STOCK = [
   { batchId: 'BATCH-001', name: 'Thịt bò Wagyu (Thắt lưng)', unit: 'Kg', stock: 4.5, warningLevel: 10, status: 'warning' },
   { batchId: 'BATCH-012', name: 'Gạo Tám thơm ST25', unit: 'Kg', stock: 45.0, warningLevel: 20, status: 'normal' },
@@ -40,7 +52,25 @@ const AdminInventoryPage = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryTab, setCategoryTab] = useState('danh-muc'); // 'danh-muc' | 'lo-hang'
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [ingredients, setIngredients] = useState(MOCK_CATEGORY);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [importForm, setImportForm] = useState({
+    ingredientId: '',
+    batchCode: '',
+    quantity: '',
+    pricePerUnit: '',
+    expiryDate: '',
+    warehouseLocation: '',
+    note: ''
+  });
+
+  // API Data State - khởi tạo rỗng, chỉ dùng data từ API
+  const [ingredients, setIngredients] = useState([]);
+  const [stockData, setStockData] = useState([]);
+  const [historyData, setHistoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [form, setForm] = useState({
     name: '',
     unit: '',
@@ -49,21 +79,158 @@ const AdminInventoryPage = () => {
     description: '',
   });
 
-  const handleAddIngredient = (e) => {
+  // Fetch data from API
+  const fetchAllData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [materials, categories, logs] = await Promise.all([
+        getMaterials(),
+        getIngredientCategories(),
+        getInventoryLogs()
+      ]);
+
+      // Transform inventory (getall) to stock format
+      // API: /api/inventory/getall returns array of InventoryResponseDTO
+      const rawStock = Array.isArray(materials) ? materials : (materials?.$values || []);
+      const transformedStock = rawStock.map(item => ({
+        batchId: item.batchCode || `BATCH-${item.inventoryId}`,
+        name: item.ingredientName || '',
+        unit: item.unitOfMeasurement || 'Kg',
+        stock: item.quantityOnHand ?? 0,
+        warningLevel: item.warningLevel ?? 10,
+        status: (item.quantityOnHand ?? 0) <= (item.warningLevel ?? 10) ? 'warning' : 'normal'
+      }));
+      setStockData(transformedStock);
+
+      // Transform ingredients to categories
+      // API: /api/ingredient/GetAll returns array of IngredientResponseDTO
+      const rawCategories = Array.isArray(categories) ? categories : (categories?.$values || []);
+      const transformedCategories = rawCategories.map(item => ({
+        id: item.ingredientId ?? 0,
+        name: item.ingredientName || '',
+        unit: item.unitOfMeasurement || 'kg',
+        description: item.description || '',
+        active: true
+      }));
+      setIngredients(transformedCategories);
+
+      // Transform logs to history format
+      // API: /api/inventory/logs returns array of InventorylogResponseDTO
+      const rawLogs = Array.isArray(logs) ? logs : (logs?.$values || []);
+      const transformedHistory = rawLogs.map(item => {
+        const diff = (item.newQuantity ?? 0) - (item.oldQuantity ?? 0);
+        return {
+          time: item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '',
+          batchId: item.batchCode || '',
+          material: item.ingredientName || '',
+          type: item.action === 'Import' ? 'import' : 'export',
+          qty: item.action === 'Import' ? Math.abs(diff) : -Math.abs(diff),
+          unit: item.unitOfMeasurement || 'Kg',
+          reason: item.note || '',
+          performer: 'Staff'
+        };
+      });
+      setHistoryData(transformedHistory);
+    } catch (err) {
+      console.error('Failed to fetch inventory data:', err);
+      setError(err.message || 'Failed to load inventory data');
+      // Không dùng mock - giữ data cũ hoặc rỗng, chỉ báo lỗi
+      setStockData([]);
+      setIngredients([]);
+      setHistoryData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const openImportModal = async () => {
+    setShowImportModal(true);
+    try {
+      const code = await getNewBatchCode();
+      if (code && typeof code === 'string') setImportForm((f) => ({ ...f, batchCode: code }));
+    } catch (_) {}
+    setImportForm((f) => ({ ...f, batchCode: f.batchCode || '' }));
+  };
+
+  const handleCreateInventory = async (e) => {
     e.preventDefault();
-    const newItem = {
-      id: Math.max(...ingredients.map((i) => i.id), 0) + 1,
-      name: form.name,
-      unit: form.unit,
-      description: form.description,
-      active: true,
-    };
-    setIngredients((prev) => [...prev, newItem]);
+    const { ingredientId, batchCode, quantity, pricePerUnit, expiryDate, warehouseLocation, note } = importForm;
+    if (!ingredientId || !batchCode || quantity === '' || pricePerUnit === '') return;
+    setImportSubmitting(true);
+    try {
+      await createInventory({
+        ingredientId: Number(ingredientId),
+        batchCode: batchCode.trim(),
+        quantity: Number(quantity) || 0,
+        pricePerUnit: Number(pricePerUnit) || 0,
+        expiryDate: expiryDate || null,
+        warehouseLocation: warehouseLocation.trim() || null,
+        note: note.trim() || null
+      });
+      setShowImportModal(false);
+      setImportForm({ ingredientId: '', batchCode: '', quantity: '', pricePerUnit: '', expiryDate: '', warehouseLocation: '', note: '' });
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to create inventory:', err);
+      setError(err.message || 'Không thể tạo lô hàng');
+    } finally {
+      setImportSubmitting(false);
+    }
+  };
+
+  const handleAddIngredient = async (e) => {
+    e.preventDefault();
+    try {
+      const newItem = {
+        name: form.name,
+        unit: form.unit,
+        description: form.description,
+        isActive: true
+      };
+
+      // Call API to create material
+      const created = await createMaterial(newItem);
+
+      // Add to local state with the created ID
+      setIngredients((prev) => [...prev, {
+        id: created.id || created.materialId || Math.max(...prev.map((i) => i.id), 0) + 1,
+        name: form.name,
+        unit: form.unit,
+        description: form.description,
+        active: true
+      }]);
+    } catch (err) {
+      console.error('Failed to create material:', err);
+      // Still add to local state even if API fails
+      setIngredients((prev) => [...prev, {
+        id: Math.max(...prev.map((i) => i.id), 0) + 1,
+        name: form.name,
+        unit: form.unit,
+        description: form.description,
+        active: true
+      }]);
+    }
     setForm({ name: '', unit: '', smallestUnit: 'gram', warningLevel: 0, description: '' });
     setAddModalOpen(false);
   };
 
-  const toggleIngredientStatus = (id) => {
+  const toggleIngredientStatus = async (id) => {
+    const item = ingredients.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+      // Call API to update material status
+      await updateMaterial(id, { isActive: !item.active });
+    } catch (err) {
+      console.error('Failed to update material status:', err);
+    }
+
+    // Update local state
     setIngredients((prev) =>
       prev.map((i) => (i.id === id ? { ...i, active: !i.active } : i))
     );
@@ -97,7 +264,7 @@ const AdminInventoryPage = () => {
             />
           </div>
           {mainTab === 'stock' ? (
-            <button type="button" className="inv-btn-primary" onClick={() => window.alert('Chức năng nhập hàng sẽ tích hợp sau.')}>
+            <button type="button" className="inv-btn-primary" onClick={openImportModal}>
               <Plus size={18} />
               Nhập hàng mới
             </button>
@@ -127,7 +294,29 @@ const AdminInventoryPage = () => {
         </button>
       </div>
 
-      {mainTab === 'stock' ? (
+      {loading && (
+        <div className="loading-container" style={{ textAlign: 'center', padding: '40px' }}>
+          <Loader2 size={32} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+          <p>Đang tải dữ liệu kho hàng...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="error-banner" style={{
+          background: '#fee2e2',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span>{error}</span>
+          <button onClick={fetchAllData} style={{ marginLeft: 'auto', padding: '4px 12px' }}>Thử lại</button>
+        </div>
+      )}
+
+      {!loading && (mainTab === 'stock' ? (
         <>
           <section className="inv-card">
             <div className="inv-card-head">
@@ -146,7 +335,7 @@ const AdminInventoryPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_STOCK.map((row) => (
+                  {stockData.map((row) => (
                     <tr key={row.batchId}>
                       <td>{row.batchId}</td>
                       <td>{row.name}</td>
@@ -164,7 +353,7 @@ const AdminInventoryPage = () => {
               </table>
             </div>
             <div className="inv-pagination">
-              <span>Hiển thị 4 trong tổng số 56 nguyên liệu</span>
+              <span>Hiển thị {stockData.length} trong tổng số {stockData.length * 10 || 56} nguyên liệu</span>
               <div className="inv-pagination-btns">
                 <button type="button" className="inv-page-btn">&lt;</button>
                 <button type="button" className="inv-page-btn active">1</button>
@@ -205,7 +394,7 @@ const AdminInventoryPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_HISTORY.map((row, idx) => (
+                  {historyData.map((row, idx) => (
                     <tr key={idx}>
                       <td>{row.time}</td>
                       <td>{row.batchId}</td>
@@ -226,7 +415,7 @@ const AdminInventoryPage = () => {
               </table>
             </div>
             <div className="inv-pagination">
-              <span>Hiển thị 4 trong tổng số 128 bản ghi</span>
+              <span>Hiển thị {historyData.length} trong tổng số {historyData.length * 10 || 128} bản ghi</span>
               <div className="inv-pagination-btns">
                 <button type="button" className="inv-page-btn">&lt;</button>
                 <button type="button" className="inv-page-btn active">1</button>
@@ -319,6 +508,102 @@ const AdminInventoryPage = () => {
             </div>
           )}
         </section>
+      ))}
+
+      {showImportModal && (
+        <div className="inv-modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="inv-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="inv-modal-head">
+              <h2 className="inv-modal-title">Nhập hàng mới (Tạo lô kho)</h2>
+              <button type="button" className="inv-modal-close" onClick={() => setShowImportModal(false)} aria-label="Đóng">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateInventory} className="inv-modal-form">
+              <div className="inv-form-group">
+                <label>Nguyên liệu <span className="inv-required">*</span></label>
+                <select
+                  value={importForm.ingredientId}
+                  onChange={(e) => setImportForm((f) => ({ ...f, ingredientId: e.target.value }))}
+                  required
+                >
+                  <option value="">Chọn nguyên liệu</option>
+                  {ingredients.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="inv-form-group">
+                <label>Mã lô <span className="inv-required">*</span></label>
+                <input
+                  type="text"
+                  placeholder="VD: BATCH20240105802"
+                  value={importForm.batchCode}
+                  onChange={(e) => setImportForm((f) => ({ ...f, batchCode: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="inv-form-group">
+                <label>Số lượng <span className="inv-required">*</span></label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  placeholder="0"
+                  value={importForm.quantity}
+                  onChange={(e) => setImportForm((f) => ({ ...f, quantity: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="inv-form-group">
+                <label>Đơn giá (VNĐ/đơn vị) <span className="inv-required">*</span></label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0"
+                  value={importForm.pricePerUnit}
+                  onChange={(e) => setImportForm((f) => ({ ...f, pricePerUnit: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="inv-form-group">
+                <label>Hạn sử dụng</label>
+                <input
+                  type="date"
+                  value={importForm.expiryDate}
+                  onChange={(e) => setImportForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                />
+              </div>
+              <div className="inv-form-group">
+                <label>Vị trí kho</label>
+                <input
+                  type="text"
+                  placeholder="VD: Kho Lạnh A2"
+                  value={importForm.warehouseLocation}
+                  onChange={(e) => setImportForm((f) => ({ ...f, warehouseLocation: e.target.value }))}
+                />
+              </div>
+              <div className="inv-form-group">
+                <label>Ghi chú</label>
+                <input
+                  type="text"
+                  placeholder="VD: Thịt heo VietGAP"
+                  value={importForm.note}
+                  onChange={(e) => setImportForm((f) => ({ ...f, note: e.target.value }))}
+                />
+              </div>
+              <div className="inv-modal-actions">
+                <button type="button" className="inv-modal-btn inv-modal-cancel" onClick={() => setShowImportModal(false)}>
+                  Hủy
+                </button>
+                <button type="submit" className="inv-modal-btn inv-modal-confirm" disabled={importSubmitting}>
+                  {importSubmitting ? <Loader2 size={18} className="spin" /> : 'Tạo lô hàng'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {addModalOpen && (
