@@ -2255,6 +2255,263 @@
   flex-wrap: wrap;
 }
 
+/* ── STEP 1 Grid 2 cột ── */
+.event-form-card-new {
+  padding: 0;
+}
+
+.event-step1-grid {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+}
+
+.event-step1-left {
+  padding: 24px 24px 20px;
+  border-right: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.event-step1-right {
+  padding: 24px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #fefcf9;
+}
+
+.event-step1-col-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--deep-black);
+  margin: 0 0 4px;
+}
+
+.event-step1-col-title .icon-orange {
+  color: var(--primary-orange);
+}
+
+.event-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.event-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--deep-black);
+}
+
+.event-field-label .icon-orange {
+  color: var(--primary-orange);
+  flex-shrink: 0;
+}
+
+.required-asterisk {
+  color: #e53e3e;
+  margin-left: 2px;
+}
+
+.event-step1-input,
+.event-step1-textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--deep-black);
+  background: white;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.event-step1-input:focus,
+.event-step1-textarea:focus {
+  outline: none;
+  border-color: var(--primary-orange);
+}
+
+.event-step1-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.event-step1-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Event type chips */
+.event-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.event-type-chip {
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #e0e0e0;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.event-type-chip:hover {
+  border-color: var(--primary-orange);
+  color: var(--primary-orange);
+}
+
+.event-type-chip.active {
+  background: var(--primary-orange);
+  border-color: var(--primary-orange);
+  color: white;
+}
+
+/* Inline calendar */
+.event-inline-calendar {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: white;
+  box-shadow: none;
+}
+
+.event-inline-calendar .calendar-numbers {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  gap: 2px;
+}
+
+.event-inline-calendar .day-btn {
+  padding: 8px 0;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--deep-black);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.event-inline-calendar .day-btn:hover:not(:disabled) {
+  background: #fff3e0;
+  color: var(--primary-orange);
+}
+
+.event-inline-calendar .day-btn.selected {
+  background: var(--primary-orange);
+  color: white;
+}
+
+.event-inline-calendar .day-btn.today {
+  border: 2px solid var(--primary-orange);
+  color: var(--primary-orange);
+  font-weight: 800;
+}
+
+.event-inline-calendar .day-btn.day-past,
+.event-inline-calendar .day-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Time slots grid */
+.time-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 7px;
+}
+
+.time-slot-btn {
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1.5px solid #e0e0e0;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.time-slot-btn:hover:not(.disabled) {
+  border-color: var(--primary-orange);
+  color: var(--primary-orange);
+}
+
+.time-slot-btn.active {
+  background: var(--primary-orange);
+  border-color: var(--primary-orange);
+  color: white;
+}
+
+.time-slot-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Validation error */
+.event-field-error {
+  font-size: 12px;
+  color: #e53e3e;
+  margin: 2px 0 0;
+}
+
+.event-form-error-summary {
+  font-size: 13px;
+  color: #e53e3e;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 0 24px 8px;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .event-step1-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .event-step1-left {
+    border-right: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+}
+
+@media (max-width: 480px) {
+  .event-step1-row-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .event-type-chips {
+    gap: 6px;
+  }
+
+  .event-type-chip {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
 .event-btn-primary {
   background: var(--primary-orange);
   color: white;
@@ -3422,4 +3679,68 @@
   .event-all-services-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* Step 5 - Success */
+.event-success-card {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  max-width: 600px;
+  margin: 40px auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+}
+.event-success-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+}
+.event-success-card h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+.event-success-card p {
+  font-size: 16px;
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+.event-success-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.event-success-actions .event-btn-primary {
+  background: linear-gradient(135deg, var(--primary-orange), var(--secondary-orange));
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.event-success-actions .event-btn-secondary {
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.event-success-actions .event-btn-secondary:hover {
+  background: #e2e8f0;
 }

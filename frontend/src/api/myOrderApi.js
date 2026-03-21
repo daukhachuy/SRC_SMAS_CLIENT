@@ -1,12 +1,52 @@
 import instance from './axiosInstance';
 
+// Map frontend type → backend orderType (theo Swagger pattern: ^(DineIn|TakeAway|Delivery|EventBooking)$)
+const MAP_ORDER_TYPE = {
+  dinein: 'DineIn',
+  takeAway: 'TakeAway',
+  takeaway: 'TakeAway',
+  delivery: 'Delivery',
+  event: 'EventBooking',
+  eventBooking: 'EventBooking',
+};
+
 export const myOrderAPI = {
   getOrders: async (orderType = 'All', statusList = ['Pending', 'Confirmed', 'Processing', 'Completed', 'Cancelled']) => {
-    const typeParam = orderType === 'All' ? '' : `orderType=${orderType}&`;
-    const statusParams = statusList.map(s => `status=${s}`).join('&');
-    
-    const response = await instance.post(`/order/filter?${typeParam}${statusParams}`);
-    return response.data;
+    // Swagger: POST /api/order/filter — orderType là required query param
+    // pattern: ^(DineIn|TakeAway|Delivery|EventBooking)$
+    const normalizedType = MAP_ORDER_TYPE[orderType?.toLowerCase()] ?? null;
+
+    if (!normalizedType) {
+      // Không filter theo type → gọi /order/history (GET, không có query param)
+      try {
+        const res = await instance.get('/order/history');
+        const data = res.data;
+        if (Array.isArray(data)) return data;
+        if (data?.$values) return data.$values;
+        if (data?.data) return data.data;
+        return [];
+      } catch {
+        return [];
+      }
+    }
+
+    // Filter theo orderType cụ thể
+    const statusParams = statusList.filter(Boolean).map(s => `status=${s}`).join('&');
+    try {
+      const res = await instance.post(`/order/filter?orderType=${normalizedType}&${statusParams}`);
+      const data = res.data;
+      if (Array.isArray(data)) return data;
+      if (data?.$values) return data.$values;
+      if (data?.data) return data.data;
+      return [];
+    } catch (err) {
+      // 404/400 khi không có đơn loại đó → trả mảng rỗng, không throw
+      if (err?.response?.status === 404 || err?.response?.status === 400) {
+        console.warn('[myOrderAPI] No orders for type:', normalizedType);
+        return [];
+      }
+      throw err;
+    }
   },
 
   getReservations: async () => {
@@ -18,18 +58,35 @@ export const myOrderAPI = {
         userId = user.userId ?? user.id ?? null;
       } catch (_) {}
     }
-    if (!userId) {
+    if (!userId) return [];
+    try {
+      const response = await instance.get(`/reservation/my`, { params: { userId } });
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data?.$values) return data.$values;
+      return data?.data ?? [];
+    } catch {
       return [];
     }
-    const response = await instance.get(`/reservation/my`, { params: { userId } });
-    const data = response.data;
-    if (Array.isArray(data)) return data;
-    if (data && typeof data === 'object' && !Array.isArray(data)) return [data];
-    return data?.data ?? [];
   },
 
   cancelOrder: async (orderId) => {
     const response = await instance.post(`/order/cancel/${orderId}`);
     return response.data;
-  }
+  },
+
+  // GET /api/book-event/history — lịch sử đặt sự kiện của user
+  getMyEvents: async () => {
+    try {
+      const response = await instance.get('/book-event/history');
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data?.$values) return data.$values;
+      if (data?.data) return data.data;
+      return [];
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 400) return [];
+      throw err;
+    }
+  },
 };
