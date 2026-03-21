@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../styles/Profile.css';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 import { getProfile, updateProfile } from '../api/userApi';
+import { myOrderAPI } from '../api/myOrderApi';
+import { formatCurrency } from '../api/managerApi';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBHDr0B4X2T13T1nVBQczGvKkS8VQZmwc";
 
@@ -16,6 +18,11 @@ const Profile = () => {
   });
 
   const [addresses, setAddresses] = useState([]);
+
+  // ── Lịch sử đặt sự kiện ──
+  const [eventOrders, setEventOrders] = useState([]);
+  const [eventOrdersLoading, setEventOrdersLoading] = useState(false);
+  const [eventOrdersError, setEventOrdersError] = useState('');
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -140,6 +147,62 @@ const Profile = () => {
       }
     };
     fetchProfile();
+  }, []);
+
+  // Lấy lịch sử đặt sự kiện từ GET /api/book-event/history
+  useEffect(() => {
+    const fetchEventOrders = async () => {
+      setEventOrdersLoading(true);
+      setEventOrdersError('');
+      try {
+        const data = await myOrderAPI.getMyEvents();
+        const list = Array.isArray(data) ? data : [];
+        // Map raw data → UI-friendly shape
+        const mapped = list.map(item => {
+          const code = item.bookEventCode ?? item.eventCode ?? item.code ?? `EV-${item.id ?? ''}`;
+          const date = item.bookingDate ?? item.eventDate ?? item.createdAt;
+          const dateObj = date ? new Date(date) : null;
+          const dateStr = dateObj && !Number.isNaN(dateObj.getTime())
+            ? dateObj.toLocaleDateString('vi-VN') : '—';
+          const timeStr = dateObj && !Number.isNaN(dateObj.getTime())
+            ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—';
+          const statusRaw = (item.status ?? item.contractStatus ?? '').toLowerCase();
+          const statusMap = {
+            pending:      { label: 'Chờ xác nhận',  cls: 'status-pending' },
+            confirmed:    { label: 'Đã xác nhận',    cls: 'status-confirmed' },
+            signed:       { label: 'Đã ký hợp đồng', cls: 'status-signed' },
+            deposit:      { label: 'Chờ đặt cọc',    cls: 'status-deposit' },
+            cancelled:    { label: 'Đã hủy',          cls: 'status-cancelled' },
+            cancel:       { label: 'Đã hủy',          cls: 'status-cancelled' },
+          };
+          const st = statusMap[statusRaw] ?? { label: item.status ?? 'Chờ xác nhận', cls: 'status-pending' };
+          return {
+            id: item.bookEventId ?? item.eventId ?? item.id,
+            code,
+            eventType: item.eventType ?? '—',
+            guestName: item.fullName ?? item.guestName ?? item.customerName ?? '—',
+            phone: item.phone ?? '—',
+            dateStr,
+            timeStr,
+            numberOfGuests: item.numberOfGuests ?? item.numberGuest ?? 0,
+            numberOfTables: item.numberTable ?? item.numberOfTables ?? 0,
+            totalAmount: item.totalAmount ?? item.estimatedRevenue ?? 0,
+            status: st.label,
+            statusCls: st.cls,
+            services: item.services ?? [],
+            menuItems: item.menuItems ?? item.foods ?? [],
+            raw: item,
+          };
+        });
+        setEventOrders(mapped);
+      } catch (err) {
+        console.warn('[Profile] Failed to load event orders:', err);
+        setEventOrdersError('Không thể tải lịch sử đặt sự kiện.');
+      } finally {
+        setEventOrdersLoading(false);
+      }
+    };
+    fetchEventOrders();
   }, []);
 
   const formatDobForDisplay = (isoDate) => {
@@ -396,7 +459,69 @@ const Profile = () => {
         </div>
       </section>
 
-      {/* 3. Đổi mật khẩu */}
+      {/* 3. Lịch sử đặt sự kiện */}
+      <section className="Profile-Section">
+        <h2 className="Profile-Section-Title">
+          <i className="fa-solid fa-calendar-check Profile-Section-Icon"></i>
+          Lịch sử đặt sự kiện
+        </h2>
+        {eventOrdersLoading ? (
+          <p className="Profile-Loading">Đang tải lịch sử đặt sự kiện...</p>
+        ) : eventOrdersError ? (
+          <p className="Profile-Error">{eventOrdersError}</p>
+        ) : eventOrders.length === 0 ? (
+          <p className="Profile-Empty">Bạn chưa có đơn đặt sự kiện nào.</p>
+        ) : (
+          <div className="Profile-EventOrders">
+            {eventOrders.map(event => (
+              <div key={event.id} className="Profile-EventCard">
+                <div className="Profile-EventCard-Header">
+                  <div className="Profile-EventCard-Left">
+                    <span className="Profile-EventCard-Code">{event.code}</span>
+                    <span className={`Profile-EventCard-Status ${event.statusCls}`}>{event.status}</span>
+                  </div>
+                  <span className="Profile-EventCard-Type">{event.eventType}</span>
+                </div>
+                <div className="Profile-EventCard-Body">
+                  <div className="Profile-EventCard-Info">
+                    <p><i className="fa-solid fa-user"></i> {event.guestName}</p>
+                    <p><i className="fa-solid fa-phone"></i> {event.phone}</p>
+                    <p><i className="fa-solid fa-calendar-day"></i> {event.dateStr} lúc {event.timeStr}</p>
+                    <p><i className="fa-solid fa-users"></i> {event.numberOfGuests} khách &nbsp;|&nbsp; <i className="fa-solid fa-chair"></i> {event.numberOfTables} bàn</p>
+                  </div>
+                  {event.services.length > 0 && (
+                    <div className="Profile-EventCard-Services">
+                      <strong>Dịch vụ:</strong>
+                      <ul>
+                        {event.services.map((s, i) => (
+                          <li key={i}>{s.serviceName ?? s.name ?? `Dịch vụ #${s.serviceId}`} — {formatCurrency(s.price ?? 0)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {event.menuItems.length > 0 && (
+                    <div className="Profile-EventCard-Foods">
+                      <strong>Thực đơn:</strong>
+                      <ul>
+                        {event.menuItems.map((f, i) => (
+                          <li key={i}>{f.foodName ?? f.name ?? `Món #${f.foodId}`} x{f.quantity}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="Profile-EventCard-Footer">
+                  <span className="Profile-EventCard-Total">
+                    Tổng cộng: <strong>{formatCurrency(event.totalAmount)}</strong>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 4. Đổi mật khẩu */}
       <section className="Profile-Section">
         <h2 className="Profile-Section-Title">
           <i className="fa-solid fa-lock Profile-Section-Icon"></i>

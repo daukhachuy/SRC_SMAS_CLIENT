@@ -170,22 +170,96 @@ export const reservationAPI = {
     }),
 };
 
-// ===== BOOK EVENTS / CONTRACTS =====
+// ===== SERVICES (dịch vụ sự kiện) =====
+export const serviceAPI = {
+  // GET /api/services - danh sách dịch vụ (Bearer token nếu backend yêu cầu)
+  getServices: () => instance.get('/services'),
+};
+
+// ===== EVENT TYPES (đồng bộ với /api/events) =====
+
+// Mapping eventId -> tên hiển thị (theo /api/events response)
+const EVENT_TYPE_MAP = {
+  1: { name: 'Tiệc Cưới', color: 'rose', apiType: 'Wedding' },
+  2: { name: 'Hội Nghị - Hội Thảo', color: 'blue', apiType: 'Conference' },
+  3: { name: 'Sinh Nhật', color: 'amber', apiType: 'Birthday' },
+  4: { name: 'Tiệc Công Ty', color: 'purple', apiType: 'Corporate' },
+  5: { name: 'Liên Hoan Gia Đình', color: 'green', apiType: 'Family' },
+};
+
+// Helper: lấy tên sự kiện từ eventId
+export const getEventTypeName = (eventId) => {
+  const id = Number(eventId);
+  return EVENT_TYPE_MAP[id]?.name || 'Sự kiện';
+};
+
+// Helper: lấy màu từ eventId
+export const getEventColorKey = (eventId) => {
+  const id = Number(eventId);
+  return EVENT_TYPE_MAP[id]?.color || 'blue';
+};
+
+// Helper: lấy api eventType từ eventId
+export const getEventApiType = (eventId) => {
+  const id = Number(eventId);
+  return EVENT_TYPE_MAP[id]?.apiType || null;
+};
+
+// Danh sách event types cho dropdown (Services.js)
+export const EVENT_TYPES_LIST = [
+  { id: 1, name: 'Tiệc Cưới', eventType: 'Wedding' },
+  { id: 2, name: 'Hội Nghị - Hội Thảo', eventType: 'Conference' },
+  { id: 3, name: 'Sinh Nhật', eventType: 'Birthday' },
+  { id: 4, name: 'Tiệc Công Ty', eventType: 'Corporate' },
+  { id: 5, name: 'Liên Hoan Gia Đình', eventType: 'Family' },
+];
+
 export const eventBookingAPI = {
   // GET /api/book-event/active
-  getActive: () => instance.get('/book-event/active'),
+  getActive: () => instance.get('/book-event/active')
+    .then(res => {
+      console.log('[eventBookingAPI] getActive response:', res.status, res.data);
+      return res;
+    }),
 
   // GET /api/book-event/asc-created-at
-  getAllAscCreatedAt: () => instance.get('/book-event/asc-created-at'),
+  getAllAscCreatedAt: () => instance.get('/book-event/asc-created-at')
+    .then(res => {
+      console.log('[eventBookingAPI] getAllAscCreatedAt response:', res.status, res.data);
+      return res;
+    }),
 
   // GET /api/book-event/history
-  getHistory: () => instance.get('/book-event/history'),
+  getHistory: () => instance.get('/book-event/history')
+    .then(res => {
+      console.log('[eventBookingAPI] getHistory response:', res.status, res.data);
+      return res;
+    }),
 
   // GET /api/events/upcoming-events
-  getUpcomingEvents: () => instance.get('/events/upcoming-events'),
+  getUpcomingEvents: () => instance.get('/events/upcoming-events')
+    .then(res => {
+      console.log('[eventBookingAPI] getUpcomingEvents response:', res.status, res.data);
+      return res;
+    }),
 
   // GET /api/contract/number-need-signed
-  getContractsNeedSigned: () => instance.get('/contract/number-need-signed'),
+  getContractsNeedSigned: () => instance.get('/contract/number-need-signed')
+    .then(res => {
+      console.log('[eventBookingAPI] getContractsNeedSigned response:', res.status, res.data);
+      return res;
+    }),
+
+  // POST /api/book-event/create
+  create: (data) => instance.post('/book-event/create', data)
+    .then(res => {
+      console.log('[eventBookingAPI.create] ✅ Success:', res.status, res.data);
+      return res;
+    })
+    .catch(err => {
+      console.error('[eventBookingAPI.create] ❌ Error:', err?.response?.status, err?.response?.data);
+      return Promise.reject(err);
+    }),
 };
 
 function pick(obj, keys, fallback = null) {
@@ -197,6 +271,44 @@ function pick(obj, keys, fallback = null) {
 
 function normalizeStatus(status) {
   return String(status || '').toLowerCase();
+}
+
+/**
+ * Format date string (ISO) thành dd/MM/yyyy và HH:mm
+ * Xử lý đúng timezone local (UTC+7 cho Việt Nam)
+ */
+function parseLocalDate(dateStr) {
+  if (!dateStr) return { date: '--/--/----', time: '--:--' };
+  
+  // Nếu là date-only (yyyy-MM-dd) thì không cần timezone adjustment
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split('-');
+    return {
+      date: `${day}/${month}/${year}`,
+      time: '--:--'
+    };
+  }
+  
+  // Nếu là datetime, parse trực tiếp với constructor có timezone
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [, year, month, day, hour, minute, second] = match;
+    const localDate = new Date(year, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second));
+    return {
+      date: localDate.toLocaleDateString('vi-VN'),
+      time: localDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    };
+  }
+  
+  const dateObj = new Date(dateStr);
+  if (!isNaN(dateObj.getTime())) {
+    return {
+      date: dateObj.toLocaleDateString('vi-VN'),
+      time: dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    };
+  }
+  
+  return { date: '--/--/----', time: '--:--' };
 }
 
 export function mapReservationToUI(item) {
@@ -228,6 +340,34 @@ export function mapReservationToUI(item) {
   }
   const time = timeStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--');
   const date = dateStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('vi-VN') : '--/--/----');
+  
+  // Lấy date và time từ reservationDate/reservationTime hoặc createdAt
+  const reservationDate = pick(item, ['reservationDate']);
+  const reservationTime = pick(item, ['reservationTime']);
+  const createdAt = pick(item, ['createdAt']);
+  
+  let date = '--/--/----';
+  let time = '--:--';
+  
+  // Ưu tiên: reservationDate + reservationTime
+  if (reservationDate) {
+    const dateInfo = parseLocalDate(reservationDate);
+    date = dateInfo.date;
+    // Nếu có reservationTime riêng
+    if (reservationTime) {
+      const timeMatch = reservationTime.match(/^(\d{2}):(\d{2})/);
+      if (timeMatch) {
+        time = `${timeMatch[1]}:${timeMatch[2]}`;
+      }
+    } else {
+      time = dateInfo.time;
+    }
+  } else if (createdAt) {
+    // Fallback: dùng createdAt
+    const dateInfo = parseLocalDate(createdAt);
+    date = dateInfo.date;
+    time = dateInfo.time;
+  }
 
   return {
     id: reservationCode,
@@ -245,36 +385,113 @@ export function mapReservationToUI(item) {
 }
 
 export function mapEventToUI(item) {
-  const statusRaw = normalizeStatus(pick(item, ['status', 'contractStatus'], 'pending'));
+  // Debug log raw item
+  console.log('[mapEventToUI] Input item:', item);
+
+  const statusRaw = normalizeStatus(pick(item, ['status', 'contractStatus', 'bookingStatus'], 'pending'));
   const statusMap = {
     signed: { status: 'signed', statusText: 'Đã ký kết' },
     confirmed: { status: 'signed', statusText: 'Đã ký kết' },
     pending: { status: 'pending', statusText: 'Chưa có hợp đồng' },
     deposit: { status: 'deposit', statusText: 'Chờ đặt cọc' },
+    active: { status: 'pending', statusText: 'Đang hoạt động' },
+    cancelled: { status: 'cancelled', statusText: 'Đã hủy' },
+    cancel: { status: 'cancelled', statusText: 'Đã hủy' },
   };
   const normalized = statusMap[statusRaw] || { status: 'pending', statusText: 'Chưa có hợp đồng' };
 
-  const guests = Number(pick(item, ['numberOfGuests', 'guestCount', 'guests'], 0));
-  const dt = pick(item, ['startTime', 'eventTime', 'bookingTime', 'createdAt']);
-  const dateObj = dt ? new Date(dt) : null;
-  const date = dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('vi-VN') : '--/--/----';
-  const time = dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  // Lấy thông tin khách hàng - thử nhiều field
+  const customerName = pick(item, [
+    'customerName', 'fullName', 'fullname', 'name', 'guestName',
+    'customer', 'contactName', 'representativeName', 'userName'
+  ], 'Khách hàng sự kiện');
+
+  const contactName = pick(item, [
+    'contactName', 'representativeName', 'contact', 'fullName', 'fullname', 'name'
+  ], customerName === 'Khách hàng sự kiện' ? 'Liên hệ' : customerName);
+
+  const phone = pick(item, [
+    'phone', 'phoneNumber', 'customerPhone', 'contactPhone', 'telephone'
+  ], '---');
+
+  const guests = Number(pick(item, [
+    'numberOfGuests', 'guestCount', 'guests', 'numberOfTable'
+  ], 0));
+
+  // Lấy ngày giờ từ nhiều field - ưu tiên reservationDate + reservationTime
+  const reservationDate = pick(item, ['reservationDate', 'bookingDate', 'eventDate']);
+  const reservationTime = pick(item, ['reservationTime', 'eventTime']);
+  const createdAt = pick(item, ['createdAt']);
+  
+  let date = '--/--/----';
+  let time = '--:--';
+  
+  if (reservationDate) {
+    const dateInfo = parseLocalDate(reservationDate);
+    date = dateInfo.date;
+    if (reservationTime) {
+      const timeMatch = reservationTime.match(/^(\d{2}):(\d{2})/);
+      if (timeMatch) {
+        time = `${timeMatch[1]}:${timeMatch[2]}`;
+      }
+    } else {
+      time = dateInfo.time;
+    }
+  } else if (createdAt) {
+    const dateInfo = parseLocalDate(createdAt);
+    date = dateInfo.date;
+    time = dateInfo.time;
+  }
+
+  // Lấy event type - ưu tiên eventId mapping, fallback sang text field
+  const eventIdRaw = pick(item, ['eventId', 'eventTypeId']);
+  const eventId = Number(eventIdRaw);
+  
+  // Thử lấy từ eventId trước
+  let eventTypeName = null;
+  let eventTypeColor = 'blue';
+  if (eventId && EVENT_TYPE_MAP[eventId]) {
+    eventTypeName = EVENT_TYPE_MAP[eventId].name;
+    eventTypeColor = EVENT_TYPE_MAP[eventId].color;
+  }
+  
+  // Fallback: thử match theo eventType text (Wedding, Conference, Birthday...)
+  if (!eventTypeName) {
+    const eventTypeText = pick(item, ['eventType', 'eventTypeName', 'eventName', 'type', 'category'], '');
+    // Map API eventType (Wedding, Conference...) sang tiếng Việt
+    const typeTextMap = {
+      'Wedding': 'Tiệc Cưới',
+      'Conference': 'Hội Nghị - Hội Thảo',
+      'Birthday': 'Sinh Nhật',
+      'Corporate': 'Tiệc Công Ty',
+      'Family': 'Liên Hoan Gia Đình',
+    };
+    const typeColorMap = {
+      'Wedding': 'rose',
+      'Conference': 'blue',
+      'Birthday': 'amber',
+      'Corporate': 'purple',
+      'Family': 'green',
+    };
+    eventTypeName = typeTextMap[eventTypeText] || eventTypeText || 'Sự kiện';
+    eventTypeColor = typeColorMap[eventTypeText] || 'blue';
+  }
 
   return {
-    id: pick(item, ['bookEventId', 'eventId', 'id']),
-    eventId: pick(item, ['bookEventId', 'eventId', 'id']),
-    bookingCode: pick(item, ['bookingCode', 'eventCode'], ''),
-    customer: pick(item, ['customerName', 'companyName', 'name'], 'Khách hàng sự kiện'),
-    contact: pick(item, ['contactName', 'representativeName'], 'Liên hệ'),
-    phone: pick(item, ['phone', 'phoneNumber'], '---'),
-    eventType: pick(item, ['eventType', 'type'], 'Sự kiện'),
-    eventTypeColor: 'blue',
+    id: pick(item, ['bookEventId', 'eventId', 'id', 'bookingId']),
+    eventId: pick(item, ['bookEventId', 'eventId', 'id', 'bookingId']),
+    bookingCode: pick(item, ['bookingCode', 'eventCode', 'code', 'bookEventCode'], ''),
+    customer: customerName,
+    contact: contactName,
+    phone,
+    eventType: eventTypeName,
+    eventTypeColor: eventTypeColor,
     guests,
     date,
     time,
     status: normalized.status,
     statusText: normalized.statusText,
-    revenue: Number(pick(item, ['estimatedRevenue', 'totalAmount', 'budget'], 0)),
+    revenue: Number(pick(item, ['estimatedRevenue', 'totalAmount', 'budget', 'total'], 0)),
     urgent: false,
     raw: item,
   };

@@ -123,6 +123,7 @@ const ManagerReservationsPage = () => {
   }, []);
 
   const loadEventsData = useCallback(async () => {
+    setLoading(true);
     try {
       const [activeRes, upcomingRes, ascRes, historyRes, pendingContractRes] = await Promise.allSettled([
         eventBookingAPI.getActive(),
@@ -132,33 +133,60 @@ const ManagerReservationsPage = () => {
         eventBookingAPI.getContractsNeedSigned(),
       ]);
 
-      const extractArray = (payload) => {
+      // Debug: Log raw responses
+      console.log('[Manager] book-event/active:', activeRes);
+      console.log('[Manager] events/upcoming-events:', upcomingRes);
+      console.log('[Manager] book-event/asc-created-at:', ascRes);
+      console.log('[Manager] book-event/history:', historyRes);
+      console.log('[Manager] contract/number-need-signed:', pendingContractRes);
+
+      const extractArray = (payload, sourceName = 'unknown') => {
         if (Array.isArray(payload)) return payload;
-        return payload?.data ?? payload?.items ?? payload?.events ?? payload?.bookEvents ?? [];
+        // Thử nhiều format phổ biến
+        const data = payload?.data;
+        if (Array.isArray(data)) return data;
+        if (data?.$values && Array.isArray(data.$values)) return data.$values;
+        if (data?.items && Array.isArray(data.items)) return data.items;
+        if (data?.events && Array.isArray(data.events)) return data.events;
+        if (data?.bookEvents && Array.isArray(data.bookEvents)) return data.bookEvents;
+        if (data?.content && Array.isArray(data.content)) return data.content;
+        console.warn(`[Manager] extractArray (${sourceName}): No array found in`, payload);
+        return [];
       };
 
       const merged = [];
-      const pushIfArray = (result) => {
-        if (result.status !== 'fulfilled') return;
-        const rows = extractArray(result.value.data);
+      const pushIfArray = (result, sourceName = 'unknown') => {
+        if (result.status !== 'fulfilled') {
+          console.warn(`[Manager] ${sourceName} failed:`, result.reason);
+          return;
+        }
+        const rows = extractArray(result.value.data, sourceName);
+        console.log(`[Manager] ${sourceName}: Found ${Array.isArray(rows) ? rows.length : 0} items`, rows.slice(0, 2));
         if (Array.isArray(rows) && rows.length > 0) merged.push(...rows);
       };
 
-      pushIfArray(activeRes);
-      pushIfArray(upcomingRes);
-      pushIfArray(ascRes);
-      pushIfArray(historyRes);
+      pushIfArray(activeRes, 'book-event/active');
+      pushIfArray(upcomingRes, 'events/upcoming-events');
+      pushIfArray(ascRes, 'book-event/asc-created-at');
+      pushIfArray(historyRes, 'book-event/history');
+
+      console.log('[Manager] Total merged events before dedup:', merged.length);
 
       // Deduplicate by best available identifier
       const seen = new Set();
       const deduped = merged.filter((item) => {
-        const key = item?.bookEventId ?? item?.eventId ?? item?.bookingCode ?? item?.id ?? JSON.stringify(item);
+        const key = item?.bookEventId ?? item?.eventId ?? item?.bookingCode ?? item?.eventCode ?? item?.id ?? JSON.stringify(item);
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
 
-      setEventsData(deduped.map(mapEventToUI));
+      console.log('[Manager] After dedup:', deduped.length, 'events');
+      console.log('[Manager] Sample events:', deduped.slice(0, 3));
+
+      const mappedEvents = deduped.map(mapEventToUI);
+      console.log('[Manager] Mapped events:', mappedEvents);
+      setEventsData(mappedEvents);
 
       if (pendingContractRes.status === 'fulfilled') {
         const data = pendingContractRes.value.data;
@@ -171,6 +199,8 @@ const ManagerReservationsPage = () => {
       console.error('Lỗi tải dữ liệu sự kiện:', err);
       setEventsData([]);
       setPendingContracts(0);
+    } finally {
+      setLoading(false);
     }
   }, []);
 

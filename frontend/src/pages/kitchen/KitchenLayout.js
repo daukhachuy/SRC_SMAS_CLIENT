@@ -1,12 +1,15 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { Bell, Calendar, ChefHat, ClipboardList, Menu, User, X } from 'lucide-react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Bell, Calendar, ChefHat, ClipboardList, LogOut, Menu, User, X } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { getProfile } from '../../api/userApi';
 import '../../styles/KitchenLayout.css';
 import '../../styles/KitchenPages.css';
 
 const KitchenLayout = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
@@ -88,6 +91,11 @@ const KitchenLayout = () => {
     };
   }, []);
 
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
+  };
+
   const navItems = useMemo(
     () => [
       { to: '/kitchen/orders', label: 'Đơn hàng', icon: ClipboardList },
@@ -138,6 +146,11 @@ const KitchenLayout = () => {
             <p>{userInfo.position}</p>
           </div>
         </div>
+
+        <button className="kitchen-logout-btn" onClick={handleLogout}>
+          <LogOut size={16} />
+          <span>Đăng xuất</span>
+        </button>
       </aside>
 
       {/* Mobile Menu Button */}

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
-import { ChevronLeft, ChevronRight, CalendarClock, User, Phone, Mail, Users, UtensilsCrossed, MapPin, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, CreditCard, Wallet, Bell, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, Users, UtensilsCrossed, MapPin, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, CreditCard, Wallet, Bell, Tag, Star } from 'lucide-react';
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
+import { eventBookingAPI, serviceAPI, EVENT_TYPES_LIST } from '../api/managerApi';
+import { getComboLists, getFoodByFilter } from '../api/foodApi';
 import { isAuthenticated } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
 import AuthRequiredModal from '../components/AuthRequiredModal';
@@ -21,6 +23,22 @@ const Services = () => {
   useEffect(() => {
     setSelectedTime('');
   }, [selectedDate]);
+
+  // ── Lịch tháng đầy đủ (đúng thứ tự T2→CN) ──
+  const getMonthDays = (year, month) => {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    // getDay(): 0=CN, 1=T2, ..., 6=T7
+    // Chuyển sang: 0=T2, 1=T3, ..., 5=T7, 6=CN
+    const startDow = firstDay.getDay(); // 0=CN, 1=T2 ...
+    const offset = startDow === 0 ? 6 : startDow - 1; // số ô trống trước ngày 1
+    const days = [];
+    // Ô trống trước
+    for (let i = 0; i < offset; i++) days.push(null);
+    // Ngày trong tháng
+    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
+    return days;
+  };
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState(0);
   const [addOnCarouselIndex, setAddOnCarouselIndex] = useState(0);
   const [bookingTab, setBookingTab] = useState('booking'); // 'booking' or 'event'
@@ -29,8 +47,8 @@ const Services = () => {
     fullName: '',
     email: '',
     phone: '',
-    numTables: '',
-    numGuests: '',
+    numTables: '1',
+    numGuests: '10',
     location: '',
     note: ''
   });
@@ -45,13 +63,12 @@ const Services = () => {
   const [bookingError, setBookingError] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState('');
   const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState(''); // tên hiển thị
+  const [selectedEventId, setSelectedEventId] = useState(0); // id gửi API (backend cần eventId)
+  const [selectedEventTime, setSelectedEventTime] = useState(''); // giờ tổ chức HH:mm
+  const [eventStepError, setEventStepError] = useState(''); // lỗi validation step 1
   const [selectedServices, setSelectedServices] = useState([]);
-  const [menuDishes, setMenuDishes] = useState([
-    { id: 1, type: 'Menu', name: 'Súp bào ngư vây cá', quantity: 10, price: 500000, notes: 'Phục vụ nóng', subtotal: 5000000, categoryLabel: 'Khai vị' },
-    { id: 2, type: 'Menu', name: 'Tôm hùm bỏ lò phô mai', quantity: 10, price: 1200000, notes: 'Không cay cho trẻ em', subtotal: 12000000, categoryLabel: 'Món chính' },
-    { id: 3, type: 'Menu', name: 'Chè tổ yến hạt sen', quantity: 10, price: 300000, notes: 'Ít đường', subtotal: 3000000, categoryLabel: 'Tráng miệng' }
-  ]);
+  const [menuDishes, setMenuDishes] = useState([]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('payos');
   const [discountCode, setDiscountCode] = useState('');
@@ -64,9 +81,112 @@ const Services = () => {
     price: 0,
     categoryLabel: 'Món chính'
   });
+  const [isEventSubmitting, setIsEventSubmitting] = useState(false);
+  const eventSubmitRef = useRef(false); // chống double-submit (React StrictMode)
+  const [eventError, setEventError] = useState('');
+  const [eventSuccess, setEventSuccess] = useState('');
+
+  // API-loaded menu & combo options
+  const [apiMenuOptions, setApiMenuOptions] = useState([]);
+  const [apiComboOptions, setApiComboOptions] = useState([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(false);
+
+  // API-loaded event services (Bước 2: Sự kiện & Dịch vụ)
+  const [eventServicesFromApi, setEventServicesFromApi] = useState([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
 
   useEffect(() => {
     // Services page is now public - anyone can view
+  }, []);
+
+  // Load menu items (food) and combos from API
+  useEffect(() => {
+    const loadMenuData = async () => {
+      setIsLoadingMenu(true);
+      try {
+        const [comboRes, foodRes] = await Promise.allSettled([
+          getComboLists(),
+          getFoodByFilter({})
+        ]);
+
+        const comboList = comboRes.status === 'fulfilled' ? (Array.isArray(comboRes.value) ? comboRes.value : comboRes.value?.$values || []) : [];
+        const foodList = foodRes.status === 'fulfilled' ? (Array.isArray(foodRes.value) ? foodRes.value : foodRes.value?.$values || []) : [];
+
+        const categoryMap = { 1: 'Khai vị', 2: 'Món chính', 3: 'Tráng miệng', 4: 'Đồ uống' };
+
+        const mappedCombos = comboList.map(c => ({
+          type: 'Combo',
+          id: c.comboId ?? c.id ?? 0,
+          comboId: c.comboId ?? c.id ?? 0,
+          name: c.comboName || c.name || '',
+          price: c.comboPrice || c.price || 0,
+          categoryLabel: 'Món chính'
+        }));
+
+        const mappedFoods = foodList.map(f => ({
+          type: 'Menu',
+          id: f.foodId ?? f.id ?? 0,
+          foodId: f.foodId ?? f.id ?? 0,
+          name: f.foodName || f.name || '',
+          price: f.price || 0,
+          categoryLabel: categoryMap[f.categoryId] || 'Món chính'
+        }));
+
+        setApiComboOptions(mappedCombos);
+        setApiMenuOptions(mappedFoods);
+
+        // Auto-fill default menu items if API returns data and no manual selection yet
+        if (mappedFoods.length > 0 && menuDishes.length <= 1) {
+          const defaultDishes = mappedFoods.slice(0, 3).map((item, idx) => ({
+            id: item.foodId || item.id || idx + 1,
+            foodId: item.foodId || item.id || 0,
+            ...item,
+            quantity: 10,
+            notes: '',
+            subtotal: item.price * 10
+          }));
+          setMenuDishes(defaultDishes);
+        }
+      } catch (err) {
+        console.warn('[Services] Failed to load menu/combo from API:', err);
+      } finally {
+        setIsLoadingMenu(false);
+      }
+    };
+
+    loadMenuData();
+  }, []);
+
+  // Load danh sách dịch vụ từ GET /api/services (Bước 2: Sự kiện & Dịch vụ)
+  useEffect(() => {
+    const loadServices = async () => {
+      setIsLoadingServices(true);
+      try {
+        const res = await serviceAPI.getServices();
+        const list = Array.isArray(res?.data) ? res.data : res?.data?.$values ?? [];
+        const apiUrl = process.env.REACT_APP_API_URL || 'https://localhost:5001/api';
+        const imageBase = apiUrl.replace(/\/api\/?$/, '') || window.location.origin;
+        const mapped = list
+          .filter(s => s.isAvailable !== false)
+          .map(s => ({
+            id: s.serviceId,
+            name: s.title || '',
+            price: s.servicePrice ?? 0,
+            description: s.description || '',
+            unit: s.unit || '',
+            image: s.image
+              ? (s.image.startsWith('http') ? s.image : imageBase + (s.image.startsWith('/') ? s.image : '/' + s.image))
+              : 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200',
+          }));
+        setEventServicesFromApi(mapped);
+      } catch (err) {
+        console.warn('[Services] Failed to load services from API:', err);
+        setEventServicesFromApi([]);
+      } finally {
+        setIsLoadingServices(false);
+      }
+    };
+    loadServices();
   }, []);
 
   // Lấy dữ liệu profile người dùng khi component mount
@@ -118,19 +238,6 @@ const Services = () => {
   // ===== HELPER FUNCTIONS FOR BOOKING =====
   
   // Lấy 14 ngày tiếp theo từ hôm nay
-  const getNextDays = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const days = [];
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + i);
-      days.push(date);
-    }
-    
-    return days;
-  };
 
   // Kiểm tra ngày có thể chọn được không (không được chọn ngày trong quá khứ)
   const isDateSelectable = (date) => {
@@ -269,126 +376,87 @@ const Services = () => {
     }
   };
 
-  // Menu và Combo options (categoryLabel dùng cho tag màu: Khai vị, Món chính, Tráng miệng)
+  // Menu và Combo options (merge API data + fallbacks, categoryLabel dùng cho tag màu)
   const menuOptions = [
-    { type: 'Menu', name: 'Súp bào ngư vây cá', price: 500000, categoryLabel: 'Khai vị' },
-    { type: 'Menu', name: 'Cá điều hồng hấp', price: 150000, categoryLabel: 'Món chính' },
-    { type: 'Menu', name: 'Tôm sú hấp', price: 180000, categoryLabel: 'Món chính' },
-    { type: 'Menu', name: 'Mực nướng', price: 200000, categoryLabel: 'Món chính' },
-    { type: 'Menu', name: 'Chè tổ yến hạt sen', price: 300000, categoryLabel: 'Tráng miệng' },
-    { type: 'Combo', name: 'Combo FPT', price: 150000, categoryLabel: 'Món chính' },
-    { type: 'Combo', name: 'Combo VIP', price: 250000, categoryLabel: 'Món chính' },
-    { type: 'Combo', name: 'Combo Family', price: 350000, categoryLabel: 'Món chính' }
+    ...apiMenuOptions,
+    ...apiComboOptions,
+    // Fallback items nếu API chưa có
+    ...(apiMenuOptions.length === 0 && apiComboOptions.length === 0 ? [
+      { type: 'Menu', name: 'Súp bào ngư vây cá', price: 500000, categoryLabel: 'Khai vị' },
+      { type: 'Menu', name: 'Cá điều hồng hấp', price: 150000, categoryLabel: 'Món chính' },
+      { type: 'Menu', name: 'Tôm sú hấp', price: 180000, categoryLabel: 'Món chính' },
+      { type: 'Menu', name: 'Mực nướng', price: 200000, categoryLabel: 'Món chính' },
+      { type: 'Menu', name: 'Chè tổ yến hạt sen', price: 300000, categoryLabel: 'Tráng miệng' },
+      { type: 'Combo', name: 'Combo FPT', price: 150000, categoryLabel: 'Món chính' },
+      { type: 'Combo', name: 'Combo VIP', price: 250000, categoryLabel: 'Món chính' },
+      { type: 'Combo', name: 'Combo Family', price: 350000, categoryLabel: 'Món chính' }
+    ] : [])
   ];
 
-  // Event Types
-  const eventTypes = [
-    { id: 1, name: 'Đám cưới' },
-    { id: 2, name: 'Sinh nhật' },
-    { id: 3, name: 'Hội họp công tác' },
-    { id: 4, name: 'Tiệc tất niên' },
-    { id: 5, name: 'Tiệc kỷ niệm' },
-    { id: 6, name: 'Sự kiện khác' }
+  // Event Types - từ API /api/events (đồng bộ với backend)
+  const eventTypes = EVENT_TYPES_LIST.map(ev => ({ id: ev.id, name: ev.name }));
+
+  // Time slots cho event (không cần đặt trước)
+  const eventTimeSlots = [
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+    '20:00', '20:30', '21:00', '21:30', '22:00'
   ];
 
-  // Service items for event
-  const eventServices = [
-    { 
-      id: 1, 
-      name: 'MC Tố Châu',
-      image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200',
-      description: 'MC tổ chức có chuyên môn cao, dẫn dắt sự kiện chuyên nghiệp',
-      price: 100000,
-      category: 'mc',
-      categoryLabel: 'Dẫn Dắt Sự Kiện'
-    },
-    { 
-      id: 2, 
-      name: 'MC Minh Hạ',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
-      description: 'MC nổi tiếng với phong cách dẫn dắt hài hước và cuốn hút',
-      price: 100000,
-      category: 'mc',
-      categoryLabel: 'Dẫn Dắt Sự Kiện'
-    },
-    { 
-      id: 3, 
-      name: 'Backdrop Tiêu Chuẩn',
-      image: 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200',
-      description: 'Backdrop trang trí cơ bản với các mẫu tiêu chuẩn',
-      price: 2000000,
-      category: 'backdrop',
-      categoryLabel: 'Trang Trí'
-    },
-    { 
-      id: 4, 
-      name: 'Backdrop VIP',
-      image: 'https://images.unsplash.com/photo-1537904904737-13fc2b3560a1?auto=format&fit=crop&q=80&w=200',
-      description: 'Backdrop cao cấp với thiết kế riêng, trang trí sang trọng',
-      price: 5000000,
-      category: 'backdrop',
-      categoryLabel: 'Trang Trí'
-    },
-    { 
-      id: 5, 
-      name: 'Âm thanh & Âm nhạc',
-      image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200',
-      description: 'Hệ thống âm thanh chuyên nghiệp, DJ live để làm nóng không khí',
-      price: 3000000,
-      category: 'sound',
-      categoryLabel: 'Âm Thanh & Âm Nhạc'
-    },
-    { 
-      id: 6, 
-      name: 'Chụp Ảnh & Video',
-      image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&q=80&w=200',
-      description: 'Chụp ảnh và quay phim chuyên nghiệp suốt sự kiện',
-      price: 2500000,
-      category: 'photo',
-      categoryLabel: 'Ghi Hình'
-    },
-    { 
-      id: 7, 
-      name: 'Lighting LED',
-      image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?auto=format&fit=crop&q=80&w=200',
-      description: 'Hệ thống đèn LED hiện đại tạo không khí sôi động',
-      price: 2000000,
-      category: 'lighting',
-      categoryLabel: 'Trang Trí'
-    },
-    { 
-      id: 8, 
-      name: 'Hoa trang trí',
-      image: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?auto=format&fit=crop&q=80&w=200',
-      description: 'Hoa tươi và trang trí hoa cao cấp cho sự kiện',
-      price: 1500000,
-      category: 'flower',
-      categoryLabel: 'Trang Trí'
-    }
+  // Dịch vụ sự kiện: ưu tiên từ API GET /api/services, không có thì dùng fallback
+  const fallbackEventServices = [
+    { id: 1, name: 'MC Tố Châu', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200', description: 'MC tổ chức có chuyên môn cao, dẫn dắt sự kiện chuyên nghiệp', price: 100000 },
+    { id: 2, name: 'MC Minh Hạ', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200', description: 'MC nổi tiếng với phong cách dẫn dắt hài hước và cuốn hút', price: 100000 },
+    { id: 3, name: 'Backdrop Tiêu Chuẩn', image: 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200', description: 'Backdrop trang trí cơ bản với các mẫu tiêu chuẩn', price: 2000000 },
+    { id: 4, name: 'Backdrop VIP', image: 'https://images.unsplash.com/photo-1537904904737-13fc2b3560a1?auto=format&fit=crop&q=80&w=200', description: 'Backdrop cao cấp với thiết kế riêng, trang trí sang trọng', price: 5000000 },
+    { id: 5, name: 'Âm thanh & Âm nhạc', image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống âm thanh chuyên nghiệp, DJ live để làm nóng không khí', price: 3000000 },
+    { id: 6, name: 'Chụp Ảnh & Video', image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&q=80&w=200', description: 'Chụp ảnh và quay phim chuyên nghiệp suốt sự kiện', price: 2500000 },
+    { id: 7, name: 'Lighting LED', image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống đèn LED hiện đại tạo không khí sôi động', price: 2000000 },
+    { id: 8, name: 'Hoa trang trí', image: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?auto=format&fit=crop&q=80&w=200', description: 'Hoa tươi và trang trí hoa cao cấp cho sự kiện', price: 1500000 },
   ];
+  const eventServices = eventServicesFromApi.length > 0 ? eventServicesFromApi : fallbackEventServices;
 
-  // Validate form trước khi next step
+  // Validate Step 1 trước khi chuyển bước
   const handleNextStep = () => {
+    setEventStepError('');
+
+    // 1) Chọn loại sự kiện
+    if (!selectedEventId || selectedEventId < 1) {
+      setEventStepError('eventId');
+      return;
+    }
+    // 2) Chọn ngày (luôn có default → không cần check trống, chỉ check quá khứ nếu muốn)
+    // 3) Chọn giờ
+    if (!selectedEventTime) {
+      setEventStepError('time');
+      return;
+    }
+    // 4) Số khách
+    const guests = parseInt(eventForm.numGuests, 10);
+    if (!guests || guests < 1) {
+      setEventStepError('Vui lòng nhập số lượng khách (≥1).');
+      return;
+    }
+    // 5) Số bàn
+    const tables = parseInt(eventForm.numTables, 10);
+    if (!tables || tables < 1) {
+      setEventStepError('Vui lòng nhập số lượng bàn (≥1).');
+      return;
+    }
+    // 6) Họ tên
     if (!eventForm.fullName || !eventForm.fullName.trim()) {
-      alert('Vui lòng nhập họ và tên');
+      setEventStepError('fullName');
       return;
     }
+    // 7) SĐT
     if (!eventForm.phone || !eventForm.phone.trim()) {
-      alert('Vui lòng nhập số điện thoại');
+      setEventStepError('phone');
       return;
     }
-    if (!eventForm.email || !eventForm.email.trim()) {
-      alert('Vui lòng nhập email');
-      return;
-    }
-    if (!eventForm.numGuests || eventForm.numGuests <= 0) {
-      alert('Vui lòng nhập số lượng khách');
-      return;
-    }
-    if (!eventForm.numTables || eventForm.numTables <= 0) {
-      alert('Vui lòng nhập số lượng bàn');
-      return;
-    }
+
+    setEventStepError('');
     setEventStep(2);
   };
 
@@ -407,6 +475,102 @@ const Services = () => {
       const service = eventServices.find(s => s.id === serviceId);
       return total + (service?.price || 0);
     }, 0);
+  };
+
+  const handleEventSubmit = async () => {
+    console.log('[handleEventSubmit] Called. isEventSubmitting:', isEventSubmitting);
+
+    if (!isAuthenticated()) {
+      console.log('[handleEventSubmit] NOT authenticated → show auth required');
+      setShowAuthRequired(true);
+      return;
+    }
+
+    console.log('[handleEventSubmit] Authenticated ✅');
+
+    if (!selectedDate) {
+      setEventError('Vui lòng chọn ngày tổ chức sự kiện');
+      return;
+    }
+
+    if (!selectedEventId || selectedEventId < 1) {
+      setEventError('Vui lòng chọn loại sự kiện.');
+      return;
+    }
+
+    const numTables = Math.max(1, parseInt(eventForm.numTables, 10) || 1);
+    const numGuests = Math.max(1, parseInt(eventForm.numGuests, 10) || 10);
+    if (numTables < 1) {
+      setEventError('Số lượng bàn phải lớn hơn 0.');
+      return;
+    }
+    if (numGuests < 1) {
+      setEventError('Số lượng khách phải lớn hơn 0.');
+      return;
+    }
+
+    setIsEventSubmitting(true);
+    setEventError('');
+    setEventSuccess('');
+
+    // Guard chống double-submit (React StrictMode gọi 2 lần)
+    if (eventSubmitRef.current) {
+      setIsEventSubmitting(false);
+      return;
+    }
+    eventSubmitRef.current = true;
+
+    try {
+      // Payload đúng spec Swagger: CreateBookEventApiRequestDTO
+      // reservationTime: format "time" = HH:mm:ss
+      const timeStr = selectedEventTime || '00:00';
+      const reservationTime = timeStr.includes(':') && timeStr.split(':').length === 2
+        ? `${timeStr}:00`
+        : timeStr;
+
+      const foodItems = menuDishes
+        .map(dish => ({
+          foodId: dish.foodId ?? dish.id ?? 0,
+          quantity: Number(dish.quantity) || 1,
+          note: dish.notes || ''
+        }))
+        .filter(f => f.foodId > 0);
+
+      const payload = {
+        numberOfGuests: numGuests,
+        reservationDate: formatReservationDate(selectedDate),
+        reservationTime,
+        note: eventForm.note || '',
+        area: eventForm.location || 'Trong nhà (Máy lạnh)',
+        eventId: selectedEventId,
+        services: selectedServices.map(id => ({
+          serviceId: id,
+          quantity: 1,
+          note: ''
+        })),
+        foods: foodItems
+      };
+
+      console.log('[Event] Submitting book-event:', payload);
+      const response = await eventBookingAPI.create(payload);
+      console.log('[Event] Success:', response?.data);
+      setEventSuccess('Đặt sự kiện thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.');
+      setEventStep(5);
+    } catch (err) {
+      console.error('[Event] Submit error:', err);
+      const status = err?.response?.status;
+      if (status === 401) {
+        setEventError('Vui lòng đăng nhập để tiếp tục.');
+        setShowAuthRequired(true);
+      } else if (status === 403) {
+        setEventError('Bạn không có quyền thực hiện thao tác này.');
+      } else {
+        setEventError(err?.response?.data?.message || err?.message || 'Đặt sự kiện thất bại. Vui lòng thử lại.');
+      }
+    } finally {
+      setIsEventSubmitting(false);
+      eventSubmitRef.current = false;
+    }
   };
 
   // Format currency
@@ -536,20 +700,32 @@ const Services = () => {
                     </span>
                   </div>
                   <div className="calendar-numbers">
-                    {getNextDays().map((date, idx) => {
-                      const dayOfWeek = date.getDay();
+                    {getMonthDays(currentMonth.getFullYear(), currentMonth.getMonth()).map((date, idx) => {
+                      if (!date) return <span key={`empty-${idx}`} />;
                       const day = date.getDate();
                       const weekdayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
                       // JS getDay(): 0=CN, 1=T2, ... 6=T7
                       const weekday = weekdayLabels[dayOfWeek];
+                      const today = new Date();
+                      const isToday = date.toDateString() === today.toDateString();
                       const isSelectable = isDateSelectable(date);
                       const isSelected = date.toDateString() === selectedDate.toDateString();
                       return (
-                        <span 
-                          key={idx} 
+                        <span
+                          key={idx}
                           onClick={() => isSelectable && setSelectedDate(date)}
                           className={`calendar-day-block ${!isSelectable ? 'day-disabled' : ''} ${isSelected ? 'day-active' : ''} ${isSelectable ? 'day-selectable' : ''}`}
                           style={{ cursor: isSelectable ? 'pointer' : 'not-allowed', opacity: isSelectable ? 1 : 0.5 }}
+                          className={`
+                            ${isToday ? 'today' : ''}
+                            ${isSelected ? 'day-active' : ''}
+                            ${!isSelectable ? 'day-disabled' : ''}
+                            ${isSelectable ? 'day-selectable' : ''}
+                          `}
+                          style={{
+                            cursor: isSelectable ? 'pointer' : 'not-allowed',
+                            opacity: isSelectable ? 1 : 0.35
+                          }}
                         >
                           <div className="calendar-weekday">{weekday}</div>
                           <div className="calendar-day-number">{day}</div>
@@ -669,7 +845,12 @@ const Services = () => {
               <div className="event-progress-block">
                 <div className="event-progress-top">
                   <span className="event-step-caption">
-                    Bước {eventStep}: {eventStep === 1 ? 'Thông Tin Khách Hàng' : eventStep === 2 ? 'Sự kiện & Dịch vụ' : eventStep === 3 ? 'Lên thực đơn' : 'Thanh toán'}
+                    Bước {eventStep}: {
+                      eventStep === 1 ? 'Chọn Sự Kiện & Thông Tin' :
+                      eventStep === 2 ? 'Dịch Vụ Đi Kèm' :
+                      eventStep === 3 ? 'Lên Thực Đơn' :
+                      'Xác Nhận & Thanh Toán'
+                    }
                   </span>
                   <span className="event-percent">{Math.round((eventStep / 4) * 100)}% Hoàn thành</span>
                 </div>
@@ -677,60 +858,271 @@ const Services = () => {
                   <div className="event-progress-bar-fill" style={{ width: `${(eventStep / 4) * 100}%` }} />
                 </div>
                 <div className="event-step-labels">
-                  <span className={eventStep >= 1 ? 'active' : ''}>Thông Tin</span>
-                  <span className={eventStep >= 2 ? 'active' : ''}>Sự kiện & Dịch vụ</span>
-                  <span className={eventStep >= 3 ? 'active' : ''}>Lên thực đơn</span>
-                  <span className={eventStep >= 4 ? 'active' : ''}>Thanh toán</span>
+                  <span className={eventStep >= 1 ? 'active' : ''}>Chọn Sự Kiện</span>
+                  <span className={eventStep >= 2 ? 'active' : ''}>Dịch Vụ</span>
+                  <span className={eventStep >= 3 ? 'active' : ''}>Thực Đơn</span>
+                  <span className={eventStep >= 4 ? 'active' : ''}>Thanh Toán</span>
                 </div>
               </div>
 
-              {/* STEP 1: Thông tin liên hệ & yêu cầu */}
+              {/* STEP 1: Chọn sự kiện + Ngày giờ + Thông tin khách hàng */}
               {eventStep === 1 && (
                 <div className="event-form-step">
-                  <div className="event-form-card">
-                    <h4 className="event-form-card-title">Thông Tin Liên Hệ & Yêu Cầu</h4>
-                    <p className="event-form-card-desc">Vui lòng điền đầy đủ thông tin để chúng tôi có thể hỗ trợ bạn tốt nhất.</p>
-                    <div className="event-form-fields">
-                      <div className="event-form-row event-form-row-2">
-                        <div className="event-field-with-icon">
-                          <label><User size={16} className="icon-orange" /> Họ và tên</label>
-                          <input type="text" value={eventForm.fullName} onChange={(e) => setEventForm({ ...eventForm, fullName: e.target.value })} placeholder="Nguyễn Văn A" />
+                  <div className="event-form-card event-form-card-new">
+                    <div className="event-step1-grid">
+
+                      {/* ── CỘT TRÁI: Event + Date/Time + Guests/Tables ── */}
+                      <div className="event-step1-left">
+                        <h4 className="event-step1-col-title">
+                          <CalendarClock size={18} className="icon-orange" />
+                          Thông Tin Sự Kiện
+                        </h4>
+
+                        {/* Loại sự kiện */}
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <Star size={14} className="icon-orange" />
+                            Loại sự kiện <span className="required-asterisk">*</span>
+                          </label>
+                          <div className="event-type-chips">
+                            {eventTypes.map(ev => (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                className={`event-type-chip ${selectedEventId === ev.id ? 'active' : ''}`}
+                                onClick={() => {
+                                  setSelectedEventId(ev.id);
+                                  setSelectedEvent(ev.name);
+                                  setEventStepError('');
+                                }}
+                              >
+                                {ev.name}
+                              </button>
+                            ))}
+                          </div>
+                          {eventStepError === 'eventId' && (
+                            <p className="event-field-error">Vui lòng chọn loại sự kiện.</p>
+                          )}
                         </div>
-                        <div className="event-field-with-icon">
-                          <label><Phone size={16} className="icon-orange" /> Số điện thoại</label>
-                          <input type="text" value={eventForm.phone} onChange={(e) => setEventForm({ ...eventForm, phone: e.target.value })} placeholder="090x xxx xxx" />
+
+                        {/* Ngày tổ chức */}
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <CalendarDays size={14} className="icon-orange" />
+                            Ngày tổ chức
+                          </label>
+                          <div className="calendar-ui event-inline-calendar">
+                            <div className="calendar-month">
+                              <span style={{ textTransform: 'capitalize' }}>
+                                Tháng {String(selectedDate.getMonth() + 1).padStart(2, '0')} {selectedDate.getFullYear()}
+                              </span>
+                            </div>
+                            <div className="calendar-weekdays">
+                              <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                            </div>
+                            <div className="calendar-numbers">
+                              {getMonthDays(selectedDate.getFullYear(), selectedDate.getMonth()).map((date, idx) => {
+                                if (!date) return <span key={`empty-${idx}`} style={{ display: 'block' }} />;
+                                const today = new Date();
+                                const isToday = date.toDateString() === today.toDateString();
+                                const isPast = date < today && date.toDateString() !== today.toDateString();
+                                const isSelected = date.toDateString() === selectedDate.toDateString();
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    className={`day-btn ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${isPast ? 'day-past' : ''}`}
+                                    onClick={() => !isPast && setSelectedDate(date)}
+                                    disabled={isPast}
+                                    style={{ cursor: isPast ? 'not-allowed' : 'pointer' }}
+                                  >
+                                    {date.getDate()}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="event-field-with-icon event-form-row-full">
-                        <label><Mail size={16} className="icon-orange" /> Email</label>
-                        <input type="email" value={eventForm.email} onChange={(e) => setEventForm({ ...eventForm, email: e.target.value })} placeholder="example@gmail.com" />
-                      </div>
-                      <div className="event-form-row event-form-row-2">
-                        <div className="event-field-with-icon">
-                          <label><Users size={16} className="icon-orange" /> Số lượng khách</label>
-                          <input type="number" value={eventForm.numGuests} onChange={(e) => setEventForm({ ...eventForm, numGuests: e.target.value })} placeholder="Ví dụ: 50" />
+
+                        {/* Giờ tổ chức */}
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <Clock size={14} className="icon-orange" />
+                            Giờ tổ chức <span className="required-asterisk">*</span>
+                          </label>
+                          <div className="time-slots-grid">
+                            {eventTimeSlots.map(time => {
+                              const [h, m] = time.split(':').map(Number);
+                              const slotDate = new Date(selectedDate);
+                              slotDate.setHours(h, m, 0, 0);
+                              const now = new Date();
+                              const isPast = selectedDate.toDateString() === now.toDateString() && slotDate <= now;
+                              const isSelected = selectedEventTime === time;
+                              return (
+                                <button
+                                  key={time}
+                                  type="button"
+                                  className={`time-slot-btn ${isSelected ? 'active' : ''} ${isPast ? 'disabled' : ''}`}
+                                  disabled={isPast}
+                                  onClick={() => {
+                                    setSelectedEventTime(time);
+                                    setEventStepError('');
+                                  }}
+                                >
+                                  {time}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {eventStepError === 'time' && (
+                            <p className="event-field-error">Vui lòng chọn giờ tổ chức.</p>
+                          )}
                         </div>
-                        <div className="event-field-with-icon">
-                          <label><UtensilsCrossed size={16} className="icon-orange" /> Số lượng bàn</label>
-                          <input type="number" value={eventForm.numTables} onChange={(e) => setEventForm({ ...eventForm, numTables: e.target.value })} placeholder="Ví dụ: 5" />
+
+                        {/* Số khách + Số bàn */}
+                        <div className="event-step1-row-2">
+                          <div className="event-field-block">
+                            <label className="event-field-label">
+                              <Users size={14} className="icon-orange" />
+                              Số khách <span className="required-asterisk">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              className="event-step1-input"
+                              value={eventForm.numGuests}
+                              min="1"
+                              onChange={(e) => {
+                                setEventForm({ ...eventForm, numGuests: e.target.value });
+                                setEventStepError('');
+                              }}
+                              placeholder="50"
+                            />
+                          </div>
+                          <div className="event-field-block">
+                            <label className="event-field-label">
+                              <UtensilsCrossed size={14} className="icon-orange" />
+                              Số bàn <span className="required-asterisk">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              className="event-step1-input"
+                              value={eventForm.numTables}
+                              min="1"
+                              onChange={(e) => {
+                                setEventForm({ ...eventForm, numTables: e.target.value });
+                                setEventStepError('');
+                              }}
+                              placeholder="5"
+                            />
+                          </div>
                         </div>
+                        {(eventStepError === 'guests' || eventStepError === 'tables') && (
+                          <p className="event-field-error">{eventStepError}</p>
+                        )}
                       </div>
-                      <div className="event-field-with-icon event-form-row-full">
-                        <label><MapPin size={16} className="icon-orange" /> Khu vực tổ chức</label>
-                        <select value={eventForm.location} onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}>
-                          <option value="">Chọn khu vực</option>
-                          <option>Trong nhà (Máy lạnh)</option>
-                          <option>Ngoài trời (Sân vườn)</option>
-                        </select>
-                      </div>
-                      <div className="event-field-with-icon event-form-row-full">
-                        <label><FileText size={16} className="icon-orange" /> Ghi chú thêm</label>
-                        <textarea value={eventForm.note} onChange={(e) => setEventForm({ ...eventForm, note: e.target.value })} rows={4} placeholder="Mô tả các yêu cầu đặc biệt của bạn..." />
+
+                      {/* ── CỘT PHẢI: Thông tin liên hệ ── */}
+                      <div className="event-step1-right">
+                        <h4 className="event-step1-col-title">
+                          <User size={18} className="icon-orange" />
+                          Thông Tin Liên Hệ
+                        </h4>
+
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <User size={14} className="icon-orange" />
+                            Họ và tên <span className="required-asterisk">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="event-step1-input"
+                            value={eventForm.fullName}
+                            onChange={(e) => {
+                              setEventForm({ ...eventForm, fullName: e.target.value });
+                              setEventStepError('');
+                            }}
+                            placeholder="Nguyễn Văn A"
+                          />
+                          {eventStepError === 'fullName' && (
+                            <p className="event-field-error">Vui lòng nhập họ và tên.</p>
+                          )}
+                        </div>
+
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <Phone size={14} className="icon-orange" />
+                            Số điện thoại <span className="required-asterisk">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="event-step1-input"
+                            value={eventForm.phone}
+                            maxLength={11}
+                            onChange={(e) => {
+                              setEventForm({ ...eventForm, phone: e.target.value.replace(/\D/g, '') });
+                              setEventStepError('');
+                            }}
+                            placeholder="090x xxx xxx"
+                          />
+                          {eventStepError === 'phone' && (
+                            <p className="event-field-error">Vui lòng nhập số điện thoại.</p>
+                          )}
+                        </div>
+
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <Mail size={14} className="icon-orange" />
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            className="event-step1-input"
+                            value={eventForm.email}
+                            onChange={(e) => setEventForm({ ...eventForm, email: e.target.value })}
+                            placeholder="example@gmail.com"
+                          />
+                        </div>
+
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <MapPin size={14} className="icon-orange" />
+                            Khu vực tổ chức
+                          </label>
+                          <select
+                            className="event-step1-input"
+                            value={eventForm.location}
+                            onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                          >
+                            <option value="">Chọn khu vực</option>
+                            <option value="Trong nhà (Máy lạnh)">Trong nhà (Máy lạnh)</option>
+                            <option value="Ngoài trời (Sân vườn)">Ngoài trời (Sân vườn)</option>
+                          </select>
+                        </div>
+
+                        <div className="event-field-block">
+                          <label className="event-field-label">
+                            <FileText size={14} className="icon-orange" />
+                            Ghi chú thêm
+                          </label>
+                          <textarea
+                            className="event-step1-textarea"
+                            rows={3}
+                            value={eventForm.note}
+                            onChange={(e) => setEventForm({ ...eventForm, note: e.target.value })}
+                            placeholder="Yêu cầu đặc biệt, trang trí, chương trình..."
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    {/* Lỗi tổng hợp */}
+                    {eventStepError && !['eventId', 'time', 'fullName', 'phone', 'guests', 'tables'].includes(eventStepError) && (
+                      <p className="event-form-error-summary">{eventStepError}</p>
+                    )}
+
                     <div className="event-form-card-actions">
+                      <button type="button" className="event-btn-secondary" onClick={() => setBookingTab('booking')}>← Đặt Bàn</button>
                       <button type="button" className="event-btn-primary" onClick={handleNextStep}>Tiếp Tục →</button>
-                      <button type="button" className="event-btn-secondary" onClick={() => setBookingTab('booking')}>Chọn Sự Kiện</button>
                     </div>
                   </div>
                 </div>
@@ -742,9 +1134,20 @@ const Services = () => {
                   <div className="event-step2-form-card">
                     <div className="event-step2-field">
                       <label className="event-label-asterisk">Chọn loại sự kiện của bạn</label>
-                      <select className="event-select-event" value={selectedEvent} onChange={(e) => setSelectedEvent(e.target.value)}>
-                        <option value="">Chọn loại sự kiện</option>
-                        {eventTypes.map(ev => <option key={ev.id} value={ev.name}>{ev.name}</option>)}
+                      <select
+                        className="event-select-event"
+                        value={selectedEventId}
+                        onChange={(e) => {
+                          const id = Number(e.target.value);
+                          setSelectedEventId(id);
+                          const ev = eventTypes.find(x => x.id === id);
+                          setSelectedEvent(ev ? ev.name : '');
+                        }}
+                      >
+                        <option value={0}>Chọn loại sự kiện</option>
+                        {eventTypes.map(ev => (
+                          <option key={ev.id} value={ev.id}>{ev.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="event-step2-services">
@@ -753,7 +1156,10 @@ const Services = () => {
                         <button type="button" className="event-view-all" onClick={() => setShowAllServicesModal(true)}>Xem tất cả</button>
                       </div>
                       <div className="event-service-cards-grid">
-                        {eventServices.slice(0, 6).map(service => (
+                        {isLoadingServices ? (
+                          <p className="event-services-loading">Đang tải dịch vụ...</p>
+                        ) : (
+                        eventServices.slice(0, 6).map(service => (
                           <div
                             key={service.id}
                             className={`event-service-card-v2 ${selectedServices.includes(service.id) ? 'selected' : ''}`}
@@ -769,7 +1175,8 @@ const Services = () => {
                             <p className="event-service-card-v2-price">{formatCurrency(service.price).replace('₫', '')} đ</p>
                             <p className="event-service-card-v2-desc">{service.description}</p>
                           </div>
-                        ))}
+                        ))
+                        )}
                       </div>
                     </div>
                   </div>
@@ -800,7 +1207,13 @@ const Services = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {menuDishes.map((dish, idx) => (
+                          {menuDishes.length === 0 ? (
+                            <tr>
+                              <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                {isLoadingMenu ? 'Đang tải thực đơn...' : 'Chưa có món nào. Vui lòng nhấn "Chỉnh sửa thực đơn" để thêm món.'}
+                              </td>
+                            </tr>
+                          ) : menuDishes.map((dish, idx) => (
                             <tr key={dish.id}>
                               <td>{String(idx + 1).padStart(2, '0')}</td>
                               <td><span className={`event-menu-tag tag-${(dish.categoryLabel || dish.type) === 'Khai vị' ? 'orange' : (dish.categoryLabel || dish.type) === 'Món chính' ? 'blue' : 'green'}`}>{dish.categoryLabel || dish.type}</span></td>
@@ -912,9 +1325,33 @@ const Services = () => {
                     </div>
                     </div>
 
-                    <button type="button" className="event-btn-confirm-payment">Xác nhận thanh toán →</button>
+                    <button
+                      type="button"
+                      className="event-btn-confirm-payment"
+                      onClick={handleEventSubmit}
+                      disabled={isEventSubmitting}
+                    >
+                      {isEventSubmitting ? 'ĐANG XỬ LÝ...' : 'Xác nhận thanh toán →'}
+                    </button>
+                    {eventError && <p className="booking-status booking-status-error" style={{ textAlign: 'center', marginTop: 8 }}>{eventError}</p>}
+                    {eventSuccess && <p className="booking-status booking-status-success" style={{ textAlign: 'center', marginTop: 8 }}>{eventSuccess}</p>}
                     <p className="event-payment-terms">Bằng cách nhấn nút, bạn đồng ý với <a href="#terms">Điều khoản dịch vụ</a> của chúng tôi.</p>
                     <button type="button" className="event-btn-back event-btn-back-payment-link" onClick={() => setEventStep(3)}>← Quay lại</button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 5: Success */}
+              {eventStep === 5 && (
+                <div className="event-form-step">
+                  <div className="event-success-card">
+                    <div className="event-success-icon"><Check size={48} strokeWidth={2.5} /></div>
+                    <h2>Đặt Sự Kiện Thành Công!</h2>
+                    <p>{eventSuccess || 'Cảm ơn bạn đã đặt sự kiện. Nhân viên của chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất để xác nhận chi tiết.'}</p>
+                    <div className="event-success-actions">
+                      <button type="button" className="event-btn-primary" onClick={() => { setEventStep(1); setEventSuccess(''); }}>Đặt sự kiện mới</button>
+                      <button type="button" className="event-btn-secondary" onClick={() => navigate('/')}>Về trang chủ</button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -924,7 +1361,7 @@ const Services = () => {
                 <div className="event-add-dish-modal-overlay" onClick={() => setIsEditingMenu(false)}>
                   <div className="event-add-dish-modal" onClick={e => e.stopPropagation()}>
                     <div className="event-add-dish-modal-header">
-                      <h4><Utensils size={22} className="icon-orange" /> Thêm Món</h4>
+                      <h4><Utensils size={22} className="icon-orange" /> Thêm Món {isLoadingMenu && '(Đang tải...)'}</h4>
                       <button type="button" className="event-modal-close" onClick={() => setIsEditingMenu(false)} aria-label="Đóng">×</button>
                     </div>
                     <div className="event-add-dish-body">
@@ -980,8 +1417,10 @@ const Services = () => {
                           const opt = menuOptions.find(o => o.name === newDishForm.name);
                           const price = opt ? opt.price : newDishForm.price;
                           const categoryLabel = opt ? opt.categoryLabel : (newDishForm.categoryLabel || 'Món chính');
+                          const foodId = opt?.foodId ?? opt?.id ?? opt?.comboId ?? 0;
                           const newDish = {
-                            id: menuDishes.length ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1,
+                            id: foodId || (menuDishes.length ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1),
+                            foodId: foodId || (opt ? 0 : (menuDishes.length ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1)),
                             type: newDishForm.type,
                             name: newDishForm.name,
                             quantity: newDishForm.quantity,
