@@ -618,6 +618,12 @@ export function mapWorkshiftToUI(item) {
 export const notificationAPI = {
   // GET /api/notification
   getAll: () => instance.get('/notification'),
+
+  /**
+   * POST /api/notification/change-workshift
+   * Body: { senderId: number, title: string, content: string }
+   */
+  changeWorkShift: (body) => instance.post('/notification/change-workshift', body),
 };
 
 // ===== SALARY RECORD =====
