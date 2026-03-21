@@ -1,22 +1,3 @@
-/**
- * Lấy danh sách nhân viên đang làm việc hôm nay
- * GET /api/Staff/working-today
- */
-export async function getWorkingStaffToday() {
-  try {
-    const response = await instance.get('/Staff/working-today');
-    // Map dữ liệu sang UI
-    const staffList = Array.isArray(response.data)
-      ? response.data.map(mapStaffToUI)
-      : Array.isArray(response.data.data)
-        ? response.data.data.map(mapStaffToUI)
-        : [];
-    return staffList;
-  } catch (error) {
-    console.error('Lỗi lấy danh sách nhân viên đang làm việc:', error);
-    return [];
-  }
-}
 import instance from './axiosInstance';
 
 /**
@@ -26,12 +7,6 @@ import instance from './axiosInstance';
 
 // ===== ORDERS =====
 export const orderAPI = {
-      // POST /api/order/filter - lấy đơn theo staffId và tableCode
-      filterByStaffTable: (staffId, tableCode, orderType, status) =>
-        instance.post('/order/filter', { staffId, tableCode, orderType, status }),
-    // POST /api/order/filter - lấy đơn theo staffId
-    filterByStaff: (staffId, orderType, status) =>
-      instance.post('/order/filter', { staffId, orderType, status }),
   // GET /api/order/active - tất cả đơn đang hoạt động
   getActive: () => instance.get('/order/active'),
 
@@ -114,7 +89,7 @@ export function formatCurrency(amount) {
 export function mapOrderToUI(order) {
   const icon = mapOrderTypeToIcon(order.orderType);
   const { label: statusLabel, css: statusClass } = mapStatus(order.status);
-  const itemCount = order.items?.length ?? order.orderItems?.length ?? order.totalItems ?? 0;
+  const itemCount = order.orderItems?.length ?? order.totalItems ?? 0;
 
   // Tiêu đề: với DineIn hiển thị số bàn, Delivery / Takeaway hiển thị tên khách
   let title = order.tableName ?? order.customerName ?? order.guestName ?? `Đơn #${order.orderId}`;
@@ -164,10 +139,7 @@ export const reservationAPI = {
   confirm: (reservationCode) => instance.patch(`/reservation/${reservationCode}/confirm`),
 
   // DELETE /api/reservation/{reservationCode}
-  cancel: (reservationCode, cancellationReason) =>
-    instance.delete(`/reservation/${reservationCode}`, {
-      data: { cancellationReason }
-    }),
+  cancel: (reservationCode) => instance.delete(`/reservation/${reservationCode}`),
 };
 
 // ===== SERVICES (dịch vụ sự kiện) =====
@@ -329,17 +301,6 @@ export function mapReservationToUI(item) {
   const phone = pick(item, ['phone', 'phoneNumber', 'customerPhone'], '---');
   const guests = Number(pick(item, ['numberOfGuests', 'guestCount', 'guests'], 0));
   const table = pick(item, ['tableCode', 'tableName', 'table'], '');
-  // Sửa mapping thời gian đặt bàn
-  const dateStr = item.reservationDate || item.bookingDate || pick(item, ['reservationDate', 'bookingDate', 'createdAt', 'date'], '');
-  const timeStr = item.reservationTime || item.bookingTime || pick(item, ['reservationTime', 'bookingTime', 'time'], '');
-  let dateObj = null;
-  if (dateStr && timeStr) {
-    dateObj = new Date(`${dateStr}T${timeStr}`);
-  } else if (dateStr) {
-    dateObj = new Date(dateStr);
-  }
-  const time = timeStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--');
-  const date = dateStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('vi-VN') : '--/--/----');
   
   // Lấy date và time từ reservationDate/reservationTime hoặc createdAt
   const reservationDate = pick(item, ['reservationDate']);
@@ -551,22 +512,18 @@ function normalizeRole(position) {
 }
 
 export function mapStaffToUI(item) {
-  // Debug: log raw item
-  console.log('STAFF RAW:', item);
   const id = pick(item, ['userId', 'staffId', 'id', 'workStaffId'], null);
   const workStaffId = pick(item, ['workStaffId', 'workId', 'idWorkStaff'], null);
   const name = pick(item, ['fullName', 'fullname', 'name', 'staffName', 'userName'], `NV #${id ?? '---'}`);
   const email = pick(item, ['email', 'gmail', 'mail'], '---');
   const avatar = pick(item, ['avatar', 'avatarUrl', 'imageUrl', 'photoUrl'], `https://i.pravatar.cc/150?u=${id ?? name}`);
-  // Sửa lại lấy đúng trường backend
-  const phone = pick(item, ['phone', 'phoneNumber', 'mobile', 'contactPhone', 'tel'], item?.Phone ?? '---');
-  const position = pick(item, ['position', 'role', 'staffRole', 'jobTitle'], item?.Position ?? 'Waiter');
-  // Sửa lại lấy đúng trường ngày vào làm
-  const joinDateRaw = pick(item, ['joinDate', 'startDate', 'createdAt', 'hireDate', 'dateJoined'], item?.JoinDate ?? null);
+  const phone = pick(item, ['phone', 'phoneNumber', 'mobile'], '---');
+  const position = pick(item, ['position', 'role', 'staffRole', 'jobTitle'], 'Waiter');
+  const joinDateRaw = pick(item, ['joinDate', 'createdAt', 'hireDate'], null);
   const joinDateObj = joinDateRaw ? new Date(joinDateRaw) : null;
   const joinDate = joinDateObj && !Number.isNaN(joinDateObj.getTime())
     ? joinDateObj.toLocaleDateString('vi-VN')
-    : (typeof joinDateRaw === 'string' ? joinDateRaw : '--/--/----');
+    : '--/--/----';
   const rating = Number(pick(item, ['rating', 'avgRating', 'averageRating'], 4.5));
   const isWorking = Boolean(pick(item, ['isWorking', 'working'], false));
   const location = pick(item, ['workArea', 'location', 'station', 'tableArea'], 'Khu vực phục vụ');

@@ -26,14 +26,3 @@ export const fetchUserOrders = async (orderType = 'Delivery', status = 'Pending'
     throw error;
   }
 };
-
-// Tạo đơn khách lẻ (dine-in)
-export const createGuestOrder = async (payload) => {
-  try {
-    const response = await instance.post('/orders/guest', payload);
-    return response.data;
-  } catch (error) {
-    console.error('Lỗi tạo đơn khách lẻ:', error.response?.status, error.response?.data);
-    throw error;
-  }
-};

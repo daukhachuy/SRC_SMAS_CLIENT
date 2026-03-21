@@ -699,13 +699,13 @@ const Services = () => {
                       Tháng {String(selectedDate.getMonth() + 1).padStart(2, '0')} {selectedDate.getFullYear()}
                     </span>
                   </div>
+                  <div className="calendar-weekdays">
+                    <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                  </div>
                   <div className="calendar-numbers">
                     {getMonthDays(currentMonth.getFullYear(), currentMonth.getMonth()).map((date, idx) => {
                       if (!date) return <span key={`empty-${idx}`} />;
                       const day = date.getDate();
-                      const weekdayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-                      // JS getDay(): 0=CN, 1=T2, ... 6=T7
-                      const weekday = weekdayLabels[dayOfWeek];
                       const today = new Date();
                       const isToday = date.toDateString() === today.toDateString();
                       const isSelectable = isDateSelectable(date);
@@ -714,8 +714,6 @@ const Services = () => {
                         <span
                           key={idx}
                           onClick={() => isSelectable && setSelectedDate(date)}
-                          className={`calendar-day-block ${!isSelectable ? 'day-disabled' : ''} ${isSelected ? 'day-active' : ''} ${isSelectable ? 'day-selectable' : ''}`}
-                          style={{ cursor: isSelectable ? 'pointer' : 'not-allowed', opacity: isSelectable ? 1 : 0.5 }}
                           className={`
                             ${isToday ? 'today' : ''}
                             ${isSelected ? 'day-active' : ''}
@@ -727,8 +725,7 @@ const Services = () => {
                             opacity: isSelectable ? 1 : 0.35
                           }}
                         >
-                          <div className="calendar-weekday">{weekday}</div>
-                          <div className="calendar-day-number">{day}</div>
+                          {day}
                         </span>
                       );
                     })}
