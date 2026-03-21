@@ -25,8 +25,10 @@ instance.interceptors.request.use(
     const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url} → Bearer ${token.slice(0, 20)}...`);
+    } else {
+      console.warn(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url} → NO TOKEN`);
     }
-    console.debug(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => {
