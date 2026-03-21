@@ -29,10 +29,12 @@ import {
 import '../../styles/ManagerReservationsPage.css';
 
 const ManagerReservationsPage = () => {
+    const [eventStatusFilter, setEventStatusFilter] = useState('all');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('regular');
   const [searchQuery, setSearchQuery] = useState('');
-  const currentPage = 1;
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [regularBookings, setRegularBookings] = useState([]);
   const [eventsData, setEventsData] = useState([]);
@@ -68,8 +70,23 @@ const ManagerReservationsPage = () => {
         ? listRes.value.data
         : listRes.value.data?.data ?? listRes.value.data?.items ?? [];
 
+      // Sắp xếp theo thời gian đặt (đơn nào đặt trước lên trước)
       const mappedReservations = reservationRaw.map(mapReservationToUI);
-      setRegularBookings(mappedReservations);
+      // Ưu tiên các đơn 'Chờ xác nhận' lên đầu, sau đó đến 'Đã xác nhận', đều sắp xếp theo thời gian đặt giảm dần
+      const getTimestamp = (booking) => {
+        const date = new Date(`${booking.date}T${booking.time}`);
+        return date.getTime();
+      };
+      const pending = mappedReservations
+        .filter(b => b.status === 'pending')
+        .sort((a, b) => getTimestamp(b) - getTimestamp(a));
+      const confirmed = mappedReservations
+        .filter(b => b.status === 'confirmed')
+        .sort((a, b) => getTimestamp(b) - getTimestamp(a));
+      const others = mappedReservations
+        .filter(b => b.status !== 'pending' && b.status !== 'confirmed')
+        .sort((a, b) => getTimestamp(b) - getTimestamp(a));
+      setRegularBookings([...pending, ...confirmed, ...others]);
 
       const activeDiningCount = mappedReservations.filter((booking) => booking.status === 'dining').length;
       setActiveTables(activeDiningCount);
@@ -191,7 +208,7 @@ const ManagerReservationsPage = () => {
     if (!cancelTarget?.reservationCode || !cancelReason.trim()) return;
     setProcessingCode(cancelTarget.reservationCode);
     try {
-      await reservationAPI.cancel(cancelTarget.reservationCode);
+      await reservationAPI.cancel(cancelTarget.reservationCode, cancelReason);
       closeCancelModal();
       await loadReservationData();
     } catch (err) {
@@ -205,24 +222,37 @@ const ManagerReservationsPage = () => {
 
   const filteredRegularBookings = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return regularBookings;
-    return regularBookings.filter((booking) => (
+    let filtered = regularBookings;
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((booking) => booking.status === statusFilter);
+    }
+    if (!query) return filtered;
+    return filtered.filter((booking) => (
       booking.customer.toLowerCase().includes(query)
       || booking.phone.includes(query)
       || String(booking.reservationCode).toLowerCase().includes(query)
     ));
-  }, [searchQuery, regularBookings]);
+  }, [searchQuery, regularBookings, statusFilter]);
 
   const filteredEvents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return eventsData;
-    return eventsData.filter((event) => (
+    let filtered = eventsData;
+    if (eventStatusFilter !== 'all') {
+      filtered = filtered.filter((event) => {
+        if (eventStatusFilter === 'signed') return event.status === 'signed';
+        if (eventStatusFilter === 'pending') return event.status === 'pending' || event.status === 'deposit';
+        if (eventStatusFilter === 'nosigned') return !event.status || event.status === 'nosigned' || event.statusText?.toLowerCase().includes('chưa có hợp đồng');
+        return true;
+      });
+    }
+    if (!query) return filtered;
+    return filtered.filter((event) => (
       event.customer.toLowerCase().includes(query)
       || event.contact.toLowerCase().includes(query)
       || event.phone.includes(query)
       || String(event.bookingCode).toLowerCase().includes(query)
     ));
-  }, [searchQuery, eventsData]);
+  }, [searchQuery, eventsData, eventStatusFilter]);
 
   const upcomingEvents = eventsData.length;
   const urgentCount = pendingContracts;
@@ -383,24 +413,96 @@ const ManagerReservationsPage = () => {
       )}
 
       <div className="content-card">
-        <div className="tabs-container">
-          <button
-            className={`tab-btn ${activeTab === 'regular' ? 'active' : ''}`}
-            onClick={() => setActiveTab('regular')}
-            type="button"
-          >
-            <Calendar size={18} />
-            Lịch đặt bàn thường
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`}
-            onClick={() => setActiveTab('events')}
-            type="button"
-          >
-            <Users size={18} />
-            Đặt tiệc / Sự kiện
-          </button>
-        </div>
+        {/* Bộ lọc trạng thái đặt bàn */}
+        {(activeTab === 'regular' || activeTab === 'events') && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1.5rem', marginTop: 8, marginBottom: 0 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              <div className="tabs-container" style={{ borderBottom: 'none', background: 'none', padding: 0 }}>
+                <button
+                  className={`tab-btn ${activeTab === 'regular' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('regular')}
+                  type="button"
+                  style={{ borderBottom: 'none', background: 'none', fontSize: 15, padding: '8px 18px', marginBottom: 0 }}
+                >
+                  <Calendar size={16} />
+                  Lịch đặt bàn thường
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('events')}
+                  type="button"
+                  style={{ borderBottom: 'none', background: 'none', fontSize: 15, padding: '8px 18px', marginBottom: 0 }}
+                >
+                  <Users size={16} />
+                  Đặt tiệc / Sự kiện
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: '#f8fafc', borderRadius: 20, padding: '3px 8px', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+              {activeTab === 'regular' && <>
+                <button
+                  className={`filter-btn${statusFilter === 'all' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: statusFilter === 'all' ? '#ff6d1f' : 'transparent', color: statusFilter === 'all' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: statusFilter === 'all' ? '0 2px 8px #ff6d1f22' : 'none' }}
+                  onClick={() => setStatusFilter('all')}
+                  onMouseOver={e => { if(statusFilter!=='all')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(statusFilter!=='all')e.target.style.background='transparent'; }}
+                >Tất cả</button>
+                <button
+                  className={`filter-btn${statusFilter === 'pending' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: statusFilter === 'pending' ? '#f59e0b' : 'transparent', color: statusFilter === 'pending' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: statusFilter === 'pending' ? '0 2px 8px #f59e0b22' : 'none' }}
+                  onClick={() => setStatusFilter('pending')}
+                  onMouseOver={e => { if(statusFilter!=='pending')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(statusFilter!=='pending')e.target.style.background='transparent'; }}
+                >Chờ xác nhận</button>
+                <button
+                  className={`filter-btn${statusFilter === 'confirmed' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: statusFilter === 'confirmed' ? '#22c55e' : 'transparent', color: statusFilter === 'confirmed' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: statusFilter === 'confirmed' ? '0 2px 8px #22c55e22' : 'none' }}
+                  onClick={() => setStatusFilter('confirmed')}
+                  onMouseOver={e => { if(statusFilter!=='confirmed')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(statusFilter!=='confirmed')e.target.style.background='transparent'; }}
+                >Đã xác nhận</button>
+                <button
+                  className={`filter-btn${statusFilter === 'cancelled' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: statusFilter === 'cancelled' ? '#64748b' : 'transparent', color: statusFilter === 'cancelled' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: statusFilter === 'cancelled' ? '0 2px 8px #64748b22' : 'none' }}
+                  onClick={() => setStatusFilter('cancelled')}
+                  onMouseOver={e => { if(statusFilter!=='cancelled')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(statusFilter!=='cancelled')e.target.style.background='transparent'; }}
+                >Đã hủy</button>
+              </>}
+              {activeTab === 'events' && <>
+                <button
+                  className={`filter-btn${eventStatusFilter === 'all' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: eventStatusFilter === 'all' ? '#ff6d1f' : 'transparent', color: eventStatusFilter === 'all' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: eventStatusFilter === 'all' ? '0 2px 8px #ff6d1f22' : 'none' }}
+                  onClick={() => setEventStatusFilter('all')}
+                  onMouseOver={e => { if(eventStatusFilter!=='all')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(eventStatusFilter!=='all')e.target.style.background='transparent'; }}
+                >Tất cả</button>
+                <button
+                  className={`filter-btn${eventStatusFilter === 'pending' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: eventStatusFilter === 'pending' ? '#f59e0b' : 'transparent', color: eventStatusFilter === 'pending' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: eventStatusFilter === 'pending' ? '0 2px 8px #f59e0b22' : 'none' }}
+                  onClick={() => setEventStatusFilter('pending')}
+                  onMouseOver={e => { if(eventStatusFilter!=='pending')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(eventStatusFilter!=='pending')e.target.style.background='transparent'; }}
+                >Chờ ký hợp đồng</button>
+                <button
+                  className={`filter-btn${eventStatusFilter === 'signed' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: eventStatusFilter === 'signed' ? '#22c55e' : 'transparent', color: eventStatusFilter === 'signed' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: eventStatusFilter === 'signed' ? '0 2px 8px #22c55e22' : 'none' }}
+                  onClick={() => setEventStatusFilter('signed')}
+                  onMouseOver={e => { if(eventStatusFilter!=='signed')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(eventStatusFilter!=='signed')e.target.style.background='transparent'; }}
+                >Đã ký hợp đồng</button>
+                <button
+                  className={`filter-btn${eventStatusFilter === 'nosigned' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: eventStatusFilter === 'nosigned' ? '#64748b' : 'transparent', color: eventStatusFilter === 'nosigned' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: eventStatusFilter === 'nosigned' ? '0 2px 8px #64748b22' : 'none' }}
+                  onClick={() => setEventStatusFilter('nosigned')}
+                  onMouseOver={e => { if(eventStatusFilter!=='nosigned')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(eventStatusFilter!=='nosigned')e.target.style.background='transparent'; }}
+                >Chưa có hợp đồng</button>
+              </>}
+            </div>
+          </div>
+        )}
+        {/* Tabs đã chuyển lên trên, bỏ đoạn này */}
 
         <div className="table-container">
           {loading ? (
@@ -418,76 +520,68 @@ const ManagerReservationsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredRegularBookings.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
-                      Không có dữ liệu đặt bàn
-                    </td>
-                  </tr>
-                )}
-                {filteredRegularBookings.map((booking) => {
-                  const regularStatus = getRegularStatusConfig(booking.status);
-                  const isProcessing = processingCode === booking.reservationCode;
-                  return (
-                    <tr key={booking.id} className={booking.status === 'cancelled' ? 'muted-row' : ''}>
-                      <td>
-                        <div className="customer-info">
-                          <div className="customer-name">{booking.customer}</div>
-                          <div className="customer-contact">SĐT: {booking.phone}</div>
-                        </div>
-                      </td>
-                      <td className="regular-value">{booking.guests} Khách</td>
-                      <td>
-                        <div className="date-time-info">
-                          <div className="time">{booking.time}</div>
-                          <div className="date">{booking.date}</div>
-                        </div>
-                      </td>
-                      <td>
-                        {booking.table ? (
-                          <span className="table-chip">{booking.table}</span>
-                        ) : (
-                          <span className="table-empty">Chưa chỉ định</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={regularStatus.className}>
-                          {regularStatus.icon}
-                          {booking.statusText}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          {booking.status === 'pending' ? (
-                            <>
-                              <button className="btn-confirm-inline" onClick={() => handleConfirmReservation(booking)} disabled={isProcessing} type="button">
-                                <Check size={14} />
-                                {isProcessing ? 'Đang xử lý...' : 'Xác nhận'}
-                              </button>
-                              <button className="btn-cancel-inline" onClick={() => openCancelModal(booking)} disabled={isProcessing} type="button">
-                                <X size={14} />
-                                Hủy
-                              </button>
-                            </>
-                          ) : booking.status === 'cancelled' ? (
-                            <button className="btn-icon-only" title="Chi tiết" type="button">
-                              <Info size={16} />
-                            </button>
+                {filteredRegularBookings
+                  .slice((currentPage - 1) * 10, currentPage * 10)
+                  .map((booking) => {
+                    const regularStatus = getRegularStatusConfig(booking.status);
+                    const isProcessing = processingCode === booking.reservationCode;
+                    return (
+                      <tr key={booking.id} className={booking.status === 'cancelled' ? 'muted-row' : ''}>
+                        <td>
+                          <div className="customer-info">
+                            <div className="customer-name">{booking.customer}</div>
+                            <div className="customer-contact">SĐT: {booking.phone}</div>
+                          </div>
+                        </td>
+                        <td className="regular-value">{booking.guests} Khách</td>
+                        <td>
+                          <div className="date-time-info">
+                            <div className="time">{booking.time}</div>
+                            <div className="date">{booking.date}</div>
+                          </div>
+                        </td>
+                        <td>
+                          {booking.table ? (
+                            <span className="table-chip">{booking.table}</span>
                           ) : (
-                            <>
-                              <button className="btn-icon-only" title="Chỉnh sửa" type="button">
-                                <Edit size={16} />
-                              </button>
-                              <button className="btn-icon-only danger" title="Hủy đặt bàn" onClick={() => openCancelModal(booking)} type="button">
-                                <Trash2 size={16} />
-                              </button>
-                            </>
+                            <span className="table-empty">Chưa chỉ định</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td>
+                          <span className={regularStatus.className}>
+                            {regularStatus.icon}
+                            {booking.statusText}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            {booking.status === 'pending' ? (
+                              <>
+                                <button className="btn-confirm-inline" onClick={() => handleConfirmReservation(booking)} disabled={isProcessing} type="button">
+                                  <Check size={14} />
+                                  {isProcessing ? 'Đang xử lý...' : 'Xác nhận'}
+                                </button>
+                                <button className="btn-cancel-inline" onClick={() => openCancelModal(booking)} disabled={isProcessing} type="button">
+                                  <X size={14} />
+                                  Hủy
+                                </button>
+                              </>
+                            ) : booking.status === 'cancelled' ? (
+                              <button className="btn-icon-only" title="Chi tiết" type="button">
+                                <Info size={16} />
+                              </button>
+                            ) : (
+                              <>
+                                <button className="btn-icon-only danger" title="Hủy đặt bàn" onClick={() => openCancelModal(booking)} type="button">
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           ) : (
@@ -578,13 +672,20 @@ const ManagerReservationsPage = () => {
               : `Hiển thị ${filteredEvents.length} trong số ${eventsData.length} sự kiện`}
           </p>
           <div className="pagination-controls">
-            <button className="pagination-btn" disabled={currentPage === 1} type="button">
+            <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)} type="button">
               <ChevronLeft size={16} />
             </button>
-            <button className="pagination-btn active" type="button">1</button>
-            <button className="pagination-btn" type="button">2</button>
-            <button className="pagination-btn" type="button">3</button>
-            <button className="pagination-btn" type="button">
+            {Array.from({ length: Math.ceil(filteredRegularBookings.length / 10) }, (_, idx) => (
+              <button
+                key={idx + 1}
+                className={`pagination-btn${currentPage === idx + 1 ? ' active' : ''}`}
+                onClick={() => setCurrentPage(idx + 1)}
+                type="button"
+              >
+                {idx + 1}
+              </button>
+            ))}
+            <button className="pagination-btn" disabled={currentPage === Math.ceil(filteredRegularBookings.length / 10) || filteredRegularBookings.length === 0} onClick={() => setCurrentPage(currentPage + 1)} type="button">
               <ChevronRight size={16} />
             </button>
           </div>

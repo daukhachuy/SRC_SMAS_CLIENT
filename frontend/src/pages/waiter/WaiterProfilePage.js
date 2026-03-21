@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
 import { salaryRecordAPI, staffAPI } from '../../api/managerApi';
+import { staffApi } from '../../api/staffApi';
 
 function asArray(value) {
   if (Array.isArray(value)) return value;
@@ -106,7 +107,7 @@ const WaiterProfilePage = () => {
 
     try {
       const [profileRes, monthDetailRes, sixMonthsRes, monthHoursRes, monthShiftsRes] = await Promise.allSettled([
-        staffAPI.getStaffProfile(),
+        staffApi.getProfile(),
         salaryRecordAPI.getCurrentMonthDetail(),
         salaryRecordAPI.getLastSixMonths(),
         staffAPI.getSumTimeworkThisMonth(),

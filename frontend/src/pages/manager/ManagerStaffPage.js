@@ -26,21 +26,19 @@ import {
 import '../../styles/ManagerStaffPage.css';
 import { mapStaffToUI, mapWorkshiftToUI, staffAPI } from '../../api/managerApi';
 
-const DEPARTMENTS = ['all', 'kitchen', 'service', 'cashier'];
+const DEPARTMENTS = ['all', 'kitchen', 'service'];
 const DEPARTMENT_LABELS = {
   all: 'Tất cả',
   kitchen: 'Bếp',
   service: 'Phục vụ',
-  cashier: 'Thu ngân',
 };
 
 const SHIFT_KEYS = ['morning', 'afternoon', 'evening'];
 
 const ROLE_TO_POSITION = {
-  all: ['Kitchen', 'Waiter', 'Cashier'],
+  all: ['Kitchen', 'Waiter'],
   kitchen: ['Kitchen'],
   service: ['Waiter'],
-  cashier: ['Cashier'],
 };
 
 function asArray(value) {
@@ -55,25 +53,19 @@ function unwrapResponse(response) {
   return asArray(response.data?.data || response.data || response);
 }
 
-function getWeekDates() {
+function getWeekDatesFromRange(dateRange) {
   const labels = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-  const today = new Date();
-  const result = [];
-
-  for (let i = 0; i < 7; i += 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    result.push({
-      key: d.toISOString().split('T')[0],
+  return dateRange.map((dateStr, idx) => {
+    const d = new Date(dateStr);
+    return {
+      key: dateStr,
       day: labels[d.getDay()],
       date: d.getDate(),
       month: d.getMonth(),
       year: d.getFullYear(),
-      highlight: i === 0,
-    });
-  }
-
-  return result;
+      highlight: idx === 0,
+    };
+  });
 }
 
 function inferShiftKey(item) {
@@ -98,7 +90,6 @@ function roleMatch(employeeRole, selectedDepartment) {
   if (selectedDepartment === 'all') return true;
   if (selectedDepartment === 'kitchen') return employeeRole === 'Đầu bếp';
   if (selectedDepartment === 'service') return employeeRole === 'Phục vụ';
-  if (selectedDepartment === 'cashier') return employeeRole === 'Thu ngân';
   return true;
 }
 
@@ -112,7 +103,7 @@ const ManagerStaffPage = () => {
 
   const [employees, setEmployees] = useState([]);
   const [currentlyWorking, setCurrentlyWorking] = useState([]);
-  const [weekSchedule, setWeekSchedule] = useState(getWeekDates());
+  const [weekSchedule, setWeekSchedule] = useState([]);
   const [scheduleData, setScheduleData] = useState({
     morning: Array.from({ length: 7 }, () => []),
     afternoon: Array.from({ length: 7 }, () => []),
@@ -152,44 +143,77 @@ const ManagerStaffPage = () => {
     setEmployees(unique);
   }, []);
 
-  const fetchSchedule = useCallback(async (baseEmployees, weekDates) => {
+  const fetchSchedule = useCallback(async (baseEmployees, dateRange) => {
     const positions = ROLE_TO_POSITION.all;
     const [nextSevenRes, weekKitchenRes] = await Promise.allSettled([
       staffAPI.getNextSevenDays(positions),
-      staffAPI.getScheduleWeekKitchenWaiter(weekDates[0]?.key),
+      staffAPI.getScheduleWeekKitchenWaiter(dateRange[0]),
     ]);
 
-    const scheduleItems = [
-      ...(nextSevenRes.status === 'fulfilled' ? unwrapResponse(nextSevenRes.value) : []),
-      ...(weekKitchenRes.status === 'fulfilled' ? unwrapResponse(weekKitchenRes.value) : []),
-    ];
-
+    // Parse API mới: shifts -> days -> staffs
+    const nextSevenData = nextSevenRes.status === 'fulfilled' ? unwrapResponse(nextSevenRes.value) : [];
+    const weekDates = getWeekDatesFromRange(nextSevenData.dateRange || dateRange);
+    setWeekSchedule(weekDates);
     const byDay = {
       morning: Array.from({ length: weekDates.length }, () => []),
       afternoon: Array.from({ length: weekDates.length }, () => []),
       evening: Array.from({ length: weekDates.length }, () => []),
     };
-
     const employeePool = [...baseEmployees];
     const employeeIds = new Set(employeePool.map((e) => e.id));
 
+    // Map shiftId sang shiftKey chuẩn
+    const getShiftKey = (shift) => {
+      if (shift.shiftId === 1) return 'morning';
+      if (shift.shiftId === 2) return 'afternoon';
+      if (shift.shiftId === 3) return 'evening';
+      const name = String(shift.shiftName || '').toLowerCase();
+      if (name.includes('sáng') || name.includes('morning')) return 'morning';
+      if (name.includes('chiều') || name.includes('afternoon')) return 'afternoon';
+      if (name.includes('tối') || name.includes('evening') || name.includes('night')) return 'evening';
+      return 'morning';
+    };
+
+    // Duyệt từng shift
+    (nextSevenData.shifts || []).forEach((shift) => {
+      const shiftKey = getShiftKey(shift);
+      if (!SHIFT_KEYS.includes(shiftKey)) return;
+      shift.days.forEach((day) => {
+        // Tìm đúng index ngày trong weekDates (so sánh theo yyyy-mm-dd)
+        const dayIndex = weekDates.findIndex((d) => d.key === day.workDay);
+        if (dayIndex < 0) return;
+        day.staffs.forEach((staff) => {
+          if (!employeeIds.has(staff.userId)) {
+            employeePool.push({
+              id: staff.userId,
+              name: staff.fullName,
+              avatar: staff.avatarUrl,
+              role: staff.position,
+            });
+            employeeIds.add(staff.userId);
+          }
+          if (!byDay[shiftKey][dayIndex].includes(staff.userId)) {
+            byDay[shiftKey][dayIndex].push(staff.userId);
+          }
+        });
+      });
+    });
+
+    // Xử lý thêm dữ liệu từ weekKitchenRes nếu cần (giữ nguyên logic cũ)
+    const scheduleItems = weekKitchenRes.status === 'fulfilled' ? unwrapResponse(weekKitchenRes.value) : [];
     scheduleItems.forEach((raw) => {
       const staff = mapStaffToUI(raw);
       if (staff.id == null) return;
-
       if (!employeeIds.has(staff.id)) {
         employeePool.push(staff);
         employeeIds.add(staff.id);
       }
-
       const workDate = raw?.workDate || raw?.workDay || staff.workDate;
       const dateKey = workDate ? new Date(workDate).toISOString().split('T')[0] : null;
       const dayIndex = weekDates.findIndex((d) => d.key === dateKey);
       if (dayIndex < 0) return;
-
       const shiftKey = inferShiftKey(raw);
       if (!SHIFT_KEYS.includes(shiftKey)) return;
-
       if (!byDay[shiftKey][dayIndex].includes(staff.id)) {
         byDay[shiftKey][dayIndex].push(staff.id);
       }
@@ -211,16 +235,15 @@ const ManagerStaffPage = () => {
     else setLoading(true);
 
     setError('');
-    const weekDates = getWeekDates();
-    setWeekSchedule(weekDates);
 
     try {
-      const [workshiftRes, staffWorkRes, workingRes, sumShiftRes, sumTimeRes] = await Promise.allSettled([
+      const [workshiftRes, staffWorkRes, workingRes, sumShiftRes, sumTimeRes, nextSevenRes] = await Promise.allSettled([
         staffAPI.getWorkshift(),
         staffAPI.getStaffWorkToday(),
         staffAPI.getWorkingToday(),
         staffAPI.getSumWorkshiftThisMonth(),
         staffAPI.getSumTimeworkThisMonth(),
+        staffAPI.getNextSevenDays(ROLE_TO_POSITION.all),
       ]);
 
       const workshiftItems = workshiftRes.status === 'fulfilled' ? unwrapResponse(workshiftRes.value) : [];
@@ -247,8 +270,26 @@ const ManagerStaffPage = () => {
         totalHours: Number.isFinite(totalHours) ? totalHours : 0,
       });
 
+      // Lấy dateRange từ API (nếu có), fallback sang getWeekDatesFromRange với hôm nay
+      let dateRange = [];
+      if (nextSevenRes.status === 'fulfilled') {
+        const data = unwrapResponse(nextSevenRes.value);
+        if (data.dateRange && Array.isArray(data.dateRange)) {
+          dateRange = data.dateRange;
+        }
+      }
+      if (!dateRange.length) {
+        // fallback: lấy 7 ngày từ hôm nay
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() + i);
+          dateRange.push(d.toISOString().split('T')[0]);
+        }
+      }
+
       await fetchEmployees(department);
-      await fetchSchedule(uniqueWorking, weekDates);
+      await fetchSchedule(uniqueWorking, dateRange);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'Không thể tải dữ liệu nhân sự.');
     } finally {
@@ -363,23 +404,13 @@ const ManagerStaffPage = () => {
           </div>
 
           <div className="staff-header-actions">
-            <button className="btn-secondary" onClick={() => fetchPageData(selectedDepartment, true)}>
-              {refreshing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-              Làm mới
-            </button>
-
+            
             {activeTab === 'list' && (
               <button className="btn-secondary" type="button">
                 <FileDown size={20} />
                 Xuất báo cáo
               </button>
             )}
-
-            <button className="btn-secondary" type="button">
-              <UserPlus size={20} />
-              Thêm nhân viên mới
-            </button>
-
             {activeTab === 'schedule' && (
               <button className="btn-primary" onClick={() => setShowAssignModal(true)}>
                 <CalendarPlus size={20} />
@@ -521,7 +552,6 @@ const ManagerStaffPage = () => {
                       </div>
                     ))}
                   </div>
-                  <button className="view-all-btn">Xem tất cả {currentlyWorking.length} người</button>
                 </div>
 
                 <div className="sidebar-card rating-card">

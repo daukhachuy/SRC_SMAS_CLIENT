@@ -210,17 +210,6 @@ const ManagerOrdersPage = () => {
               onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
             />
           </div>
-          <button
-            onClick={fetchAll}
-            title="Làm mới"
-            style={{
-              background: 'none', border: '1.5px solid #e0e0e0',
-              borderRadius: 8, padding: '8px 10px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', color: '#666',
-            }}
-          >
-            <RefreshCw size={17} />
-          </button>
         </div>
       </div>
 
