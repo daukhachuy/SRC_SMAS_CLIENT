@@ -252,10 +252,6 @@ const ManagerLayout = () => {
       setProfileError('Mật khẩu mới không khớp');
       return;
     }
-    if (passwordData.newPassword.length < 6) {
-      setProfileError('Mật khẩu mới phải có ít nhất 6 ký tự');
-      return;
-    }
 
     setProfileLoading(true);
     setProfileError('');
