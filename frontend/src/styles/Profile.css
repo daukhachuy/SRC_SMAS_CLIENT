@@ -665,21 +665,180 @@
   .Profile-Form-Grid {
     grid-template-columns: 1fr;
   }
-  
+
   .Profile-Section {
     padding: 24px 20px;
   }
-  
+
   .Profile-Section-Header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .AddressModal-Row {
     grid-template-columns: 1fr;
   }
-  
+
   .AddressModal-TypeGroup {
     flex-wrap: wrap;
+  }
+}
+
+/* ── Lịch sử đặt sự kiện ── */
+.Profile-EventOrders {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.Profile-Empty,
+.Profile-Error {
+  text-align: center;
+  padding: 32px;
+  color: var(--pf-text-muted);
+  font-size: 15px;
+}
+
+.Profile-EventCard {
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-border);
+  border-radius: 16px;
+  padding: 20px;
+  transition: var(--pf-transition);
+}
+
+.Profile-EventCard:hover {
+  box-shadow: var(--pf-shadow);
+  border-color: var(--pf-primary-light);
+}
+
+.Profile-EventCard-Header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.Profile-EventCard-Left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.Profile-EventCard-Code {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--pf-primary);
+}
+
+.Profile-EventCard-Type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pf-text-muted);
+  background: var(--pf-border);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.Profile-EventCard-Status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.status-pending    { background: #FEF3C7; color: #92400E; }
+.status-confirmed  { background: #DBEAFE; color: #1E40AF; }
+.status-signed     { background: #D1FAE5; color: #065F46; }
+.status-deposit    { background: #EDE9FE; color: #5B21B6; }
+.status-cancelled  { background: #FEE2E2; color: #991B1B; }
+
+.Profile-EventCard-Body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.Profile-EventCard-Info {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+
+.Profile-EventCard-Info p {
+  font-size: 14px;
+  color: var(--pf-text-muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.Profile-EventCard-Info p i {
+  color: var(--pf-primary);
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.Profile-EventCard-Services ul,
+.Profile-EventCard-Foods ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.Profile-EventCard-Services li,
+.Profile-EventCard-Foods li {
+  font-size: 13px;
+  color: var(--pf-text);
+  background: var(--pf-white);
+  border: 1px solid var(--pf-border);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.Profile-EventCard-Services strong,
+.Profile-EventCard-Foods strong {
+  font-size: 13px;
+  color: var(--pf-text-muted);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.Profile-EventCard-Footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pf-border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.Profile-EventCard-Total {
+  font-size: 15px;
+  color: var(--pf-text);
+}
+
+.Profile-EventCard-Total strong {
+  color: var(--pf-primary);
+  font-size: 17px;
+}
+
+@media (max-width: 600px) {
+  .Profile-EventCard-Info {
+    grid-template-columns: 1fr;
+  }
+
+  .Profile-EventCard-Header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

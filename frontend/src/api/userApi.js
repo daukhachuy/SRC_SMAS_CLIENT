@@ -2,13 +2,13 @@ import instance from './axiosInstance';
 
 /**
  * User API calls
- * Endpoints: /api/User/profile
+ * Endpoints: /api/user/profile
  */
 
 export async function getProfile() {
   try {
     console.log('👤 Fetching user profile...');
-    const response = await instance.get('/User/profile');
+    const response = await instance.get('/user/profile');
     console.log('✅ User profile loaded:', response.data);
     return response.data;
   } catch (error) {
@@ -41,7 +41,7 @@ export async function updateProfile(profileData) {
       updateData.newPassword = profileData.confirmPassword;
     }
 
-    const response = await instance.put('/User/profile', updateData);
+    const response = await instance.put('/user/profile', updateData);
     console.log('✅ User profile updated');
     return response.data;
   } catch (error) {
@@ -49,6 +49,28 @@ export async function updateProfile(profileData) {
     throw {
       status: error.response?.status,
       message: error.response?.data?.message || 'Failed to update user profile.',
+      error
+    };
+  }
+}
+
+/**
+ * Change password - gọi PUT /api/user/profile với newPassword
+ */
+export async function changePassword(currentPassword, newPassword) {
+  try {
+    console.log('🔐 Changing password...');
+    const response = await instance.put('/user/profile', {
+      currentPassword,
+      newPassword
+    });
+    console.log('✅ Password changed successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to change password:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to change password.',
       error
     };
   }
