@@ -1,8 +1,5 @@
 import instance from './axiosInstance';
 
-/** @deprecated dùng trực tiếp từ ./kitchenOrderApi — giữ để tương thích import cũ */
-export { apiGetPending as fetchPendingOrderItems } from './kitchenOrderApi';
-
 export const fetchUserOrders = async (orderType = 'Delivery', status = 'Pending') => {
   try {
     const response = await instance.post(
