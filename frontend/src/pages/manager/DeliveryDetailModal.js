@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Truck,
@@ -14,100 +14,84 @@ import {
   UtensilsCrossed,
   ChevronDown
 } from 'lucide-react';
-
-import { orderAPI, getWorkingStaffToday } from '../../api/managerApi';
 import '../../styles/DeliveryDetailModal.css';
-
 
 const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
   const [selectedDriver, setSelectedDriver] = useState('');
   const [cancelReason, setCancelReason] = useState('');
-  const [orderDetail, setOrderDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [drivers, setDrivers] = useState([]);
-
-  // Khi mở modal, fetch chi tiết đơn hàng nếu có orderId/code
-  useEffect(() => {
-    if (!isOpen) return;
-    const orderCode = deliveryData?.code || deliveryData?.orderId;
-    if (!orderCode) return;
-    setLoading(true);
-    setError('');
-    orderAPI.getByCode(orderCode)
-      .then(res => {
-        const data = res?.data?.data || res?.data || res;
-        setOrderDetail(data);
-      })
-      .catch(() => setError('Không thể tải chi tiết đơn hàng.'))
-      .finally(() => setLoading(false));
-
-    // Fetch delivery staff (drivers)
-    getWorkingStaffToday()
-      .then(staffList => {
-        // Nếu không có role giao hàng, lấy luôn nhân viên phục vụ (Waiter)
-        const deliveryStaff = staffList.filter(
-          s => (s.position && (
-                  s.position.toLowerCase().includes('delivery') ||
-                  s.position.toLowerCase().includes('waiter') ||
-                  s.position.toLowerCase().includes('phục vụ')
-                ))
-            || (s.role && (
-                  s.role.toLowerCase().includes('delivery') ||
-                  s.role.toLowerCase().includes('waiter') ||
-                  s.role.toLowerCase().includes('phục vụ')
-                ))
-        );
-        setDrivers(deliveryStaff);
-      })
-      .catch(() => setDrivers([]));
-  }, [isOpen, deliveryData]);
 
   if (!isOpen) return null;
 
-  // Nếu đang loading hoặc lỗi
-  if (loading) {
-    return <div className="delivery-modal-overlay"><div className="delivery-modal-container"><div style={{padding: 40, textAlign: 'center'}}>Đang tải chi tiết đơn hàng...</div></div></div>;
-  }
-  if (error) {
-    return <div className="delivery-modal-overlay"><div className="delivery-modal-container"><div style={{padding: 40, color: 'red', textAlign: 'center'}}>{error}</div></div></div>;
-  }
-
-  // Nếu có dữ liệu thực tế từ API thì ưu tiên render, nếu không fallback về dữ liệu mẫu
-  const delivery = orderDetail ? {
-    orderId: orderDetail.orderCode || orderDetail.code || orderDetail.id || '',
-    customerName: orderDetail.delivery?.recipientName || orderDetail.customerName || orderDetail.title || '',
-    phone: orderDetail.delivery?.recipientPhone || orderDetail.phone || '',
-    address: orderDetail.delivery?.address || orderDetail.address || '',
-    distance: orderDetail.distance || '',
-    status: orderDetail.status || '',
-    statusColor: orderDetail.statusClass === 'shipping' ? 'blue' :
-                 orderDetail.statusClass === 'preparing' ? 'orange' :
-                 orderDetail.statusClass === 'ready' ? 'green' :
-                 orderDetail.statusClass === 'pending' ? 'gray' :
-                 orderDetail.statusColor || 'gray',
-    orderTime: orderDetail.orderTime || orderDetail.createdAt || '',
-    menuItems: Array.isArray(orderDetail.items)
-      ? orderDetail.items.map(item => ({
-          name: item.itemName || item.foodName || item.name || '',
-          quantity: item.quantity,
-          price: item.unitPrice || item.price,
-          total: item.totalPrice || item.subtotal || (item.quantity && (item.unitPrice || item.price) ? item.quantity * (item.unitPrice || item.price) : ''),
-        }))
-      : [],
+  // Default delivery data with proper structure
+  const defaultData = {
+    orderId: 'VC003',
+    customerName: 'Nguyễn Văn An',
+    phone: '090 123 4567',
+    address: '123 Đường Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh',
+    distance: '4.8 km',
+    status: 'Đang chế biến',
+    statusColor: 'orange',
+    orderTime: '10:30',
+    
+    menuItems: [
+      {
+        name: 'Phở Bò Đặc Biệt',
+        quantity: 2,
+        price: '95.000đ',
+        total: '190.000đ'
+      },
+      {
+        name: 'Gỏi Cuốn Tôm Thịt',
+        quantity: 1,
+        price: '65.000đ',
+        total: '65.000đ'
+      },
+      {
+        name: 'Trà Đào Cam Sả',
+        quantity: 2,
+        price: '45.000đ',
+        total: '90.000đ'
+      }
+    ],
+    
     payment: {
-      subtotal: orderDetail.subTotal ?? orderDetail.subtotal ?? orderDetail.totalBeforeDiscount ?? '',
-      shippingFee: orderDetail.deliveryPrice ?? orderDetail.shippingFee ?? orderDetail.deliveryFee ?? orderDetail.feeShip ?? '',
-      discount: orderDetail.discountAmount ?? orderDetail.discount ?? '',
-      total: orderDetail.totalAmount ?? orderDetail.total ?? '',
+      subtotal: '345.000đ',
+      shippingFee: '20.000đ',
+      discount: '-15.000đ',
+      total: '350.000đ'
     },
-    drivers: drivers,
-    assignedDriver: orderDetail.assignedDriver || null,
-  } : {
+    
+    drivers: [
+      { id: '1', name: 'Trần Minh Tâm', status: 'Đang rảnh', available: true },
+      { id: '2', name: 'Lê Hoàng Nam', status: 'Đang giao 1 đơn', available: false },
+      { id: '3', name: 'Phạm Quốc Việt', status: 'Đang rảnh', available: true }
+    ],
+    
+    assignedDriver: {
+      id: '1',
+      name: 'Trần Minh Tâm',
+      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAW5hIHVeyhf-1JxlUvB6fEgJ4-n_gimrxjv0LKNu9qhxJNInpr1Z4mNmimAx37BW1qgwEPveIp7TTKBR5epmLVJmB-pZ5wsQ5AbT9SLIT9yemNkVwBAoVL0kg533FEr5dUupuzV_7Gg5CTmXKS9luJeT9aLF5WXACSsDhKsxvrj8UMGsa1w84FdJJ6mSBOeGmGzjbWen5hUQLTy8OJBu3kGmD5R1oOL6cL7wr4Om2MN8Q88Bal78flDc9JXyw-UrJaDO3MVUoA1yM',
+      status: 'Sẵn sàng'
+    }
+  };
+
+  // Merge deliveryData with defaults to ensure all required properties exist
+  const delivery = {
+    ...defaultData,
     ...deliveryData,
-    menuItems: Array.isArray(deliveryData?.menuItems) ? deliveryData.menuItems : [],
-    payment: deliveryData?.payment || {},
-    drivers: Array.isArray(deliveryData?.drivers) ? deliveryData.drivers : [],
+    orderId: deliveryData?.code || defaultData.orderId,
+    customerName: deliveryData?.title || defaultData.customerName,
+    status: deliveryData?.status || defaultData.status,
+    menuItems: deliveryData?.menuItems || defaultData.menuItems,
+    payment: deliveryData?.payment || defaultData.payment,
+    drivers: deliveryData?.drivers || defaultData.drivers,
+    assignedDriver: deliveryData?.assignedDriver || defaultData.assignedDriver,
+    // Map statusClass to statusColor
+    statusColor: deliveryData?.statusClass === 'shipping' ? 'blue' :
+                 deliveryData?.statusClass === 'preparing' ? 'orange' :
+                 deliveryData?.statusClass === 'ready' ? 'green' :
+                 deliveryData?.statusClass === 'pending' ? 'gray' :
+                 deliveryData?.statusColor || 'gray'
   };
 
   const handleDriverChange = (e) => {
@@ -192,7 +176,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(delivery.menuItems || []).map((item, index) => (
+                    {delivery.menuItems.map((item, index) => (
                       <tr key={index}>
                         <td className="delivery-menu-item-name">{item.name}</td>
                         <td className="text-center">{item.quantity}</td>
@@ -209,21 +193,21 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
             <div className="delivery-payment-summary">
               <div className="delivery-payment-row">
                 <span className="delivery-payment-label">Tạm tính</span>
-                <span className="delivery-payment-value">{delivery.payment?.subtotal || ''}</span>
+                <span className="delivery-payment-value">{delivery.payment.subtotal}</span>
               </div>
               <div className="delivery-payment-row">
                 <span className="delivery-payment-label">Phí ship</span>
-                <span className="delivery-payment-value">{delivery.payment?.shippingFee || ''}</span>
+                <span className="delivery-payment-value">{delivery.payment.shippingFee}</span>
               </div>
               <div className="delivery-payment-row">
                 <span className="delivery-payment-label">Giảm giá</span>
                 <span className="delivery-payment-value delivery-payment-discount">
-                  {delivery.payment?.discount || ''}
+                  {delivery.payment.discount}
                 </span>
               </div>
               <div className="delivery-payment-total-row">
                 <span className="delivery-payment-total-label">Tổng cộng</span>
-                <span className="delivery-payment-total-amount">{delivery.payment?.total || ''}</span>
+                <span className="delivery-payment-total-amount">{delivery.payment.total}</span>
               </div>
             </div>
           </div>
@@ -277,7 +261,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
                       onChange={handleDriverChange}
                     >
                       <option value="">Chọn nhân viên...</option>
-                      {(delivery.drivers || []).map((driver) => (
+                      {delivery.drivers.map((driver) => (
                         <option key={driver.id} value={driver.id}>
                           {driver.name} ({driver.status})
                         </option>

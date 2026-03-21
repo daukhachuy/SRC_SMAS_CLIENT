@@ -23,8 +23,6 @@ import {
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
 import { orderAPI } from '../../api/managerApi';
-import { createGuestOrder } from '../../api/orderApi';
-import { getFoodByFilter } from '../../api/foodApi';
 
 const asArray = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -40,16 +38,10 @@ const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
 
 const mapOrderStatus = (status) => {
   const s = normalizeStatus(status);
-    if (s === 'ready' || s === 'confirmed') /* ...existing code... */
-    if (s === 'delivering' || s === 'shipping') /* ...existing code... */
-    if (s === 'completed' || s === 'done') /* ...existing code... */
-    // Các trạng thái hủy bàn
-    if ([
-      'cancelled', 'canceled', 'rejected', 'voided', 'cancel', 'huy', 'đã hủy', 'da huy', 'hủy bàn', 'huy ban'
-    ].includes(s)) {
-      return { status: 'cancelled', statusLabel: 'Đã hủy bàn' };
-    }
-    return { status: 'preparing', statusLabel: 'Đang làm' };
+  if (s === 'ready' || s === 'confirmed') return { status: 'ready', statusLabel: 'Sẵn sàng' };
+  if (s === 'delivering' || s === 'shipping') return { status: 'delivering', statusLabel: 'Đang giao' };
+  if (s === 'completed' || s === 'done') return { status: 'ready', statusLabel: 'Hoàn thành' };
+  if (s === 'cancelled' || s === 'canceled') return { status: 'preparing', statusLabel: 'Đã hủy' };
   return { status: 'preparing', statusLabel: 'Đang làm' };
 };
 
@@ -111,16 +103,6 @@ const mapApiOrderToWaiter = (order) => {
 };
 
 const WaiterOrdersPage = () => {
-  // ...existing code...
-    // Hàm xử lý hủy đơn hàng (giả định tên là handleCancelOrder)
-    // Sau khi hủy thành công, gọi lại fetchWaiterOrders để reload danh sách đơn
-    // Nếu đã có sẵn logic này thì bỏ qua, nếu chưa thì thêm vào như sau:
-    // Ví dụ:
-    // const handleCancelOrder = async () => {
-    //   // ...gọi API hủy đơn...
-    //   await fetchWaiterOrders(); // reload lại danh sách đơn để cập nhật trạng thái
-    // }
-  // Di chuyển các biến này xuống sau các hook
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState('');
   const [activeTab, setActiveTab] = useState('dineIn');
@@ -141,36 +123,19 @@ const WaiterOrdersPage = () => {
   const [receivedMoney, setReceivedMoney] = useState('200000');
   const [menuSearch, setMenuSearch] = useState('');
 
-  const [cartItems, setCartItems] = useState([]);
-  const [menuItems, setMenuItems] = useState([]);
-  const [menuLoading, setMenuLoading] = useState(false);
-  const [menuError, setMenuError] = useState(null);
-
-  // Lấy danh sách món ăn thực tế khi mở modal tạo đơn mới
-  useEffect(() => {
-    if (!showCreateModal) return;
-    setMenuLoading(true);
-    setMenuError(null);
-    const fetchMenu = async () => {
-      try {
-        const params = new URLSearchParams();
-        // Có thể thêm filter nếu muốn
-        // MOCK: Dữ liệu món ăn mẫu (không gọi API)
-        const foods = [
-          { id: 1, name: 'Phở bò', price: 50000, image: '' },
-          { id: 2, name: 'Bún chả', price: 45000, image: '' },
-          { id: 3, name: 'Cơm tấm', price: 40000, image: '' }
-        ];
-        setMenuItems(foods);
-      } catch (err) {
-        setMenuError('Không thể tải dữ liệu món ăn.');
-        setMenuItems([]);
-      } finally {
-        setMenuLoading(false);
-      }
-    };
-    fetchMenu();
-  }, [showCreateModal]);
+  const [cartItems, setCartItems] = useState([
+    { id: 'dish-1', name: 'Phở Bò Tái Lăn', price: 65000, quantity: 2, note: '' },
+    {
+      id: 'buffet-1',
+      name: 'Buffet Hải Sản',
+      price: 299000,
+      quantity: 1,
+      note: '',
+      type: 'buffet',
+      selectedChildren: ['Tôm hùm bỏ lò', 'Cua hoàng đế']
+    },
+    { id: 'drink-1', name: 'Trà Đào Cam Sả', price: 35000, quantity: 1, note: '' }
+  ]);
 
   const [orderForm, setOrderForm] = useState({
     fullName: 'Nguyễn Hoàng Nam',
@@ -183,31 +148,29 @@ const WaiterOrdersPage = () => {
     note: ''
   });
 
-  // Sửa logic: tableSelection lưu id số của bàn
   const [tableSelection, setTableSelection] = useState({
-    mainTableId: 1,
-    mergedTableIds: [2, 10]
+    mainTableId: 'T.01',
+    mergedTableIds: ['T.02', 'T.10']
   });
 
-  // Sửa tables: id là số, code là string
   const tables = useMemo(
     () => [
-      { id: 1, code: 'T.01', seats: 4, status: 'empty' },
-      { id: 2, code: 'T.02', seats: 4, status: 'empty' },
-      { id: 3, code: 'T.03', seats: 2, status: 'empty' },
-      { id: 4, code: 'T.04', seats: 6, status: 'occupied' },
-      { id: 5, code: 'T.05', seats: 4, status: 'empty' },
-      { id: 6, code: 'T.06', seats: 4, status: 'empty' },
-      { id: 7, code: 'T.07', seats: 8, status: 'empty' },
-      { id: 8, code: 'T.08', seats: 2, status: 'empty' },
-      { id: 9, code: 'T.09', seats: 4, status: 'occupied' },
-      { id: 10, code: 'T.10', seats: 4, status: 'empty' },
-      { id: 11, code: 'T.11', seats: 4, status: 'empty' },
-      { id: 12, code: 'T.12', seats: 2, status: 'empty' },
-      { id: 13, code: 'T.13', seats: 4, status: 'empty' },
-      { id: 14, code: 'T.14', seats: 4, status: 'empty' },
-      { id: 15, code: 'T.15', seats: 6, status: 'empty' },
-      { id: 16, code: 'T.16', seats: 4, status: 'occupied' }
+      { id: 'T.01', seats: 4, status: 'empty' },
+      { id: 'T.02', seats: 4, status: 'empty' },
+      { id: 'T.03', seats: 2, status: 'empty' },
+      { id: 'T.04', seats: 6, status: 'occupied' },
+      { id: 'T.05', seats: 4, status: 'empty' },
+      { id: 'T.06', seats: 4, status: 'empty' },
+      { id: 'T.07', seats: 8, status: 'empty' },
+      { id: 'T.08', seats: 2, status: 'empty' },
+      { id: 'T.09', seats: 4, status: 'occupied' },
+      { id: 'T.10', seats: 4, status: 'empty' },
+      { id: 'T.11', seats: 4, status: 'empty' },
+      { id: 'T.12', seats: 2, status: 'empty' },
+      { id: 'T.13', seats: 4, status: 'empty' },
+      { id: 'T.14', seats: 4, status: 'empty' },
+      { id: 'T.15', seats: 6, status: 'empty' },
+      { id: 'T.16', seats: 4, status: 'occupied' }
     ],
     []
   );
@@ -264,12 +227,81 @@ const WaiterOrdersPage = () => {
           acc[dateKey] = current;
           return acc;
         }, {});
-        // ...existing code...
+
+        const historyRows = Object.entries(groupedByDate)
+          .slice(0, 7)
+          .map(([date, metrics]) => ({
+            date,
+            totalOrders: `${metrics.totalOrders} đơn`,
+            revenue: `${metrics.revenue.toLocaleString('vi-VN')}đ`,
+            rating: 5,
+            status: 'Hoàn thành'
+          }));
+
+        setServiceHistory(historyRows);
+      } else {
+        setServiceHistory([]);
       }
     } catch (error) {
-      setOrdersError(error.message || 'Lỗi không xác định khi tải đơn hàng.');
+      console.error('Không thể tải dữ liệu đơn hàng waiter:', error);
+      setOrdersError(error?.message || 'Không thể tải dữ liệu đơn hàng.');
+      setDineInOrders([]);
+      setTakeawayOrders([]);
+      setDeliveryOrders([]);
+      setServiceHistory([]);
+    } finally {
+      setLoadingOrders(false);
     }
   }, []);
+
+  useEffect(() => {
+    fetchWaiterOrders();
+  }, [fetchWaiterOrders]);
+
+  const currentOrders =
+    activeTab === 'delivery'
+      ? deliveryOrders
+      : activeTab === 'takeaway'
+        ? takeawayOrders
+        : dineInOrders;
+  const deliveryCount = deliveryOrders.length;
+  const takeawayCount = takeawayOrders.length;
+  const dineInCount = dineInOrders.length;
+
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'preparing':
+        return 'status-preparing';
+      case 'ready':
+        return 'status-ready';
+      case 'delivering':
+        return 'status-delivering';
+      default:
+        return '';
+    }
+  };
+
+  const getDishStatus = (status) => {
+    switch (status) {
+      case 'pending':
+        return { label: 'Đang chờ', cls: 'dish-status pending' };
+      case 'preparing':
+        return { label: 'Đang làm', cls: 'dish-status preparing' };
+      case 'ready':
+        return { label: 'Đã xong', cls: 'dish-status ready' };
+      case 'served':
+        return { label: 'Đã bưng lên', cls: 'dish-status served' };
+      default:
+        return { label: 'Đang chờ', cls: 'dish-status pending' };
+    }
+  };
+
+  const formatCurrency = (value) => `${value.toLocaleString('vi-VN')}đ`;
+
+  const getOrderItemsSummary = (order) =>
+    ((order.items || []).length ? (order.items || []) : [{ name: 'Chưa có món', quantity: 0 }])
+      .map((item) => `${item.name} (${item.quantity})`)
+      .join(', ');
 
   const calculateOrderSubtotal = (order) =>
     (order.items || []).reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -279,34 +311,6 @@ const WaiterOrdersPage = () => {
 
   const openOrderDetail = (order) => {
     setSelectedOrder(order);
-          // Helper: getStatusClass
-          const getStatusClass = (status) => {
-            switch (status) {
-              case 'ready':
-                return 'status-ready';
-              case 'preparing':
-                return 'status-preparing';
-              case 'delivering':
-                return 'status-delivering';
-              case 'completed':
-                return 'status-completed';
-              default:
-                return 'status-pending';
-            }
-          };
-
-          // Helper: getOrderItemsSummary
-          const getOrderItemsSummary = (order) => {
-            if (!order.items || !order.items.length) return 'Không có món';
-            return order.items.map((item) => `${item.name} (${item.quantity})`).join(', ');
-          };
-
-          // Helper: formatCurrency
-          const formatCurrency = (value) => {
-            const n = Number(value);
-            return n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
-          };
-
     setShowOrderDetailModal(true);
   };
 
@@ -377,16 +381,6 @@ const WaiterOrdersPage = () => {
   };
 
   const pendingDeliveries = deliveryOrders.filter((order) => order.status === 'ready').slice(0, 2);
-  // Orders tab counts and currentOrders
-  const dineInCount = dineInOrders.length;
-  const takeawayCount = takeawayOrders.length;
-  const deliveryCount = deliveryOrders.length;
-  const currentOrders =
-    activeTab === 'dineIn'
-      ? dineInOrders
-      : activeTab === 'takeaway'
-      ? takeawayOrders
-      : deliveryOrders;
 
   return (
     <div className="waiter-orders-container">
@@ -402,7 +396,26 @@ const WaiterOrdersPage = () => {
           Tạo đơn hàng mới
         </button>
       </header>
-      {/* ...existing code... */}
+
+      {ordersError && (
+        <div style={{
+          marginBottom: '16px',
+          border: '1px solid #ffccc7',
+          background: '#fff2f0',
+          color: '#cf1322',
+          padding: '10px 12px',
+          borderRadius: '10px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <span>{ordersError}</span>
+          <button className="btn-order-detail" type="button" onClick={fetchWaiterOrders}>
+            Tải lại
+          </button>
+        </div>
+      )}
 
       <div className="waiter-orders-layout">
         <section className="orders-main-section">
@@ -510,14 +523,34 @@ const WaiterOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {serviceHistory.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', color: '#888' }}>
+                        Chưa có dữ liệu lịch sử từ API.
+                      </td>
+                    </tr>
+                  )}
                   {serviceHistory.map((record, index) => (
                     <tr key={index}>
                       <td>{record.date}</td>
                       <td className="font-medium">{record.totalOrders}</td>
                       <td>{record.revenue}</td>
-                      <td>{record.rating || '-'}</td>
                       <td>
-                        <span className="status-completed">✓ {record.status}</span>
+                        <div className="rating-stars">
+                          {[...Array(5)].map((_, i) => (
+                            <span
+                              key={i}
+                              className={i < Math.floor(record.rating) ? 'star-filled' : 'star-empty'}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="status-completed">
+                          ✓ {record.status}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -657,81 +690,6 @@ const WaiterOrdersPage = () => {
                 </label>
               </div>
 
-              {/* UI chọn món ăn và giỏ hàng - đồng bộ style, lấy món thực tế */}
-              <div className="menu-modal-section">
-                <h4 className="menu-modal-title">Chọn món ăn</h4>
-                {menuLoading ? (
-                  <div>Đang tải danh sách món ăn...</div>
-                ) : menuError ? (
-                  <div style={{ color: 'red' }}>{menuError}</div>
-                ) : (
-                  <div className="menu-modal-list">
-                    {menuItems.map((item) => (
-                      <div key={item.id} className="menu-modal-item">
-                        <img src={item.image} alt={item.name} className="menu-modal-img" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, marginRight: 12 }} />
-                        <div style={{ flex: 1 }}>
-                          <div className="menu-modal-item-name">{item.name}</div>
-                          <div className="menu-modal-item-price">{item.price?.toLocaleString('vi-VN')}đ</div>
-                        </div>
-                        <button
-                          className="menu-modal-add-btn"
-                          onClick={() => {
-                            setCartItems((prev) => {
-                              const found = prev.find((c) => c.id === item.id);
-                              if (found) {
-                                return prev.map((c) =>
-                                  c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-                                );
-                              }
-                              return [...prev, { ...item, quantity: 1 }];
-                            });
-                          }}
-                        >
-                          Thêm
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <h4 className="menu-modal-title" style={{ marginTop: 24 }}>Giỏ hàng</h4>
-                {cartItems.length === 0 ? (
-                  <div>Chưa có món nào trong giỏ.</div>
-                ) : (
-                  <table className="Cart-Table" style={{ width: '100%', marginTop: 8 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left' }}>Món</th>
-                        <th>Số lượng</th>
-                        <th>Giá</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cartItems.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.name}</td>
-                          <td>
-                            <div className="Quantity-Control">
-                              <button className="Qty-Btn" onClick={() => updateCartQuantity(item.id, -1)}>-</button>
-                              <input type="text" value={item.quantity} readOnly style={{ width: 32, textAlign: 'center' }} />
-                              <button className="Qty-Btn" onClick={() => updateCartQuantity(item.id, 1)}>+</button>
-                            </div>
-                          </td>
-                          <td>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</td>
-                          <td>
-                            <button className="Action-Btn delete" onClick={() => removeCartItem(item.id)}>🗑️</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                <div style={{ marginTop: 12, textAlign: 'right' }}>
-                  <b>Tổng cộng: </b>
-                  {cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString('vi-VN')}đ
-                </div>
-              </div>
-
               {/* Search Input */}
               <div className="search-section">
                 <label className="search-label">Nhập thông tin tra cứu</label>
@@ -759,63 +717,9 @@ const WaiterOrdersPage = () => {
               </button>
               <button
                 className="btn-continue"
-                onClick={async () => {
-                  // Chuyển tableIds sang đúng định dạng (nếu backend cần số, cần mapping từ string sang số)
-                  // Lấy đúng ID thực tế của bàn từ backend (ví dụ: tables.find(...).id là số)
-                  // Lấy đúng id bàn là số từ tables
-                  const tableIds = [tableSelection.mainTableId, ...tableSelection.mergedTableIds]
-                    .filter(Boolean)
-                    .map(tid => {
-                      // Nếu tid là số, dùng luôn
-                      if (typeof tid === 'number') return tid;
-                      // Nếu tid là string, tìm trong tables theo code và lấy id số
-                      const found = tables.find(t => t.code === tid && typeof t.id === 'number');
-                      return found ? found.id : undefined;
-                    })
-                    .filter(id => typeof id === 'number');
-
-                  // Mapping orderItems đúng schema, chỉ gửi các trường có giá trị
-                  const orderItems = cartItems.map(item => {
-                    let obj = { quantity: Number(item.quantity) || 1, note: item.note || '' };
-                    // Chỉ gửi đúng 1 trường ID thực tế, không gửi 0 hoặc undefined
-                    if (item.foodId && typeof item.foodId === 'number' && item.foodId > 0) {
-                      obj.foodId = item.foodId;
-                    } else if (item.comboId && typeof item.comboId === 'number' && item.comboId > 0) {
-                      obj.comboId = item.comboId;
-                    } else if (item.buffetId && typeof item.buffetId === 'number' && item.buffetId > 0) {
-                      obj.buffetId = item.buffetId;
-                    }
-                    return obj;
-                  }).filter(item => (item.foodId || item.comboId || item.buffetId));
-
-                  let payload = {
-                    orderType: 'DineIn',
-                    tableIds,
-                    numberOfGuests: Number(orderForm.guests) || 1,
-                    note: orderForm.note,
-                    orderItems
-                  };
-                  // Kiểm tra trạng thái bàn, chỉ cho phép chọn bàn trống
-                  const invalidTables = tableIds.filter(id => {
-                    const found = tables.find(t => t.id === id);
-                    return found && found.status !== 'empty';
-                  });
-                  if (!tableIds || tableIds.length === 0) {
-                    alert('Bạn phải chọn ít nhất 1 bàn trước khi tạo đơn!');
-                    return;
-                  }
-                  if (invalidTables.length > 0) {
-                    alert('Bạn chỉ được chọn bàn trống!');
-                    return;
-                  }
-                  if (!orderItems || orderItems.length === 0) {
-                    alert('Bạn phải chọn ít nhất 1 món ăn trước khi tạo đơn!');
-                    return;
-                  }
-                  // MOCK: Không gọi API, chỉ đóng modal và báo thành công
-                  alert('Đã tạo đơn thành công (mock)!');
+                onClick={() => {
                   setShowCreateModal(false);
-                  setShowOrderInfoModal(false);
+                  setShowOrderInfoModal(true);
                 }}
               >
                 Tiếp tục
@@ -1572,6 +1476,6 @@ const WaiterOrdersPage = () => {
       )}
     </div>
   );
-}
+};
 
 export default WaiterOrdersPage;

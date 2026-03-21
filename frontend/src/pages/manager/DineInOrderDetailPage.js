@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,7 +11,6 @@ import {
   Edit,
 } from 'lucide-react';
 import PaymentModal from '../../components/PaymentModal';
-import { orderAPI } from '../../api/managerApi';
 import '../../styles/DineInOrderDetailPage.css';
 
 function DineInOrderDetailPage() {
@@ -19,28 +18,61 @@ function DineInOrderDetailPage() {
   const { id } = useParams(); // Get order ID from URL
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-
   // Decode the ID if it contains encoded characters
   const orderId = id ? decodeURIComponent(id) : null;
-  const [orderData, setOrderData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  console.log('Order ID from URL:', orderId);
 
-  useEffect(() => {
-    if (!orderId) return;
-    setLoading(true);
-    setError('');
-    orderAPI.getByCode(orderId)
-      .then(res => {
-        // Nếu API trả về .data.data thì lấy sâu vào, còn không thì lấy .data
-        const data = res?.data?.data || res?.data || res;
-        setOrderData(data);
-      })
-      .catch(err => {
-        setError('Không thể tải chi tiết đơn hàng.');
-      })
-      .finally(() => setLoading(false));
-  }, [orderId]);
+  const orderData = {
+    code: orderId || '#HD005',
+    status: 'Đã đủ món',
+    statusClass: 'ready',
+    tableNumber: 'Bàn 12',
+    floor: 'Tầng 1',
+    waiter: 'Nguyễn Thu Hà',
+    waiterImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAqL3Xa8a5DuLMkaiiB7H46ei7LwQTnLexZILiHxC3buKQvv3GNH-ZZjiZ8mWQLkI1HLr6Dg5nDl0QA_fMk-GcckS3mMIkWeLfh4BTG4Td02nBuhOE2x7J7RkoaypjcLh_dOKkOhTu_Izk3M_uDHrYfPoiL0ZY_mLlNf6pPYcs6KsUVCjDYzfsThCrHjwWWQuXO6Sqyz2H4dzl2PztYaUM6WrRFgAzp9KJzBAzmOpq85e9lU3zZR-cfkw6BfEPmwESnrmU-OSDOXIY',
+    orderTime: '20/10/2023 19:30',
+    items: [
+      {
+        name: 'Bò Wagyu Nướng Đá',
+        quantity: 1,
+        unitPrice: 450000,
+        totalPrice: 450000,
+        note: 'Chín vừa (Medium)'
+      },
+      {
+        name: 'Sashimi Cá Hồi Tươi',
+        quantity: 2,
+        unitPrice: 280000,
+        totalPrice: 560000,
+        note: '-'
+      },
+      {
+        name: 'Salad Hoàng Gia',
+        quantity: 1,
+        unitPrice: 120000,
+        totalPrice: 120000,
+        note: 'Ít sốt'
+      },
+      {
+        name: 'Rượu Vang Đỏ (Ly)',
+        quantity: 2,
+        unitPrice: 60000,
+        totalPrice: 120000,
+        note: '-'
+      }
+    ],
+    processingStages: [
+      { label: 'Mới nhận', time: '19:30:15', completed: true },
+      { label: 'Chế biến', time: '19:35:40', completed: true },
+      { label: 'Đủ món', time: '19:55:22', completed: true },
+      { label: 'Thanh toán', time: null, completed: false }
+    ],
+    subtotal: 1250000,
+    discount: 0,
+    tax: 125000,
+    total: 1375000,
+    customerNote: 'Hôm nay là kỷ niệm ngày cưới, vui lòng trang trí bàn nhẹ nhàng giúp mình nhé.'
+  };
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -55,16 +87,6 @@ function DineInOrderDetailPage() {
     navigate(-1);
   };
 
-  if (loading) {
-    return <div className="dinein-detail-page-wrapper"><div style={{padding: 40, textAlign: 'center'}}>Đang tải chi tiết đơn hàng...</div></div>;
-  }
-  if (error) {
-    return <div className="dinein-detail-page-wrapper"><div style={{padding: 40, color: 'red', textAlign: 'center'}}>{error}</div></div>;
-  }
-  if (!orderData) {
-    return <div className="dinein-detail-page-wrapper"><div style={{padding: 40, color: 'red', textAlign: 'center'}}>Không có dữ liệu đơn hàng.</div></div>;
-  }
-
   return (
     <div className="dinein-detail-page-wrapper">
       {/* Header */}
@@ -78,9 +100,9 @@ function DineInOrderDetailPage() {
             <div className="dinein-detail-divider"></div>
             <div>
               <div className="dinein-detail-title-group">
-                <h1>Chi tiết đơn hàng {orderData.code || orderData.orderCode || orderId}</h1>
-                <span className={`dinein-detail-status-badge status-${orderData.statusClass || orderData.status || ''}`}>
-                  {orderData.status || '---'}
+                <h1>Chi tiết đơn hàng {orderData.code}</h1>
+                <span className={`dinein-detail-status-badge status-${orderData.statusClass}`}>
+                  {orderData.status}
                 </span>
               </div>
             </div>
@@ -109,7 +131,7 @@ function DineInOrderDetailPage() {
                   Danh sách món ăn
                 </h3>
                 <span className="dinein-detail-items-count">
-                  {orderData.items?.length || 0} Món • {(orderData.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)} Phần
+                  {orderData.items.length} Món • {orderData.items.reduce((sum, item) => sum + item.quantity, 0)} Phần
                 </span>
               </div>
               <div className="dinein-detail-table-wrapper">
@@ -124,13 +146,13 @@ function DineInOrderDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(orderData.items || []).map((item, idx) => (
+                    {orderData.items.map((item, idx) => (
                       <tr key={idx}>
-                        <td className="dinein-detail-item-name">{item.name || item.foodName}</td>
-                        <td className="text-right">{formatCurrency(item.unitPrice || item.price || 0)}</td>
-                        <td className="text-center font-bold">{item.quantity || 0}</td>
-                        <td className="text-right font-black">{formatCurrency(item.totalPrice || (item.price * item.quantity) || 0)}</td>
-                        <td className="dinein-detail-item-note">{item.note || ''}</td>
+                        <td className="dinein-detail-item-name">{item.name}</td>
+                        <td className="text-right">{formatCurrency(item.unitPrice)}</td>
+                        <td className="text-center font-bold">{item.quantity}</td>
+                        <td className="text-right font-black">{formatCurrency(item.totalPrice)}</td>
+                        <td className="dinein-detail-item-note">{item.note}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -150,7 +172,7 @@ function DineInOrderDetailPage() {
                 Trạng thái chế biến
               </h3>
               <div className="dinein-detail-stages">
-                {(orderData.processingStages || []).map((stage, idx) => (
+                {orderData.processingStages.map((stage, idx) => (
                   <div
                     key={idx}
                     className={`dinein-detail-stage ${stage.completed ? 'completed' : 'pending'}`}
@@ -177,22 +199,22 @@ function DineInOrderDetailPage() {
                 <div className="dinein-detail-info-row">
                   <span>Loại đơn</span>
                   <span className="dinein-detail-info-value">
-                    Ăn tại chỗ - {orderData.tableNumber || orderData.tableName || ''}
+                    Ăn tại chỗ - {orderData.tableNumber}
                   </span>
                 </div>
                 <div className="dinein-detail-info-row">
                   <span>Thời gian gọi món</span>
-                  <span className="dinein-detail-info-value">{orderData.orderTime || orderData.createdAt || ''}</span>
+                  <span className="dinein-detail-info-value">{orderData.orderTime}</span>
                 </div>
                 <div className="dinein-detail-info-row">
                   <span>Nhân viên phục vụ</span>
                   <div className="dinein-detail-waiter-info">
                     <img
-                      src={orderData.waiterImage || ''}
-                      alt={orderData.waiter || ''}
+                      src={orderData.waiterImage}
+                      alt={orderData.waiter}
                       className="dinein-detail-waiter-image"
                     />
-                    <span>{orderData.waiter || ''}</span>
+                    <span>{orderData.waiter}</span>
                   </div>
                 </div>
               </div>
@@ -207,19 +229,19 @@ function DineInOrderDetailPage() {
               <div className="dinein-detail-payment-summary">
                 <div className="dinein-detail-payment-row">
                   <span>Tạm tính</span>
-                  <span className="dinein-detail-payment-value">{formatCurrency(orderData.subtotal || 0)}</span>
+                  <span className="dinein-detail-payment-value">{formatCurrency(orderData.subtotal)}</span>
                 </div>
                 <div className="dinein-detail-payment-row">
                   <span>Giảm giá</span>
-                  <span className="dinein-detail-payment-discount">{formatCurrency(orderData.discount || 0)}</span>
+                  <span className="dinein-detail-payment-discount">{formatCurrency(orderData.discount)}</span>
                 </div>
                 <div className="dinein-detail-payment-row">
                   <span>Thuế VAT (10%)</span>
-                  <span className="dinein-detail-payment-value">{formatCurrency(orderData.tax || 0)}</span>
+                  <span className="dinein-detail-payment-value">{formatCurrency(orderData.tax)}</span>
                 </div>
                 <div className="dinein-detail-payment-total">
                   <span>Tổng cộng</span>
-                  <span className="dinein-detail-total-amount">{formatCurrency(orderData.total || 0)}</span>
+                  <span className="dinein-detail-total-amount">{formatCurrency(orderData.total)}</span>
                 </div>
               </div>
               <div className="dinein-detail-payment-buttons">
