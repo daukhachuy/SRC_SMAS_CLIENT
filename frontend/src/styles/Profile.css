@@ -163,26 +163,6 @@
   box-shadow: 0 0 0 4px rgba(236, 91, 19, 0.1);
 }
 
-.Profile-Field input.Profile-Input-Error,
-.Profile-Input-With-Icon input.Profile-Input-Error {
-  border-color: var(--pf-danger);
-  background: #fff5f5;
-}
-
-.Profile-Field-Error {
-  font-size: 0.8rem;
-  color: var(--pf-danger);
-  margin: 0;
-  font-weight: 600;
-}
-
-.Profile-Field-Hint {
-  font-size: 0.75rem;
-  color: var(--pf-text-muted);
-  margin: 4px 0 0;
-  line-height: 1.35;
-}
-
 .Profile-Input-Readonly {
   background: #F1F5F9 !important;
   color: var(--pf-text-muted) !important;
