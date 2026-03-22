@@ -23,6 +23,9 @@ const instance = axios.create({
 instance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+    // Log chi tiết token và API URL để debug
+    console.log('[DEBUG] API BASE URL:', API_BASE_URL);
+    console.log('[DEBUG] Token FE gửi lên:', token);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url} → Bearer ${token.slice(0, 20)}...`);

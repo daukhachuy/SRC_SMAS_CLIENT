@@ -1,3 +1,4 @@
+// Đảm bảo không có hook ngoài function component
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   UserPlus,
@@ -24,7 +25,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import '../../styles/ManagerStaffPage.css';
-import { mapStaffToUI, mapWorkshiftToUI, staffAPI } from '../../api/managerApi';
+import { getAllStaffSchedule, groupScheduleByDate } from '../../api/managerApi';
+import { staffAPI } from '../../api/managerApi';
 
 const DEPARTMENTS = ['all', 'kitchen', 'service'];
 const DEPARTMENT_LABELS = {
@@ -41,6 +43,40 @@ const ROLE_TO_POSITION = {
   service: ['Waiter'],
 };
 
+// --- MAPPER FUNCTIONS ---
+function mapStaffToUI(raw) {
+  // Log dữ liệu để debug
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[STAFF RAW]', raw);
+  }
+  return {
+    id: raw.userId || raw.id,
+    name: raw.fullName || raw.fullname || raw.name || raw.staffName || '---',
+    avatar: raw.avatarUrl || raw.avatar || '',
+    role: raw.position || raw.role || raw.staffRole || '',
+    email: raw.email || '',
+    phone: raw.phone || '',
+    joinDate: raw.hireDate || raw.joinDate || '',
+    rating: typeof raw.rating === 'number' ? raw.rating : 0,
+    workStaffId: raw.workStaffId,
+    isWorking: raw.isWorking,
+    startTime: raw.startTime,
+    location: raw.location || '',
+    roleColor: 'blue',
+  };
+}
+
+function mapWorkshiftToUI(raw) {
+  return {
+    id: raw.shiftId || raw.id,
+    name: raw.shiftName || raw.name,
+    startTime: raw.startTime,
+    endTime: raw.endTime,
+    typeStaff: raw.typeStaff,
+    additionalWork: raw.additionalWork,
+  };
+}
+
 function asArray(value) {
   if (Array.isArray(value)) return value;
   if (Array.isArray(value?.data)) return value.data;
@@ -48,9 +84,13 @@ function asArray(value) {
   return [];
 }
 
-function unwrapResponse(response) {
-  if (!response) return [];
-  return asArray(response.data?.data || response.data || response);
+function unwrapResponse(res) {
+  if (!res) return null;
+
+  if (res.data?.data) return res.data.data;
+  if (res.data) return res.data;
+
+  return res;
 }
 
 function getWeekDatesFromRange(dateRange) {
@@ -93,6 +133,7 @@ function roleMatch(employeeRole, selectedDepartment) {
   return true;
 }
 
+
 const ManagerStaffPage = () => {
   const [activeTab, setActiveTab] = useState('schedule');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
@@ -101,58 +142,48 @@ const ManagerStaffPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [employees, setEmployees] = useState([]);
-  const [currentlyWorking, setCurrentlyWorking] = useState([]);
-  const [weekSchedule, setWeekSchedule] = useState([]);
-  const [scheduleData, setScheduleData] = useState({
-    morning: Array.from({ length: 7 }, () => []),
-    afternoon: Array.from({ length: 7 }, () => []),
-    evening: Array.from({ length: 7 }, () => []),
-  });
-  const [workshifts, setWorkshifts] = useState([]);
-  const [stats, setStats] = useState({ totalWorkShift: 0, totalHours: 0 });
-
+  const [schedule, setSchedule] = useState([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [weekSchedule, setWeekSchedule] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [grouped, setGrouped] = useState({});
+  const [currentlyWorking, setCurrentlyWorking] = useState([]);
+
+  const [scheduleData, setScheduleData] = useState({
+    morning: [],
+    afternoon: [],
+    evening: [],
+  });
+
+  const [employees, setEmployees] = useState([]);
+  const [workshifts, setWorkshifts] = useState([]);
+
+  const [stats, setStats] = useState({
+    totalWorkShift: 0,
+    totalHours: 0,
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [processingDetail, setProcessingDetail] = useState(false);
-  const [error, setError] = useState('');
-
-  const fetchEmployees = useCallback(async (department) => {
-    const positions = ROLE_TO_POSITION[department] || ROLE_TO_POSITION.all;
-    const [filteredRes, fallbackRes] = await Promise.allSettled([
-      staffAPI.filterByPosition(positions),
-      staffAPI.getWorkingToday(),
-    ]);
-
-    const filteredItems = filteredRes.status === 'fulfilled' ? unwrapResponse(filteredRes.value) : [];
-    const fallbackItems = fallbackRes.status === 'fulfilled' ? unwrapResponse(fallbackRes.value) : [];
-    const merged = [...filteredItems, ...fallbackItems].map(mapStaffToUI);
-
-    const unique = [];
-    const seen = new Set();
-    for (const item of merged) {
-      const key = item.id ?? `${item.name}-${item.email}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (item.isManager) continue;
-      if (!roleMatch(item.role, department)) continue;
-      unique.push(item);
-    }
-
-    setEmployees(unique);
-  }, []);
 
   const fetchSchedule = useCallback(async (baseEmployees, dateRange) => {
+
     const positions = ROLE_TO_POSITION.all;
+    const dateParam = dateRange[0];
+    // Log tham số truyền lên để so sánh với Swagger
+    console.log('[DEBUG] Call getNextSevenDays positions:', positions);
+    console.log('[DEBUG] Call getNextSevenDays raw param:', JSON.stringify(positions));
+    console.log('[DEBUG] Call getScheduleWeekKitchenWaiter date:', dateParam);
     const [nextSevenRes, weekKitchenRes] = await Promise.allSettled([
       staffAPI.getNextSevenDays(positions),
-      staffAPI.getScheduleWeekKitchenWaiter(dateRange[0]),
+      staffAPI.getScheduleWeekKitchenWaiter(dateParam),
     ]);
 
     // Parse API mới: shifts -> days -> staffs
-    const nextSevenData = nextSevenRes.status === 'fulfilled' ? unwrapResponse(nextSevenRes.value) : [];
-    const weekDates = getWeekDatesFromRange(nextSevenData.dateRange || dateRange);
+const nextSevenData = nextSevenRes.status === 'fulfilled'
+  ? unwrapResponse(nextSevenRes.value)
+  : null;    const weekDates = getWeekDatesFromRange(nextSevenData.dateRange || dateRange);
     setWeekSchedule(weekDates);
     const byDay = {
       morning: Array.from({ length: weekDates.length }, () => []),
@@ -162,27 +193,29 @@ const ManagerStaffPage = () => {
     const employeePool = [...baseEmployees];
     const employeeIds = new Set(employeePool.map((e) => e.id));
 
-    // Map shiftId sang shiftKey chuẩn
+    // Map shiftId sang shiftKey chuẩn (luôn đúng với dữ liệu backend)
     const getShiftKey = (shift) => {
-      if (shift.shiftId === 1) return 'morning';
-      if (shift.shiftId === 2) return 'afternoon';
-      if (shift.shiftId === 3) return 'evening';
-      const name = String(shift.shiftName || '').toLowerCase();
-      if (name.includes('sáng') || name.includes('morning')) return 'morning';
-      if (name.includes('chiều') || name.includes('afternoon')) return 'afternoon';
-      if (name.includes('tối') || name.includes('evening') || name.includes('night')) return 'evening';
+      if (shift.shiftId === 1 || /sáng|morning/i.test(shift.shiftName || '')) return 'morning';
+      if (shift.shiftId === 2 || /chiều|afternoon/i.test(shift.shiftName || '')) return 'afternoon';
+      if (shift.shiftId === 3 || /tối|evening|night/i.test(shift.shiftName || '')) return 'evening';
       return 'morning';
     };
+
+    // DEBUG LOG: Kiểm tra dữ liệu API trả về
+    console.log('DEBUG nextSevenData:', nextSevenData);
+    console.log('DEBUG weekDates:', weekDates);
 
     // Duyệt từng shift
     (nextSevenData.shifts || []).forEach((shift) => {
       const shiftKey = getShiftKey(shift);
       if (!SHIFT_KEYS.includes(shiftKey)) return;
       shift.days.forEach((day) => {
-        // Tìm đúng index ngày trong weekDates (so sánh theo yyyy-mm-dd)
-        const dayIndex = weekDates.findIndex((d) => d.key === day.workDay);
+        // So sánh ngày chính xác (yyyy-MM-dd)
+        const workDayStr = (day.workDay || '').slice(0, 10);
+        const dayIndex = weekDates.findIndex((d) => d.key.slice(0, 10) === workDayStr);
         if (dayIndex < 0) return;
         day.staffs.forEach((staff) => {
+          // Luôn thêm nhân viên vào employeePool nếu chưa có
           if (!employeeIds.has(staff.userId)) {
             employeePool.push({
               id: staff.userId,
@@ -192,6 +225,7 @@ const ManagerStaffPage = () => {
             });
             employeeIds.add(staff.userId);
           }
+          // Luôn thêm userId vào byDay nếu chưa có
           if (!byDay[shiftKey][dayIndex].includes(staff.userId)) {
             byDay[shiftKey][dayIndex].push(staff.userId);
           }
@@ -219,6 +253,10 @@ const ManagerStaffPage = () => {
       }
     });
 
+    // DEBUG LOG: Kết quả mapping ca làm
+    console.log('DEBUG byDay:', byDay);
+    console.log('DEBUG employeePool:', employeePool);
+
     setScheduleData(byDay);
 
     setEmployees((prev) => {
@@ -226,7 +264,9 @@ const ManagerStaffPage = () => {
       employeePool.forEach((p) => {
         if (p.id != null && !map.has(p.id)) map.set(p.id, p);
       });
-      return Array.from(map.values());
+      const arr = Array.from(map.values());
+      console.log('[SET EMPLOYEES]', arr);
+      return arr;
     });
   }, []);
 
@@ -246,8 +286,27 @@ const ManagerStaffPage = () => {
         staffAPI.getNextSevenDays(ROLE_TO_POSITION.all),
       ]);
 
+      // Log chi tiết response API getWorkshift
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DEBUG] workshiftRes:', workshiftRes);
+        if (workshiftRes.status === 'fulfilled') {
+          console.log('[DEBUG] workshiftRes.value:', workshiftRes.value);
+        } else {
+          console.error('[ERROR] workshiftRes:', workshiftRes.reason);
+        }
+      }
       const workshiftItems = workshiftRes.status === 'fulfilled' ? unwrapResponse(workshiftRes.value) : [];
-      setWorkshifts(workshiftItems.map(mapWorkshiftToUI).filter((x) => x.id != null));
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DEBUG] workshiftItems (raw):', workshiftItems);
+      }
+      const mappedWorkshifts = workshiftItems.map(mapWorkshiftToUI).filter((x) => x.id != null);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DEBUG] mappedWorkshifts:', mappedWorkshifts);
+        if (mappedWorkshifts.length === 0) {
+          console.warn('[WARNING] Không có ca làm việc nào sau khi map!');
+        }
+      }
+      setWorkshifts(mappedWorkshifts);
 
       const workingItemsA = staffWorkRes.status === 'fulfilled' ? unwrapResponse(staffWorkRes.value) : [];
       const workingItemsB = workingRes.status === 'fulfilled' ? unwrapResponse(workingRes.value) : [];
@@ -288,7 +347,6 @@ const ManagerStaffPage = () => {
         }
       }
 
-      await fetchEmployees(department);
       await fetchSchedule(uniqueWorking, dateRange);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'Không thể tải dữ liệu nhân sự.');
@@ -296,7 +354,7 @@ const ManagerStaffPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [fetchEmployees, fetchSchedule]);
+  }, [fetchSchedule]);
 
   useEffect(() => {
     fetchPageData(selectedDepartment);
@@ -304,19 +362,19 @@ const ManagerStaffPage = () => {
 
   const employeeMap = useMemo(() => {
     const map = new Map();
-    [...employees, ...currentlyWorking].forEach((emp) => {
+    employees.forEach((emp) => {
       if (emp?.id != null) map.set(emp.id, emp);
     });
     return map;
-  }, [employees, currentlyWorking]);
+  }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch = !q
         || emp.name.toLowerCase().includes(q)
-        || emp.email.toLowerCase().includes(q)
-        || emp.phone.toLowerCase().includes(q);
+        || (emp.email?.toLowerCase().includes(q))
+        || (emp.phone?.toLowerCase().includes(q));
       return matchesSearch && roleMatch(emp.role, selectedDepartment);
     });
   }, [employees, searchQuery, selectedDepartment]);
@@ -331,6 +389,8 @@ const ManagerStaffPage = () => {
   };
 
   const renderEmployeeAvatar = (employeeId) => {
+    // Log debug chi tiết khi render avatar
+    console.log('[RENDER AVATAR]', { employeeId, employeeMap, employee: employeeMap.get(employeeId) });
     const employee = employeeMap.get(employeeId);
     if (!employee) return null;
 
@@ -344,7 +404,16 @@ const ManagerStaffPage = () => {
           setShowDetailModal(true);
         }}
       >
-        <img src={employee.avatar} alt={employee.name} />
+        <img
+          src={employee.avatar}
+          alt={employee.name}
+          onError={e => {
+            if (!e.target.src.includes('default-avatar.png')) {
+              e.target.onerror = null;
+              e.target.src = '/images/default-avatar.png';
+            }
+          }}
+        />
       </div>
     );
   };
@@ -490,9 +559,9 @@ const ManagerStaffPage = () => {
                       <p className="shift-name">Sáng</p>
                       <p className="shift-time">06:00 - 12:00</p>
                     </div>
-                    {scheduleData.morning.map((assigned, dayIdx) => (
-                      <div key={`morning-${weekSchedule[dayIdx].key}`} className={`shift-cell ${weekSchedule[dayIdx].highlight ? 'today' : ''}`}>
-                        {assigned.map((empId) => renderEmployeeAvatar(empId))}
+                    {weekSchedule.map((day, dayIdx) => (
+                      <div key={`morning-${day.key}`} className={`shift-cell ${day.highlight ? 'today' : ''}`}>
+                        {(scheduleData.morning?.[dayIdx] || []).map((empId) => renderEmployeeAvatar(empId))}
                         <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
                           <Plus size={16} />
                         </button>
@@ -506,9 +575,9 @@ const ManagerStaffPage = () => {
                       <p className="shift-name">Chiều</p>
                       <p className="shift-time">12:00 - 18:00</p>
                     </div>
-                    {scheduleData.afternoon.map((assigned, dayIdx) => (
-                      <div key={`afternoon-${weekSchedule[dayIdx].key}`} className={`shift-cell ${weekSchedule[dayIdx].highlight ? 'today' : ''}`}>
-                        {assigned.map((empId) => renderEmployeeAvatar(empId))}
+                    {weekSchedule.map((day, dayIdx) => (
+                      <div key={`afternoon-${day.key}`} className={`shift-cell ${day.highlight ? 'today' : ''}`}>
+                        {(scheduleData.afternoon?.[dayIdx] || []).map((empId) => renderEmployeeAvatar(empId))}
                         <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
                           <Plus size={16} />
                         </button>
@@ -522,7 +591,7 @@ const ManagerStaffPage = () => {
                       <p className="shift-name">Tối</p>
                       <p className="shift-time">18:00 - 23:00</p>
                     </div>
-                    {scheduleData.evening.map((assigned, dayIdx) => (
+                    {(scheduleData.evening || []).map((assigned, dayIdx) => (
                       <div key={`evening-${weekSchedule[dayIdx].key}`} className={`shift-cell ${weekSchedule[dayIdx].highlight ? 'today' : ''}`}>
                         {assigned.map((empId) => renderEmployeeAvatar(empId))}
                         <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
@@ -540,13 +609,33 @@ const ManagerStaffPage = () => {
                   <div className="working-staff-list">
                     {currentlyWorking.slice(0, 8).map((staff) => (
                       <div key={staff.id} className="working-staff-item">
-                        <div className="staff-avatar-wrapper">
-                          <img src={staff.avatar} alt={staff.name} className="staff-avatar-img" />
-                          <div className="online-indicator"></div>
+                        <div className="staff-avatar-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                          <img
+                            src={staff.avatar}
+                            alt={staff.name}
+                            className="staff-avatar-img"
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '2px solid #e5e7eb',
+                              background: '#f3f4f6',
+                              boxShadow: '0 1px 4px 0 #0001',
+                              display: 'block',
+                            }}
+                            onError={e => {
+                              if (!e.target.src.includes('default-avatar.png')) {
+                                e.target.onerror = null;
+                                e.target.src = '/images/default-avatar.png';
+                              }
+                            }}
+                          />
+                          <div className="online-indicator" style={{ left: 32, bottom: 6, width: 10, height: 10, border: '2px solid #fff' }}></div>
                         </div>
-                        <div className="staff-info">
-                          <p className="staff-name">{typeof staff.name === 'string' ? staff.name : (staff.name?.toString?.() || '---')}</p>
-                          <p className="staff-details">{staff.role} • {staff.location}</p>
+                        <div className="staff-info" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <p className="staff-name" style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>{typeof staff.name === 'string' ? staff.name : (staff.name?.toString?.() || '---')}</p>
+                          <p className="staff-details" style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>{staff.role} {staff.location ? `• ${staff.location}` : ''}</p>
                         </div>
                         <span className="staff-time">{staff.startTime}</span>
                       </div>
@@ -601,7 +690,16 @@ const ManagerStaffPage = () => {
                         <td>
                           <div className="employee-info">
                             <div className="employee-avatar-wrapper">
-                              <img src={employee.avatar} alt={employee.name} />
+                              <img
+                                src={employee.avatar}
+                                alt={employee.name}
+                                onError={e => {
+                                  if (!e.target.src.includes('default-avatar.png')) {
+                                    e.target.onerror = null;
+                                    e.target.src = '/images/default-avatar.png';
+                                  }
+                                }}
+                              />
                             </div>
                             <div className="employee-details">
                               <span className="employee-name">{typeof employee.name === 'string' ? employee.name : (employee.name?.toString?.() || '---')}</span>
@@ -618,7 +716,7 @@ const ManagerStaffPage = () => {
                         <td className="text-slate-600 dark:text-slate-400">{employee.joinDate}</td>
                         <td>
                           <div className="rating-cell">
-                            <span className="rating-value">{employee.rating.toFixed(1)}</span>
+                            <span className="rating-value">{(typeof employee.rating === 'number' ? employee.rating : 0).toFixed(1)}</span>
                             <Star size={16} fill="#fbbf24" color="#fbbf24" />
                           </div>
                         </td>
@@ -700,6 +798,10 @@ const AssignShiftModal = ({ onClose, employees, workshifts, submitting, onConfir
     if (!selectedShiftId && workshifts[0]?.id) {
       setSelectedShiftId(String(workshifts[0].id));
     }
+    // Log workshifts để debug
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[DEBUG] workshifts:', workshifts);
+    }
   }, [selectedShiftId, workshifts]);
 
   const submit = async () => {
@@ -761,6 +863,11 @@ const AssignShiftModal = ({ onClose, employees, workshifts, submitting, onConfir
               </select>
               <ChevronRight className="select-arrow" size={20} />
             </div>
+            {workshifts.length === 0 && (
+              <div style={{ color: '#dc2626', marginTop: 8, fontSize: 14 }}>
+                Không có ca làm việc nào, vui lòng kiểm tra lại dữ liệu ca làm!
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -833,7 +940,16 @@ const ShiftDetailModal = ({ employee, replacementCandidates, onClose, onUpdate, 
         <div className="modal-content">
           <div className="employee-profile">
             <div className="employee-profile-avatar">
-              <img src={employee.avatar} alt={employee.name} />
+              <img
+                src={employee.avatar}
+                alt={employee.name}
+                onError={e => {
+                  if (!e.target.src.includes('default-avatar.png')) {
+                    e.target.onerror = null;
+                    e.target.src = '/images/default-avatar.png';
+                  }
+                }}
+              />
               {isWorking && <div className="online-badge"></div>}
             </div>
             <div className="employee-profile-info">
