@@ -149,8 +149,8 @@ const WaiterLayout = () => {
         <div className="waiter-sidebar-footer">
           <div className="waiter-avatar">{userInfo.initials}</div>
           <div>
-            <strong>{userInfo.fullname}</strong>
-            <p>{userInfo.email || `ID: ${userInfo.userId}`}</p>
+            <strong>{typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || 'Đang tải...')}</strong>
+            <p>{typeof userInfo.email === 'string' ? userInfo.email : (userInfo.email?.toString?.() || `ID: ${typeof userInfo.userId === 'string' || typeof userInfo.userId === 'number' ? userInfo.userId : (userInfo.userId?.toString?.() || '---')}`)}</p>
           </div>
         </div>
 

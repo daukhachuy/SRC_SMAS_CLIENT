@@ -24,19 +24,16 @@ const Services = () => {
     setSelectedTime('');
   }, [selectedDate]);
 
-  // ── Lịch tháng đầy đủ (đúng thứ tự T2→CN) ──
-  const getMonthDays = (year, month) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    // getDay(): 0=CN, 1=T2, ..., 6=T7
-    // Chuyển sang: 0=T2, 1=T3, ..., 5=T7, 6=CN
-    const startDow = firstDay.getDay(); // 0=CN, 1=T2 ...
-    const offset = startDow === 0 ? 6 : startDow - 1; // số ô trống trước ngày 1
+  // Lấy 7 ngày tiếp theo từ hôm nay (không hiển thị ngày quá khứ)
+  const getNext7Days = () => {
     const days = [];
-    // Ô trống trước
-    for (let i = 0; i < offset; i++) days.push(null);
-    // Ngày trong tháng
-    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
     return days;
   };
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState(0);
@@ -700,11 +697,10 @@ const Services = () => {
                     </span>
                   </div>
                   <div className="calendar-numbers">
-                    {getMonthDays(currentMonth.getFullYear(), currentMonth.getMonth()).map((date, idx) => {
-                      if (!date) return <span key={`empty-${idx}`} />;
+                    {getNext7Days().map((date, idx) => {
                       const day = date.getDate();
                       const weekdayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-                      // JS getDay(): 0=CN, 1=T2, ... 6=T7
+                      const dayOfWeek = date.getDay();
                       const weekday = weekdayLabels[dayOfWeek];
                       const today = new Date();
                       const isToday = date.toDateString() === today.toDateString();

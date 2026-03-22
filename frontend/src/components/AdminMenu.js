@@ -113,7 +113,7 @@ const AdminMenu = () => {
           <div className="admin-user-row">
             <div className="admin-avatar">{userInfo.initials}</div>
             <div className="admin-user-info">
-              <strong>{userInfo.fullname}</strong>
+              <strong>{typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || 'Đang tải...')}</strong>
               <p>Quản trị viên</p>
             </div>
           </div>

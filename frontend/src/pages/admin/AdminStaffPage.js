@@ -210,13 +210,13 @@ const AdminStaffPage = () => {
                     <td>
                       <div className="staff-info-cell">
                         <div className="staff-avatar">{getInitials(row.name)}</div>
-                        <div className="staff-name">{row.name}</div>
+                        <div className="staff-name">{typeof row.name === 'string' ? row.name : (row.name?.toString?.() || '---')}</div>
                       </div>
                     </td>
                     <td>
                       <div className="staff-contact">
-                        <div>{row.email}</div>
-                        <div className="staff-meta">{row.phone}</div>
+                        <div>{typeof row.email === 'string' ? row.email : (row.email?.toString?.() || '---')}</div>
+                        <div className="staff-meta">{typeof row.phone === 'string' ? row.phone : (row.phone?.toString?.() || '---')}</div>
                       </div>
                     </td>
                     <td>{row.created}</td>
@@ -273,14 +273,14 @@ const AdminStaffPage = () => {
                       <div className="staff-info-cell">
                         <div className="staff-avatar">{getInitials(row.name)}</div>
                         <div>
-                          <div className="staff-name">{row.name}</div>
+                          <div className="staff-name">{typeof row.name === 'string' ? row.name : (row.name?.toString?.() || '---')}</div>
                         </div>
                       </div>
                     </td>
                     <td>
                       <div className="staff-contact">
-                        <div>{row.email}</div>
-                        <div className="staff-meta">{row.phone}</div>
+                        <div>{typeof row.email === 'string' ? row.email : (row.email?.toString?.() || '---')}</div>
+                        <div className="staff-meta">{typeof row.phone === 'string' ? row.phone : (row.phone?.toString?.() || '---')}</div>
                       </div>
                     </td>
                     <td>{row.startDate}</td>
@@ -321,20 +321,20 @@ const AdminStaffPage = () => {
             <button type="button" className="staff-modal-close" onClick={() => setSelectedCustomer(null)} aria-label="Đóng"><X size={20} /></button>
             <div className="staff-customer-modal-header">
               <div className="staff-customer-avatar">{getInitials(selectedCustomer.name)}</div>
-              <h2 className="staff-customer-name">{selectedCustomer.name}</h2>
+              <h2 className="staff-customer-name">{typeof selectedCustomer.name === 'string' ? selectedCustomer.name : (selectedCustomer.name?.toString?.() || '---')}</h2>
               {selectedCustomer.isVip && <span className="staff-customer-vip">VIP MEMBER</span>}
-              <span className="staff-customer-id">ID: #{selectedCustomer.customerId || `CUS-${String(selectedCustomer.id).padStart(4, '0')}`}</span>
+              <span className="staff-customer-id">ID: #{typeof selectedCustomer.customerId === 'string' || typeof selectedCustomer.customerId === 'number' ? selectedCustomer.customerId : (selectedCustomer.customerId?.toString?.() || `CUS-${String(selectedCustomer.id).padStart(4, '0')}`)}</span>
             </div>
             <div className="staff-customer-section">
               <h3 className="staff-customer-section-title"><FileText size={16} /> CONTACT INFORMATION</h3>
               <div className="staff-customer-cards">
                 <div className="staff-customer-info-card">
                   <span className="staff-customer-info-label"><Phone size={14} /> PHONE NUMBER</span>
-                  <span>{selectedCustomer.phone}</span>
+                  <span>{typeof selectedCustomer.phone === 'string' ? selectedCustomer.phone : (selectedCustomer.phone?.toString?.() || '---')}</span>
                 </div>
                 <div className="staff-customer-info-card">
                   <span className="staff-customer-info-label"><Mail size={14} /> EMAIL ADDRESS</span>
-                  <span>{selectedCustomer.email}</span>
+                  <span>{typeof selectedCustomer.email === 'string' ? selectedCustomer.email : (selectedCustomer.email?.toString?.() || '---')}</span>
                 </div>
                 <div className="staff-customer-info-card">
                   <span className="staff-customer-info-label"><MapPin size={14} /> ADDRESS</span>

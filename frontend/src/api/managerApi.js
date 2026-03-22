@@ -136,10 +136,10 @@ export function mapOrderToUI(order) {
 }
 
 const IMAGES = {
-  dine: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
-  takeaway: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=800&q=80',
-  delivery: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
-  event: 'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?auto=format&fit=crop&w=800&q=80',
+  dine: 'https://images.pexels.com/photos/461382/pexels-photo-461382.jpeg?auto=compress&w=800&q=80', // Bàn ăn nhà hàng
+  takeaway: 'https://images.pexels.com/photos/70497/pexels-photo-70497.jpeg?auto=compress&w=800&q=80', // Đồ ăn mang về
+  delivery: 'https://images.pexels.com/photos/1931536/pexels-photo-1931536.jpeg?auto=compress&w=800&q=80', // Giao hàng tận nơi
+  event: 'https://images.pexels.com/photos/1679825/pexels-photo-1679825.jpeg?auto=compress&w=800&q=80', // Sự kiện, tiệc
 };
 
 function defaultImageByType(icon) {
@@ -264,7 +264,20 @@ export const eventBookingAPI = {
 
 function pick(obj, keys, fallback = null) {
   for (const key of keys) {
-    if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== '') return obj[key];
+    const val = obj?.[key];
+    if (val !== undefined && val !== null && val !== '') {
+      // Nếu là object, thử lấy fullname, name, email, phone, userId, hoặc stringify
+      if (typeof val === 'object') {
+        if (val.fullname) return val.fullname;
+        if (val.name) return val.name;
+        if (val.email) return val.email;
+        if (val.phone) return val.phone;
+        if (val.userId) return val.userId.toString();
+        // fallback stringify
+        return JSON.stringify(val);
+      }
+      return val;
+    }
   }
   return fallback;
 }
@@ -338,35 +351,35 @@ export function mapReservationToUI(item) {
   } else if (dateStr) {
     dateObj = new Date(dateStr);
   }
-  const time = timeStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--');
-  const date = dateStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('vi-VN') : '--/--/----');
+    let timeVal = timeStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--');
+    let dateVal = dateStr || (dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('vi-VN') : '--/--/----');
   
   // Lấy date và time từ reservationDate/reservationTime hoặc createdAt
   const reservationDate = pick(item, ['reservationDate']);
   const reservationTime = pick(item, ['reservationTime']);
   const createdAt = pick(item, ['createdAt']);
   
-  let date = '--/--/----';
-  let time = '--:--';
+    // let date = '--/--/----'; // Removed to avoid redeclaration
+    // let time = '--:--'; // Removed to avoid redeclaration
   
   // Ưu tiên: reservationDate + reservationTime
   if (reservationDate) {
     const dateInfo = parseLocalDate(reservationDate);
-    date = dateInfo.date;
+      dateVal = dateInfo.date;
     // Nếu có reservationTime riêng
     if (reservationTime) {
       const timeMatch = reservationTime.match(/^(\d{2}):(\d{2})/);
       if (timeMatch) {
-        time = `${timeMatch[1]}:${timeMatch[2]}`;
+          timeVal = `${timeMatch[1]}:${timeMatch[2]}`;
       }
     } else {
-      time = dateInfo.time;
+        timeVal = dateInfo.time;
     }
   } else if (createdAt) {
     // Fallback: dùng createdAt
     const dateInfo = parseLocalDate(createdAt);
-    date = dateInfo.date;
-    time = dateInfo.time;
+      dateVal = dateInfo.date;
+      timeVal = dateInfo.time;
   }
 
   return {
@@ -375,8 +388,8 @@ export function mapReservationToUI(item) {
     customer: customerName,
     phone,
     guests,
-    time,
-    date,
+      time: timeVal,
+      date: dateVal,
     table,
     status: normalized.status,
     statusText: normalized.statusText,
@@ -550,18 +563,33 @@ function normalizeRole(position) {
   return { role: 'Phục vụ', roleColor: 'blue' };
 }
 
+
+// Utility: flatten only primitive fields for safe rendering
+function flattenStaffForUI(staffObj) {
+  if (!staffObj || typeof staffObj !== 'object') return {};
+  const allowed = [
+    'id', 'workStaffId', 'name', 'email', 'avatar', 'role', 'roleColor', 'phone',
+    'joinDate', 'rating', 'isWorking', 'location', 'startTime', 'shiftId', 'shiftName', 'workDate', 'isManager', 'active', 'position', 'positionLabel', 'address', 'salary', 'taxId', 'bankName', 'bankAccount', 'startDate', 'created', 'customerId', 'ordersPlaced', 'ordersCanceled', 'noShow', 'totalSpending', 'lastUpdated', 'isVip'
+  ];
+  const flat = {};
+  for (const key of allowed) {
+    if (staffObj[key] !== undefined && (typeof staffObj[key] !== 'object' || staffObj[key] === null)) {
+      flat[key] = staffObj[key];
+    }
+  }
+  return flat;
+}
+
 export function mapStaffToUI(item) {
   // Debug: log raw item
-  console.log('STAFF RAW:', item);
+  // console.log('STAFF RAW:', item);
   const id = pick(item, ['userId', 'staffId', 'id', 'workStaffId'], null);
   const workStaffId = pick(item, ['workStaffId', 'workId', 'idWorkStaff'], null);
   const name = pick(item, ['fullName', 'fullname', 'name', 'staffName', 'userName'], `NV #${id ?? '---'}`);
   const email = pick(item, ['email', 'gmail', 'mail'], '---');
   const avatar = pick(item, ['avatar', 'avatarUrl', 'imageUrl', 'photoUrl'], `https://i.pravatar.cc/150?u=${id ?? name}`);
-  // Sửa lại lấy đúng trường backend
   const phone = pick(item, ['phone', 'phoneNumber', 'mobile', 'contactPhone', 'tel'], item?.Phone ?? '---');
   const position = pick(item, ['position', 'role', 'staffRole', 'jobTitle'], item?.Position ?? 'Waiter');
-  // Sửa lại lấy đúng trường ngày vào làm
   const joinDateRaw = pick(item, ['joinDate', 'startDate', 'createdAt', 'hireDate', 'dateJoined'], item?.JoinDate ?? null);
   const joinDateObj = joinDateRaw ? new Date(joinDateRaw) : null;
   const joinDate = joinDateObj && !Number.isNaN(joinDateObj.getTime())
@@ -582,7 +610,8 @@ export function mapStaffToUI(item) {
   const roleMeta = normalizeRole(position);
   const isManager = roleMeta.role === 'Quản lý';
 
-  return {
+  // Compose the staff object
+  const staffObj = {
     id,
     workStaffId,
     name,
@@ -600,8 +629,27 @@ export function mapStaffToUI(item) {
     shiftName,
     workDate,
     isManager,
-    raw: item,
+    // Add common admin fields for compatibility
+    position,
+    positionLabel: item.positionLabel,
+    address: item.address,
+    salary: item.salary,
+    taxId: item.taxId,
+    bankName: item.bankName,
+    bankAccount: item.bankAccount,
+    startDate: item.startDate,
+    created: item.created,
+    customerId: item.customerId,
+    ordersPlaced: item.ordersPlaced,
+    ordersCanceled: item.ordersCanceled,
+    noShow: item.noShow,
+    totalSpending: item.totalSpending,
+    lastUpdated: item.lastUpdated,
+    isVip: item.isVip,
+    active: item.active,
   };
+  // Defensive: flatten before returning for JSX
+  return flattenStaffForUI(staffObj);
 }
 
 export function mapWorkshiftToUI(item) {

@@ -160,7 +160,7 @@ const AdminLayout = () => {
               <span className="text-sm font-semibold text-gray-600">{userInfo.initials}</span>
             </div>
             <div className="admin-user-info">
-              <strong>{userInfo.fullname}</strong>
+              <strong>{typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || 'Đang tải...')}</strong>
               <p>Quản trị viên</p>
             </div>
           </button>
