@@ -545,7 +545,7 @@ const ManagerStaffPage = () => {
                           <div className="online-indicator"></div>
                         </div>
                         <div className="staff-info">
-                          <p className="staff-name">{staff.name}</p>
+                          <p className="staff-name">{typeof staff.name === 'string' ? staff.name : (staff.name?.toString?.() || '---')}</p>
                           <p className="staff-details">{staff.role} • {staff.location}</p>
                         </div>
                         <span className="staff-time">{staff.startTime}</span>
@@ -604,8 +604,8 @@ const ManagerStaffPage = () => {
                               <img src={employee.avatar} alt={employee.name} />
                             </div>
                             <div className="employee-details">
-                              <span className="employee-name">{employee.name}</span>
-                              <span className="employee-email">{employee.email}</span>
+                              <span className="employee-name">{typeof employee.name === 'string' ? employee.name : (employee.name?.toString?.() || '---')}</span>
+                              <span className="employee-email">{typeof employee.email === 'string' ? employee.email : (employee.email?.toString?.() || '---')}</span>
                             </div>
                           </div>
                         </td>
@@ -614,7 +614,7 @@ const ManagerStaffPage = () => {
                             {employee.role}
                           </span>
                         </td>
-                        <td className="text-slate-600 dark:text-slate-400 font-medium">{employee.phone}</td>
+                        <td className="text-slate-600 dark:text-slate-400 font-medium">{typeof employee.phone === 'string' ? employee.phone : (employee.phone?.toString?.() || '---')}</td>
                         <td className="text-slate-600 dark:text-slate-400">{employee.joinDate}</td>
                         <td>
                           <div className="rating-cell">

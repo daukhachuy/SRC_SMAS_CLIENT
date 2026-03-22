@@ -468,7 +468,7 @@ const Profile = () => {
           <div className="Profile-Form-Grid">
             <div className="Profile-Field">
               <label>Họ và tên</label>
-              <input type="text" name="fullname" value={userInfo.fullname} onChange={handleInputChange} placeholder="Họ và tên" />
+              <input type="text" name="fullname" value={typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || '')} onChange={handleInputChange} placeholder="Họ và tên" />
             </div>
             <div className="Profile-Field">
               <label>Ngày sinh</label>
@@ -510,9 +510,9 @@ const Profile = () => {
                 name="phone"
                 inputMode="numeric"
                 autoComplete="tel"
-                value={userInfo.phone}
+                value={typeof userInfo.phone === 'string' ? userInfo.phone : (userInfo.phone?.toString?.() || '')}
                 onChange={handleInputChange}
-                placeholder="0901234567 hoặc 0281234567"
+                placeholder="Số điện thoại"
                 maxLength={11}
                 className={fieldErrors.phone ? 'Profile-Input-Error' : ''}
                 aria-invalid={!!fieldErrors.phone}
@@ -522,7 +522,7 @@ const Profile = () => {
             </div>
             <div className="Profile-Field Profile-Field-Full">
               <label>Email</label>
-              <input type="email" value={userInfo.email} readOnly className="Profile-Input-Readonly" />
+              <input type="email" value={typeof userInfo.email === 'string' ? userInfo.email : (userInfo.email?.toString?.() || '')} readOnly className="Profile-Input-Readonly" />
             </div>
           </div>
           <div className="Profile-Form-Actions">
@@ -556,7 +556,7 @@ const Profile = () => {
                   {addr.isDefault && <span className="Profile-Address-Default">MẶC ĐỊNH</span>}
                 </div>
                 <p className="Profile-Address-Text">{addr.address}</p>
-                <p className="Profile-Address-Phone">SĐT: {addr.phone}</p>
+                <p className="Profile-Address-Phone">SĐT: {typeof addr.phone === 'string' ? addr.phone : (addr.phone?.toString?.() || '---')}</p>
               </div>
               <div className="Profile-Address-Actions">
                 <button type="button" className="Profile-Address-Action" title="Sửa" onClick={() => setDefaultAddress(addr.id)}><i className="fa-solid fa-pencil"></i></button>
@@ -593,7 +593,7 @@ const Profile = () => {
                 <div className="Profile-EventCard-Body">
                   <div className="Profile-EventCard-Info">
                     <p><i className="fa-solid fa-user"></i> {event.guestName}</p>
-                    <p><i className="fa-solid fa-phone"></i> {event.phone}</p>
+                    <p><i className="fa-solid fa-phone"></i> {typeof event.phone === 'string' ? event.phone : (event.phone?.toString?.() || '---')}</p>
                     <p><i className="fa-solid fa-calendar-day"></i> {event.dateStr} lúc {event.timeStr}</p>
                     <p><i className="fa-solid fa-users"></i> {event.numberOfGuests} khách &nbsp;|&nbsp; <i className="fa-solid fa-chair"></i> {event.numberOfTables} bàn</p>
                   </div>

@@ -142,7 +142,7 @@ const KitchenLayout = () => {
             <ChefHat size={24} />
           </div>
           <div>
-            <strong>{userInfo.fullname}</strong>
+            <strong>{typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || 'Đang tải...')}</strong>
             <p>{userInfo.position}</p>
           </div>
         </div>

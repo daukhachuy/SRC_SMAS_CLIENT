@@ -122,8 +122,8 @@ const MyOrders = () => {
                   </div>
                   <div className="Card-Main-Grid">
                     <div className="Grid-Col">
-                      <p>NGƯỜI ĐẶT: <span>{res.fullname}</span></p>
-                      <p>ĐIỆN THOẠI: <span>{res.phone}</span></p>
+                      <p>NGƯỜI ĐẶT: <span>{typeof res.fullname === 'string' ? res.fullname : (res.fullname?.toString?.() || '')}</span></p>
+                      <p>ĐIỆN THOẠI: <span>{typeof res.phone === 'string' ? res.phone : (res.phone?.toString?.() || '')}</span></p>
                     </div>
                     <div className="Grid-Col">
                       <p>NGÀY ĐẶT: <span>{res.reservationDate}</span></p>
@@ -177,8 +177,8 @@ const MyOrders = () => {
 
                 <div className="Card-Main-Grid">
                   <div className="Grid-Col">
-                    <p>NGƯỜI NHẬN: <span>{order.delivery?.recipientName || order.customer?.fullname}</span></p>
-                    <p>ĐIỆN THOẠI: <span>{order.delivery?.recipientPhone || order.customer?.phone}</span></p>
+                    <p>NGƯỜI NHẬN: <span>{typeof order.delivery?.recipientName === 'string' ? order.delivery.recipientName : (order.delivery?.recipientName?.toString?.() || (typeof order.customer?.fullname === 'string' ? order.customer.fullname : (order.customer?.fullname?.toString?.() || '')))}</span></p>
+                    <p>ĐIỆN THOẠI: <span>{typeof order.delivery?.recipientPhone === 'string' ? order.delivery.recipientPhone : (order.delivery?.recipientPhone?.toString?.() || (typeof order.customer?.phone === 'string' ? order.customer.phone : (order.customer?.phone?.toString?.() || '')))}</span></p>
                   </div>
                   <div className="Grid-Col">
                     <p>HÌNH THỨC: <span>{order.paymentMethod || 'Tiền mặt'}</span></p>
