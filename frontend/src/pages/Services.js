@@ -24,19 +24,16 @@ const Services = () => {
     setSelectedTime('');
   }, [selectedDate]);
 
-  // ── Lịch tháng đầy đủ (đúng thứ tự T2→CN) ──
-  const getMonthDays = (year, month) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    // getDay(): 0=CN, 1=T2, ..., 6=T7
-    // Chuyển sang: 0=T2, 1=T3, ..., 5=T7, 6=CN
-    const startDow = firstDay.getDay(); // 0=CN, 1=T2 ...
-    const offset = startDow === 0 ? 6 : startDow - 1; // số ô trống trước ngày 1
+  // Lấy 7 ngày tiếp theo từ hôm nay (không hiển thị ngày quá khứ)
+  const getNext7Days = () => {
     const days = [];
-    // Ô trống trước
-    for (let i = 0; i < offset; i++) days.push(null);
-    // Ngày trong tháng
-    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
     return days;
   };
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState(0);
@@ -699,13 +696,12 @@ const Services = () => {
                       Tháng {String(selectedDate.getMonth() + 1).padStart(2, '0')} {selectedDate.getFullYear()}
                     </span>
                   </div>
-                  <div className="calendar-weekdays">
-                    <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
-                  </div>
                   <div className="calendar-numbers">
-                    {getMonthDays(currentMonth.getFullYear(), currentMonth.getMonth()).map((date, idx) => {
-                      if (!date) return <span key={`empty-${idx}`} />;
+                    {getNext7Days().map((date, idx) => {
                       const day = date.getDate();
+                      const weekdayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                      const dayOfWeek = date.getDay();
+                      const weekday = weekdayLabels[dayOfWeek];
                       const today = new Date();
                       const isToday = date.toDateString() === today.toDateString();
                       const isSelectable = isDateSelectable(date);
@@ -714,6 +710,8 @@ const Services = () => {
                         <span
                           key={idx}
                           onClick={() => isSelectable && setSelectedDate(date)}
+                          className={`calendar-day-block ${!isSelectable ? 'day-disabled' : ''} ${isSelected ? 'day-active' : ''} ${isSelectable ? 'day-selectable' : ''}`}
+                          style={{ cursor: isSelectable ? 'pointer' : 'not-allowed', opacity: isSelectable ? 1 : 0.5 }}
                           className={`
                             ${isToday ? 'today' : ''}
                             ${isSelected ? 'day-active' : ''}
@@ -725,7 +723,8 @@ const Services = () => {
                             opacity: isSelectable ? 1 : 0.35
                           }}
                         >
-                          {day}
+                          <div className="calendar-weekday">{weekday}</div>
+                          <div className="calendar-day-number">{day}</div>
                         </span>
                       );
                     })}

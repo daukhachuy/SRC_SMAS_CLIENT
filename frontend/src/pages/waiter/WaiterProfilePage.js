@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
 import { salaryRecordAPI, staffAPI } from '../../api/managerApi';
+import { staffApi } from '../../api/staffApi';
 
 function asArray(value) {
   if (Array.isArray(value)) return value;
@@ -106,7 +107,7 @@ const WaiterProfilePage = () => {
 
     try {
       const [profileRes, monthDetailRes, sixMonthsRes, monthHoursRes, monthShiftsRes] = await Promise.allSettled([
-        staffAPI.getStaffProfile(),
+        staffApi.getProfile(),
         salaryRecordAPI.getCurrentMonthDetail(),
         salaryRecordAPI.getLastSixMonths(),
         staffAPI.getSumTimeworkThisMonth(),
@@ -259,11 +260,11 @@ const WaiterProfilePage = () => {
             <div className="waiter-profile-info-grid">
               <div>
                 <p>Họ và tên</p>
-                <strong>{profile.fullname}</strong>
+                <strong>{typeof profile.fullname === 'string' ? profile.fullname : (profile.fullname?.toString?.() || 'Đang tải...')}</strong>
               </div>
               <div>
                 <p>Số điện thoại</p>
-                <strong>{profile.phone}</strong>
+                <strong>{typeof profile.phone === 'string' ? profile.phone : (profile.phone?.toString?.() || '---')}</strong>
               </div>
               <div className="full-row">
                 <p>Địa chỉ thường trú</p>

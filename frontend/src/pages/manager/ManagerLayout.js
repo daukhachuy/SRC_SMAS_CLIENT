@@ -252,10 +252,6 @@ const ManagerLayout = () => {
       setProfileError('Mật khẩu mới không khớp');
       return;
     }
-    if (passwordData.newPassword.length < 6) {
-      setProfileError('Mật khẩu mới phải có ít nhất 6 ký tự');
-      return;
-    }
 
     setProfileLoading(true);
     setProfileError('');
@@ -317,8 +313,8 @@ const ManagerLayout = () => {
             )}
           </div>
           <div>
-            <strong>{userInfo.fullname}</strong>
-            <p>{userInfo.email}</p>
+            <strong>{typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || 'Đang tải...')}</strong>
+            <p>{typeof userInfo.email === 'string' ? userInfo.email : (userInfo.email?.toString?.() || 'Đang tải...')}</p>
           </div>
         </div>
 

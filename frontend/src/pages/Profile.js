@@ -7,6 +7,66 @@ import { formatCurrency } from '../api/managerApi';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBHDr0B4X2T13T1nVBQczGvKkS8VQZmwc";
 
+/** Chuẩn hóa dob từ API → yyyy-mm-dd (tránh lệch ngày do timezone) */
+function normalizeDobFromApi(dob) {
+  if (dob == null || dob === '') return '';
+  if (typeof dob !== 'string') return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(dob)) return dob.split('T')[0];
+  const m = dob.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const d = m[1].padStart(2, '0');
+    const mo = m[2].padStart(2, '0');
+    const y = m[3];
+    return `${y}-${mo}-${d}`;
+  }
+  return '';
+}
+
+/** yyyy-mm-dd → hiển thị dd/mm/yyyy */
+function isoToDdMmYyyy(iso) {
+  if (!iso || typeof iso !== 'string') return '';
+  const s = iso.includes('T') ? iso.split('T')[0] : iso;
+  const parts = s.split('-');
+  if (parts.length !== 3) return '';
+  const [y, m, day] = parts;
+  if (!y || !m || !day) return '';
+  return `${String(day).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+}
+
+/** Chuỗi gõ (có hoặc không có /) → yyyy-mm-dd nếu hợp lệ */
+function parseDdMmYyyyToIso(input) {
+  if (!input || typeof input !== 'string') return '';
+  const digits = input.replace(/\D/g, '');
+  if (digits.length !== 8) return '';
+  const d = parseInt(digits.slice(0, 2), 10);
+  const mo = parseInt(digits.slice(2, 4), 10);
+  const y = parseInt(digits.slice(4, 8), 10);
+  if (y < 1900 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  const date = new Date(y, mo - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return '';
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** Mask khi gõ: dd/mm/yyyy */
+function maskDobInput(value) {
+  const d = value.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/**
+ * Số điện thoại VN: 10 số bắt đầu bằng 0 (di động 03/05/07/08/09 hoặc cố định 02…)
+ */
+function isValidVietnamPhone(digits) {
+  if (!digits || typeof digits !== 'string') return false;
+  const d = digits.replace(/\D/g, '');
+  if (!/^0\d{9}$/.test(d)) return false;
+  const second = d.charAt(1);
+  if (second === '0' || second === '1') return false;
+  return true;
+}
+
 const Profile = () => {
   const [userInfo, setUserInfo] = useState({
     fullname: '',
@@ -34,6 +94,9 @@ const Profile = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  /** Hiển thị ngày sinh dạng DD/MM/YYYY khi gõ (đồng bộ với userInfo.dob dạng ISO) */
+  const [dobInput, setDobInput] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({ phone: '', dob: '' });
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [newAddress, setNewAddress] = useState({
     street: '',
@@ -117,7 +180,7 @@ const Profile = () => {
         const fullname = (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '';
         const phone = (profileData.phone && profileData.phone !== 'string') ? (profileData.phone || '').replace('+84', '0') : '';
         const address = (profileData.address && profileData.address !== 'string') ? profileData.address : '';
-        const dob = profileData.dob ? profileData.dob.split('T')[0] : '';
+        const dob = normalizeDobFromApi(profileData.dob);
         const gender = (profileData.gender && profileData.gender !== 'string') ? profileData.gender : 'Nam';
 
         setUserInfo({
@@ -128,6 +191,7 @@ const Profile = () => {
           address,
           dob
         });
+        setDobInput(isoToDdMmYyyy(dob));
 
         if (address || phone) {
           setAddresses([
@@ -205,35 +269,43 @@ const Profile = () => {
     fetchEventOrders();
   }, []);
 
-  const formatDobForDisplay = (isoDate) => {
-    if (!isoDate) return '';
-    const d = (typeof isoDate === 'string' && isoDate.includes('T')) ? isoDate.split('T')[0] : isoDate;
-    const parts = d.split('-');
-    if (parts.length !== 3) return d;
-    const [y, m, day] = parts;
-    return `${day.padStart(2, '0')}/${m}/${y}`;
-  };
-  const parseDobToISO = (input) => {
-    if (!input) return '';
-    const parts = input.replace(/\D/g, ' ').trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 3) {
-      const [a, b, c] = parts;
-      if (a.length <= 2 && b.length <= 2 && c.length === 4) {
-        const day = a.padStart(2, '0');
-        const month = b.padStart(2, '0');
-        return `${c}-${month}-${day}`;
-      }
+  const handleDobChange = (e) => {
+    const masked = maskDobInput(e.target.value);
+    setDobInput(masked);
+    setFieldErrors((prev) => ({ ...prev, dob: '' }));
+    const iso = parseDdMmYyyyToIso(masked);
+    if (iso) {
+      setUserInfo((prev) => ({ ...prev, dob: iso }));
+    } else if (masked.replace(/\D/g, '').length === 0) {
+      setUserInfo((prev) => ({ ...prev, dob: '' }));
     }
-    return '';
+  };
+
+  const handleDobBlur = () => {
+    const digits = dobInput.replace(/\D/g, '');
+    if (digits.length === 0) {
+      setFieldErrors((prev) => ({ ...prev, dob: '' }));
+      return;
+    }
+    const iso = parseDdMmYyyyToIso(dobInput);
+    if (!iso) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        dob: 'Ngày sinh không hợp lệ. Dùng định dạng DD/MM/YYYY (ví dụ 20/10/2020).'
+      }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, dob: '' }));
+      setUserInfo((prev) => ({ ...prev, dob: iso }));
+      setDobInput(isoToDdMmYyyy(iso));
+    }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name === 'phone') {
-      setUserInfo({ ...userInfo, [name]: value.replace(/[^0-9]/g, '') });
-    } else if (name === 'dob') {
-      const iso = parseDobToISO(value) || value;
-      setUserInfo({ ...userInfo, dob: iso });
+      const digits = value.replace(/\D/g, '').slice(0, 11);
+      setFieldErrors((prev) => ({ ...prev, phone: '' }));
+      setUserInfo({ ...userInfo, [name]: digits });
     } else {
       setUserInfo({ ...userInfo, [name]: value });
     }
@@ -249,6 +321,21 @@ const Profile = () => {
     }
     if (!userInfo.phone.trim()) {
       setError('Vui lòng nhập số điện thoại.');
+      setFieldErrors((prev) => ({ ...prev, phone: 'Vui lòng nhập số điện thoại.' }));
+      return;
+    }
+    const dobFinal = parseDdMmYyyyToIso(dobInput) || userInfo.dob;
+    if (!dobFinal) {
+      const msg = 'Vui lòng nhập ngày sinh đúng định dạng DD/MM/YYYY.';
+      setError(msg);
+      setFieldErrors((prev) => ({ ...prev, dob: msg }));
+      return;
+    }
+    if (!isValidVietnamPhone(userInfo.phone)) {
+      const msg =
+        'Số điện thoại không hợp lệ. Dùng 10 số (bắt đầu bằng 0), ví dụ: 0901234567 hoặc 0281234567.';
+      setError(msg);
+      setFieldErrors((prev) => ({ ...prev, phone: msg }));
       return;
     }
     const phone = userInfo.phone.startsWith('0') ? '+84' + userInfo.phone.slice(1) : userInfo.phone;
@@ -257,6 +344,7 @@ const Profile = () => {
       setIsSubmitting(true);
       await updateProfile({
         ...userInfo,
+        dob: dobFinal,
         phone,
         address: defaultAddr ? defaultAddr.address : userInfo.address
       });
@@ -380,20 +468,27 @@ const Profile = () => {
           <div className="Profile-Form-Grid">
             <div className="Profile-Field">
               <label>Họ và tên</label>
-              <input type="text" name="fullname" value={userInfo.fullname} onChange={handleInputChange} placeholder="Họ và tên" />
+              <input type="text" name="fullname" value={typeof userInfo.fullname === 'string' ? userInfo.fullname : (userInfo.fullname?.toString?.() || '')} onChange={handleInputChange} placeholder="Họ và tên" />
             </div>
             <div className="Profile-Field">
               <label>Ngày sinh</label>
               <div className="Profile-Input-With-Icon">
                 <input
                   type="text"
-                  value={formatDobForDisplay(userInfo.dob)}
-                  onChange={(e) => setUserInfo({ ...userInfo, dob: parseDobToISO(e.target.value) })}
+                  inputMode="numeric"
+                  autoComplete="bday"
+                  name="dob"
+                  value={dobInput}
+                  onChange={handleDobChange}
+                  onBlur={handleDobBlur}
                   placeholder="DD/MM/YYYY"
                   maxLength={10}
+                  className={fieldErrors.dob ? 'Profile-Input-Error' : ''}
+                  aria-invalid={!!fieldErrors.dob}
                 />
                 <i className="fa-regular fa-calendar Profile-Field-Icon"></i>
               </div>
+              {fieldErrors.dob && <p className="Profile-Field-Error">{fieldErrors.dob}</p>}
             </div>
             <div className="Profile-Field">
               <label>Giới tính</label>
@@ -410,11 +505,24 @@ const Profile = () => {
             </div>
             <div className="Profile-Field">
               <label>Số điện thoại</label>
-              <input type="text" name="phone" value={userInfo.phone} onChange={handleInputChange} placeholder="0901234567" maxLength={11} />
+              <input
+                type="text"
+                name="phone"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={typeof userInfo.phone === 'string' ? userInfo.phone : (userInfo.phone?.toString?.() || '')}
+                onChange={handleInputChange}
+                placeholder="Số điện thoại"
+                maxLength={11}
+                className={fieldErrors.phone ? 'Profile-Input-Error' : ''}
+                aria-invalid={!!fieldErrors.phone}
+              />
+              {fieldErrors.phone && <p className="Profile-Field-Error">{fieldErrors.phone}</p>}
+              <p className="Profile-Field-Hint">10 số, bắt đầu bằng 0 (di động hoặc cố định).</p>
             </div>
             <div className="Profile-Field Profile-Field-Full">
               <label>Email</label>
-              <input type="email" value={userInfo.email} readOnly className="Profile-Input-Readonly" />
+              <input type="email" value={typeof userInfo.email === 'string' ? userInfo.email : (userInfo.email?.toString?.() || '')} readOnly className="Profile-Input-Readonly" />
             </div>
           </div>
           <div className="Profile-Form-Actions">
@@ -448,7 +556,7 @@ const Profile = () => {
                   {addr.isDefault && <span className="Profile-Address-Default">MẶC ĐỊNH</span>}
                 </div>
                 <p className="Profile-Address-Text">{addr.address}</p>
-                <p className="Profile-Address-Phone">SĐT: {addr.phone}</p>
+                <p className="Profile-Address-Phone">SĐT: {typeof addr.phone === 'string' ? addr.phone : (addr.phone?.toString?.() || '---')}</p>
               </div>
               <div className="Profile-Address-Actions">
                 <button type="button" className="Profile-Address-Action" title="Sửa" onClick={() => setDefaultAddress(addr.id)}><i className="fa-solid fa-pencil"></i></button>
@@ -485,7 +593,7 @@ const Profile = () => {
                 <div className="Profile-EventCard-Body">
                   <div className="Profile-EventCard-Info">
                     <p><i className="fa-solid fa-user"></i> {event.guestName}</p>
-                    <p><i className="fa-solid fa-phone"></i> {event.phone}</p>
+                    <p><i className="fa-solid fa-phone"></i> {typeof event.phone === 'string' ? event.phone : (event.phone?.toString?.() || '---')}</p>
                     <p><i className="fa-solid fa-calendar-day"></i> {event.dateStr} lúc {event.timeStr}</p>
                     <p><i className="fa-solid fa-users"></i> {event.numberOfGuests} khách &nbsp;|&nbsp; <i className="fa-solid fa-chair"></i> {event.numberOfTables} bàn</p>
                   </div>

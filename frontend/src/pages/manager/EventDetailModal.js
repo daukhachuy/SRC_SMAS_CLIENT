@@ -98,8 +98,8 @@ const CustomerInfoSection = ({ customer }) => (
           <User className="w-6 h-6 text-slate-400" />
         </div>
         <div className="flex flex-col">
-          <p className="text-base font-bold text-slate-900 dark:text-white">{customer.name}</p>
-          <p className="text-xs text-slate-500">{customer.type}</p>
+          <p className="text-base font-bold text-slate-900 dark:text-white">{typeof customer.name === 'string' ? customer.name : (customer.name?.toString?.() || '---')}</p>
+          <p className="text-xs text-slate-500">{typeof customer.type === 'string' ? customer.type : (customer.type?.toString?.() || '---')}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -108,7 +108,7 @@ const CustomerInfoSection = ({ customer }) => (
             Điện thoại
           </span>
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {customer.phone}
+            {typeof customer.phone === 'string' ? customer.phone : (customer.phone?.toString?.() || '---')}
           </span>
         </div>
         <div className="flex flex-col gap-1">
@@ -116,7 +116,7 @@ const CustomerInfoSection = ({ customer }) => (
             Loại tiệc
           </span>
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {customer.eventType}
+            {typeof customer.eventType === 'string' ? customer.eventType : (customer.eventType?.toString?.() || '---')}
           </span>
         </div>
         <div className="flex flex-col gap-1">
@@ -124,7 +124,7 @@ const CustomerInfoSection = ({ customer }) => (
             Ngày tổ chức
           </span>
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {customer.eventDate}
+            {typeof customer.eventDate === 'string' ? customer.eventDate : (customer.eventDate?.toString?.() || '---')}
           </span>
         </div>
         <div className="flex flex-col gap-1">
@@ -132,7 +132,7 @@ const CustomerInfoSection = ({ customer }) => (
             Số lượng khách
           </span>
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {customer.guestCount}
+            {typeof customer.guestCount === 'string' || typeof customer.guestCount === 'number' ? customer.guestCount : (customer.guestCount?.toString?.() || '---')}
           </span>
         </div>
       </div>
@@ -220,7 +220,24 @@ const EventDetailModal = ({ isOpen, event, onClose, onSave }) => {
   if (!isOpen || !event) return null;
 
   const menuItems = event.menuItems || [];
-  const customer = event.customer || {};
+  // Flatten customer info for CustomerInfoSection
+  const customer = (event.customer && typeof event.customer === 'object' && !Array.isArray(event.customer))
+    ? {
+        name: event.customer.fullname || event.customer.name || event.customer.fullName || '',
+        type: event.customer.type || event.eventType || '',
+        phone: event.customer.phone || '',
+        eventType: event.eventType || '',
+        eventDate: event.eventDate || '',
+        guestCount: event.guestCount || '',
+      }
+    : {
+        name: event.customer || '',
+        type: event.eventType || '',
+        phone: '',
+        eventType: event.eventType || '',
+        eventDate: event.eventDate || '',
+        guestCount: event.guestCount || '',
+      };
   const contractStatus = event.contractStatus || {};
   const paymentInfo = event.paymentInfo || {};
 

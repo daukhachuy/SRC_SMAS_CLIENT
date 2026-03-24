@@ -137,8 +137,8 @@ const UserLayout = () => {
                 </label>
               </div>
             </div>
-            <h2 className="User-Name">{userProfile.fullname || 'Đang tải...'}</h2>
-            <p className="User-Email">{userProfile.email || 'Đang tải...'}</p>
+            <h2 className="User-Name">{typeof userProfile.fullname === 'string' ? userProfile.fullname : (userProfile.fullname?.toString?.() || 'Đang tải...')}</h2>
+            <p className="User-Email">{typeof userProfile.email === 'string' ? userProfile.email : (userProfile.email?.toString?.() || 'Đang tải...')}</p>
 
             <nav className="Profile-Nav">
               <NavLink to="/profile" className={({ isActive }) => isActive ? "Nav-Item Active" : "Nav-Item"}>

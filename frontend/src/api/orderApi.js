@@ -1,5 +1,8 @@
 import instance from './axiosInstance';
 
+/** @deprecated dùng trực tiếp từ ./kitchenOrderApi — giữ để tương thích import cũ */
+export { apiGetPending as fetchPendingOrderItems } from './kitchenOrderApi';
+
 export const fetchUserOrders = async (orderType = 'Delivery', status = 'Pending') => {
   try {
     const response = await instance.post(
@@ -23,6 +26,17 @@ export const fetchUserOrders = async (orderType = 'Delivery', status = 'Pending'
       console.warn("Phiên đăng nhập hết hạn.");
     }
     
+    throw error;
+  }
+};
+
+// Tạo đơn khách lẻ (dine-in)
+export const createGuestOrder = async (payload) => {
+  try {
+    const response = await instance.post('/orders/guest', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Lỗi tạo đơn khách lẻ:', error.response?.status, error.response?.data);
     throw error;
   }
 };

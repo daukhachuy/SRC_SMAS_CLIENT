@@ -161,7 +161,11 @@ const EventContractModal = ({ isOpen, onClose, contractData }) => {
                 <p className="contract-article-text">{contract.serviceDescription}</p>
                 <ul className="contract-article-list">
                   {contract.serviceItems.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      {typeof item === 'object' && item !== null
+                        ? `${item.fullname || ''} ${item.phone ? '- ' + item.phone : ''} ${item.email ? '- ' + item.email : ''}`.trim()
+                        : item}
+                    </li>
                   ))}
                 </ul>
               </div>
