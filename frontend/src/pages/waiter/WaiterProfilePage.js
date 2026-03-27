@@ -260,9 +260,9 @@ const WaiterProfilePage = () => {
             <div className="waiter-profile-info-grid">
               <div>
                 <p>Họ và tên</p>
-                <strong>{typeof profile.fullname === 'string' ? profile.fullname : (profile.fullname?.toString?.() || 'Đang tải...')}</strong>
+                 <strong>{typeof profile.fullname === 'string' ? profile.fullname : (profile.fullname?.toString?.() || 'Đang tải...')}</strong>
               </div>
-              <div>
+              <div> 
                 <p>Số điện thoại</p>
                 <strong>{typeof profile.phone === 'string' ? profile.phone : (profile.phone?.toString?.() || '---')}</strong>
               </div>

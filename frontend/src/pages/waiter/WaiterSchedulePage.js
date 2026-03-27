@@ -298,14 +298,7 @@ const WaiterSchedulePage = () => {
         </div>
 
         <div className="waiter-schedule-actions">
-          <button
-            className="waiter-schedule-refresh"
-            onClick={() => fetchSchedule(true)}
-            type="button"
-          >
-            {refreshing ? <Loader2 size={16} className="waiter-spin" /> : <RefreshCw size={16} />}
-            Làm mới
-          </button>
+          {/* Đã xóa nút Làm mới theo yêu cầu */}
         </div>
       </header>
 
