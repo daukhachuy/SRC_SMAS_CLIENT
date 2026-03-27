@@ -40,17 +40,16 @@ const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
 
 const mapOrderStatus = (status) => {
   const s = normalizeStatus(status);
-    if (s === 'ready' || s === 'confirmed') /* ...existing code... */
-    if (s === 'delivering' || s === 'shipping') /* ...existing code... */
-    if (s === 'completed' || s === 'done') /* ...existing code... */
-    // Các trạng thái hủy bàn
-    if ([
-      'cancelled', 'canceled', 'rejected', 'voided', 'cancel', 'huy', 'đã hủy', 'da huy', 'hủy bàn', 'huy ban'
-    ].includes(s)) {
-      return { status: 'cancelled', statusLabel: 'Đã hủy bàn' };
-    }
-    return { status: 'preparing', statusLabel: 'Đang làm' };
-  return { status: 'preparing', statusLabel: 'Đang làm' };
+  if (s === 'pending') return { status: 'pending', statusLabel: 'Chờ xử lý' };
+  if (s === 'preparing' || s === 'processing') return { status: 'preparing', statusLabel: 'Đang làm' };
+  if (s === 'ready') return { status: 'ready', statusLabel: 'Sẵn sàng' };
+  if (s === 'completed' || s === 'done') return { status: 'completed', statusLabel: 'Hoàn thành' };
+  if ([
+    'cancelled', 'canceled', 'rejected', 'voided', 'cancel', 'huy', 'đã hủy', 'da huy', 'hủy bàn', 'huy ban'
+  ].includes(s)) {
+    return { status: 'cancelled', statusLabel: 'Đã hủy bàn' };
+  }
+  return { status: 'pending', statusLabel: 'Chờ xử lý' };
 };
 
 const mapDishStatus = (status) => {
@@ -76,8 +75,10 @@ const toOrderItem = (item, idx) => ({
 
 const mapApiOrderToWaiter = (order) => {
   const orderCode = order?.orderCode || order?.code || `DH-${order?.orderId || order?.id || '---'}`;
-  const mappedStatus = mapOrderStatus(order?.status);
-  const orderItems = asArray(order?.orderItems).map(toOrderItem);
+  // Ưu tiên lấy orderStatus, fallback về status nếu không có
+  const mappedStatus = mapOrderStatus(order?.orderStatus || order?.status);
+  // Ưu tiên lấy items, fallback về orderItems nếu không có
+  const orderItems = asArray(order?.items || order?.orderItems).map(toOrderItem);
   const totalAmount = toCurrencyNumber(order?.totalAmount ?? order?.total ?? 0);
 
   const orderType = String(order?.orderType || '').toLowerCase();
@@ -112,6 +113,11 @@ const mapApiOrderToWaiter = (order) => {
 
 const WaiterOrdersPage = () => {
   // ...existing code...
+
+  // Tự động lấy đơn hàng khi trang load
+  useEffect(() => {
+    fetchWaiterOrders();
+  }, []);
     // Hàm xử lý hủy đơn hàng (giả định tên là handleCancelOrder)
     // Sau khi hủy thành công, gọi lại fetchWaiterOrders để reload danh sách đơn
     // Nếu đã có sẵn logic này thì bỏ qua, nếu chưa thì thêm vào như sau:
@@ -153,14 +159,10 @@ const WaiterOrdersPage = () => {
     setMenuError(null);
     const fetchMenu = async () => {
       try {
+        const { getFoodByFilter } = require('../../api/foodApi');
         const params = new URLSearchParams();
-        // Có thể thêm filter nếu muốn
-        // MOCK: Dữ liệu món ăn mẫu (không gọi API)
-        const foods = [
-          { id: 1, name: 'Phở bò', price: 50000, image: '' },
-          { id: 2, name: 'Bún chả', price: 45000, image: '' },
-          { id: 3, name: 'Cơm tấm', price: 40000, image: '' }
-        ];
+        // Có thể thêm filter nếu muốn, ví dụ: params.append('category', 'all');
+        const foods = await getFoodByFilter(params);
         setMenuItems(foods);
       } catch (err) {
         setMenuError('Không thể tải dữ liệu món ăn.');
@@ -177,40 +179,49 @@ const WaiterOrdersPage = () => {
     phone: '0901234567',
     orderCode: '#ORD-240524-001',
     orderType: 'at-place',
-    guests: 4,
-    bookingDate: '2024-05-24',
-    bookingTime: '18:30',
+    fullName: '',
+    phone: '',
+    guests: '',
+    bookingDate: '',
+    bookingTime: '',
     note: ''
   });
 
   // Sửa logic: tableSelection lưu id số của bàn
   const [tableSelection, setTableSelection] = useState({
-    mainTableId: 1,
-    mergedTableIds: [2, 10]
+    mainTableId: null,
+    mergedTableIds: []
   });
 
-  // Sửa tables: id là số, code là string
-  const tables = useMemo(
-    () => [
-      { id: 1, code: 'T.01', seats: 4, status: 'empty' },
-      { id: 2, code: 'T.02', seats: 4, status: 'empty' },
-      { id: 3, code: 'T.03', seats: 2, status: 'empty' },
-      { id: 4, code: 'T.04', seats: 6, status: 'occupied' },
-      { id: 5, code: 'T.05', seats: 4, status: 'empty' },
-      { id: 6, code: 'T.06', seats: 4, status: 'empty' },
-      { id: 7, code: 'T.07', seats: 8, status: 'empty' },
-      { id: 8, code: 'T.08', seats: 2, status: 'empty' },
-      { id: 9, code: 'T.09', seats: 4, status: 'occupied' },
-      { id: 10, code: 'T.10', seats: 4, status: 'empty' },
-      { id: 11, code: 'T.11', seats: 4, status: 'empty' },
-      { id: 12, code: 'T.12', seats: 2, status: 'empty' },
-      { id: 13, code: 'T.13', seats: 4, status: 'empty' },
-      { id: 14, code: 'T.14', seats: 4, status: 'empty' },
-      { id: 15, code: 'T.15', seats: 6, status: 'empty' },
-      { id: 16, code: 'T.16', seats: 4, status: 'occupied' }
-    ],
-    []
-  );
+  // Danh sách bàn thực tế từ API
+  const [tables, setTables] = useState([]);
+
+  // Lấy danh sách bàn khi mở modal chọn bàn hoặc khi trang load
+  useEffect(() => {
+    if (!showTablePickerModal) return;
+    async function fetchTables() {
+      try {
+        const { getTables } = require('../../api/tableApi');
+        const data = await getTables();
+        console.log('API /api/table/all result:', data);
+        // Chuẩn hóa dữ liệu nếu cần
+        const mapped = Array.isArray(data)
+          ? data.map((t) => ({
+              id: t.id || t.tableId || t.code || t.tableCode,
+              code: t.code || t.tableCode || t.id,
+              seats: t.seats || t.capacity || t.chairs || 4,
+              status: t.status || 'empty',
+            }))
+          : [];
+        console.log('Mapped tables:', mapped);
+        setTables(mapped);
+      } catch (err) {
+        console.error('Lỗi lấy bàn:', err);
+        setTables([]);
+      }
+    }
+    fetchTables();
+  }, [showTablePickerModal]);
 
   const [deliveryOrders, setDeliveryOrders] = useState([]);
   const [dineInOrders, setDineInOrders] = useState([]);
@@ -220,54 +231,21 @@ const WaiterOrdersPage = () => {
   const fetchWaiterOrders = useCallback(async () => {
     setLoadingOrders(true);
     setOrdersError('');
-
     try {
-      const [activeResult, historyResult] = await Promise.allSettled([
-        orderAPI.getActive(),
-        orderAPI.getHistory()
-      ]);
-
-      let activeOrders = [];
-
-      if (activeResult.status === 'fulfilled') {
-        activeOrders = asArray(activeResult.value?.data).map(mapApiOrderToWaiter);
-      } else {
-        const status = activeResult.reason?.response?.status;
-
-        // Một số backend không cấp quyền /order/active cho Waiter.
-        // Thử fallback endpoint hôm nay trước khi báo lỗi.
-        if (status === 403) {
-          const todayResult = await Promise.allSettled([orderAPI.getToday()]);
-          if (todayResult[0].status === 'fulfilled') {
-            activeOrders = asArray(todayResult[0].value?.data).map(mapApiOrderToWaiter);
-          } else {
-            throw new Error('Lỗi 403: Tài khoản Waiter không có quyền gọi API đơn hàng hiện tại. Vui lòng cấp quyền endpoint order cho Waiter hoặc cung cấp endpoint riêng cho waiter.');
-          }
-        } else {
-          const message = activeResult.reason?.response?.data?.message || activeResult.reason?.message;
-          throw new Error(`Lỗi ${status || 'kết nối'}: ${message || 'Không thể tải danh sách đơn hàng.'}`);
-        }
-      }
-
-      setDineInOrders(activeOrders.filter((order) => order.channel === 'dineIn'));
-      setTakeawayOrders(activeOrders.filter((order) => order.channel === 'takeaway'));
-      setDeliveryOrders(activeOrders.filter((order) => order.channel === 'delivery'));
-
-      if (historyResult.status === 'fulfilled') {
-        const historyOrders = asArray(historyResult.value?.data);
-        const groupedByDate = historyOrders.reduce((acc, order) => {
-          const rawDate = order?.createdAt || order?.updatedAt || order?.orderDate;
-          const dateKey = rawDate ? new Date(rawDate).toLocaleDateString('vi-VN') : 'Không xác định';
-          const current = acc[dateKey] || { totalOrders: 0, revenue: 0 };
-          current.totalOrders += 1;
-          current.revenue += toCurrencyNumber(order?.totalAmount ?? order?.total ?? 0);
-          acc[dateKey] = current;
-          return acc;
-        }, {});
-        // ...existing code...
-      }
+      const res = await orderAPI.getPreparingMy();
+      console.log('[RAW API]', res.data);
+      const rawOrders = asArray(res.data?.data);
+      console.log('[ORDERS]', rawOrders);
+      const mapped = rawOrders.map(mapApiOrderToWaiter);
+      console.log('[MAPPED]', mapped);
+      setDineInOrders(mapped);
+      setTakeawayOrders([]);
+      setDeliveryOrders([]);
     } catch (error) {
-      setOrdersError(error.message || 'Lỗi không xác định khi tải đơn hàng.');
+      console.error(error);
+      setOrdersError('Không lấy được đơn hàng của waiter');
+    } finally {
+      setLoadingOrders(false);
     }
   }, []);
 
@@ -397,7 +375,7 @@ const WaiterOrdersPage = () => {
             Hôm nay, {new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <button className="btn-create-order" onClick={() => setShowCreateModal(true)}>
+        <button className="btn-create-order" onClick={() => setShowTablePickerModal(true)}>
           <Plus size={20} />
           Tạo đơn hàng mới
         </button>
@@ -591,13 +569,10 @@ const WaiterOrdersPage = () => {
                 ×
               </button>
             </div>
-
             <div className="modal-body">
               <p className="modal-description">
                 Vui lòng chọn phương thức khởi tạo đơn hàng để tiếp tục
               </p>
-
-              {/* Order Type Options */}
               <div className="order-type-grid">
                 <label className="order-type-option">
                   <input
@@ -617,7 +592,6 @@ const WaiterOrdersPage = () => {
                     </p>
                   </div>
                 </label>
-
                 <label className="order-type-option">
                   <input
                     type="radio"
@@ -636,7 +610,6 @@ const WaiterOrdersPage = () => {
                     </p>
                   </div>
                 </label>
-
                 <label className="order-type-option">
                   <input
                     type="radio"
@@ -656,83 +629,6 @@ const WaiterOrdersPage = () => {
                   </div>
                 </label>
               </div>
-
-              {/* UI chọn món ăn và giỏ hàng - đồng bộ style, lấy món thực tế */}
-              <div className="menu-modal-section">
-                <h4 className="menu-modal-title">Chọn món ăn</h4>
-                {menuLoading ? (
-                  <div>Đang tải danh sách món ăn...</div>
-                ) : menuError ? (
-                  <div style={{ color: 'red' }}>{menuError}</div>
-                ) : (
-                  <div className="menu-modal-list">
-                    {menuItems.map((item) => (
-                      <div key={item.id} className="menu-modal-item">
-                        <img src={item.image} alt={item.name} className="menu-modal-img" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, marginRight: 12 }} />
-                        <div style={{ flex: 1 }}>
-                          <div className="menu-modal-item-name">{item.name}</div>
-                          <div className="menu-modal-item-price">{item.price?.toLocaleString('vi-VN')}đ</div>
-                        </div>
-                        <button
-                          className="menu-modal-add-btn"
-                          onClick={() => {
-                            setCartItems((prev) => {
-                              const found = prev.find((c) => c.id === item.id);
-                              if (found) {
-                                return prev.map((c) =>
-                                  c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-                                );
-                              }
-                              return [...prev, { ...item, quantity: 1 }];
-                            });
-                          }}
-                        >
-                          Thêm
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <h4 className="menu-modal-title" style={{ marginTop: 24 }}>Giỏ hàng</h4>
-                {cartItems.length === 0 ? (
-                  <div>Chưa có món nào trong giỏ.</div>
-                ) : (
-                  <table className="Cart-Table" style={{ width: '100%', marginTop: 8 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left' }}>Món</th>
-                        <th>Số lượng</th>
-                        <th>Giá</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cartItems.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.name}</td>
-                          <td>
-                            <div className="Quantity-Control">
-                              <button className="Qty-Btn" onClick={() => updateCartQuantity(item.id, -1)}>-</button>
-                              <input type="text" value={item.quantity} readOnly style={{ width: 32, textAlign: 'center' }} />
-                              <button className="Qty-Btn" onClick={() => updateCartQuantity(item.id, 1)}>+</button>
-                            </div>
-                          </td>
-                          <td>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</td>
-                          <td>
-                            <button className="Action-Btn delete" onClick={() => removeCartItem(item.id)}>🗑️</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                <div style={{ marginTop: 12, textAlign: 'right' }}>
-                  <b>Tổng cộng: </b>
-                  {cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString('vi-VN')}đ
-                </div>
-              </div>
-
-              {/* Search Input */}
               <div className="search-section">
                 <label className="search-label">Nhập thông tin tra cứu</label>
                 <div className="search-input-wrapper">
@@ -752,7 +648,6 @@ const WaiterOrdersPage = () => {
                 </p>
               </div>
             </div>
-
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowCreateModal(false)}>
                 Hủy bỏ
@@ -760,62 +655,44 @@ const WaiterOrdersPage = () => {
               <button
                 className="btn-continue"
                 onClick={async () => {
-                  // Chuyển tableIds sang đúng định dạng (nếu backend cần số, cần mapping từ string sang số)
-                  // Lấy đúng ID thực tế của bàn từ backend (ví dụ: tables.find(...).id là số)
-                  // Lấy đúng id bàn là số từ tables
-                  const tableIds = [tableSelection.mainTableId, ...tableSelection.mergedTableIds]
-                    .filter(Boolean)
-                    .map(tid => {
-                      // Nếu tid là số, dùng luôn
-                      if (typeof tid === 'number') return tid;
-                      // Nếu tid là string, tìm trong tables theo code và lấy id số
-                      const found = tables.find(t => t.code === tid && typeof t.id === 'number');
-                      return found ? found.id : undefined;
-                    })
-                    .filter(id => typeof id === 'number');
-
-                  // Mapping orderItems đúng schema, chỉ gửi các trường có giá trị
-                  const orderItems = cartItems.map(item => {
-                    let obj = { quantity: Number(item.quantity) || 1, note: item.note || '' };
-                    // Chỉ gửi đúng 1 trường ID thực tế, không gửi 0 hoặc undefined
-                    if (item.foodId && typeof item.foodId === 'number' && item.foodId > 0) {
-                      obj.foodId = item.foodId;
-                    } else if (item.comboId && typeof item.comboId === 'number' && item.comboId > 0) {
-                      obj.comboId = item.comboId;
-                    } else if (item.buffetId && typeof item.buffetId === 'number' && item.buffetId > 0) {
-                      obj.buffetId = item.buffetId;
+                  // Validate input, then move to next step (showOrderInfoModal or showAddItemsModal...)
+                  if ((createOrderType === 'reservation' || createOrderType === 'member') && !searchInput.trim()) {
+                    alert('Vui lòng nhập thông tin tra cứu!');
+                    return;
+                  }
+                  // Tự động fill thông tin cá nhân nếu là thành viên/đặt chỗ
+                  if (createOrderType === 'reservation') {
+                    try {
+                      const { reservationAPI } = require('../../api/managerApi');
+                      const res = await reservationAPI.getByCode(searchInput.trim());
+                      const found = res.data || res.data?.data || {};
+                      setOrderForm(prev => ({
+                        ...prev,
+                        fullName: found.fullname || '',
+                        phone: found.phone || '',
+                        guests: found.numberOfGuests || found.guests || '',
+                        bookingDate: found.bookingDate || found.date || '',
+                        bookingTime: found.bookingTime || found.time || '',
+                        note: found.note || ''
+                      }));
+                    } catch (err) {
+                      // Không fill được thì bỏ qua
                     }
-                    return obj;
-                  }).filter(item => (item.foodId || item.comboId || item.buffetId));
-
-                  let payload = {
-                    orderType: 'DineIn',
-                    tableIds,
-                    numberOfGuests: Number(orderForm.guests) || 1,
-                    note: orderForm.note,
-                    orderItems
-                  };
-                  // Kiểm tra trạng thái bàn, chỉ cho phép chọn bàn trống
-                  const invalidTables = tableIds.filter(id => {
-                    const found = tables.find(t => t.id === id);
-                    return found && found.status !== 'empty';
-                  });
-                  if (!tableIds || tableIds.length === 0) {
-                    alert('Bạn phải chọn ít nhất 1 bàn trước khi tạo đơn!');
-                    return;
+                  } else if (createOrderType === 'member') {
+                    try {
+                      const { getProfile } = require('../../api/userApi');
+                      const profile = await getProfile(searchInput.trim());
+                      setOrderForm(prev => ({
+                        ...prev,
+                        fullName: profile.fullname || '',
+                        phone: profile.phone || '',
+                      }));
+                    } catch (err) {
+                      // Không fill được thì bỏ qua
+                    }
                   }
-                  if (invalidTables.length > 0) {
-                    alert('Bạn chỉ được chọn bàn trống!');
-                    return;
-                  }
-                  if (!orderItems || orderItems.length === 0) {
-                    alert('Bạn phải chọn ít nhất 1 món ăn trước khi tạo đơn!');
-                    return;
-                  }
-                  // MOCK: Không gọi API, chỉ đóng modal và báo thành công
-                  alert('Đã tạo đơn thành công (mock)!');
                   setShowCreateModal(false);
-                  setShowOrderInfoModal(false);
+                  setShowOrderInfoModal(true); // sang bước tiếp theo
                 }}
               >
                 Tiếp tục
@@ -945,17 +822,7 @@ const WaiterOrdersPage = () => {
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    className="select-table-btn"
-                    onClick={() => setShowTablePickerModal(true)}
-                  >
-                    <LayoutGrid size={18} />
-                    Chọn bàn (Bàn chính & Ghép thêm)
-                  </button>
-                  <p className="select-table-hint">
-                    Vui lòng chọn bàn để hoàn thành chi tiết đơn hàng
-                  </p>
+                  {/* Đã chọn bàn ở bước trước, không cần nút chọn bàn và cảnh báo nữa */}
                 </section>
               </form>
             </div>
@@ -965,7 +832,102 @@ const WaiterOrdersPage = () => {
                 <ArrowLeft size={16} />
                 Quay lại
               </button>
-              <button className="btn-continue">
+              <button
+                className="btn-continue"
+                onClick={async () => {
+                  // Validate: phải chọn bàn
+                  const tableIds = [tableSelection.mainTableId, ...tableSelection.mergedTableIds]
+                    .filter(Boolean)
+                    .map(tid => {
+                      if (typeof tid === 'number') return tid;
+                      const found = tables.find(t => t.code === tid && typeof t.id === 'number');
+                      return found ? found.id : undefined;
+                    })
+                    .filter(id => typeof id === 'number');
+                  if (!tableIds || tableIds.length === 0) {
+                    alert('Bạn phải chọn ít nhất 1 bàn trước khi tạo đơn!');
+                    return;
+                  }
+                  const invalidTables = tableIds.filter(id => {
+                    const found = tables.find(t => t.id === id);
+                    if (!found) return true;
+                    const status = String(found.status || '').trim().toLowerCase();
+                    // Log trạng thái thực tế để debug
+                    console.log('Kiểm tra bàn:', found.id, 'status:', found.status);
+                    return !['empty', 'available'].includes(status);
+                  });
+                  if (invalidTables.length > 0) {
+                    alert('Bạn chỉ được chọn bàn trống!');
+                    return;
+                  }
+                  // Chuẩn bị payload và gọi API đúng loại đơn
+                  let payload;
+                  let apiFunc;
+                  if (createOrderType === 'walkin') {
+                    // Khách lẻ: lấy đúng dữ liệu từ UI, không fix cứng
+                    payload = {
+                      orderType: 'DineIn',
+                      tableIds,
+                      numberOfGuests: Number(orderForm.guests) || 1,
+                      note: orderForm.note,
+                      orderItems: cartItems.map(item => {
+                        let obj = { quantity: Number(item.quantity) || 1, note: item.note || '' };
+                        if (item.foodId && typeof item.foodId === 'number' && item.foodId > 0) {
+                          obj.foodId = item.foodId;
+                        } else if (item.comboId && typeof item.comboId === 'number' && item.comboId > 0) {
+                          obj.comboId = item.comboId;
+                        } else if (item.buffetId && typeof item.buffetId === 'number' && item.buffetId > 0) {
+                          obj.buffetId = item.buffetId;
+                        }
+                        return obj;
+                      }).filter(item => (item.foodId || item.comboId || item.buffetId))
+                    };
+                    if (payload.orderItems.length === 0) delete payload.orderItems;
+                    apiFunc = window.createGuestOrder || require('../../api/orderApi').createGuestOrder;
+                  } else if (createOrderType === 'reservation') {
+                    payload = {
+                      reservationCode: searchInput,
+                      numberOfGuests: Number(orderForm.guests) || 1,
+                      note: orderForm.note,
+                      tableIds
+                    };
+                    apiFunc = window.createOrderByReservation || require('../../api/orderApi').createOrderByReservation;
+                  } else {
+                    // member
+                    payload = {
+                      contact: searchInput,
+                      numberOfGuests: Number(orderForm.guests) || 1,
+                      note: orderForm.note,
+                      tableIds
+                    };
+                    apiFunc = window.createOrderByContact || require('../../api/orderApi').createOrderByContact;
+                  }
+                  try {
+                    await apiFunc(payload);
+                    alert('Đã tạo đơn thành công!');
+                    setShowOrderInfoModal(false);
+                    if (typeof fetchWaiterOrders === 'function') fetchWaiterOrders();
+                    // Reload lại danh sách bàn để cập nhật trạng thái mới nhất
+                    if (typeof getTables === 'function') {
+                      const { getTables } = require('../../api/tableApi');
+                      getTables().then((data) => {
+                        const mapped = Array.isArray(data)
+                          ? data.map((t) => ({
+                              id: t.id || t.tableId || t.code || t.tableCode,
+                              code: t.code || t.tableCode || t.id,
+                              seats: t.seats || t.capacity || t.chairs || t.numberOfPeople || 4,
+                              status: t.status || 'empty',
+                            }))
+                          : [];
+                        setTables(mapped);
+                      });
+                    }
+                  } catch (err) {
+                    let msg = err?.response?.data?.message || err.message || 'Tạo đơn thất bại!';
+                    alert(msg);
+                  }
+                }}
+              >
                 Hoàn thành thông tin đơn
                 <CheckCircle2 size={18} />
               </button>
@@ -1020,7 +982,23 @@ const WaiterOrdersPage = () => {
                         isOccupied ? 'table-occupied' : isSelected ? 'table-selected' : 'table-empty'
                       }`}
                       disabled={isOccupied}
-                      onClick={() => toggleTableSelection(table.id)}
+                      onClick={() => {
+                        // Nếu chưa có bàn chính, chọn bàn này làm chính
+                        if (!tableSelection.mainTableId) {
+                          setTableSelection({ mainTableId: table.id, mergedTableIds: [] });
+                        } else if (tableSelection.mainTableId === table.id) {
+                          // Bấm lại bàn chính để bỏ chọn
+                          setTableSelection({ mainTableId: null, mergedTableIds: [] });
+                        } else {
+                          // Nếu đã có bàn chính, chọn bàn này làm ghép hoặc bỏ ghép
+                          setTableSelection((prev) => {
+                            const merged = prev.mergedTableIds.includes(table.id)
+                              ? prev.mergedTableIds.filter((id) => id !== table.id)
+                              : [...prev.mergedTableIds, table.id];
+                            return { ...prev, mergedTableIds: merged };
+                          });
+                        }
+                      }}
                     >
                       {isMain && <span className="table-badge main">Chính</span>}
                       {isMerged && <span className="table-badge merged">Ghép</span>}
@@ -1058,7 +1036,10 @@ const WaiterOrdersPage = () => {
                 <ArrowLeft size={16} />
                 Quay lại
               </button>
-              <button className="btn-continue" onClick={() => setShowTablePickerModal(false)}>
+              <button className="btn-continue" onClick={() => {
+                setShowTablePickerModal(false);
+                setShowCreateModal(true);
+              }}>
                 Xác nhận chọn bàn
                 <CheckCircle2 size={18} />
               </button>

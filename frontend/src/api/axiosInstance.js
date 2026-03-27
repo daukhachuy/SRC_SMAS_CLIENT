@@ -8,7 +8,7 @@ import axios from 'axios';
  * - CORS compatibility
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api';
 
 const instance = axios.create({
   baseURL: API_BASE_URL,
