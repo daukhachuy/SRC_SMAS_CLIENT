@@ -129,10 +129,19 @@
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, #fef2f2 100%);
 }
 
+
 .table-card.disabled {
-  opacity: 0.6;
-  border-color: #e5e7eb;
-  background: #f9fafb;
+  opacity: 1;
+  border-color: #ffd6a0;
+  background: linear-gradient(180deg, #fffbe6 0%, #ffe7c7 100%);
+  box-shadow: 0 4px 24px 0 #ffb86c33;
+  filter: none;
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+
+.table-card.disabled:hover {
+  box-shadow: 0 8px 32px 0 #ffb86c55;
+  border-color: #ff9800;
 }
 
 .table-card.disabled:hover {
@@ -293,13 +302,20 @@
   color: #25160d;
 }
 
+
 .action-btn.close-btn {
-  background: #fee2e2;
+  background: #ffedd5;
   color: #8b5e38;
   border-color: #fecaca;
-    writing-mode: horizontal-tb;
-    text-orientation: initial;
-    transform: none;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  writing-mode: initial !important;
+  text-orientation: initial !important;
+  transform: none !important;
+  vertical-align: initial !important;
 }
 
 .action-btn.close-btn:hover:not(:disabled) {

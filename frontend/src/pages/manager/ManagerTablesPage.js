@@ -89,15 +89,27 @@ const ManagerTablesPage = () => {
     }
   };
 
-  // Đóng bàn
-  const handleCloseTable = (table) => {
-    if (window.confirm(`Bạn có chắc muốn đóng bàn ${table.name}?`)) {
-      setTables((prev) =>
-        prev.map((t) =>
-          t.id === table.id ? { ...t, status: 'empty', currentGuests: 0 } : t
-        )
-      );
+  // Đóng bàn (gọi API thật, reload danh sách)
+  const handleCloseTable = async (table) => {
+    if (!window.confirm(`Bạn có chắc muốn đóng bàn ${table.name}?`)) return;
+    try {
+      // Lấy userId từ token lưu trong localStorage
+      const token = localStorage.getItem('authToken');
+      const user = token ? extractUserFromToken(token) : null;
+      if (!user || !user.userId) {
+        alert('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+        return;
+      }
+      // Sử dụng đúng mã bàn (code hoặc tableCode hoặc id)
+      const tableCode = table.code || table.tableCode || table.id;
+      // Gọi API đóng bàn
+      await import('../../api/tableSessionApi').then(api => api.closeTable(tableCode, user.userId));
       alert(`✅ Đã đóng bàn ${table.name}`);
+      // Reload lại danh sách bàn từ server
+      const data = await getTables();
+      setTables(data);
+    } catch (error) {
+      alert(error?.message || `❌ Đóng bàn thất bại!`);
     }
   };
 
