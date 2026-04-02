@@ -1,4 +1,4 @@
-  // Đảm bảo không có hook ngoài function component
+// Đảm bảo không có hook ngoài function component
   import React, { useCallback, useEffect, useMemo, useState } from 'react';
   import {
     UserPlus,
@@ -27,6 +27,7 @@
   import '../../styles/ManagerStaffPage.css';
   import { staffAPI } from '../../api/managerApi';
   import { getAllStaff } from '../../api/managerApi';
+  import { getTables } from '../../api/tableApi';
 
   const DEPARTMENTS = ['all', 'kitchen', 'service'];
   const DEPARTMENT_LABELS = {
@@ -49,11 +50,14 @@
     if (process.env.NODE_ENV !== 'production') {
       console.log('[STAFF RAW]', raw);
     }
+    let role = raw.position || raw.role || raw.staffRole || '';
+    if (role && role.toLowerCase() === 'waiter') role = 'Phục vụ';
+    if (role && role.toLowerCase() === 'kitchen') role = 'Đầu bếp';
     return {
       id: raw.userId || raw.id,
       name: raw.fullName || raw.fullname || raw.name || raw.staffName || '---',
       avatar: raw.avatarUrl || raw.avatar || '',
-      role: raw.position || raw.role || raw.staffRole || '',
+      role,
       email: raw.email || '',
       phone: raw.phone || '',
       joinDate: raw.hireDate || raw.joinDate || '',
@@ -166,7 +170,7 @@
 
     const [submitting, setSubmitting] = useState(false);
     const [processingDetail, setProcessingDetail] = useState(false);
-
+    const [tables, setTables] = useState([]);
 
     const fetchSchedule = useCallback(async (baseEmployees, dateRange) => {
       const positions = ROLE_TO_POSITION.all;
@@ -300,6 +304,7 @@
       setError('');
 
       try {
+
         const [workshiftRes, staffWorkRes, workingRes, sumShiftRes, sumTimeRes, nextSevenRes] = await Promise.allSettled([
           staffAPI.getWorkshift(),
           staffAPI.getStaffWorkToday(),
@@ -332,8 +337,10 @@
         setWorkshifts(mappedWorkshifts);
 
         const workingItemsA = staffWorkRes.status === 'fulfilled' ? unwrapResponse(staffWorkRes.value) : [];
-        const workingItemsB = workingRes.status === 'fulfilled' ? unwrapResponse(workingRes.value) : [];
-        const workingMapped = [...workingItemsA, ...workingItemsB]
+        let workingItemsB = workingRes.status === 'fulfilled' ? unwrapResponse(workingRes.value) : [];
+        // Đảm bảo workingItemsB là mảng
+        if (!Array.isArray(workingItemsB)) workingItemsB = [];
+        const workingMapped = [...(Array.isArray(workingItemsA) ? workingItemsA : []), ...workingItemsB]
           .map(mapStaffToUI)
           .filter((x) => x.id != null && !x.isManager);
         const uniqueWorking = [];
@@ -474,7 +481,12 @@
         await fetchPageData(selectedDepartment, true);
         console.log('[DEBUG][handleCreateAssignment] Đã reload dữ liệu sau khi tạo ca');
       } catch (err) {
-        setError(err?.response?.data?.message || err?.message || 'Không thể tạo ca làm việc.');
+        // Kiểm tra lỗi 409 (Conflict - trùng ca)
+        if (err?.response?.status === 409) {
+          setError('Nhân viên này đã có ca làm việc vào thời gian này!');
+        } else {
+          setError(err?.response?.data?.message || err?.message || 'Không thể tạo ca làm việc.');
+        }
         console.error('[DEBUG][handleCreateAssignment] Lỗi:', err);
       } finally {
         setSubmitting(false);
@@ -510,6 +522,16 @@
         setProcessingDetail(false);
       }
     };
+
+    // Lấy danh sách bàn khi mount trang (chỉ gọi 1 lần, không ảnh hưởng logic khác)
+    useEffect(() => {
+      getTables()
+        .then(setTables)
+        .catch((err) => {
+          // Có thể log hoặc hiển thị lỗi nếu cần
+          console.error('Lỗi lấy danh sách bàn:', err);
+        });
+    }, []);
 
     return (
       <div className="staff-page-container">
@@ -603,6 +625,7 @@
                       ))}
                     </div>
 
+                    {/* Lọc nhân viên theo vai trò cho từng ca */}
                     <div className="shift-row">
                       <div className="shift-label">
                         <Sun className="shift-icon morning" size={24} />
@@ -611,7 +634,16 @@
                       </div>
                       {weekSchedule.map((day, dayIdx) => (
                         <div key={`morning-${day.key}`} className={`shift-cell ${day.highlight ? 'today' : ''}`}>
-                          {(scheduleData.morning?.[dayIdx] || []).map((empId) => renderEmployeeAvatar(empId))}
+                          {(scheduleData.morning?.[dayIdx] || [])
+                            .filter((empId) => {
+                              if (selectedDepartment === 'all') return true;
+                              const emp = employees.find(e => e.id === empId);
+                              if (!emp) return false;
+                              if (selectedDepartment === 'kitchen') return emp.role === 'Đầu bếp';
+                              if (selectedDepartment === 'service') return emp.role === 'Phục vụ';
+                              return true;
+                            })
+                            .map((empId) => renderEmployeeAvatar(empId))}
                           <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
                             <Plus size={16} />
                           </button>
@@ -627,7 +659,16 @@
                       </div>
                       {weekSchedule.map((day, dayIdx) => (
                         <div key={`afternoon-${day.key}`} className={`shift-cell ${day.highlight ? 'today' : ''}`}>
-                          {(scheduleData.afternoon?.[dayIdx] || []).map((empId) => renderEmployeeAvatar(empId))}
+                          {(scheduleData.afternoon?.[dayIdx] || [])
+                            .filter((empId) => {
+                              if (selectedDepartment === 'all') return true;
+                              const emp = employees.find(e => e.id === empId);
+                              if (!emp) return false;
+                              if (selectedDepartment === 'kitchen') return emp.role === 'Đầu bếp';
+                              if (selectedDepartment === 'service') return emp.role === 'Phục vụ';
+                              return true;
+                            })
+                            .map((empId) => renderEmployeeAvatar(empId))}
                           <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
                             <Plus size={16} />
                           </button>
@@ -641,9 +682,18 @@
                         <p className="shift-name">Tối</p>
                         <p className="shift-time">18:00 - 23:00</p>
                       </div>
-                      {(scheduleData.evening || []).map((assigned, dayIdx) => (
+                      {weekSchedule.map((day, dayIdx) => (
                         <div key={`evening-${weekSchedule[dayIdx].key}`} className={`shift-cell ${weekSchedule[dayIdx].highlight ? 'today' : ''}`}>
-                          {assigned.map((empId) => renderEmployeeAvatar(empId))}
+                          {(scheduleData.evening?.[dayIdx] || [])
+                            .filter((empId) => {
+                              if (selectedDepartment === 'all') return true;
+                              const emp = employees.find(e => e.id === empId);
+                              if (!emp) return false;
+                              if (selectedDepartment === 'kitchen') return emp.role === 'Đầu bếp';
+                              if (selectedDepartment === 'service') return emp.role === 'Phục vụ';
+                              return true;
+                            })
+                            .map((empId) => renderEmployeeAvatar(empId))}
                           <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
                             <Plus size={16} />
                           </button>
@@ -694,7 +744,7 @@
                   </div>
 
                   <div className="sidebar-card rating-card">
-                    <h3 className="sidebar-title">Rating trung bình</h3>
+                    <h3 className="sidebar-title">Đánh giá trung bình</h3>
                     <div className="rating-display">
                       <span className="rating-number">4.8</span>
                       <div className="rating-stars">
@@ -726,12 +776,12 @@
                   <table className="employee-table">
                     <thead>
                       <tr>
-                        <th>Ảnh đại diện & Họ tên</th>
-                        <th>Vai trò</th>
-                        <th>Số điện thoại</th>
-                        <th>Ngày vào làm</th>
-                        <th className="text-center">Rating</th>
-                        <th className="text-right">Thao tác</th>
+                        <th style={{color: '#fff'}}>Ảnh đại diện & Họ tên</th>
+                        <th style={{color: '#fff'}}>Vai trò</th>
+                        <th style={{color: '#fff'}}>Số điện thoại</th>
+                        <th style={{color: '#fff'}}>Ngày vào làm</th>
+                        <th className="text-center" style={{color: '#fff'}}>Đánh giá</th>
+                        <th className="text-right" style={{color: '#fff'}}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -781,9 +831,6 @@
                               >
                                 Chi tiết
                               </button>
-                              <button className="edit-btn" type="button">
-                                <Edit2 size={20} />
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -824,6 +871,7 @@
         {showDetailModal && selectedEmployee && (
           <ShiftDetailModal
             employee={selectedEmployee}
+            replacementCandidates={employees}
             processing={processingDetail}
             onClose={() => {
               setShowDetailModal(false);
@@ -831,7 +879,6 @@
             }}
             onUpdate={handleUpdateShift}
             onDelete={handleDeleteShift}
-            replacementCandidates={employees}
           />
         )}
       </div>

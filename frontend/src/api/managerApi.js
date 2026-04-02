@@ -172,7 +172,7 @@ export async function getAllStaffSchedule() {
     const { label: statusLabel, css: statusClass } = mapStatus(order.status);
     const itemCount = order.items?.length ?? order.orderItems?.length ?? order.totalItems ?? 0;
 
-    // Tiêu đề: với DineIn hiển thị số bàn, Delivery / Takeaway hiển thị tên khách
+    // Tiêu đề: với DineIn hiển thị số bàn, Delivery / Takeaway hiể                                                                     n thị tên khách
     let title = order.tableName ?? order.customerName ?? order.guestName ?? `Đơn #${order.orderId}`;
 
     return {

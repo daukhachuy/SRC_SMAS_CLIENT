@@ -1,3 +1,13 @@
+    // Helper: formatCurrency (moved to component scope)
+    const formatCurrency = (value) => {
+      const n = Number(value);
+      return n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+    };
+  // Helper: getOrderItemsSummary (moved to component scope)
+  const getOrderItemsSummary = (order) => {
+    if (!order.items || !order.items.length) return 'Không có món';
+    return order.items.map((item) => `${item.name} (${item.quantity})`).join(', ');
+  };
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -21,6 +31,21 @@ import {
   Utensils,
   X
 } from 'lucide-react';
+
+// Helper: getDishStatus trả về object cho UI trạng thái món ăn
+const getDishStatus = (status) => {
+  switch (status) {
+    case 'ready':
+      return { cls: 'dish-status-ready', label: 'Sẵn sàng' };
+    case 'served':
+      return { cls: 'dish-status-served', label: 'Đã phục vụ' };
+    case 'preparing':
+      return { cls: 'dish-status-preparing', label: 'Đang làm' };
+    case 'pending':
+    default:
+      return { cls: 'dish-status-pending', label: 'Chờ xử lý' };
+  }
+};
 import '../../styles/WaiterPages.css';
 import { orderAPI } from '../../api/managerApi';
 import { createGuestOrder } from '../../api/orderApi';
@@ -252,39 +277,29 @@ const WaiterOrdersPage = () => {
   const calculateOrderSubtotal = (order) =>
     (order.items || []).reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+
   const calculateOrderTotal = (order) =>
     calculateOrderSubtotal(order) + (order.deliveryFee || 0) - (order.discount || 0);
 
+  // Helper: getStatusClass (moved to component scope)
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'ready':
+        return 'status-ready';
+      case 'preparing':
+        return 'status-preparing';
+      case 'delivering':
+        return 'status-delivering';
+      case 'completed':
+        return 'status-completed';
+      default:
+        return 'status-pending';
+    }
+  };
+
   const openOrderDetail = (order) => {
     setSelectedOrder(order);
-          // Helper: getStatusClass
-          const getStatusClass = (status) => {
-            switch (status) {
-              case 'ready':
-                return 'status-ready';
-              case 'preparing':
-                return 'status-preparing';
-              case 'delivering':
-                return 'status-delivering';
-              case 'completed':
-                return 'status-completed';
-              default:
-                return 'status-pending';
-            }
-          };
-
-          // Helper: getOrderItemsSummary
-          const getOrderItemsSummary = (order) => {
-            if (!order.items || !order.items.length) return 'Không có món';
-            return order.items.map((item) => `${item.name} (${item.quantity})`).join(', ');
-          };
-
-          // Helper: formatCurrency
-          const formatCurrency = (value) => {
-            const n = Number(value);
-            return n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
-          };
-
+    // ...existing code for getOrderItemsSummary and formatCurrency (unchanged)...
     setShowOrderDetailModal(true);
   };
 
@@ -304,10 +319,17 @@ const WaiterOrdersPage = () => {
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  // Hoàn tác: Đóng tất cả modal khi quay lại
   const closeCreateFlow = () => {
     setShowCreateModal(false);
     setShowOrderInfoModal(false);
     setShowTablePickerModal(false);
+  };
+
+  // Quay lại trang khởi tạo đơn hàng mới (bước đầu tiên)
+  const backToCreateOrderStart = () => {
+    setShowOrderInfoModal(false);
+    setShowCreateModal(true);
   };
 
   const toggleTableSelection = (tableId) => {
@@ -798,16 +820,19 @@ const WaiterOrdersPage = () => {
                         }
                       />
                     </div>
-                    <div className="field-group">
-                      <label>Giờ đặt bàn</label>
-                      <input
-                        type="time"
-                        value={orderForm.bookingTime}
-                        onChange={(e) =>
-                          setOrderForm((prev) => ({ ...prev, bookingTime: e.target.value }))
-                        }
-                      />
-                    </div>
+                    {/* Ẩn trường Giờ đặt bàn nếu là khách lẻ */}
+                    {createOrderType !== 'walkin' && (
+                      <div className="field-group">
+                        <label>Giờ đặt bàn</label>
+                        <input
+                          type="time"
+                          value={orderForm.bookingTime}
+                          onChange={(e) =>
+                            setOrderForm((prev) => ({ ...prev, bookingTime: e.target.value }))
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="field-group">
@@ -828,7 +853,7 @@ const WaiterOrdersPage = () => {
             </div>
 
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeCreateFlow}>
+              <button className="btn-cancel" onClick={backToCreateOrderStart}>
                 <ArrowLeft size={16} />
                 Quay lại
               </button>
@@ -972,25 +997,30 @@ const WaiterOrdersPage = () => {
                   const isMain = table.id === tableSelection.mainTableId;
                   const isMerged = tableSelection.mergedTableIds.includes(table.id);
                   const isSelected = isMain || isMerged;
-                  const isOccupied = table.status === 'occupied';
-
+                  // Chuẩn hóa trạng thái bàn
+                  const status = String(table.status || '').trim().toUpperCase();
+                  const isAvailable = status === 'AVAILABLE';
+                  const isOpen = status === 'OPEN';
+                  const isOccupied = isOpen || status === 'OCCUPIED';
+                  // Phân loại màu sắc
+                  let tableClass = 'table-empty';
+                  if (isOccupied) tableClass = 'table-occupied';
+                  else if (isSelected) tableClass = 'table-selected';
+                  // Disable nếu không phải AVAILABLE
+                  const disabled = !isAvailable;
                   return (
                     <button
                       key={table.id}
                       type="button"
-                      className={`table-item ${
-                        isOccupied ? 'table-occupied' : isSelected ? 'table-selected' : 'table-empty'
-                      }`}
-                      disabled={isOccupied}
+                      className={`table-item ${tableClass}`}
+                      disabled={disabled}
                       onClick={() => {
-                        // Nếu chưa có bàn chính, chọn bàn này làm chính
+                        if (disabled) return;
                         if (!tableSelection.mainTableId) {
                           setTableSelection({ mainTableId: table.id, mergedTableIds: [] });
                         } else if (tableSelection.mainTableId === table.id) {
-                          // Bấm lại bàn chính để bỏ chọn
                           setTableSelection({ mainTableId: null, mergedTableIds: [] });
                         } else {
-                          // Nếu đã có bàn chính, chọn bàn này làm ghép hoặc bỏ ghép
                           setTableSelection((prev) => {
                             const merged = prev.mergedTableIds.includes(table.id)
                               ? prev.mergedTableIds.filter((id) => id !== table.id)
@@ -1002,8 +1032,10 @@ const WaiterOrdersPage = () => {
                     >
                       {isMain && <span className="table-badge main">Chính</span>}
                       {isMerged && <span className="table-badge merged">Ghép</span>}
-                      <strong>{table.id}</strong>
+                      <strong>{table.name || table.id}</strong>
                       <span>{table.seats} ghế</span>
+                      <span style={{fontSize:'12px',color:'#888'}}>{table.type}</span>
+                      <span style={{fontSize:'12px',color:'#888'}}>{status === 'AVAILABLE' ? 'Bàn trống' : status === 'OPEN' ? 'Đang có khách' : status}</span>
                     </button>
                   );
                 })}
@@ -1036,10 +1068,17 @@ const WaiterOrdersPage = () => {
                 <ArrowLeft size={16} />
                 Quay lại
               </button>
-              <button className="btn-continue" onClick={() => {
-                setShowTablePickerModal(false);
-                setShowCreateModal(true);
-              }}>
+              <button
+                className="btn-continue"
+                onClick={() => {
+                  if (!tableSelection.mainTableId) {
+                    alert('Vui lòng chọn bàn chính!');
+                    return;
+                  }
+                  setShowTablePickerModal(false);
+                  setShowCreateModal(true);
+                }}
+              >
                 Xác nhận chọn bàn
                 <CheckCircle2 size={18} />
               </button>
