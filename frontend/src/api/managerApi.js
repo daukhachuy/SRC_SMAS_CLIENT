@@ -1,76 +1,69 @@
-  /**
-   * Lấy danh sách nhân viên đang làm việc hôm nay
-   * GET /api/Staff/working-today
-   */
-  export async function getWorkingStaffToday() {
-    try {
-      const response = await instance.get('/Staff/working-today');
-      // Map dữ liệu sang UI
-      const staffList = Array.isArray(response.data)
-        ? response.data.map(mapStaffToUI)
-        : Array.isArray(response.data.data)
-          ? response.data.data.map(mapStaffToUI)
-          : [];
-      return staffList;
-    } catch (error) {
-      console.error('Lỗi lấy danh sách nhân viên đang làm việc:', error);
-      return [];
+
+import instance from './axiosInstance';
+// Export lại các hàm cho các file khác import trực tiếp (đặt sau staffAPI)
+export const getWorkingStaffToday = (...args) => staffAPI.getWorkshift(...args);
+export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
+
+// ===== SCHEDULE API (QUAN TRỌNG) =====
+// ...existing code...
+// ...existing code...
+
+  // ...existing code...
+
+    // ===== SCHEDULE API (QUAN TRỌNG) =====
+   export const staffAPI = {
+  filterByPosition: (positions = []) =>
+    instance.post('/Staff/filter-by-position', positions),
+
+  getNextSevenDays: (positions) => {
+    if (positions && Array.isArray(positions) && positions.length > 0) {
+      const paramStr = positions.join(',');
+      return instance.get(`/Staff/workshift/next-seven-days?positions=${encodeURIComponent(paramStr)}`);
     }
+    return instance.get('/Staff/workshift/next-seven-days');
+  },
+
+  getWorkshift: () => instance.get('/Staff/workshift/all'),
+
+  getStaffWorkToday: () => instance.get('/Staff/workshift/today'),
+
+  getWorkingToday: () => instance.get('/Staff/working-today'),
+
+  getSumWorkshiftThisMonth: () => instance.get('/Staff/sum-workshift-thismonth'),
+
+  getSumTimeworkThisMonth: () => instance.get('/Staff/sum-timework-thismonth'),
+
+  getScheduleWeekKitchenWaiter: (date) =>
+    instance.get('/Staff/schedule-week-kitchen-waiter', { params: { date } }),
+
+  getStaffsList: () => instance.get('/Staff/filter-by-position'),
+
+  createWorkStaff: (payload) => instance.post('/Staff/workshift', payload),
+
+  updateWorkStaff: (workStaffId, payload) =>
+    instance.put(`/Staff/${workStaffId}`, payload),
+
+  deleteWorkStaff: (workStaffId) =>
+    instance.delete(`/Staff/${workStaffId}`),
+};
+
+// ===== CALL API + MAP =====
+export async function getAllStaffSchedule() {
+  try {
+    const res = await staffAPI.getNextSevenDays([]);
+    console.log('[API RAW SCHEDULE]:', res.data);
+
+    const mapped = mapScheduleToUI(res.data);
+
+    console.log('[MAPPED SCHEDULE]:', mapped);
+    return mapped;
+  } catch (error) {
+    console.error('Lỗi lấy lịch nhân viên:', error);
+    return [];
   }
-  import instance from './axiosInstance';
+}
 
-  // ===== SCHEDULE API (QUAN TRỌNG) =====
-  export const scheduleAPI = {
-    getNextSevenDays: (positions = []) =>
-      instance.post('/Staff/next-seven-days', positions),
-  };
-
-  // ===== MAP SCHEDULE (NESTED → FLAT) =====
-  export function mapScheduleToUI(data) {
-    if (!data || !data.shifts) return [];
-
-    const result = [];
-
-    data.shifts.forEach((shift) => {
-      shift.days.forEach((day) => {
-        if (!day.staffs || day.staffs.length === 0) return;
-
-        day.staffs.forEach((staff) => {
-          result.push({
-            id: staff.userId,
-            name: staff.fullName,
-            avatar:
-              staff.avatarUrl?.startsWith('/')
-                ? `${process.env.REACT_APP_API_URL?.replace('/api', '')}${staff.avatarUrl}`
-                : staff.avatarUrl,
-            role: staff.position,
-            date: day.workDay,
-            shiftName: shift.shiftName,
-            startTime: shift.startTime,
-            endTime: shift.endTime,
-          });
-        });
-      });
-    });
-
-    return result;
-  }
-
-  // ===== CALL API + MAP =====
-  export async function getAllStaffSchedule() {
-    try {
-      const res = await scheduleAPI.getNextSevenDays([]);
-      console.log('[API RAW SCHEDULE]:', res.data);
-      const mapped = mapScheduleToUI(res.data);
-      console.log('[MAPPED SCHEDULE]:', mapped);
-      return mapped;
-    } catch (error) {
-      console.error('Lỗi lấy lịch nhân viên:', error);
-      return [];
-    }
-  }
-
-  // ===== OPTIONAL: GROUP THEO NGÀY =====
+// ===== OPTIONAL: GROUP THEO NGÀY =====
   export function groupScheduleByDate(list) {
     const map = {};
     list.forEach((item) => {
@@ -87,13 +80,15 @@
 
   // ===== ORDERS =====
   export const orderAPI = {
+          // API dành riêng cho Waiter lấy đơn của chính mình
+          getPreparingMy: () => instance.get('/order/preparing/my'),
         // POST /api/order/filter - lấy đơn theo staffId và tableCode
         filterByStaffTable: (staffId, tableCode, orderType, status) =>
           instance.post('/order/filter', { staffId, tableCode, orderType, status }),
       // POST /api/order/filter - lấy đơn theo staffId
       filterByStaff: (staffId, orderType, status) =>
         instance.post('/order/filter', { staffId, orderType, status }),
-    // GET /api/order/active - tất cả đơn đang hoạt động
+    // GET /api/order/active - tất cả đơn đang hoạt động (cho manager)
     getActive: () => instance.get('/order/active'),
 
     // GET /api/order/active/type?orderType=DineIn|Takeaway|Delivery|Event
@@ -177,7 +172,7 @@
     const { label: statusLabel, css: statusClass } = mapStatus(order.status);
     const itemCount = order.items?.length ?? order.orderItems?.length ?? order.totalItems ?? 0;
 
-    // Tiêu đề: với DineIn hiển thị số bàn, Delivery / Takeaway hiển thị tên khách
+    // Tiêu đề: với DineIn hiển thị số bàn, Delivery / Takeaway hiể                                                                     n thị tên khách
     let title = order.tableName ?? order.customerName ?? order.guestName ?? `Đơn #${order.orderId}`;
 
     return {
@@ -211,6 +206,9 @@
   export const reservationAPI = {
     // GET /api/reservation
     getAll: () => instance.get('/reservation'),
+
+    // GET /api/reservation/{code} - lấy chi tiết đặt chỗ theo mã
+    getByCode: (code) => instance.get(`/reservation/${code}`),
 
     // GET /api/reservation/desc-created-at
     getAllDescCreatedAt: () => instance.get('/reservation/desc-created-at'),
@@ -578,22 +576,7 @@
     EVENING: 'evening',
   });
 
-  export const staffAPI = {
-    filterByPosition: (positions = []) =>
-      instance.post('/Staff/filter-by-position', positions),
-    getNextSevenDays: (positions = []) =>
-      instance.post('/Staff/next-seven-days', positions),
-    getStaffWorkToday: () => instance.get('/Staff/staff-work-today'),
-    getWorkingToday: () => instance.get('/Staff/working-today'),
-    getWorkshift: () => instance.get('/Staff/workshift'),
-    getSumWorkshiftThisMonth: () => instance.get('/Staff/sum-workshift-thismonth'),
-    getSumTimeworkThisMonth: () => instance.get('/Staff/sum-timework-thismonth'),
-    getScheduleWeekKitchenWaiter: (date) =>
-      instance.get('/Staff/schedule-week-kitchen-waiter', { params: { date } }),
-    createWorkStaff: (payload) => instance.post('/Staff', payload),
-    updateWorkStaff: (workStaffId, payload) => instance.put(`/Staff/${workStaffId}`, payload),
-    deleteWorkStaff: (workStaffId) => instance.delete(`/Staff/${workStaffId}`),
-  };
+
 
   function normalizeRole(position) {
     const role = String(position || '').toLowerCase();

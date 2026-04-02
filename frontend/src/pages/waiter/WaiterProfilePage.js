@@ -1,3 +1,27 @@
+  // Cloudinary config cho upload avatar
+  const cloudName = "dgjkqvbhm";
+  const uploadPreset = "unsigned_preset"; // Đặt đúng tên preset bạn đã tạo trên Cloudinary
+
+  // Hàm upload avatar lên Cloudinary
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.secure_url) {
+        setEditForm((prev) => ({ ...prev, avatarUrl: data.secure_url }));
+      }
+    } catch (err) {
+      alert('Lỗi upload ảnh đại diện!');
+    }
+  };
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   User,
@@ -205,14 +229,14 @@ const WaiterProfilePage = () => {
     setError('');
 
     try {
-      await staffAPI.updateStaffProfile({
+      await staffApi.updateProfile({
         fullname: editForm.fullname || null,
         phone: editForm.phone || null,
         email: editForm.email || null,
         gender: editForm.gender || null,
         dob: editForm.dob || null,
         address: editForm.address || null,
-        avatarUrl: editForm.avatarUrl || null,
+        avatar: editForm.avatarUrl || null, // Đổi thành avatar để backend nhận đúng
         bankAccountNumber: editForm.bankAccountNumber || null,
         bankName: editForm.bankName || null,
       });
@@ -260,9 +284,9 @@ const WaiterProfilePage = () => {
             <div className="waiter-profile-info-grid">
               <div>
                 <p>Họ và tên</p>
-                <strong>{typeof profile.fullname === 'string' ? profile.fullname : (profile.fullname?.toString?.() || 'Đang tải...')}</strong>
+                 <strong>{typeof profile.fullname === 'string' ? profile.fullname : (profile.fullname?.toString?.() || 'Đang tải...')}</strong>
               </div>
-              <div>
+              <div> 
                 <p>Số điện thoại</p>
                 <strong>{typeof profile.phone === 'string' ? profile.phone : (profile.phone?.toString?.() || '---')}</strong>
               </div>
@@ -349,9 +373,10 @@ const WaiterProfilePage = () => {
                       src={editForm.avatarUrl || profile.avatarUrl || `https://i.pravatar.cc/320?u=${encodeURIComponent(editForm.email || profile.email || profile.fullname)}`}
                       alt={profile.fullname}
                     />
-                    <button type="button" className="waiter-profile-avatar-camera-btn" title="Cập nhật URL ảnh đại diện ở trường Avatar URL">
+                    <label className="waiter-profile-avatar-camera-btn" title="Chọn ảnh mới">
                       <Camera size={16} />
-                    </button>
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
+                    </label>
                   </div>
                   <p>Ảnh đại diện</p>
                 </aside>

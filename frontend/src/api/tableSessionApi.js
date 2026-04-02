@@ -33,10 +33,9 @@ function handleApiError(error) {
 ===================================================== */
 export async function openTable(tableCode, userId) {
   try {
-    const response = await instance.post(`/api/tables/${tableCode}/open`, {
-      userId,
-    });
-
+    // Đúng chuẩn: truyền userId qua query, body để trống, encode tableCode
+    const url = `/api/tables/${encodeURIComponent(tableCode)}/open?userId=${userId}`;
+    const response = await instance.post(url);
     console.log('✅ Table opened:', response.data);
     return response.data;
   } catch (error) {
