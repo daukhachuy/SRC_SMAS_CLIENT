@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -7,14 +8,11 @@ import {
   LineElement,
   PointElement,
   ArcElement,
-  BarController,
-  LineController,
-  DoughnutController,
   Tooltip,
   Legend,
-  Filler
 } from 'chart.js';
-import { Chart } from 'react-chartjs-2';
+import { Chart, Line, Doughnut } from 'react-chartjs-2';
+import { fetchAdminDashboardAll, ORDER_STRUCTURE_LABELS } from '../../api/adminDashboardApi';
 import '../../styles/AdminDashboard.css';
 
 ChartJS.register(
@@ -24,219 +22,433 @@ ChartJS.register(
   LineElement,
   PointElement,
   ArcElement,
-  BarController,
-  LineController,
-  DoughnutController,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 );
 
-const statCards = [
-  { title: 'Tổng doanh thu', value: '1.2 tỷ VND', sparkline: [10, 15, 8, 25, 18, 22] },
-  { title: 'Chi phí nhập kho', value: '450tr VND', sparkline: [20, 10, 25, 15, 30, 20] },
-  { title: 'Hợp đồng mới', value: '12', sparkline: [5, 20, 15, 25, 10, 30] },
-  { title: 'Khách hàng mới', value: '156', sparkline: [12, 18, 14, 28, 20, 25] }
-];
-
-const revenueCostLabels = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
-const revenueData = [800, 950, 700, 1200, 1100, 1400];
-const costData = [400, 450, 380, 500, 480, 600];
-
-const orderStructureData = {
-  labels: ['Tại chỗ', 'Mang về', 'Giao hàng', 'Sự kiện'],
-  values: [45, 20, 25, 10]
-};
-
-const recentTransactions = [
-  { code: '#TK-9021', supplier: 'Nông trại xanh Đà Lạt', amount: '45,000,000 ₫', status: 'Hoàn thành', statusClass: 'done' },
-  { code: '#TK-8942', supplier: 'Thủy hải sản Miền Đông', amount: '32,500,000 ₫', status: 'Chờ thanh toán', statusClass: 'pending' },
-  { code: '#TK-8851', supplier: 'CP Food Logistics', amount: '12,800,000 ₫', status: 'Hoàn thành', statusClass: 'done' },
-  { code: '#TK-8840', supplier: 'Rượu vang Hoàng Gia', amount: '85,200,000 ₫', status: 'Đã hủy', statusClass: 'cancelled' },
-  { code: '#TK-8711', supplier: 'Công ty Bao bì Hợp Nhất', amount: '5,400,000 ₫', status: 'Hoàn thành', statusClass: 'done' }
-];
-
-const chartOptions = {
+const sparkOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top',
-      align: 'end'
-    }
-  },
-  scales: {
-    y: {
-      beginAtZero: true,
-      grid: { color: '#f3f4f6' }
-    },
-    x: {
-      grid: { display: false }
-    }
-  }
+  plugins: { legend: { display: false }, tooltip: { enabled: false } },
+  scales: { x: { display: false }, y: { display: false } },
 };
 
-const Sparkline = ({ data }) => {
-  const sparklineData = useMemo(() => ({
-    labels: new Array(data.length).fill(''),
-    datasets: [{
-      data: data,
+const sparkData = (values) => ({
+  labels: values.map(() => ''),
+  datasets: [
+    {
+      data: values,
       borderColor: '#FF6C1F',
       borderWidth: 2,
       pointRadius: 0,
       fill: false,
-      tension: 0.4
-    }]
-  }), [data]);
+      tension: 0.4,
+    },
+  ],
+});
 
-  return (
-    <div className="stat-card-sparkline">
-      <Chart
-        type="line"
-        data={sparklineData}
-        options={{
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          scales: { x: { display: false }, y: { display: false } }
-        }}
-      />
-    </div>
-  );
+const DONUT_COLORS = ['#FF6C1F', '#FF8F50', '#FFB281', '#FFD4B3'];
+
+function statusClass(key) {
+  if (key === 'pending') return 'status-badge status-pending';
+  if (key === 'cancelled') return 'status-badge status-cancelled';
+  return 'status-badge status-done';
+}
+
+/** Số từ API summary (newContracts / newCustomers); null = chưa có dữ liệu */
+function formatSummaryCount(v) {
+  if (v == null) return '—';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString('vi-VN');
+}
+
+const currentPeriod = () => {
+  const d = new Date();
+  return { month: d.getMonth() + 1, year: d.getFullYear() };
 };
 
+const CHART_MONTH_OPTIONS = [3, 6, 12];
+
 const AdminDashboard = () => {
-  const revenueCostChartData = useMemo(
-    () => ({
-      labels: revenueCostLabels,
+  const [loading, setLoading] = useState(true);
+  const [bundle, setBundle] = useState(null);
+  const [period, setPeriod] = useState(currentPeriod);
+  const [revenueChartMonths, setRevenueChartMonths] = useState(6);
+  const [orderPeriod, setOrderPeriod] = useState({ month: currentPeriod().month, year: currentPeriod().year });
+  const [summaryOffset, setSummaryOffset] = useState(0);
+  const summaryTotal = 4; // doanh thu, chi phí, hợp đồng, khách hàng
+
+  const handleSummaryNext = () => {
+    setSummaryOffset((o) => (o + 1) % summaryTotal);
+  };
+  const handleSummaryPrev = () => {
+    setSummaryOffset((o) => (o - 1 + summaryTotal) % summaryTotal);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchAdminDashboardAll({
+      ...period,
+      chartMonths: revenueChartMonths,
+      orderMonth: orderPeriod.month,
+      orderYear: orderPeriod.year,
+    }).then((d) => {
+      if (!cancelled) {
+        setBundle(d);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [period.month, period.year, revenueChartMonths, orderPeriod.month, orderPeriod.year]);
+
+  const summary = bundle?.summary;
+  const revenue = bundle?.revenue;
+  const orders = bundle?.orders;
+  const txs = bundle?.txs;
+  const partialErrors = bundle?.errors?.filter(Boolean) || [];
+
+  const comboData = useMemo(() => {
+    if (!revenue) return { labels: [], datasets: [] };
+    return {
+      labels: revenue.labels,
       datasets: [
         {
+          type: 'bar',
           label: 'Doanh thu',
-          data: revenueData,
+          data: revenue.revenues,
           backgroundColor: '#FF6C1F',
           borderRadius: 6,
-          order: 2
+          order: 2,
         },
         {
-          label: 'Chi phí',
-          data: costData,
           type: 'line',
+          label: 'Chi phí',
+          data: revenue.costs,
           borderColor: '#2D3748',
           backgroundColor: 'rgba(45, 55, 72, 0.1)',
           fill: false,
           tension: 0.4,
-          order: 1
-        }
-      ]
+          order: 1,
+        },
+      ],
+    };
+  }, [revenue]);
+
+  const comboOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', align: 'end' },
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+        x: { grid: { display: false } },
+      },
     }),
     []
   );
 
-  const orderStructureChartData = useMemo(
-    () => ({
-      labels: orderStructureData.labels,
+  const donutData = useMemo(() => {
+    const labels = orders?.labels?.length ? orders.labels : ORDER_STRUCTURE_LABELS;
+    const vals = orders?.values?.length ? [...orders.values] : [0, 0, 0, 0];
+    while (vals.length < labels.length) vals.push(0);
+    const data = vals.slice(0, labels.length);
+    return {
+      labels,
       datasets: [
         {
-          data: orderStructureData.values,
-          backgroundColor: ['#FF6C1F', '#FF8F50', '#FFB281', '#FFD4B3'],
+          data,
+          backgroundColor: DONUT_COLORS.slice(0, labels.length),
           borderWidth: 2,
-          hoverOffset: 4
-        }
-      ]
+          hoverOffset: 4,
+        },
+      ],
+    };
+  }, [orders]);
+
+  const donutOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      cutout: '70%',
     }),
     []
   );
 
-  const handleExportReport = () => {
-    window.alert('Chức năng xuất báo cáo sẽ được tích hợp sau.');
-  };
+  if (loading && !bundle) {
+    return (
+      <div className="admin-dashboard" style={{ padding: '2rem', textAlign: 'center' }}>
+        Đang tải dữ liệu dashboard…
+      </div>
+    );
+  }
 
   return (
     <div className="admin-dashboard">
+      {partialErrors.length > 0 && (
+        <div
+          style={{
+            marginBottom: '1rem',
+            padding: '0.75rem 1rem',
+            fontSize: '0.8125rem',
+            color: '#92400e',
+            background: '#fef3c7',
+            borderRadius: '0.5rem',
+          }}
+        >
+          Một số nguồn dữ liệu không tải được: {partialErrors.join(' · ')}
+        </div>
+      )}
+
       <header className="dashboard-header">
         <div>
           <h1>Tổng quan hệ thống</h1>
           <p>Chào mừng quay trở lại, đây là dữ liệu mới nhất hôm nay.</p>
         </div>
-        <button type="button" className="admin-export-btn" onClick={handleExportReport}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+        <div className="dashboard-header-actions">
+          <label className="dashboard-period-label" htmlFor="dash-month">
+            <span className="dashboard-period-text">Kỳ</span>
+            <select
+              id="dash-month"
+              className="chart-select dashboard-period-select"
+              value={period.month}
+              onChange={(e) => setPeriod((p) => ({ ...p, month: Number(e.target.value) }))}
+              aria-label="Tháng"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  Tháng {m}
+                </option>
+              ))}
+            </select>
+            <select
+              className="chart-select dashboard-period-select"
+              value={period.year}
+              onChange={(e) => setPeriod((p) => ({ ...p, year: Number(e.target.value) }))}
+              aria-label="Năm"
+            >
+              {[0, 1, 2].map((offset) => {
+                const y = currentPeriod().year - offset;
+                return (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        <button type="button" className="admin-export-btn" onClick={() => window.print()}>
+          <svg style={{ width: 16, height: 16, marginRight: 8 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
           </svg>
           Xuất báo cáo
         </button>
+        </div>
       </header>
 
-      <section className="stats-grid">
-        {statCards.map((card) => (
-          <div key={card.title} className="stat-card custom-shadow">
-            <div className="flex flex-col">
-              <span className="stat-card-title">{card.title}</span>
-              <h3 className="stat-card-value">{card.value}</h3>
-              <Sparkline data={card.sparkline} />
-            </div>
+      <section className="summary-row" aria-label="Chỉ số tổng quan">
+        <button
+          type="button"
+          className="summary-nav summary-nav--prev"
+          onClick={handleSummaryPrev}
+          aria-label="Trước"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+
+        <div className="summary-viewport">
+          <div
+            className="summary-track"
+            style={{
+              transform: `translateX(calc(-${summaryOffset} * ((100cqi - 2 * var(--summary-gap)) / 3.08 + var(--summary-gap))))`,
+            }}
+          >
+            {/* 8 cards: 4 + 4 lặp — mỗi bước next dịch 1 thẻ + gap (đồng bộ CSS .summary-card) */}
+            {[...Array(8)].map((_, i) => {
+              const idx = i % summaryTotal;
+              const cards = [
+                {
+                  label: 'Tổng doanh thu',
+                  value: summary?.totalRevenueDisplay ?? '—',
+                  spark: summary && (
+                    <Line key={`sp-rev-${i}`} data={sparkData(summary.revenueSparkline)} options={sparkOptions} />
+                  ),
+                },
+                {
+                  label: 'Chi phí nhập kho',
+                  value: summary?.warehouseCostsDisplay ?? '—',
+                  spark: summary && (
+                    <Line key={`sp-cost-${i}`} data={sparkData(summary.costsSparkline)} options={sparkOptions} />
+                  ),
+                },
+                {
+                  label: 'Hợp đồng mới',
+                  value: formatSummaryCount(summary?.newContracts),
+                  spark: summary && (
+                    <Line key={`sp-ctr-${i}`} data={sparkData(summary.contractsSparkline)} options={sparkOptions} />
+                  ),
+                },
+                {
+                  label: 'Khách hàng mới',
+                  value: formatSummaryCount(summary?.newCustomers),
+                  spark: summary && (
+                    <Line key={`sp-cus-${i}`} data={sparkData(summary.customersSparkline)} options={sparkOptions} />
+                  ),
+                },
+              ];
+              const c = cards[idx];
+              return (
+                <div key={i} className="summary-card">
+                  <span className="stat-card-title">{c.label}</span>
+                  <p className="stat-card-value">{c.value}</p>
+                  <div className="stat-card-sparkline">{c.spark}</div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
+
+        <button
+          type="button"
+          className="summary-nav summary-nav--next"
+          onClick={handleSummaryNext}
+          aria-label="Sau"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
       </section>
 
       <section className="charts-row">
-        <div className="chart-card custom-shadow">
+        <div className="chart-card">
           <div className="chart-card-header">
-            <h3>Biểu đồ Doanh thu &amp; Chi phí</h3>
-            <span className="chart-card-sub">Dữ liệu 6 tháng gần nhất</span>
-          </div>
-          <div className="chart-wrapper">
-            <Chart type="bar" data={revenueCostChartData} options={chartOptions} />
-          </div>
-        </div>
-
-        <div className="chart-card custom-shadow">
-          <div className="chart-card-header">
-            <h3>Cơ cấu đơn hàng</h3>
-            <select className="chart-select">
-              <option>Tháng này</option>
-              <option>Tháng trước</option>
+            <div>
+              <h3>Biểu đồ Doanh thu &amp; Chi phí</h3>
+              <span className="chart-card-sub">
+                Năm {period.year} · {revenueChartMonths} tháng gần nhất
+              </span>
+            </div>
+            <select
+              className="chart-select"
+              aria-label="Số tháng trên biểu đồ doanh thu"
+              value={revenueChartMonths}
+              onChange={(e) => setRevenueChartMonths(Number(e.target.value))}
+            >
+              {CHART_MONTH_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {m} tháng
+                </option>
+              ))}
             </select>
           </div>
+          <div className="chart-wrapper">
+            {revenue && comboData.labels.length > 0 ? (
+              <Chart type="bar" data={comboData} options={comboOptions} />
+            ) : (
+              !loading && (
+                <div className="chart-empty-hint" style={{ padding: '2rem', textAlign: 'center', color: '#6b7280', fontSize: '0.875rem' }}>
+                  Chưa có dữ liệu biểu đồ cho kỳ này hoặc API chưa trả về mảng tháng.
+                </div>
+              )
+            )}
+          </div>
+        </div>
+        <div className="chart-card">
+          <div className="chart-card-header">
+            <div>
+              <h3>Cơ cấu đơn hàng</h3>
+              <span className="chart-card-sub">
+                Tháng {orderPeriod.month}/{orderPeriod.year}
+                {orders?.total != null &&
+                  ` · Tổng ${Number(orders.total).toLocaleString('vi-VN')} đơn`}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+              <select
+                className="chart-select"
+                aria-label="Tháng cơ cấu đơn"
+                value={orderPeriod.month}
+                onChange={(e) =>
+                  setOrderPeriod((p) => ({ ...p, month: Number(e.target.value) }))
+                }
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>
+                    Tháng {m}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="chart-select"
+                aria-label="Năm cơ cấu đơn"
+                value={orderPeriod.year}
+                onChange={(e) =>
+                  setOrderPeriod((p) => ({ ...p, year: Number(e.target.value) }))
+                }
+              >
+                {[0, 1, 2].map((offset) => {
+                  const y = currentPeriod().year - offset;
+                  return (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
           <div className="donut-wrapper">
-            <Chart
-              type="doughnut"
-              data={orderStructureChartData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                cutout: '70%'
-              }}
-            />
+            {!loading &&
+            (orders?.values || []).reduce((a, b) => a + Number(b || 0), 0) === 0 ? (
+              <div className="chart-empty-hint" style={{ padding: '2rem', textAlign: 'center', color: '#6b7280', fontSize: '0.875rem' }}>
+                Không có đơn trong kỳ.
+              </div>
+            ) : (
+              <Doughnut data={donutData} options={donutOptions} />
+            )}
           </div>
         </div>
       </section>
 
-      <section className="table-card custom-shadow">
+      <section className="table-card">
         <div className="table-card-header">
           <h3>Giao dịch nhập kho gần đây</h3>
-          <a href="/admin/inventory">Xem tất cả</a>
+          <Link to="/admin/inventory">Xem tất cả</Link>
         </div>
         <div className="table-wrapper">
           <table className="admin-table">
             <thead>
               <tr>
-                <th>MÃ GIAO DỊCH</th>
-                <th>NHÀ CUNG CẤP</th>
-                <th>TỔNG TIỀN</th>
-                <th>TRẠNG THÁI</th>
+                <th>Mã giao dịch</th>
+                <th>Nhà cung cấp</th>
+                <th>Tổng tiền</th>
+                <th>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              {recentTransactions.map((row) => (
-                <tr key={row.code}>
-                  <td className="font-medium">{row.code}</td>
-                  <td>{row.supplier}</td>
-                  <td className="amount">{row.amount}</td>
+              {(txs || []).map((row, idx) => (
+                <tr key={`${row.code}-${idx}`}>
+                  <td style={{ fontWeight: 600, color: '#111827' }}>{row.code}</td>
+                  <td>{row.supplier || '—'}</td>
+                  <td className="amount">
+                    {Number(row.amount || 0).toLocaleString('vi-VN')} đ
+                  </td>
                   <td>
-                    <span className={`status-badge status-${row.statusClass}`}>
-                      {row.status}
-                    </span>
+                    <span className={statusClass(row.statusKey)}>{row.statusLabel}</span>
                   </td>
                 </tr>
               ))}

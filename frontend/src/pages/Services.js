@@ -11,6 +11,20 @@ import { isAuthenticated } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 
+/** Tháng lịch hiển thị T2–CN: trả về mảng (null ô trống | Date). month: 0–11 */
+function getMonthDays(year, month) {
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const dow = first.getDay();
+  const startPad = dow === 0 ? 6 : dow - 1;
+  const cells = [];
+  for (let i = 0; i < startPad; i += 1) cells.push(null);
+  for (let d = 1; d <= last.getDate(); d += 1) {
+    cells.push(new Date(year, month, d));
+  }
+  return cells;
+}
+
 const Services = () => {
   const navigate = useNavigate();
   const [showAuthRequired, setShowAuthRequired] = useState(false);

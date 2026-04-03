@@ -146,14 +146,11 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Redirect old admin URLs to manager */}
-        <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
-
-        {/* Admin pages - Không có authorization (permissions tạm tắt) */}
+        {/* Admin pages */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="orders" element={<AdminDashboard />} />
-          <Route path="reservations" element={<AdminDashboard />} />
+          <Route path="orders" element={<div style={{ padding: '2rem', textAlign: 'center' }}>Trang Đơn hàng đang phát triển…</div>} />
+          <Route path="reservations" element={<div style={{ padding: '2rem', textAlign: 'center' }}>Trang Đặt chỗ đang phát triển…</div>} />
           <Route path="tables" element={<AdminTableMap />} />
           <Route path="menu" element={<AdminMenuManagement />} />
           <Route path="inventory" element={<AdminInventoryPage />} />

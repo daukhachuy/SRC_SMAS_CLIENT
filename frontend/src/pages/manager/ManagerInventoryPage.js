@@ -32,6 +32,77 @@ import {
   createImport,
   getNewBatchCode
 } from '../../api/inventoryApi';
+import {
+  getFoodCategories,
+  normalizeFoodCategoryPayload,
+  resolveFoodImageUrl,
+  getComboLists,
+  getBuffetLists,
+  updateFoodStatus,
+  updateBuffetStatus
+} from '../../api/foodApi';
+
+const FIXED_MENU_IMG = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+
+const formatVnd = (n) => {
+  if (n == null || n === '') return '0đ';
+  const num = Number(n);
+  if (Number.isNaN(num)) return '0đ';
+  return `${num.toLocaleString('vi-VN')}đ`;
+};
+
+const normalizeFoodRow = (raw) => {
+  const rawId = raw.foodId ?? raw.id;
+  const id = Number.isFinite(Number(rawId)) ? Number(rawId) : rawId;
+  const available = raw.isAvailable !== false;
+  return {
+    kind: 'food',
+    id,
+    name: raw.foodName || raw.name || '',
+    description: raw.description || '',
+    priceLine: formatVnd(raw.price),
+    image: resolveFoodImageUrl(raw.image),
+    state: available ? 'active' : 'sold-out',
+    available
+  };
+};
+
+const normalizeComboRow = (raw) => {
+  const id = raw.comboId ?? raw.id;
+  const available = raw.isAvailable !== false;
+  return {
+    kind: 'combo',
+    id,
+    name: raw.comboName || raw.name || '',
+    description: raw.description || '',
+    priceLine: formatVnd(raw.comboPrice ?? raw.price),
+    image: resolveFoodImageUrl(raw.image),
+    state: available ? 'active' : 'sold-out',
+    available,
+    isAvailable: available
+  };
+};
+
+const normalizeBuffetRow = (raw) => {
+  const rawId = raw.buffetId ?? raw.id;
+  const id = Number.isFinite(Number(rawId)) ? Number(rawId) : rawId;
+  const available = raw.isAvailable !== false;
+  const adult = raw.mainPrice ?? raw.adultPrice ?? raw.price ?? 0;
+  const child = raw.childrenPrice ?? raw.childPrice ?? 0;
+  return {
+    kind: 'buffet',
+    id,
+    name: raw.name || '',
+    description: raw.description || '',
+    nlPriceText: formatVnd(adult),
+    tePriceText: formatVnd(child),
+    priceLine: `NL ${formatVnd(adult)} · TE ${formatVnd(child)}`,
+    image: resolveFoodImageUrl(raw.image),
+    state: available ? 'active' : 'sold-out',
+    available,
+    isAvailable: available
+  };
+};
 
 const materialsData = [
   {
@@ -134,26 +205,6 @@ const logsData = [
   }
 ];
 
-const menuManageData = {
-  menu: [
-    { name: 'Phở Bò Tái Lăn', price: '65.000đ', state: 'active' },
-    { name: 'Sushi Cá Hồi', price: '120.000đ', state: 'sold-out' },
-    { name: 'Bún Đậu Mắm Tôm', price: '55.000đ', state: 'active' },
-    { name: 'Salad Ức Gà', price: '45.000đ', state: 'active' }
-  ],
-  combo: [
-    { name: 'Combo Gia đình', price: '285.000đ', state: 'active' },
-    { name: 'Combo Tiết kiệm', price: '115.000đ', state: 'active' },
-    { name: 'Combo Bạn bè', price: '390.000đ', state: 'sold-out' }
-  ],
-  buffet: [
-    { name: 'Buffet Lẩu 199k', price: '199.000đ', state: 'active' },
-    { name: 'Buffet Nướng BBQ', price: '299.000đ', state: 'sold-out' },
-    { name: 'Buffet Hải sản cao cấp', price: '499.000đ', state: 'active' },
-    { name: 'Buffet Chay Thuần Việt', price: '159.000đ', state: 'active' }
-  ]
-};
-
 const ManagerInventoryPage = () => {
   const [activeTab, setActiveTab] = useState('materials');
   const [searchQuery, setSearchQuery] = useState('');
@@ -165,6 +216,22 @@ const ManagerInventoryPage = () => {
   const [returnSubmitting, setReturnSubmitting] = useState(false);
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [menuModalTab, setMenuModalTab] = useState('menu');
+  const [catalogFoods, setCatalogFoods] = useState([]);
+  const [catalogCombos, setCatalogCombos] = useState([]);
+  const [catalogBuffets, setCatalogBuffets] = useState([]);
+  const [menuCatalogLoading, setMenuCatalogLoading] = useState(false);
+  const [menuCatalogError, setMenuCatalogError] = useState(null);
+  const [foodTogglingId, setFoodTogglingId] = useState(null);
+  const [buffetTogglingId, setBuffetTogglingId] = useState(null);
+  /** Optimistic UI: foodId → isAvailable (chờ API; lỗi thì xóa key để revert) */
+  const [foodAvailOverride, setFoodAvailOverride] = useState({});
+  /** Optimistic UI: buffetId → isAvailable (tách khỏi food để trùng id) */
+  const [buffetAvailOverride, setBuffetAvailOverride] = useState({});
+  const [menuPage, setMenuPage] = useState(1);
+  const MENU_PAGE_SIZE = 6;
+  const [menuSearchQuery, setMenuSearchQuery] = useState('');
+  /** Mặc định «Tất cả» — tắt món → API → món biến mất (lọc bỏ sold-out khi default selling) */
+  const [menuStatusFilter, setMenuStatusFilter] = useState('all');
   const [exportQty, setExportQty] = useState('');
   const [exportReason, setExportReason] = useState('');
   const [exportTargetBatch, setExportTargetBatch] = useState(null);
@@ -234,9 +301,139 @@ const ManagerInventoryPage = () => {
     }
   };
 
+  const fetchMenuCatalog = async () => {
+    setMenuCatalogLoading(true);
+    setMenuCatalogError(null);
+    try {
+      const [foodRes, comboRes, buffetRes] = await Promise.allSettled([
+        getFoodCategories(),
+        getComboLists(),
+        getBuffetLists()
+      ]);
+
+      if (foodRes.status === 'fulfilled') {
+        const arr = normalizeFoodCategoryPayload(foodRes.value);
+        setCatalogFoods(arr.map(normalizeFoodRow));
+      } else {
+        setCatalogFoods([]);
+      }
+
+      if (comboRes.status === 'fulfilled') {
+        const raw = comboRes.value;
+        const arr = Array.isArray(raw) ? raw : raw?.$values || [];
+        setCatalogCombos(arr.map(normalizeComboRow));
+      } else {
+        setCatalogCombos([]);
+      }
+
+      if (buffetRes.status === 'fulfilled') {
+        const raw = buffetRes.value;
+        const arr = Array.isArray(raw) ? raw : raw?.$values || [];
+        setCatalogBuffets(arr.map(normalizeBuffetRow));
+      } else {
+        setCatalogBuffets([]);
+      }
+      setFoodAvailOverride({});
+      setBuffetAvailOverride({});
+    } catch (err) {
+      console.error('fetchMenuCatalog:', err);
+      setMenuCatalogError(err.message || 'Không tải được thực đơn');
+    } finally {
+      setMenuCatalogLoading(false);
+    }
+  };
+
+  const catalogFoodsEffective = useMemo(() => {
+    return catalogFoods.map((f) => {
+      const key = Number.isFinite(Number(f.id)) ? Number(f.id) : f.id;
+      const o = foodAvailOverride[key];
+      if (o === undefined) return f;
+      return { ...f, available: o, state: o ? 'active' : 'sold-out', isAvailable: o };
+    });
+  }, [catalogFoods, foodAvailOverride]);
+
+  const catalogCombosEffective = useMemo(() => catalogCombos, [catalogCombos]);
+
+  const catalogBuffetsEffective = useMemo(() => {
+    return catalogBuffets.map((b) => {
+      const key = Number.isFinite(Number(b.id)) ? Number(b.id) : b.id;
+      const o = buffetAvailOverride[key];
+      if (o === undefined) return b;
+      return { ...b, available: o, state: o ? 'active' : 'sold-out', isAvailable: o };
+    });
+  }, [catalogBuffets, buffetAvailOverride]);
+
+  const handleFoodToggle = async (row) => {
+    if (row.kind !== 'food' || row.id == null) return;
+    const id = Number(row.id);
+    if (!Number.isFinite(id)) return;
+    const nextAvailable = !row.available;
+    setFoodAvailOverride((prev) => ({ ...prev, [id]: nextAvailable }));
+    setFoodTogglingId(id);
+    setMenuCatalogError(null);
+    try {
+      const res = await updateFoodStatus(id);
+      if (res?.msgCode && res.msgCode !== 'MSG_022') {
+        console.warn('msgCode không phải MSG_022:', res.msgCode);
+      }
+      await fetchMenuCatalog();
+    } catch (err) {
+      setFoodAvailOverride((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      setMenuCatalogError(err.message || 'Không thể cập nhật trạng thái món');
+    } finally {
+      setFoodTogglingId(null);
+    }
+  };
+
+  const handleBuffetToggle = async (row) => {
+    if (row.kind !== 'buffet' || row.id == null) return;
+    const id = Number(row.id);
+    if (!Number.isFinite(id)) return;
+    const nextAvailable = !row.available;
+    setBuffetAvailOverride((prev) => ({ ...prev, [id]: nextAvailable }));
+    setBuffetTogglingId(id);
+    setMenuCatalogError(null);
+    try {
+      const res = await updateBuffetStatus(id);
+      if (res?.msgCode && res.msgCode !== 'MSG_022') {
+        console.warn('Buffet status msgCode không phải MSG_022:', res.msgCode);
+      }
+      await fetchMenuCatalog();
+    } catch (err) {
+      setBuffetAvailOverride((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      setMenuCatalogError(err.message || 'Không thể cập nhật trạng thái buffet');
+    } finally {
+      setBuffetTogglingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  useEffect(() => {
+    fetchMenuCatalog();
+  }, []);
+
+  useEffect(() => {
+    setMenuPage(1);
+  }, [menuModalTab, menuSearchQuery, menuStatusFilter]);
+
+  useEffect(() => {
+    if (showMenuModal) {
+      setMenuStatusFilter('all');
+      setMenuPage(1);
+      setMenuSearchQuery('');
+    }
+  }, [showMenuModal]);
 
   const openImportModal = async () => {
     setShowImportModal(true);
@@ -302,20 +499,52 @@ const ManagerInventoryPage = () => {
     }));
   };
 
+  /** GET /api/inventory/logs: inventoryLogId, ingredientName, unitOfMeasurement, batchCode, action, oldQuantity, newQuantity, details, timestamp, fullname */
   const transformLogs = (data) => {
     if (!data) return [];
     const arr = Array.isArray(data) ? data : data.$values || [];
-    return arr.map(item => ({
-      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '',
-      time: item.createdAt ? new Date(item.createdAt).toLocaleTimeString('vi-VN') : '',
-      type: item.action === 'Import' ? 'import' : 'export',
-      material: item.ingredientName || '',
-      quantity: (item.action === 'Import' ? '+' : '-') + (Math.abs((item.newQuantity || 0) - (item.oldQuantity || 0))),
-      unit: item.unitOfMeasurement || 'kg',
-      reason: item.note || '',
-      operator: 'NV. Staff',
-      avatar: 'S'
-    }));
+
+    const isImportAction = (action) => {
+      const s = String(action ?? '').trim().toLowerCase();
+      if (!s) return null;
+      if (s.includes('import') || s.includes('nhập') || s === 'in' || s === '1') return true;
+      if (s.includes('export') || s.includes('xuất') || s === 'out' || s === '2') return false;
+      return null;
+    };
+
+    return arr.map((item) => {
+      const tsRaw = item.timestamp ?? item.createdAt;
+      const d = tsRaw ? new Date(tsRaw) : null;
+      const oldQ = Number(item.oldQuantity) || 0;
+      const newQ = Number(item.newQuantity) || 0;
+      const delta = newQ - oldQ;
+      const magnitude = Math.abs(delta);
+      const fromAction = isImportAction(item.action);
+      const type =
+        fromAction !== null
+          ? (fromAction ? 'import' : 'export')
+          : delta >= 0
+            ? 'import'
+            : 'export';
+      const quantity = `${type === 'import' ? '+' : '-'}${magnitude}`;
+
+      const fullname = String(item.fullname || '').trim();
+      const avatar = fullname ? fullname.charAt(0).toUpperCase() : '?';
+
+      return {
+        id: item.inventoryLogId ?? item.id,
+        batchCode: item.batchCode || '',
+        date: d ? d.toLocaleDateString('vi-VN') : '',
+        time: d ? d.toLocaleTimeString('vi-VN') : '',
+        type,
+        material: item.ingredientName || '',
+        quantity,
+        unit: item.unitOfMeasurement || 'kg',
+        reason: item.details ?? item.note ?? '',
+        operator: fullname || '—',
+        avatar
+      };
+    });
   };
 
   // Mock data fallback
@@ -572,23 +801,116 @@ const ManagerInventoryPage = () => {
   const filteredMaterials = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return materialsData;
-    return materialsData.filter((item) => item.name.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
+    return materialsData.filter((item) => {
+      const name = String(item.name ?? '').toLowerCase();
+      const idStr = String(item.id ?? '').toLowerCase();
+      return name.includes(q) || idStr.includes(q);
+    });
   }, [searchQuery, materialsData]);
 
   const filteredBatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return batchesData;
-    return batchesData.filter((item) => item.material.toLowerCase().includes(q) || item.batchCode.toLowerCase().includes(q));
+    return batchesData.filter((item) => {
+      const mat = String(item.material ?? '').toLowerCase();
+      const code = String(item.batchCode ?? '').toLowerCase();
+      return mat.includes(q) || code.includes(q);
+    });
   }, [searchQuery, batchesData]);
 
   const filteredLogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return logsData;
-    return logsData.filter((item) => item.material.toLowerCase().includes(q) || item.reason.toLowerCase().includes(q));
+    return logsData.filter((item) => {
+      const mat = String(item.material ?? '').toLowerCase();
+      const reason = String(item.reason ?? '').toLowerCase();
+      const batch = String(item.batchCode ?? '').toLowerCase();
+      const op = String(item.operator ?? '').toLowerCase();
+      return mat.includes(q) || reason.includes(q) || batch.includes(q) || op.includes(q);
+    });
   }, [searchQuery, logsData]);
 
   /** Chỉ 2 log mới nhất cho sidebar "Nhật ký Kho gần đây" */
   const recentLogs = useMemo(() => filteredLogs.slice(0, 2), [filteredLogs]);
+
+  const filteredModalItems = useMemo(() => {
+    let list =
+      menuModalTab === 'menu'
+        ? catalogFoodsEffective
+        : menuModalTab === 'combo'
+          ? catalogCombosEffective
+          : catalogBuffetsEffective;
+    const q = menuSearchQuery.trim().toLowerCase();
+    return list.filter((item) => {
+      const name = (item.name || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      if (q) {
+        if (menuModalTab === 'buffet') {
+          if (!name.includes(q)) return false;
+        } else if (!name.includes(q) && !desc.includes(q)) {
+          return false;
+        }
+      }
+      if (menuStatusFilter === 'selling' && item.state === 'sold-out') return false;
+      if (menuStatusFilter === 'soldout' && item.state !== 'sold-out') return false;
+      return true;
+    });
+  }, [menuModalTab, menuSearchQuery, menuStatusFilter, catalogFoodsEffective, catalogCombosEffective, catalogBuffetsEffective]);
+
+  const modalTotalPages = Math.max(1, Math.ceil(filteredModalItems.length / MENU_PAGE_SIZE) || 1);
+
+  useEffect(() => {
+    setMenuPage((p) => Math.min(p, modalTotalPages));
+  }, [modalTotalPages]);
+
+  const modalPageItems = useMemo(() => {
+    const start = (menuPage - 1) * MENU_PAGE_SIZE;
+    return filteredModalItems.slice(start, start + MENU_PAGE_SIZE);
+  }, [filteredModalItems, menuPage]);
+
+  /** Trang 1 … 12 (có …) cho thanh phân trang modal thực đơn */
+  const menuModalPageNumbers = useMemo(() => {
+    const total = modalTotalPages;
+    const cur = menuPage;
+    if (total <= 1) return [1];
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const set = new Set([1, total]);
+    for (let d = -2; d <= 2; d++) {
+      const p = cur + d;
+      if (p >= 1 && p <= total) set.add(p);
+    }
+    const sorted = [...set].sort((a, b) => a - b);
+    const out = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+        out.push('ellipsis');
+      }
+      out.push(sorted[i]);
+    }
+    return out;
+  }, [modalTotalPages, menuPage]);
+
+  const servingCount = useMemo(
+    () => catalogFoodsEffective.filter((f) => f.available).length,
+    [catalogFoodsEffective]
+  );
+  const suspendedCount = useMemo(
+    () => catalogFoodsEffective.filter((f) => !f.available).length,
+    [catalogFoodsEffective]
+  );
+  const menuPreviewRows = useMemo(
+    () => catalogFoodsEffective.filter((f) => f.state !== 'sold-out').slice(0, 2),
+    [catalogFoodsEffective]
+  );
+
+  const menuSearchPlaceholder =
+    menuModalTab === 'combo'
+      ? 'Tìm tên combo...'
+      : menuModalTab === 'buffet'
+        ? 'Tìm gói buffet...'
+        : 'Tìm tên món ăn...';
 
   const renderMaterialsTable = () => (
     <div className="inventory-table-wrap">
@@ -699,7 +1021,7 @@ const ManagerInventoryPage = () => {
           </thead>
           <tbody>
             {filteredLogs.map((log, idx) => (
-              <tr key={`${log.material}-${idx}`}>
+              <tr key={log.id != null ? `log-${log.id}` : `log-${idx}-${log.time}`}>
                 <td>
                   <div className="cell-title">{log.date}</div>
                   <div className="cell-subtitle">{log.time}</div>
@@ -846,29 +1168,65 @@ const ManagerInventoryPage = () => {
               </div>
 
               <div className="menu-mini-list">
-                <div className="menu-mini-item">
-                  <div className="menu-mini-icon"><Beef size={16} /></div>
-                  <div>
-                    <strong>Phở Bò Tái Lăn</strong>
-                    <span>65,000đ • Sẵn sàng</span>
-                  </div>
-                </div>
-                <div className="menu-mini-item sold-out">
-                  <div className="menu-mini-icon"><Fish size={16} /></div>
-                  <div>
-                    <strong>Sushi Cá Hồi</strong>
-                    <span>Hết nguyên liệu</span>
-                  </div>
-                </div>
+                {menuCatalogLoading && (
+                  <p className="recent-log-empty">Đang tải thực đơn...</p>
+                )}
+                {!menuCatalogLoading && menuCatalogError && (
+                  <p className="recent-log-empty">{menuCatalogError}</p>
+                )}
+                {!menuCatalogLoading && !menuCatalogError && menuPreviewRows.length === 0 && (
+                  <p className="recent-log-empty">Chưa có món từ API</p>
+                )}
+                {!menuCatalogLoading &&
+                  !menuCatalogError &&
+                  menuPreviewRows.map((row, idx) => {
+                    const Icon = idx % 2 === 0 ? Beef : Fish;
+                    const ok = row.state !== 'sold-out';
+                    return (
+                      <div key={`preview-${row.id}-${idx}`} className={`menu-mini-item ${ok ? '' : 'sold-out'}`}>
+                        <div className="menu-mini-icon">
+                          <Icon size={16} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong>{row.name || '—'}</strong>
+                          <span>
+                            {ok ? `${row.priceLine} • Sẵn sàng` : 'HẾT NGUYÊN LIỆU'}
+                          </span>
+                        </div>
+                        {row.kind === 'food' && (
+                          <button
+                            type="button"
+                            className="mini-switch-btn"
+                            role="switch"
+                            aria-checked={ok}
+                            title={ok ? 'Tắt bán' : 'Bật bán'}
+                            disabled={foodTogglingId === row.id}
+                            onClick={() => handleFoodToggle(row)}
+                          >
+                            <span className={`mini-toggle-track ${ok ? 'is-on' : ''} ${foodTogglingId === row.id ? 'is-loading' : ''}`}>
+                              {foodTogglingId === row.id && (
+                                <Loader2 size={11} className="spin" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', color: '#fff', zIndex: 1 }} />
+                              )}
+                            </span>
+                          </button>
+                        )}
+                        {row.kind !== 'food' && (
+                          <span className={`toggle-label ${ok ? 'on' : 'off'}`} style={{ fontSize: '0.58rem' }}>
+                            {ok ? 'ON' : 'OFF'}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
 
               <div className="mini-stats">
                 <div>
-                  <strong>24</strong>
+                  <strong>{menuCatalogLoading ? '—' : servingCount}</strong>
                   <span>Phục vụ</span>
                 </div>
                 <div>
-                  <strong>02</strong>
+                  <strong>{menuCatalogLoading ? '—' : suspendedCount}</strong>
                   <span>Tạm ngưng</span>
                 </div>
               </div>
@@ -1127,64 +1485,232 @@ const ManagerInventoryPage = () => {
             <div className="inv-modal-head">
               <div>
                 <h3>Quản lý Thực đơn</h3>
-                <p>Cập nhật danh sách món và trạng thái phục vụ</p>
+                <p>
+                  {menuModalTab === 'buffet'
+                    ? 'Cập nhật danh sách gói buffet và trạng thái phục vụ (Đang bán / Hết hàng).'
+                    : menuModalTab === 'combo'
+                      ? 'Cập nhật danh sách combo và trạng thái (chỉ món lẻ có thể bật/tắt bán qua API).'
+                      : 'Cập nhật danh sách món và trạng thái phục vụ.'}
+                </p>
               </div>
-              <button onClick={() => setShowMenuModal(false)}><X size={18} /></button>
+              <button type="button" onClick={() => setShowMenuModal(false)}><X size={18} /></button>
             </div>
 
+            {menuCatalogError && (
+              <div className="error-banner" style={{ margin: '0 1rem' }}>
+                <CircleAlert size={16} />
+                <span>{menuCatalogError}</span>
+              </div>
+            )}
+
             <div className="menu-modal-tabs">
-              <button className={menuModalTab === 'menu' ? 'active' : ''} onClick={() => setMenuModalTab('menu')}>Món lẻ (Menu)</button>
-              <button className={menuModalTab === 'combo' ? 'active' : ''} onClick={() => setMenuModalTab('combo')}>Combo</button>
-              <button className={menuModalTab === 'buffet' ? 'active' : ''} onClick={() => setMenuModalTab('buffet')}>Buffet</button>
+              <button type="button" className={menuModalTab === 'menu' ? 'active' : ''} onClick={() => setMenuModalTab('menu')}>Món lẻ (Menu)</button>
+              <button type="button" className={menuModalTab === 'combo' ? 'active' : ''} onClick={() => setMenuModalTab('combo')}>Combo</button>
+              <button type="button" className={menuModalTab === 'buffet' ? 'active' : ''} onClick={() => setMenuModalTab('buffet')}>Buffet</button>
             </div>
 
             <div className="menu-modal-search">
               <div className="input-wrap">
                 <Search size={16} />
-                <input type="text" placeholder="Tìm tên món ăn..." />
+                <input
+                  type="text"
+                  placeholder={menuSearchPlaceholder}
+                  value={menuSearchQuery}
+                  onChange={(e) => setMenuSearchQuery(e.target.value)}
+                />
               </div>
               <div className="filter-wrap">
                 <span>Trạng thái:</span>
-                <select>
-                  <option>Tất cả</option>
-                  <option>Đang bán</option>
-                  <option>Hết hàng</option>
+                <select value={menuStatusFilter} onChange={(e) => setMenuStatusFilter(e.target.value)}>
+                  <option value="all">Tất cả</option>
+                  <option value="selling">Đang bán</option>
+                  <option value="soldout">Hết hàng</option>
                 </select>
               </div>
             </div>
+            <p className="menu-modal-filter-hint">
+              {menuModalTab === 'buffet'
+                ? 'Tắt gói buffet → API cập nhật → ẩn với khách. Chọn «Hết hàng» để lọc và bật lại.'
+                : 'Tắt món → API cập nhật → món biến mất khỏi lưới. Chọn «Hết hàng» để tìm và bật lại.'}
+            </p>
 
             <div className="menu-modal-body">
-              <div className="menu-grid">
-                {(menuManageData[menuModalTab] || []).map((item) => (
-                  <div key={item.name} className={`menu-card ${item.state === 'sold-out' ? 'sold-out' : ''}`}>
-                    <div>
-                      <h4>{item.name}</h4>
-                      <p>{item.price}</p>
-                    </div>
-                    <div className="toggle-wrap">
-                      <span className={item.state === 'sold-out' ? 'off' : 'on'}>
-                        {item.state === 'sold-out' ? 'HẾT HÀNG' : 'ĐANG BÁN'}
-                      </span>
+              {menuCatalogLoading && (
+                <div className="loading-container" style={{ padding: '2rem' }}>
+                  <Loader2 size={28} className="spin" />
+                  <p>Đang tải thực đơn...</p>
+                </div>
+              )}
+              {!menuCatalogLoading && (
+                <>
+                  <div className="menu-grid">
+                    {modalPageItems.length === 0 && (
+                      <p className="recent-log-empty" style={{ gridColumn: '1 / -1' }}>Không có mục nào.</p>
+                    )}
+                    {modalPageItems.map((item) => (
+                      <div
+                        key={`${item.kind}-${item.id}`}
+                        className={`menu-card menu-card--compact ${item.state === 'sold-out' ? 'sold-out' : ''}`}
+                      >
+                        <div className="menu-card-thumb-wrap">
+                          <img
+                            className="menu-card-thumb"
+                            src={item.image}
+                            alt=""
+                            onError={(e) => {
+                              e.target.src = FIXED_MENU_IMG;
+                            }}
+                          />
+                          {item.state === 'sold-out' && (
+                            <span className="menu-card-badge-oos">Hết hàng</span>
+                          )}
+                        </div>
+                        <div className="menu-card-main">
+                          <div className="menu-card-text">
+                            <h4>{item.name}</h4>
+                            {item.kind === 'buffet' ? (
+                              <div className="menu-card-buffet-prices">
+                                <div className="buffet-price-row">
+                                  <span className="buffet-price-label">NL</span>
+                                  <span className="buffet-price-value">{item.nlPriceText}</span>
+                                </div>
+                                <div className="buffet-price-row">
+                                  <span className="buffet-price-label">TE</span>
+                                  <span className="buffet-price-value">{item.tePriceText}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="menu-card-price">{item.priceLine}</p>
+                            )}
+                          </div>
+                          <div className="menu-card-actions">
+                            {item.kind === 'food' ? (
+                              <div className="toggle-wrap menu-card-toggle-inner">
+                                <button
+                                  type="button"
+                                  className="menu-switch-btn"
+                                  role="switch"
+                                  aria-checked={item.state !== 'sold-out'}
+                                  title={item.state === 'sold-out' ? 'Bật bán' : 'Tắt bán'}
+                                  disabled={foodTogglingId === item.id}
+                                  onClick={() => handleFoodToggle(item)}
+                                >
+                                  <span
+                                    className={`toggle-track ${item.state !== 'sold-out' ? 'is-on' : ''} ${foodTogglingId === item.id ? 'is-loading' : ''}`}
+                                  >
+                                    {foodTogglingId === item.id && (
+                                      <Loader2 size={13} className="spin" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', color: '#fff', zIndex: 1 }} />
+                                    )}
+                                  </span>
+                                  <span className={`toggle-label ${item.state === 'sold-out' ? 'off' : 'on'}`}>
+                                    {item.state === 'sold-out' ? 'HẾT HÀNG' : 'ĐANG BÁN'}
+                                  </span>
+                                </button>
+                              </div>
+                            ) : item.kind === 'buffet' ? (
+                              <div className="toggle-wrap menu-card-toggle-inner">
+                                <button
+                                  type="button"
+                                  className="menu-switch-btn"
+                                  role="switch"
+                                  aria-checked={item.state !== 'sold-out'}
+                                  title={item.state === 'sold-out' ? 'Bật bán' : 'Tắt bán'}
+                                  disabled={buffetTogglingId === item.id}
+                                  onClick={() => handleBuffetToggle(item)}
+                                >
+                                  <span
+                                    className={`toggle-track ${item.state !== 'sold-out' ? 'is-on' : ''} ${buffetTogglingId === item.id ? 'is-loading' : ''}`}
+                                  >
+                                    {buffetTogglingId === item.id && (
+                                      <Loader2 size={13} className="spin" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', color: '#fff', zIndex: 1 }} />
+                                    )}
+                                  </span>
+                                  <span className={`toggle-label ${item.state === 'sold-out' ? 'off' : 'on'}`}>
+                                    {item.state === 'sold-out' ? 'HẾT HÀNG' : 'ĐANG BÁN'}
+                                  </span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="toggle-wrap menu-card-toggle-inner">
+                                <div
+                                  className="menu-switch-btn menu-switch-readonly"
+                                  role="presentation"
+                                  aria-hidden
+                                >
+                                  <span className={`toggle-track ${item.state !== 'sold-out' ? 'is-on' : ''}`} />
+                                  <span className={`toggle-label ${item.state === 'sold-out' ? 'off' : 'on'}`}>
+                                    {item.state === 'sold-out' ? 'HẾT HÀNG' : 'ĐANG BÁN'}
+                                  </span>
+                                </div>
+                                <span className="menu-toggle-hint">Chỉ món lẻ / buffet đổi tại đây</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="menu-pagination">
+                    <p className="menu-pagination-summary">
+                      {filteredModalItems.length === 0
+                        ? '0 mục'
+                        : `Hiển thị ${(menuPage - 1) * MENU_PAGE_SIZE + 1}–${Math.min(menuPage * MENU_PAGE_SIZE, filteredModalItems.length)} trên ${filteredModalItems.length} ${menuModalTab === 'menu' ? 'món ăn' : menuModalTab === 'combo' ? 'combo' : 'gói buffet'}`}
+                    </p>
+                    <div className="menu-pagination-controls">
+                      <button
+                        type="button"
+                        className="menu-page-nav menu-page-nav--prev"
+                        disabled={menuPage <= 1}
+                        onClick={() => setMenuPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft size={14} />
+                        <span>Trước</span>
+                      </button>
+                      <div className="menu-page-numbers" role="navigation" aria-label="Chọn trang">
+                        {menuModalPageNumbers.map((entry, idx) =>
+                          entry === 'ellipsis' ? (
+                            <span key={`e-${idx}`} className="menu-page-ellipsis">
+                              …
+                            </span>
+                          ) : (
+                            <button
+                              key={entry}
+                              type="button"
+                              className={`menu-page-num ${menuPage === entry ? 'active' : ''}`}
+                              onClick={() => setMenuPage(entry)}
+                            >
+                              {entry}
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="menu-page-nav menu-page-nav--next"
+                        disabled={menuPage >= modalTotalPages}
+                        onClick={() => setMenuPage((p) => Math.min(modalTotalPages, p + 1))}
+                      >
+                        <span>Sau</span>
+                        <ChevronRight size={14} />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-
-              <div className="menu-pagination">
-                <p>Hiển thị 4 trên {menuModalTab === 'menu' ? '48' : menuModalTab === 'combo' ? '12' : '8'} mục</p>
-                <div className="page-row">
-                  <button className="page-icon" disabled><ChevronLeft size={14} /></button>
-                  <button className="page-chip active">1</button>
-                  <button className="page-chip">2</button>
-                  {menuModalTab !== 'buffet' && <button className="page-chip">3</button>}
-                  <button className="page-icon"><ChevronRight size={14} /></button>
-                </div>
-              </div>
+                </>
+              )}
             </div>
 
             <div className="inv-modal-foot">
-              <button className="ghost" onClick={() => setShowMenuModal(false)}>Đóng</button>
-              <button className="primary" onClick={() => setShowMenuModal(false)}>
+              <button type="button" className="ghost" onClick={() => setShowMenuModal(false)}>Đóng</button>
+              <button
+                type="button"
+                className="primary"
+                disabled={menuCatalogLoading}
+                onClick={async () => {
+                  await fetchMenuCatalog();
+                  setShowMenuModal(false);
+                }}
+              >
                 <Check size={14} />
                 Lưu thay đổi
               </button>

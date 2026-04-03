@@ -442,6 +442,7 @@
 }
 
 .chef-image-wrap {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -830,4 +831,48 @@
     min-width: 0;
     max-width: none;
   }
+}
+
+/* Món hết hàng (isAvailable = false) — khách vẫn thấy, không thêm giỏ */
+.menu-food-sold-out .menu-item-image,
+.menu-food-sold-out .chef-image-wrap img {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.menu-food-sold-out .menu-item-name,
+.menu-food-sold-out .chef-card-top h4 {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.menu-food-sold-out .new-price,
+.menu-food-sold-out .chef-price {
+  color: #94a3b8 !important;
+}
+
+.menu-oos-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  z-index: 2;
+}
+
+.menu-oos-badge--corner {
+  top: 10px;
+  right: 10px;
+  bottom: auto;
+}
+
+.chef-cart-btn:disabled,
+.menu-cart-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
