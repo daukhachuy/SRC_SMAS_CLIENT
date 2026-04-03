@@ -23,7 +23,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 import { getAllCategories } from '../api/categoryApi';
-import { getFoodByFilter } from '../api/foodApi';
+import { getFoodByFilter, resolveFoodImageUrl } from '../api/foodApi';
 import { isAuthenticated } from '../api/authApi';
 
 const MenuPage = () => {
@@ -84,8 +84,9 @@ const MenuPage = () => {
           name: item.name,
           price: item.price,
           oldPrice: item.promotionalPrice,
-          image: item.image,
+          image: resolveFoodImageUrl(item.image),
           categoryName: item.categories?.[0]?.name || 'Món ăn',
+          isAvailable: item.isAvailable !== false,
         }));
 
         setMenuItems(mapped);
@@ -103,6 +104,7 @@ const MenuPage = () => {
   }, [selectedCategoryIds, priceRange]);
 
   const addToCart = (item) => {
+    if (item.isAvailable === false) return;
     if (!isAuthenticated()) {
       setShowAuthRequired(true);
       return;
@@ -362,7 +364,10 @@ const MenuPage = () => {
 
                     <div className="chef-featured-grid">
                       {featuredItems.map((item, idx) => (
-                        <article key={`featured-${item.id}`} className="chef-feature-card">
+                        <article
+                          key={`featured-${item.id}`}
+                          className={`chef-feature-card${item.isAvailable === false ? ' menu-food-sold-out' : ''}`}
+                        >
                           <div className="chef-image-wrap">
                             <img
                               src={item.image || FIXED_PRODUCT_IMAGE}
@@ -371,6 +376,9 @@ const MenuPage = () => {
                                 e.target.src = FIXED_PRODUCT_IMAGE;
                               }}
                             />
+                            {item.isAvailable === false && (
+                              <span className="menu-oos-badge">Hết hàng</span>
+                            )}
                           </div>
                           <div className="chef-card-body">
                             <div className="chef-card-top">
@@ -381,8 +389,13 @@ const MenuPage = () => {
                               <span className="chef-price">{item.price.toLocaleString()}đ</span>
                             </div>
                             <p className="chef-desc">{item.categoryName} được yêu thích bởi thực khách trong tuần này.</p>
-                            <button className="chef-cart-btn" onClick={() => addToCart(item)}>
-                              Thêm vào giỏ <ShoppingCart size={16} />
+                            <button
+                              type="button"
+                              className="chef-cart-btn"
+                              disabled={item.isAvailable === false}
+                              onClick={() => addToCart(item)}
+                            >
+                              {item.isAvailable === false ? 'Tạm ngưng bán' : 'Thêm vào giỏ'} <ShoppingCart size={16} />
                             </button>
                           </div>
                         </article>
@@ -398,7 +411,10 @@ const MenuPage = () => {
 
                   <div className="menu-page-grid">
                     {displayedItems.map((item) => (
-                      <article key={item.id} className="menu-item-card">
+                      <article
+                        key={item.id}
+                        className={`menu-item-card${item.isAvailable === false ? ' menu-food-sold-out' : ''}`}
+                      >
                         <div className="menu-item-image-wrap">
                           <img
                             className="menu-item-image"
@@ -409,6 +425,9 @@ const MenuPage = () => {
                             }}
                           />
                           <span className="menu-item-badge">{item.categoryName}</span>
+                          {item.isAvailable === false && (
+                            <span className="menu-oos-badge menu-oos-badge--corner">Hết hàng</span>
+                          )}
                         </div>
 
                         <h4 className="menu-item-name">{item.name}</h4>
@@ -418,7 +437,13 @@ const MenuPage = () => {
                             {item.oldPrice && <span className="old-price">{item.oldPrice.toLocaleString()}đ</span>}
                             <span className="new-price">{item.price.toLocaleString()}đ</span>
                           </div>
-                          <button className="menu-cart-btn" onClick={() => addToCart(item)} aria-label="Thêm vào giỏ">
+                          <button
+                            type="button"
+                            className="menu-cart-btn"
+                            disabled={item.isAvailable === false}
+                            onClick={() => addToCart(item)}
+                            aria-label={item.isAvailable === false ? 'Món tạm hết' : 'Thêm vào giỏ'}
+                          >
                             <ShoppingCart size={18} />
                           </button>
                         </div>

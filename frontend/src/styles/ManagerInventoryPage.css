@@ -507,6 +507,11 @@
   border-color: #fecaca;
 }
 
+.menu-mini-item.sold-out .menu-mini-icon {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
 .menu-mini-item strong {
   display: block;
   font-size: 0.84rem;
@@ -834,17 +839,17 @@
 
 .menu-modal-tabs {
   display: flex;
-  gap: 0.55rem;
-  padding: 0.8rem 1rem;
+  gap: 0.4rem;
+  padding: 0.55rem 0.85rem;
   border-bottom: 1px solid #f1f5f9;
   background: #faf8f7;
 }
 
 .menu-modal-tabs button {
   border: 0;
-  border-radius: 10px;
-  padding: 0.42rem 0.7rem;
-  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.74rem;
   font-weight: 800;
   background: #f1f5f9;
   color: #64748b;
@@ -856,12 +861,47 @@
   color: #fff;
 }
 
+/* Chủ đề cam buffet / lưu modal thực đơn (#FF6B00) */
+.inv-modal.menu-modal .menu-modal-tabs button.active {
+  background: #ff6b00;
+}
+
+.inv-modal.menu-modal .menu-modal-tabs button.active:hover {
+  background: #e85f00;
+}
+
+.inv-modal.menu-modal .inv-modal-foot .primary {
+  background: #ff6b00;
+}
+
+.inv-modal.menu-modal .inv-modal-foot .primary:hover {
+  background: #e85f00;
+}
+
+.inv-modal.menu-modal .menu-page-num.active {
+  background: #ff6b00;
+  border-color: #ff6b00;
+}
+
+.inv-modal.menu-modal .menu-page-nav:hover:not(:disabled) {
+  border-color: #ff6b00;
+  color: #ff6b00;
+}
+
 .menu-modal-search {
   display: flex;
-  gap: 0.8rem;
+  gap: 0.55rem;
   align-items: center;
-  padding: 0.9rem 1rem;
+  padding: 0.55rem 0.85rem;
   border-bottom: 1px solid #f1f5f9;
+}
+
+.menu-modal-filter-hint {
+  margin: 0 0.85rem 0.35rem;
+  padding: 0 0.15rem;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: #94a3b8;
 }
 
 .input-wrap {
@@ -903,84 +943,442 @@
 
 .menu-modal-body {
   overflow: auto;
-  padding: 1rem;
+  padding: 0.55rem 0.75rem 0.65rem;
+  flex: 1;
+  min-height: 0;
 }
 
+/* Lưới gọn: 2 cột × 3 hàng = 6 món/trang (Menu, Combo, Buffet) */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem;
+  gap: 0.45rem;
+  align-items: stretch;
 }
 
 .menu-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 0.8rem;
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-  align-items: center;
+  border: 1px solid #e8ecf0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.18s, border-color 0.18s;
+}
+
+.menu-card:hover {
+  box-shadow: 0 4px 14px rgba(21, 31, 44, 0.07);
+  border-color: #e2e8f0;
 }
 
 .menu-card.sold-out {
   border-color: #fecaca;
-  background: #fef2f2;
+  background: #fffafb;
 }
 
-.menu-card h4 {
+/* —— Thẻ ngang nhỏ gọn (mock) —— */
+.menu-card--compact {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.menu-card--compact .menu-card-thumb-wrap {
+  position: relative;
+  width: 72px;
+  min-width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  align-self: center;
+  border-radius: 8px;
+  margin: 6px 0 6px 6px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.menu-card--compact .menu-card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.menu-card--compact:hover .menu-card-thumb {
+  transform: none;
+}
+
+.menu-card--compact.sold-out .menu-card-thumb {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.menu-card--compact .menu-card-badge-oos {
+  top: 4px;
+  right: 4px;
+  font-size: 8px;
+  padding: 2px 6px;
+}
+
+.menu-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 6px 8px 6px 8px;
+}
+
+.menu-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+
+.menu-card-text h4 {
   margin: 0;
-  font-size: 0.88rem;
-  color: #1e293b;
-}
-
-.menu-card.sold-out h4 {
-  text-decoration: line-through;
-  color: #94a3b8;
-}
-
-.menu-card p {
-  margin: 0.2rem 0 0;
   font-size: 0.78rem;
-  color: #ff6c1f;
   font-weight: 800;
+  color: #1d2630;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.menu-card.sold-out p {
+.menu-card--compact.sold-out .menu-card-text h4 {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.menu-card-price {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #ff6c1f;
+}
+
+.menu-card--compact.sold-out .menu-card-price {
   color: #94a3b8;
 }
 
-.toggle-wrap span {
+/* Buffet: NL (người lớn) / TE (trẻ em) — nhãn cam, giá đậm */
+.menu-card-buffet-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 1px;
+}
+
+.buffet-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.buffet-price-label {
+  font-weight: 800;
+  color: #ff6b00;
+  min-width: 1.25rem;
+  font-size: 0.68rem;
+}
+
+.buffet-price-value {
+  font-weight: 700;
+  color: #1d2630;
+}
+
+.menu-card--compact.sold-out .buffet-price-value {
+  color: #94a3b8;
+}
+
+.menu-card-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.menu-card--compact .menu-card-actions .toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.menu-card-toggle-inner {
+  align-items: flex-end;
+}
+
+.menu-toggle-hint {
+  font-size: 8px;
+  color: #94a3b8;
+  text-align: right;
+  max-width: 92px;
+  line-height: 1.2;
+}
+
+.menu-switch-readonly {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+/* Track gọn hơn trong thẻ ngang */
+.menu-card--compact .toggle-wrap .toggle-track {
+  width: 38px;
+  height: 20px;
+}
+
+.menu-card--compact .toggle-wrap .toggle-track::after {
+  width: 16px;
+  height: 16px;
+  top: 2px;
+  left: 2px;
+}
+
+.menu-card--compact .toggle-wrap .toggle-track.is-on::after {
+  transform: translateX(18px);
+}
+
+.menu-card--compact .toggle-wrap .toggle-label {
+  font-size: 0.55rem;
+  padding: 0.12rem 0.32rem;
+}
+
+/* ===== Toggle pill switch ===== */
+.toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* Nút bật/tắt (button) — tránh checkbox controlled + pointer-events gây không bấm được */
+.toggle-wrap .menu-switch-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: right;
+}
+
+.toggle-wrap .menu-switch-btn:disabled {
+  cursor: wait;
+  opacity: 0.85;
+}
+
+.toggle-wrap .menu-switch-btn:focus-visible {
+  outline: 2px solid #ff6c1f;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.toggle-wrap .toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-wrap .toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  transition: transform 0.2s, background 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* ON = xanh (ĐANG BÁN) theo mock UI */
+.toggle-wrap .toggle-track.is-on {
+  background: #22c55e;
+}
+.toggle-wrap .toggle-track.is-on::after {
+  transform: translateX(20px);
+  border-color: #22c55e;
+}
+
+.toggle-wrap .menu-switch-btn:disabled .toggle-track.is-loading::after {
+  opacity: 0;
+}
+
+/* Status label */
+.toggle-wrap .toggle-label {
   font-size: 0.62rem;
   font-weight: 800;
   border-radius: 999px;
-  padding: 0.25rem 0.45rem;
+  padding: 0.2rem 0.4rem;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.toggle-wrap .toggle-label.on  { background: #dcfce7; color: #15803d; }
+.toggle-wrap .toggle-label.off { background: #fee2e2; color: #b91c1c; }
+
+/* Sidebar mini switch (button) */
+.menu-mini-item .mini-switch-btn {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.menu-mini-item .mini-switch-btn:disabled {
+  cursor: wait;
+  opacity: 0.85;
 }
 
-.toggle-wrap span.on {
-  background: #dcfce7;
-  color: #15803d;
+.menu-mini-item .mini-switch-btn:focus-visible {
+  outline: 2px solid #ff6c1f;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
-
-.toggle-wrap span.off {
-  background: #fee2e2;
-  color: #b91c1c;
+.menu-mini-item .mini-toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 20px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  transition: background 0.2s;
+}
+.menu-mini-item .mini-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+.menu-mini-item .mini-toggle-track.is-on {
+  background: #22c55e;
+}
+.menu-mini-item .mini-toggle-track.is-on::after {
+  transform: translateX(20px);
+  border-color: #22c55e;
+}
+.menu-mini-item .mini-switch-btn:disabled .mini-toggle-track.is-loading::after {
+  opacity: 0;
 }
 
 .menu-pagination {
-  margin-top: 1rem;
-  padding-top: 0.8rem;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
   border-top: 1px solid #f1f5f9;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.45rem 0.65rem;
 }
 
-.menu-pagination p {
+.menu-pagination-summary {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   color: #64748b;
+  line-height: 1.35;
+}
+
+.menu-pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.menu-page-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.menu-page-nav:hover:not(:disabled) {
+  border-color: #ff6c1f;
+  color: #ff6c1f;
+}
+
+.menu-page-nav:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menu-page-numbers {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-wrap: wrap;
+}
+
+.menu-page-num {
+  min-width: 1.65rem;
+  height: 1.65rem;
+  padding: 0 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.menu-page-num:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.menu-page-num.active {
+  background: #ff6c1f;
+  border-color: #ff6c1f;
+  color: #fff;
+}
+
+.menu-page-ellipsis {
+  padding: 0 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #94a3b8;
+  user-select: none;
 }
 
 .inventory-footer {
@@ -1046,8 +1444,13 @@
     justify-content: center;
   }
 
-  .menu-grid {
-    grid-template-columns: 1fr;
+  .menu-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .menu-pagination-controls {
+    justify-content: center;
   }
 
   .menu-modal-search {
@@ -1064,5 +1467,11 @@
 
   .action-inline {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .inv-modal.menu-modal .menu-grid {
+    grid-template-columns: 1fr;
   }
 }
