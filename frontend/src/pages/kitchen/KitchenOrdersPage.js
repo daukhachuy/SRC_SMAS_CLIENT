@@ -296,16 +296,7 @@ const KitchenOrdersPage = () => {
           </div>
         </div>
         <div className="kds-header-right">
-          <button
-            type="button"
-            className="kds-refresh-btn"
-            onClick={loadOrders}
-            disabled={loading}
-            title="Tải lại danh sách"
-          >
-            <RefreshCw size={20} className={loading ? 'kds-spin' : ''} />
-            <span>{loading ? 'Đang tải...' : 'Tải lại'}</span>
-          </button>
+          {/* Đã xóa nút Tải lại theo yêu cầu */}
           <div className="kds-time">
             <Clock size={20} />
             <span>{new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>

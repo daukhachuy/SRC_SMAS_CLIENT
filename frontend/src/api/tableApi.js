@@ -73,6 +73,7 @@ export function normalizeTableRow(raw) {
     isVip,
     note,
     isActive,
+    qrCode: raw.qrCode || null, // Giữ thêm trường qrCode từ main nếu cần
   };
 }
 
@@ -112,10 +113,6 @@ function clampGuestCount(v) {
   return Math.min(99, n);
 }
 
-/**
- * Chuẩn hóa tableType gửi BE — GET danh sách thường có "standard" / "VIP", Swagger mẫu dùng "vip".
- * Chuỗi tự nhập khác: trim, giữ nguyên (BE tự validate).
- */
 function normalizeTableTypeForApi(raw) {
   const s = String(raw ?? '').trim();
   if (!s) return 'standard';
@@ -124,7 +121,6 @@ function normalizeTableTypeForApi(raw) {
   if (lower === 'indoor' || lower === 'trong nhà' || lower === 'trong nha' || lower === 'standard') {
     return 'standard';
   }
-  /* BE có thể lưu enum "VIP" (như cột danh sách); Swagger mẫu là "vip" — ưu tiên khớp DB */
   if (lower === 'vip') return 'VIP';
   if (lower === 'outdoor' || lower === 'sân vườn' || lower === 'san vuon') return 'outdoor';
   return s;
@@ -144,10 +140,6 @@ function assertEnvelopeSuccess(data) {
   }
 }
 
-/**
- * Lấy thông báo lỗi từ axios / ProblemDetails / validation ASP.NET
- * @param {string} [fallback] - khi không có chi tiết từ server
- */
 export function parseTableApiError(error, fallback = 'Lưu thất bại.') {
   const d = error?.response?.data;
   const status = error?.response?.status;
@@ -171,17 +163,11 @@ export function parseTableApiError(error, fallback = 'Lưu thất bại.') {
   if (!msg) msg = error?.message || fallback;
 
   if (status === 500 && /lỗi hệ thống/i.test(msg)) {
-    msg +=
-      '\n\nGợi ý: đổi tên bàn (tránh trùng), thử loại vip hoặc standard. Lỗi 500 do server — cần xem log trên Azure.';
+    msg += '\n\nGợi ý: đổi tên bàn (tránh trùng), thử loại vip hoặc standard.';
   }
   return msg;
 }
 
-/**
- * Swagger POST/PUT /api/table — body:
- * { tableName: string, tableType: string, numberOfPeople: int }
- * @see https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/swagger/index.html
- */
 function toSwaggerTableBody(form) {
   const numberOfPeople = clampGuestCount(form.maxGuests);
   const tableName = String(form.name ?? '').trim() || 'Bàn mới';

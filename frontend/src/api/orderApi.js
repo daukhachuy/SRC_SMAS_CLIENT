@@ -1,3 +1,24 @@
+// Tạo đơn theo đặt bàn (reservation)
+export const createOrderByReservation = async (payload) => {
+  try {
+    const response = await instance.post('/orders/by-reservation', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Lỗi tạo đơn theo đặt bàn:', error.response?.status, error.response?.data);
+    throw error;
+  }
+};
+
+// Tạo đơn theo thông tin liên hệ (member)
+export const createOrderByContact = async (payload) => {
+  try {
+    const response = await instance.post('/orders/by-contact', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Lỗi tạo đơn theo thông tin liên hệ:', error.response?.status, error.response?.data);
+    throw error;
+  }
+};
 import instance from './axiosInstance';
 
 /** @deprecated dùng trực tiếp từ ./kitchenOrderApi — giữ để tương thích import cũ */
