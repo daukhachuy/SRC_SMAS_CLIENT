@@ -1,3 +1,9 @@
+// Thêm món vào đơn hàng (orderCode)
+export const addItemToOrder = async (orderCode, item) => {
+  // item: { foodId, comboId, buffetId, quantity, note }
+  const response = await instance.post(`/order/${orderCode}/items`, item);
+  return response.data;
+};
 // Tạo đơn theo đặt bàn (reservation)
 export const createOrderByReservation = async (payload) => {
   try {
