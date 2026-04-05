@@ -27,6 +27,7 @@ import ManagerReservationsPage from './pages/manager/ManagerReservationsPage';
 import EventDetailPage from './pages/manager/EventDetailPage';
 import ContractSigningPage from './pages/manager/ContractSigningPage';
 import ManagerStaffPage from './pages/manager/ManagerStaffPage';
+import StaffProfilePage from './pages/manager/StaffProfilePage';
 import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import ManagerProfilePage from './pages/manager/ManagerProfilePage';
@@ -179,6 +180,7 @@ const AppRoutes = () => {
           <Route path="reservations/:eventId" element={<EventDetailPage />} />
           <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
           <Route path="staff" element={<ManagerStaffPage />} />
+          <Route path="staff/:staffId/profile" element={<StaffProfilePage />} />
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
           <Route path="profile" element={<ManagerProfilePage />} />

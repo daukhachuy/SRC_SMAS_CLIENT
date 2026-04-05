@@ -5,10 +5,19 @@ import instance from './axiosInstance';
  * Endpoints: /api/user/profile
  */
 
-export async function getProfile() {
+/**
+ * Lấy profile khách hàng theo contact (SĐT/Email)
+ * Nếu không truyền contact sẽ lấy profile của user hiện tại
+ */
+export async function getProfile(contact) {
   try {
     console.log('👤 Fetching user profile...');
-    const response = await instance.get('/user/profile');
+    let response;
+    if (contact) {
+      response = await instance.get('/user/profile', { params: { contact } });
+    } else {
+      response = await instance.get('/user/profile');
+    }
     console.log('✅ User profile loaded:', response.data);
     return response.data;
   } catch (error) {

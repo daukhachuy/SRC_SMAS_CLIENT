@@ -28,6 +28,7 @@
   import { staffAPI } from '../../api/managerApi';
   import { getAllStaff } from '../../api/managerApi';
   import { getTables } from '../../api/tableApi';
+  import { useNavigate } from 'react-router-dom';
 
   const DEPARTMENTS = ['all', 'kitchen', 'service'];
   const DEPARTMENT_LABELS = {
@@ -139,9 +140,11 @@
 
 
   const ManagerStaffPage = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('schedule');
     const [selectedDepartment, setSelectedDepartment] = useState('all');
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [selectedWorkDay, setSelectedWorkDay] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -233,22 +236,33 @@
       };
 
       // DEBUG LOG: Duyệt từng shift
+      // Tạo map để tra cứu workStaffId từ weekKitchenRes
+      const scheduleItemsMap = weekKitchenRes.status === 'fulfilled' ? unwrapResponse(weekKitchenRes.value) : [];
+      const workStaffIdMap = new Map();
+      scheduleItemsMap.forEach((raw) => {
+        // key: userId|shiftId|workDay
+        const key = `${raw.userId || raw.id}|${raw.shiftId}|${(raw.workDate || raw.workDay || '').slice(0,10)}`;
+        workStaffIdMap.set(key, raw.workStaffId);
+      });
+
       (nextSevenData?.shifts || []).forEach((shift, shiftIdx) => {
         const shiftKey = getShiftKey(shift);
         if (!SHIFT_KEYS.includes(shiftKey)) return;
         shift.days.forEach((day, dayIdx) => {
           const workDayStr = (day.workDay || '').slice(0, 10);
           const dayIndex = weekDates.findIndex((d) => d.key.slice(0, 10) === workDayStr);
-          console.log(`[DEBUG][fetchSchedule] shiftIdx=${shiftIdx}, shiftKey=${shiftKey}, dayIdx=${dayIdx}, workDayStr=${workDayStr}, dayIndex=${dayIndex}`);
           if (dayIndex < 0) return;
           day.staffs.forEach((staff, staffIdx) => {
-            console.log(`[DEBUG][fetchSchedule]  staffIdx=${staffIdx}, staff=`, staff);
+            // Tìm workStaffId từ map
+            const key = `${staff.userId}|${shift.shiftId}|${workDayStr}`;
+            const workStaffId = workStaffIdMap.get(key);
             if (!employeeIds.has(staff.userId)) {
               employeePool.push({
                 id: staff.userId,
                 name: staff.fullName,
                 avatar: staff.avatarUrl,
                 role: staff.position,
+                workStaffId: workStaffId || null,
               });
               employeeIds.add(staff.userId);
             }
@@ -644,7 +658,7 @@
                               return true;
                             })
                             .map((empId) => renderEmployeeAvatar(empId))}
-                          <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
+                          <button className="add-employee-btn" onClick={() => { setSelectedWorkDay(day.key); setShowAssignModal(true); }}>
                             <Plus size={16} />
                           </button>
                         </div>
@@ -669,7 +683,7 @@
                               return true;
                             })
                             .map((empId) => renderEmployeeAvatar(empId))}
-                          <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
+                          <button className="add-employee-btn" onClick={() => { setSelectedWorkDay(day.key); setShowAssignModal(true); }}>
                             <Plus size={16} />
                           </button>
                         </div>
@@ -694,7 +708,7 @@
                               return true;
                             })
                             .map((empId) => renderEmployeeAvatar(empId))}
-                          <button className="add-employee-btn" onClick={() => setShowAssignModal(true)}>
+                          <button className="add-employee-btn" onClick={() => { setSelectedWorkDay(day.key); setShowAssignModal(true); }}>
                             <Plus size={16} />
                           </button>
                         </div>
@@ -760,14 +774,7 @@
                     </div>
                   </div>
 
-                  <div className="sidebar-card status-card">
-                    <div className="status-header">
-                      <CheckCircle className="status-icon" size={24} />
-                      <p className="status-label">THỐNG KÊ THÁNG</p>
-                    </div>
-                    <p className="status-text">Tổng ca làm đã phân: {stats.totalWorkShift}</p>
-                    <p className="status-subtext">Tổng giờ làm đã ghi nhận: {stats.totalHours}</p>
-                  </div>
+
                 </aside>
               </>
             ) : (
@@ -825,8 +832,7 @@
                               <button
                                 className="detail-btn"
                                 onClick={() => {
-                                  setSelectedEmployee(employee);
-                                  setShowDetailModal(true);
+                                  navigate(`/manager/staff/${employee.id}/profile`);
                                 }}
                               >
                                 Chi tiết
@@ -858,13 +864,16 @@
           </div>
         )}
 
+
+        {/* Lưu ngày được chọn khi click vào nút phân ca trên từng ô lịch */}
         {showAssignModal && (
           <AssignShiftModal
-            onClose={() => setShowAssignModal(false)}
+            onClose={() => { setShowAssignModal(false); setSelectedWorkDay(null); }}
             employees={employees}
             workshifts={workshifts}
             submitting={submitting}
             onConfirm={handleCreateAssignment}
+            workDay={selectedWorkDay}
           />
         )}
 
@@ -885,10 +894,12 @@
     );
   };
 
-  const AssignShiftModal = ({ onClose, employees, workshifts, submitting, onConfirm }) => {
+
+  // Nhận workDay từ props nếu có
+  const AssignShiftModal = ({ onClose, employees, workshifts, submitting, onConfirm, workDay: initialWorkDay }) => {
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
     const [selectedShiftId, setSelectedShiftId] = useState(workshifts[0]?.id ? String(workshifts[0].id) : '');
-    const [workDay, setWorkDay] = useState(new Date().toISOString().split('T')[0]);
+    const [workDay, setWorkDay] = useState(initialWorkDay || new Date().toISOString().split('T')[0]);
     const [note, setNote] = useState('');
 
     useEffect(() => {
@@ -998,6 +1009,9 @@
     );
   };
 
+
+
+  // Modal chi tiết ca làm việc (bản gốc)
   const ShiftDetailModal = ({ employee, replacementCandidates, onClose, onUpdate, onDelete, processing }) => {
     const [replaceUserId, setReplaceUserId] = useState('');
     const [checkInTime, setCheckInTime] = useState('');
@@ -1009,7 +1023,6 @@
 
     const update = async () => {
       if (!canMutate) return;
-
       await onUpdate(employee.workStaffId, {
         replaceUserId: replaceUserId ? Number(replaceUserId) : null,
         checkInTime: checkInTime ? new Date(checkInTime).toISOString() : null,
@@ -1053,7 +1066,7 @@
                 <p className="employee-profile-name">{employee.name}</p>
                 <div className="employee-profile-role">
                   <MapPin size={16} />
-                  <p>{employee.role.toUpperCase()}</p>
+                  <p>{employee.role?.toUpperCase?.() || ''}</p>
                 </div>
               </div>
             </div>

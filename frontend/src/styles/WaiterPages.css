@@ -2993,7 +2993,7 @@
   font-size: 12px;
 }
 
-.qty-box {
+ qty-box {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -3002,7 +3002,7 @@
   padding: 4px 8px;
 }
 
-.qty-box button {
+ qty-box button {
   border: 0;
   background: transparent;
   width: 18px;
@@ -3012,7 +3012,7 @@
   cursor: pointer;
 }
 
-.qty-box span {
+ qty-box span {
   min-width: 14px;
   text-align: center;
   font-size: 13px;
@@ -3082,6 +3082,12 @@
   color: #ff6d1f;
   font-size: 28px;
   line-height: 1;
+}
+
+/* Viền xanh lá sáng, dày hơn cho bàn đã sẵn sàng */
+.order-card.order-card-ready {
+  border: 3.5px solid #6ee7b7 !important; /* xanh lá nhạt hơn */
+  box-shadow: 0 0 0 4px #a7f3d0cc;
 }
 
 /* Responsive Design */

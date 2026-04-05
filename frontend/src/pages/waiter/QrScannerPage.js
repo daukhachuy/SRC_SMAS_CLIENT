@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { QrCode, X, Copy, Share2, AlertCircle, Loader } from 'lucide-react';
-import { openTable } from '../../api/tableSessionApi';
+import React, { useState, useEffect } from 'react';
+import { QrCode } from 'lucide-react';
+import { getWaiterTables } from '../../api/waiterApiTable';
+import TableQRCode from '../../components/TableQRCode';
 import '../../styles/QrScannerPage.css';
 
 /**
@@ -11,269 +11,81 @@ import '../../styles/QrScannerPage.css';
  * - Nhận được QR ticket để chia sẻ cho khách hàng
  */
 const QrScannerPage = () => {
-  const navigate = useNavigate();
-  const videoRef = useRef(null);
-  const [scanning, setScanning] = useState(false);
-  const [openedTable, setOpenedTable] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [shareLink, setShareLink] = useState(null);
-  const [selectedTable, setSelectedTable] = useState('');
-  
-  // Danh sách bàn mẫu (sẽ được thay thế bằng API)
-  const [tables] = useState([
-    { tableCode: 'TABLE-01', tableId: 1 },
-    { tableCode: 'TABLE-02', tableId: 2 },
-    { tableCode: 'TABLE-03', tableId: 3 },
-    { tableCode: 'TABLE-04', tableId: 4 },
-    { tableCode: 'TABLE-05', tableId: 5 },
-  ]);
+  const [tables, setTables] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Lấy thông tin user đang đăng nhập
-  const getCurrentUserId = () => {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (!userStr) return null;
-      const user = JSON.parse(userStr);
-      return user.id || user.userId;
-    } catch (error) {
-      console.error('Cannot parse user info:', error);
-      return null;
-    }
-  };
-
-  // Khởi động camera để quét QR
-  const startScanning = async () => {
-    try {
-      setScanning(true);
-      setError(null);
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-
-      // Trong thực tế, cần thư viện như jsQR hoặc quagga để decode QR
-      // Đây là ví dụ đơn giản
-      console.log('📸 Camera started. Please scan QR code.');
-    } catch (err) {
-      setError('Không thể truy cập camera: ' + err.message);
-      setScanning(false);
-    }
-  };
-
-  // Dừng camera
-  const stopScanning = () => {
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-    }
-    setScanning(false);
-  };
-
-  // Mở bàn
-  const handleOpenTable = async (tableCode) => {
-    try {
+  useEffect(() => {
+    async function fetchTables() {
       setLoading(true);
-      setError(null);
-
-      const userId = getCurrentUserId();
-      if (!userId) {
-        setError('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
-        return;
-      }
-
-      const response = await openTable(tableCode, userId);
-
-      // Tạo link chia sẻ cho khách
-      const baseUrl = window.location.origin;
-      const link = `${baseUrl}/table/${tableCode}/session?ticket=${response.qrTicket}`;
-
-      setOpenedTable({
-        tableCode,
-        sessionId: response.sessionId,
-        qrTicket: response.qrTicket,
-      });
-      setShareLink(link);
-
-      if (scanning) {
-        stopScanning();
-      }
-    } catch (err) {
-      setError(err.message || 'Không thể mở bàn. Vui lòng thử lại.');
-      console.error('Error opening table:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Copy link vào clipboard
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      alert('Đã sao chép link!');
-    } catch (err) {
-      console.error('Failed to copy:', err);
-      alert('Không thể sao chép. Vui lòng thử lại.');
-    }
-  };
-
-  // Chia sẻ link (nếu hỗ trợ)
-  const shareLink_fn = async () => {
-    if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'Gọi món tại bàn',
-          text: `Vui lòng quét mã QR hoặc click vào link để gọi món`,
-          url: shareLink,
-        });
+        const data = await getWaiterTables();
+        setTables(data);
       } catch (err) {
-        console.error('Error sharing:', err);
+        setTables([]);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      copyToClipboard();
     }
-  };
-
-  // Reset
-  const handleReset = () => {
-    setOpenedTable(null);
-    setShareLink(null);
-    setSelectedTable('');
-  };
+    fetchTables();
+  }, []);
 
   return (
-    <div className="qr-scanner-page">
-      <div className="qr-scanner-container">
-        <h1 className="page-title">
-          <QrCode size={28} />
-          Mở bàn
-        </h1>
-
-        {/* Error Alert */}
-        {error && (
-          <div className="alert alert-danger">
-            <AlertCircle size={20} />
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="btn-close">
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
-        {/* Chưa mở bàn - Chọn phương thức */}
-        {!openedTable && (
-          <div className="scanner-methods">
-            {/* Phương thức 1: Quét QR */}
-            <div className="method-card">
-              <h3>Quét mã QR bàn</h3>
-              {!scanning ? (
-                <button
-                  className="btn btn-primary"
-                  onClick={startScanning}
-                  disabled={loading}
+    <div className="qr-scanner-page" style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #ffe0b2 0%, #ffb26b 100%)', padding: '40px 0' }}>
+      <div style={{
+        maxWidth: 1000,
+        margin: '0 auto',
+        padding: '32px 12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 32 }}>
+          <QrCode size={32} color="#ff9800" />
+          <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, color: '#ff9800', letterSpacing: 1 }}>QR Bàn</h1>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', color: '#ff9800', fontWeight: 600 }}>Đang tải danh sách bàn...</div>
+        ) : (
+          <>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 28,
+              justifyItems: 'center',
+              marginBottom: 24,
+            }}>
+              {tables.slice((currentPage-1)*16, currentPage*16).map(table => (
+                <div key={table.id} style={{
+                  background: '#fff',
+                  borderRadius: 18,
+                  boxShadow: '0 4px 16px #ffb26b33',
+                  padding: 18,
+                  minWidth: 180,
+                  maxWidth: 210,
+                  textAlign: 'center',
+                  marginBottom: 8,
+                  border: '2px solid #ffb26b',
+                  transition: 'box-shadow 0.2s, border 0.2s',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+                onMouseOver={e => e.currentTarget.style.boxShadow = '0 8px 24px #ff980055'}
+                onMouseOut={e => e.currentTarget.style.boxShadow = '0 4px 16px #ffb26b33'}
                 >
-                  <QrCode size={20} />
-                  {loading ? 'Đang xử lý...' : 'Bắt đầu quét'}
-                </button>
-              ) : (
-                <>
-                  <video
-                    ref={videoRef}
-                    className="qr-video"
-                    autoPlay
-                    playsInline
-                  />
-                  <button className="btn btn-secondary" onClick={stopScanning}>
-                    <X size={20} />
-                    Dừng quét
-                  </button>
-                </>
-              )}
+                  <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4, color: '#ff9800', letterSpacing: 0.5 }}>Bàn {table.name}</div>
+                  <div style={{ color: '#ff9800cc', fontSize: 14, marginBottom: 4 }}>{table.seats} ghế</div>
+                  <TableQRCode qrValue={table.qrCode} tableName={table.name} size={100} />
+                  <div style={{ color: '#888', fontSize: 13, marginTop: 8 }}>Quét mã để gọi món & thanh toán</div>
+                </div>
+              ))}
             </div>
-
-            {/* Phương thức 2: Chọn bàn từ danh sách */}
-            <div className="method-card">
-              <h3>Chọn bàn từ danh sách</h3>
-              <select
-                className="table-select"
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
-                disabled={loading}
-              >
-                <option value="">-- Chọn bàn --</option>
-                {tables.map((table) => (
-                  <option key={table.tableCode} value={table.tableCode}>
-                    {table.tableCode}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn btn-primary"
-                onClick={() => handleOpenTable(selectedTable)}
-                disabled={!selectedTable || loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader size={20} className="spinner" />
-                    Đang mở bàn...
-                  </>
-                ) : (
-                  'Mở bàn'
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Đã mở bàn - Chia sẻ link */}
-        {openedTable && (
-          <div className="opened-table-section">
-            <div className="success-box">
-              <div className="success-icon">✓</div>
-              <h2>Bàn {openedTable.tableCode} đã được mở</h2>
-              <p>Chia sẻ link sau với khách để gọi món:</p>
-            </div>
-
-            {/* Hiển thị link chia sẻ */}
-            <div className="share-section">
-              <div className="share-link-box">
-                <input
-                  type="text"
-                  className="share-link-input"
-                  value={shareLink}
-                  readOnly
-                />
-                <button
-                  className="btn-copy"
-                  onClick={copyToClipboard}
-                  title="Sao chép link"
-                >
-                  <Copy size={18} />
-                </button>
+            {/* Pagination */}
+            {tables.length > 16 && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} style={{ padding: '7px 18px', borderRadius: 8, border: '1.5px solid #ff9800', background: currentPage === 1 ? '#ffe0b2' : '#fff', color: '#ff9800', fontWeight: 700, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: 15 }}>Trước</button>
+                <span style={{ fontWeight: 700, color: '#ff9800', fontSize: 17 }}>Trang {currentPage} / {Math.ceil(tables.length/16)}</span>
+                <button onClick={() => setCurrentPage(p => Math.min(Math.ceil(tables.length/16), p+1))} disabled={currentPage === Math.ceil(tables.length/16)} style={{ padding: '7px 18px', borderRadius: 8, border: '1.5px solid #ff9800', background: currentPage === Math.ceil(tables.length/16) ? '#ffe0b2' : '#fff', color: '#ff9800', fontWeight: 700, cursor: currentPage === Math.ceil(tables.length/16) ? 'not-allowed' : 'pointer', fontSize: 15 }}>Sau</button>
               </div>
-
-              <div className="share-actions">
-                <button className="btn btn-primary" onClick={shareLink_fn}>
-                  <Share2 size={18} />
-                  Chia sẻ
-                </button>
-                <button className="btn btn-secondary" onClick={handleReset}>
-                  Mở bàn khác
-                </button>
-              </div>
-            </div>
-
-            {/* QR Ticket Info */}
-            <div className="ticket-info">
-              <p className="label">Mã ticket:</p>
-              <div className="ticket-code">{openedTable.qrTicket.substring(0, 20)}...</div>
-              <p className="label">Session ID:</p>
-              <div className="session-id">{openedTable.sessionId}</div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
