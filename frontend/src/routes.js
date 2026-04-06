@@ -27,6 +27,7 @@ import ManagerReservationsPage from './pages/manager/ManagerReservationsPage';
 import EventDetailPage from './pages/manager/EventDetailPage';
 import ContractSigningPage from './pages/manager/ContractSigningPage';
 import ManagerStaffPage from './pages/manager/ManagerStaffPage';
+import StaffProfilePage from './pages/manager/StaffProfilePage';
 import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import ManagerProfilePage from './pages/manager/ManagerProfilePage';
@@ -146,14 +147,11 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Redirect old admin URLs to manager */}
-        <Route path="/admin/*" element={<Navigate to="/manager" replace />} />
-
-        {/* Admin pages - Không có authorization (permissions tạm tắt) */}
+        {/* Admin pages */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="orders" element={<AdminDashboard />} />
-          <Route path="reservations" element={<AdminDashboard />} />
+          <Route path="orders" element={<div style={{ padding: '2rem', textAlign: 'center' }}>Trang Đơn hàng đang phát triển…</div>} />
+          <Route path="reservations" element={<div style={{ padding: '2rem', textAlign: 'center' }}>Trang Đặt chỗ đang phát triển…</div>} />
           <Route path="tables" element={<AdminTableMap />} />
           <Route path="menu" element={<AdminMenuManagement />} />
           <Route path="inventory" element={<AdminInventoryPage />} />
@@ -182,6 +180,7 @@ const AppRoutes = () => {
           <Route path="reservations/:eventId" element={<EventDetailPage />} />
           <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
           <Route path="staff" element={<ManagerStaffPage />} />
+          <Route path="staff/:staffId/profile" element={<StaffProfilePage />} />
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
           <Route path="profile" element={<ManagerProfilePage />} />

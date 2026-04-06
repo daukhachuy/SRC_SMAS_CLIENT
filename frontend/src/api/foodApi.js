@@ -3,6 +3,40 @@ import instance from './axiosInstance';
 const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
 /**
+ * Ghép URL ảnh món (Swagger: image có thể là path tương đối "/foods/xxx.jpg")
+ */
+export function resolveFoodImageUrl(imagePath) {
+  if (imagePath == null || imagePath === '') return FIXED_PRODUCT_IMAGE;
+  const s = String(imagePath).trim();
+  if (!s) return FIXED_PRODUCT_IMAGE;
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  const apiBase = process.env.REACT_APP_API_URL || '';
+  const origin = apiBase.replace(/\/api\/?$/, '') || (typeof window !== 'undefined' ? window.location.origin : '');
+  const path = s.startsWith('/') ? s : `/${s}`;
+  return `${origin}${path}`;
+}
+
+/**
+ * Chuẩn hóa payload GET /api/food/category (mảng phẳng hoặc lồng category)
+ */
+export function normalizeFoodCategoryPayload(data) {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.$values)) return data.$values;
+  if (Array.isArray(data.foods)) return data.foods;
+  if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.categories)) {
+    const out = [];
+    for (const c of data.categories) {
+      const foods = c.foods || c.menuItems || c.$values;
+      if (Array.isArray(foods)) out.push(...foods);
+    }
+    return out;
+  }
+  return [];
+}
+
+/**
  * FOOD API - Lấy danh sách món ăn theo danh mục
  * Endpoint: /api/food/category
  */
@@ -146,5 +180,79 @@ export async function getFoodByFilter(params) {
   } catch (error) {
     console.error('❌ Failed to fetch foods with filter:', error.response?.data || error.message);
     throw error;
+  }
+}
+
+/**
+ * Cập nhật trạng thái món ăn (backend toggle: Đang bán ↔ Hết hàng)
+ * Swagger: PATCH /api/food/status-food/{id} — path id: integer($int32), không body
+ * Thành công: { msgCode: "MSG_022", message: "Cập nhật trạng thái món ăn thành công !" }
+ *
+ * @param {number|string} foodId - foodId (int32)
+ * @returns {Promise<{ msgCode?: string, message?: string }>}
+ */
+export async function updateFoodStatus(foodId) {
+  const idNum = Number(foodId);
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    throw {
+      status: 400,
+      message: 'Mã món không hợp lệ.',
+      error: new Error('Invalid food id')
+    };
+  }
+  try {
+    const response = await instance.patch(`/food/status-food/${idNum}`);
+    return response.data;
+  } catch (error) {
+    const data = error.response?.data;
+    const msg =
+      (typeof data === 'object' && data?.message) ||
+      (typeof data === 'string' ? data : null) ||
+      error.message ||
+      'Không thể cập nhật trạng thái món.';
+    console.error('❌ Failed to update food status:', data || error.message);
+    throw {
+      status: error.response?.status,
+      message: msg,
+      msgCode: typeof data === 'object' ? data?.msgCode : undefined,
+      error
+    };
+  }
+}
+
+/**
+ * Cập nhật trạng thái gói buffet (bật/tắt bán)
+ * Swagger: PATCH /api/Buffer/status-buffer/{id} — id = buffetId (int32), không body
+ * Thành công: { msgCode: "MSG_022", message: "Cập nhật trạng thái món ăn thành công !" }
+ *
+ * @param {number|string} buffetId
+ * @returns {Promise<{ msgCode?: string, message?: string }>}
+ */
+export async function updateBuffetStatus(buffetId) {
+  const idNum = Number(buffetId);
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    throw {
+      status: 400,
+      message: 'Mã gói buffet không hợp lệ.',
+      error: new Error('Invalid buffet id')
+    };
+  }
+  try {
+    const response = await instance.patch(`/Buffer/status-buffer/${idNum}`);
+    return response.data;
+  } catch (error) {
+    const data = error.response?.data;
+    const msg =
+      (typeof data === 'object' && data?.message) ||
+      (typeof data === 'string' ? data : null) ||
+      error.message ||
+      'Không thể cập nhật trạng thái buffet.';
+    console.error('❌ Failed to update buffet status:', data || error.message);
+    throw {
+      status: error.response?.status,
+      message: msg,
+      msgCode: typeof data === 'object' ? data?.msgCode : undefined,
+      error
+    };
   }
 }

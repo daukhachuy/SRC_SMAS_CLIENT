@@ -51,19 +51,22 @@ const BuffetPage = () => {
     loadBuffetData();
   }, []);
 
-  const filteredBuffetItems = buffetItems.filter((item) => {
-    const keyword = searchTerm.trim().toLowerCase();
-    if (!keyword) return true;
+  const filteredBuffetItems = buffetItems
+    .filter((item) => item.isAvailable !== false)
+    .filter((item) => {
+      const keyword = searchTerm.trim().toLowerCase();
+      if (!keyword) return true;
 
-    const buffetName = (item.name || '').toLowerCase();
-    const foodNames = (item.foods?.$values || item.foods || [])
-      .map((food) => (food.foodName || '').toLowerCase())
-      .join(' ');
+      const buffetName = (item.name || '').toLowerCase();
+      const foodNames = (item.foods?.$values || item.foods || [])
+        .map((food) => (food.foodName || '').toLowerCase())
+        .join(' ');
 
-    return buffetName.includes(keyword) || foodNames.includes(keyword);
-  });
+      return buffetName.includes(keyword) || foodNames.includes(keyword);
+    });
 
   const addBuffetToCart = (item) => {
+    if (item.isAvailable === false) return;
     if (!isAuthenticated()) {
       setShowAuthRequired(true);
       return;
@@ -182,7 +185,12 @@ const BuffetPage = () => {
                         </div>
                       </div>
                       <button className="btn-order-now" onClick={() => navigate('/services')}>ĐẶT BÀN NGAY</button>
-                      <button className="btn-add-buffet-cart" onClick={() => addBuffetToCart(item)}>
+                      <button
+                        type="button"
+                        className="btn-add-buffet-cart"
+                        disabled={item.isAvailable === false}
+                        onClick={() => addBuffetToCart(item)}
+                      >
                         <ShoppingCart size={18} />
                         <span>THÊM VÀO GIỎ</span>
                       </button>

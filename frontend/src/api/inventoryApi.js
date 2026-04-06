@@ -34,12 +34,29 @@ export async function getInventory() {
  * GET /api/inventory/logs
  * 404 = chưa có lịch sử → trả về [] để không làm fail cả trang
  */
+function normalizeLogsPayload(raw) {
+  if (raw == null) return [];
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return normalizeLogsPayload(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.$values)) return raw.$values;
+  if (Array.isArray(raw.data)) return raw.data;
+  return [];
+}
+
 export async function getInventoryLogs() {
   try {
     console.log('📜 Fetching inventory logs...');
     const response = await instance.get('/inventory/logs');
-    console.log('✅ Inventory logs loaded:', response.data);
-    return response.data;
+    const list = normalizeLogsPayload(response.data);
+    console.log('✅ Inventory logs loaded:', list);
+    return list;
   } catch (error) {
     if (error.response?.status === 404) {
       console.warn('⚠️ No inventory logs yet (404) – using empty list');

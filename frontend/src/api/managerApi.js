@@ -45,6 +45,7 @@ export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
 
   deleteWorkStaff: (workStaffId) =>
     instance.delete(`/Staff/${workStaffId}`),
+
 };
 
 // ===== CALL API + MAP =====

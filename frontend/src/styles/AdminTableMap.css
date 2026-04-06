@@ -501,3 +501,18 @@
 .tablemap-modal-save:hover {
   background: #e85a15;
 }
+
+.tablemap-modal-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: tablemap-spin 0.85s linear infinite;
+}
+
+@keyframes tablemap-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
