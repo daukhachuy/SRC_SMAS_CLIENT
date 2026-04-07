@@ -188,7 +188,6 @@ const PaymentInfoSection = ({ paymentInfo, onProceedPayment }) => (
     <div className="p-6 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
       <div className="space-y-2">
         <InfoRow label="Tổng thực đơn:" value={paymentInfo.menuTotal} />
-        <InfoRow label="Thuế VAT (10%):" value={paymentInfo.tax} />
         <div className="flex justify-between items-center text-sm pb-2 border-b border-slate-200 dark:border-slate-700">
           <span className="text-slate-500 font-medium">Đã đặt cọc:</span>
           <span className="text-emerald-600 dark:text-emerald-400 font-bold">

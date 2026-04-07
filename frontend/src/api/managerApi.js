@@ -1,7 +1,6 @@
-
-import instance from './axiosInstance';
+import instance from './axiosInstance'; 
 // Export lại các hàm cho các file khác import trực tiếp (đặt sau staffAPI)
-export const getWorkingStaffToday = (...args) => staffAPI.getWorkshift(...args);
+export const getWorkingStaffToday = (...args) => staffAPI.getWorkingToday(...args);
 export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
 
 // ===== SCHEDULE API (QUAN TRỌNG) =====
@@ -46,6 +45,8 @@ export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
   deleteWorkStaff: (workStaffId) =>
     instance.delete(`/Staff/${workStaffId}`),
 
+  // Lịch sử ca làm việc của nhân viên
+  getStaffWorkHistory: (staffId) => instance.get(`/Staff/${staffId}/work-history`),
 };
 
 // ===== CALL API + MAP =====
@@ -389,6 +390,8 @@ export async function getAllStaffSchedule() {
     const statusMap = {
       pending: { status: 'pending', statusText: 'Chờ xác nhận' },
       waitconfirm: { status: 'pending', statusText: 'Chờ xác nhận' },
+      // Khi khách đã được xếp chỗ (Seated), giữ trạng thái riêng để UI lọc độc lập.
+      seated: { status: 'seated', statusText: 'Đã nhận bàn' },
       confirmed: { status: 'confirmed', statusText: 'Đã xác nhận' },
       dining: { status: 'dining', statusText: 'Đang dùng bữa' },
       active: { status: 'dining', statusText: 'Đang dùng bữa' },

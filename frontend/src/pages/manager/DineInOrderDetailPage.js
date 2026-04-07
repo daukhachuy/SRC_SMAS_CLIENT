@@ -213,10 +213,6 @@ function DineInOrderDetailPage() {
                   <span>Giảm giá</span>
                   <span className="dinein-detail-payment-discount">{formatCurrency(orderData.discount || 0)}</span>
                 </div>
-                <div className="dinein-detail-payment-row">
-                  <span>Thuế VAT (10%)</span>
-                  <span className="dinein-detail-payment-value">{formatCurrency(orderData.tax || 0)}</span>
-                </div>
                 <div className="dinein-detail-payment-total">
                   <span>Tổng cộng</span>
                   <span className="dinein-detail-total-amount">{formatCurrency(orderData.total || 0)}</span>

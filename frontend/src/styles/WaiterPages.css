@@ -2973,17 +2973,51 @@
 .cart-item.buffet {
   background: rgba(255, 109, 31, 0.06);
   border-color: rgba(255, 109, 31, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cart-item.buffet .remove-cart-item {
+  top: 6px;
+  right: 6px;
 }
 
 .cart-item-row {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  align-items: flex-start;
+}
+
+.cart-item-row > div:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .cart-item-row h5 {
   margin: 0;
   font-size: 14px;
+  line-height: 1.35;
+}
+
+.buffet-summary h5 {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.buffet-line {
+  margin: 0;
+  color: #ff6d1f;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  margin-right: 8px;
 }
 
 .cart-item-row p {
@@ -2993,7 +3027,7 @@
   font-size: 12px;
 }
 
- qty-box {
+.qty-box {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -3002,7 +3036,7 @@
   padding: 4px 8px;
 }
 
- qty-box button {
+.qty-box button {
   border: 0;
   background: transparent;
   width: 18px;
@@ -3012,11 +3046,73 @@
   cursor: pointer;
 }
 
- qty-box span {
+.qty-box span {
   min-width: 14px;
   text-align: center;
   font-size: 13px;
   font-weight: 800;
+}
+
+.buffet-child-qty {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: #fff7f0;
+  border-radius: 8px;
+}
+
+.buffet-child-qty-note {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+.buffet-qty-rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.buffet-price-qty-rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.buffet-price-qty-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+}
+
+.buffet-qty-box {
+  gap: 8px;
+  padding: 2px 5px;
+}
+
+.buffet-qty-box button {
+  width: 14px;
+  height: 14px;
+  font-size: 13px;
+}
+
+.buffet-qty-box span {
+  min-width: 10px;
+  font-size: 11px;
+}
+
+.buffet-qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.buffet-qty-row > span {
+  font-size: 12px;
+  color: #6f6258;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .cart-item input {
@@ -3025,6 +3121,20 @@
   background: #f8f5f2;
   padding: 9px;
   font-size: 12px;
+}
+
+.cart-note-input {
+  width: 100%;
+}
+
+.buffet-note-input {
+  grid-column: 1;
+  grid-row: auto;
+  min-height: 46px;
+  max-height: 58px;
+  padding: 8px;
+  font-size: 11px;
+  resize: none;
 }
 
 .buffet-children-tags {

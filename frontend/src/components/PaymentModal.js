@@ -30,8 +30,7 @@ function PaymentModal({ isOpen, onClose, orderData }) {
   const subtotal = orderData?.subtotal || 1250000;
   const discount = orderData?.discount || 0;
   const fixedDiscount = 30000;
-  const tax = orderData?.tax || 125000;
-  const total = subtotal - discount - fixedDiscount + tax;
+  const total = subtotal - discount - fixedDiscount;
 
   const handleApplyCode = () => {
     if (discountCode) {
@@ -119,10 +118,6 @@ function PaymentModal({ isOpen, onClose, orderData }) {
               <div className="payment-modal-summary-row">
                 <span>Mã giảm giá (GIAM30K):</span>
                 <span className="payment-modal-summary-discount">{formatCurrency(fixedDiscount)}</span>
-              </div>
-              <div className="payment-modal-summary-row">
-                <span>Thuế (VAT 8%):</span>
-                <span className="payment-modal-summary-value">{formatCurrency(tax)}</span>
               </div>
               <div className="payment-modal-summary-total">
                 <span>Tổng thanh toán:</span>
