@@ -1,0 +1,101 @@
+/* StaffProfilePage.css */
+
+.staff-profile-bg {
+	min-height: 100vh;
+	background: #F9F4F0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 32px 8px;
+}
+
+.staff-profile-card {
+	background: #fff;
+	border-radius: 24px;
+	box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+	border: 1px solid #f3ede7;
+	width: 100%;
+	max-width: 900px;
+	margin: auto;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.staff-profile-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 32px;
+	border-bottom: 1px solid #f3ede7;
+	background: #fff;
+}
+
+.staff-profile-header-info {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+}
+
+.staff-profile-avatar {
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: #f3ede7;
+	border: 2px solid #FF6C1F22;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.staff-profile-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.staff-profile-header-title {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: #1A1A1A;
+}
+
+.staff-profile-header-title .highlight {
+	color: #FF6C1F;
+}
+
+.staff-profile-header-meta {
+	font-size: 1.35rem;
+	font-weight: 800;
+	color: #23160f;
+	letter-spacing: -0.01em;
+}
+.staff-profile-header-title .highlight {
+	color: #FF6C1F;
+	font-weight: 900;
+}
+
+.staff-profile-close-btn {
+	background: none;
+	border: none;
+	border-radius: 50%;
+	padding: 8px;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+.staff-profile-close-btn:hover {
+	background: #f3ede7;
+}
+
+.staff-profile-stats {
+	display: flex;
+	gap: 18px;
+	padding: 24px 32px 18px 32px;
+	background: #f9f4f0;
+	border-bottom: 1.5px solid #f3ede7;
+}
+
+.staff-profile-stat-card {
+	background: #fff;
+}

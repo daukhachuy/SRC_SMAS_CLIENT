@@ -18,6 +18,41 @@ import {
 import { orderAPI, getWorkingStaffToday } from '../../api/managerApi';
 import '../../styles/DeliveryDetailModal.css';
 
+const asArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.$values)) return payload.$values;
+  if (Array.isArray(payload?.data?.data)) return payload.data.data;
+  if (Array.isArray(payload?.data?.data?.$values)) return payload.data.data.$values;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data?.items?.$values)) return payload.data.items.$values;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.items?.$values)) return payload.items.$values;
+  return [];
+};
+
+const isWaiterStaff = (staff) => {
+  const role = String(staff?.role || staff?.staffRole || '').toLowerCase();
+  const position = String(staff?.position || staff?.positionName || staff?.jobTitle || '').toLowerCase();
+  return role.includes('waiter') || position.includes('waiter') || position.includes('phuc vu') || position.includes('phục vụ');
+};
+
+const mapDriver = (staff) => ({
+  id: staff?.id ?? staff?.staffId ?? staff?.userId ?? staff?.workStaffId,
+  name: staff?.name || staff?.fullname || staff?.fullName || staff?.staffName || 'Nhân viên',
+  status: staff?.status || 'Đang làm việc',
+});
+
+const uniqueById = (list) => {
+  const seen = new Set();
+  return list.filter((x) => {
+    const key = String(x.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
   const [selectedDriver, setSelectedDriver] = useState('');
@@ -42,25 +77,17 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
       .catch(() => setError('Không thể tải chi tiết đơn hàng.'))
       .finally(() => setLoading(false));
 
-    // Fetch delivery staff (drivers)
-    getWorkingStaffToday()
-      .then(staffList => {
-        // Nếu không có role giao hàng, lấy luôn nhân viên phục vụ (Waiter)
-        const deliveryStaff = staffList.filter(
-          s => (s.position && (
-                  s.position.toLowerCase().includes('delivery') ||
-                  s.position.toLowerCase().includes('waiter') ||
-                  s.position.toLowerCase().includes('phục vụ')
-                ))
-            || (s.role && (
-                  s.role.toLowerCase().includes('delivery') ||
-                  s.role.toLowerCase().includes('waiter') ||
-                  s.role.toLowerCase().includes('phục vụ')
-                ))
-        );
-        setDrivers(deliveryStaff);
-      })
-      .catch(() => setDrivers([]));
+    // Fetch drivers: chỉ lấy từ API "Nhân viên đang làm việc"
+    (async () => {
+      try {
+        const allStaffRes = await getWorkingStaffToday();
+        const waiterCandidates = asArray(allStaffRes?.data ?? allStaffRes).filter(isWaiterStaff);
+        const mappedWaiters = uniqueById(waiterCandidates.map(mapDriver).filter((s) => s.id != null));
+        setDrivers(mappedWaiters);
+      } catch {
+        setDrivers([]);
+      }
+    })();
   }, [isOpen, deliveryData]);
 
   if (!isOpen) return null;

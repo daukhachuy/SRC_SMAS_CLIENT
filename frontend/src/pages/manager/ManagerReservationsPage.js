@@ -88,7 +88,9 @@ const ManagerReservationsPage = () => {
         .sort((a, b) => getTimestamp(b) - getTimestamp(a));
       setRegularBookings([...pending, ...confirmed, ...others]);
 
-      const activeDiningCount = mappedReservations.filter((booking) => booking.status === 'dining').length;
+      const activeDiningCount = mappedReservations.filter(
+        (booking) => booking.status === 'dining' || booking.status === 'seated'
+      ).length;
       setActiveTables(activeDiningCount);
 
       if (sumTodayRes.status === 'fulfilled') {
@@ -337,6 +339,10 @@ const ManagerReservationsPage = () => {
         className: 'regular-status confirmed',
         icon: <CheckCircle size={14} />,
       },
+      seated: {
+        className: 'regular-status dining',
+        icon: <Utensils size={14} />,
+      },
       cancelled: {
         className: 'regular-status cancelled',
         icon: <XCircle size={14} />,
@@ -492,6 +498,13 @@ const ManagerReservationsPage = () => {
                   onMouseOut={e => { if(statusFilter!=='confirmed')e.target.style.background='transparent'; }}
                 >Đã xác nhận</button>
                 <button
+                  className={`filter-btn${statusFilter === 'seated' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: statusFilter === 'seated' ? '#0ea5e9' : 'transparent', color: statusFilter === 'seated' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: statusFilter === 'seated' ? '0 2px 8px #0ea5e922' : 'none' }}
+                  onClick={() => setStatusFilter('seated')}
+                  onMouseOver={e => { if(statusFilter!=='seated')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(statusFilter!=='seated')e.target.style.background='transparent'; }}
+                >Đã nhận bàn</button>
+                <button
                   className={`filter-btn${statusFilter === 'cancelled' ? ' active' : ''}`}
                   style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: statusFilter === 'cancelled' ? '#64748b' : 'transparent', color: statusFilter === 'cancelled' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: statusFilter === 'cancelled' ? '0 2px 8px #64748b22' : 'none' }}
                   onClick={() => setStatusFilter('cancelled')}
@@ -541,6 +554,7 @@ const ManagerReservationsPage = () => {
             <table className="events-table regular-table">
               <thead>
                 <tr>
+                  <th>Mã đặt chỗ</th>
                   <th>Khách hàng</th>
                   <th>Số lượng</th>
                   <th>Thời gian đặt</th>
@@ -557,6 +571,7 @@ const ManagerReservationsPage = () => {
                     const isProcessing = processingCode === booking.reservationCode;
                     return (
                       <tr key={booking.id} className={booking.status === 'cancelled' ? 'muted-row' : ''}>
+                        <td>{booking.reservationCode}</td>
                         <td>
                           <div className="customer-info">
                             <div className="customer-name">{booking.customer}</div>

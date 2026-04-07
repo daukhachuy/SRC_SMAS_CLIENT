@@ -263,6 +263,7 @@ const Services = () => {
   const getAvailableTimes = (selectedDateParam) => {
     const now = new Date();
     const times = [];
+    const openingHour = 9;
     
     // Kiểm tra nếu ngày được chọn là hôm nay
     const isToday = selectedDateParam.toDateString() === now.toDateString();
@@ -277,6 +278,12 @@ const Services = () => {
       minEarliestTime.setHours(minEarliestTime.getHours() + 1, 0, 0);
       startHour = minEarliestTime.getHours();
       startMinute = minEarliestTime.getMinutes();
+
+      // Không cho đặt trước giờ mở cửa.
+      if (startHour < openingHour) {
+        startHour = openingHour;
+        startMinute = 0;
+      }
     }
     
     // Kết thúc trước 21:00 (Nhà hàng nhận booking đến 21:00)
@@ -303,13 +310,18 @@ const Services = () => {
   const isTimeSelectable = (time, selectedDateParam) => {
     const now = new Date();
     const isToday = selectedDateParam.toDateString() === now.toDateString();
+    const [hours, minutes] = time.split(':').map(Number);
+
+    // Không cho chọn giờ ngoài khung mở cửa.
+    if (hours < 9 || (hours > 21 || (hours === 21 && minutes > 0))) {
+      return false;
+    }
     
     if (!isToday) {
       return true; // Có thể chọn bất kỳ giờ nào ngoài hôm nay
     }
     
     // Hôm nay: chỉ có thể chọn giờ từ hiện tại + 1 tiếng
-    const [hours, minutes] = time.split(':').map(Number);
     const timeDate = new Date();
     timeDate.setHours(hours, minutes, 0);
     

@@ -253,6 +253,7 @@
           const dayIndex = weekDates.findIndex((d) => d.key.slice(0, 10) === workDayStr);
           if (dayIndex < 0) return;
           day.staffs.forEach((staff, staffIdx) => {
+                        // Tìm workStaffId từ map
             // Tìm workStaffId từ map
             const key = `${staff.userId}|${shift.shiftId}|${workDayStr}`;
             const workStaffId = workStaffIdMap.get(key);
@@ -276,6 +277,7 @@
       // Xử lý thêm dữ liệu từ weekKitchenRes nếu cần (giữ nguyên logic cũ)
       const scheduleItems = weekKitchenRes.status === 'fulfilled' ? unwrapResponse(weekKitchenRes.value) : [];
       scheduleItems.forEach((raw, idx) => {
+        // ...existing code...
         const staff = mapStaffToUI(raw);
         if (staff.id == null) return;
         if (!employeeIds.has(staff.id)) {
@@ -301,6 +303,7 @@
       setScheduleData(byDay);
 
       setEmployees((prev) => {
+        // ...existing code...
         const map = new Map(prev.map((p) => [p.id, p]));
         employeePool.forEach((p) => {
           if (p.id != null && !map.has(p.id)) map.set(p.id, p);
@@ -318,14 +321,13 @@
       setError('');
 
       try {
-
         const [workshiftRes, staffWorkRes, workingRes, sumShiftRes, sumTimeRes, nextSevenRes] = await Promise.allSettled([
           staffAPI.getWorkshift(),
           staffAPI.getStaffWorkToday(),
           staffAPI.getWorkingToday(),
           staffAPI.getSumWorkshiftThisMonth(),
           staffAPI.getSumTimeworkThisMonth(),
-          staffAPI.getNextSevenDays(ROLE_TO_POSITION.all),
+          staffAPI.getNextSevenDays(ROLE_TO_POSITION.all)
         ]);
 
         // Log chi tiết response API getWorkshift

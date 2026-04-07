@@ -260,7 +260,7 @@ const EventDetailPage = () => {
                 <span className="payment-value">{formatCurrency(eventData.payment.subtotal)}</span>
               </div>
               <div className="payment-row">
-                <span>Phí dịch vụ & VAT (10%)</span>
+                <span>Phí dịch vụ</span>
                 <span className="payment-value">{formatCurrency(eventData.payment.serviceVAT)}</span>
               </div>
               <div className="payment-row">

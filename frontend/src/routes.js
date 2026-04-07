@@ -1,3 +1,6 @@
+import GuesQRorder from './pages/GuesQRorder';
+  {/* Trang đặt món QR cho khách */}
+  <Route path="/guest-qr-order" element={<GuesQRorder />} />
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -116,6 +119,7 @@ const AppRoutes = () => {
       <Router>
       <Routes>
         {/* Các trang công khai */}
+        <Route path="/guest-qr-order" element={<GuesQRorder />} />
         <Route path="/" element={<CustomerPublicRoute><Home /></CustomerPublicRoute>} />
         <Route path="/menu" element={<CustomerPublicRoute><MenuPage menuItems={BEST_SELLERS_DATA} /></CustomerPublicRoute>} />
         <Route path="/combo" element={<CustomerPublicRoute><ComboPage combos={COMBOS_DATA} /></CustomerPublicRoute>} />
