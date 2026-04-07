@@ -216,10 +216,6 @@ function TakeawayOrderDetailPage() {
                   <span className="takeaway-payment-label">Giảm giá</span>
                   <span className="takeaway-payment-value">{formatCurrency(orderData.discount)}</span>
                 </div>
-                <div className="takeaway-payment-row">
-                  <span className="takeaway-payment-label">Thuế (0%)</span>
-                  <span className="takeaway-payment-value">{formatCurrency(orderData.tax)}</span>
-                </div>
               </div>
               <div className="takeaway-payment-total">
                 <span className="takeaway-payment-total-label">Tổng cộng</span>
