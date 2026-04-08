@@ -83,6 +83,32 @@
   justify-content: flex-end;
 }
 
+.rest-toolbar-search {
+  flex: 1;
+  max-width: 360px;
+}
+
+.rest-search-input {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #111827;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.rest-search-input:focus {
+  border-color: #FF6C1F;
+}
+
+.rest-search-input::placeholder {
+  color: #9ca3af;
+}
+
 .rest-search-wrap {
   position: relative;
 }
@@ -204,6 +230,31 @@
   color: #b91c1c;
 }
 
+.rest-img-cell {
+  width: 64px;
+  height: 40px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rest-img-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rest-img-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #d1d5db;
+}
+
 .rest-toggle {
   position: relative;
   width: 44px;
@@ -237,9 +288,31 @@
   transform: translateX(20px);
 }
 
+.rest-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rest-service-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .rest-status-text {
   font-size: 0.8125rem;
   color: #6b7280;
+}
+
+.rest-status-on {
+  color: #15803d;
+  font-weight: 500;
+}
+
+.rest-status-off {
+  color: #b91c1c;
+  font-weight: 500;
 }
 
 .rest-icon-btn {
@@ -256,6 +329,25 @@
 .rest-icon-btn:hover {
   color: #FF6C1F;
   background: #fff7ed;
+}
+
+.rest-icon-btn--loading {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes rest-spin {
+  to { transform: rotate(360deg); }
+}
+
+.rest-spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #9ca3af;
+  border-top-color: #FF6C1F;
+  border-radius: 50%;
+  animation: rest-spin 0.6s linear infinite;
 }
 
 .rest-pagination {
@@ -470,6 +562,12 @@
   font-weight: 700;
 }
 
+.rest-review-avatar.rest-review-avatar-img {
+  display: block;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .rest-review-card:nth-child(3) .rest-review-avatar {
   background: #9ca3af;
 }
@@ -531,6 +629,450 @@
 
 .rest-modal-lg {
   max-width: 560px;
+}
+
+/* ── Blog detail modal (layout 2 cột, tone ấm) ── */
+.rest-modal-overlay--blog-detail {
+  background: rgba(35, 24, 18, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.rest-blog-detail-modal {
+  position: relative;
+  width: 100%;
+  max-width: 980px;
+  max-height: 90vh;
+  margin: auto;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fdf5f0;
+  box-shadow: 0 28px 90px rgba(45, 28, 22, 0.22), 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.rest-blog-detail-loading--full {
+  padding: 4rem 2rem;
+  text-align: center;
+  color: #7d5c4a;
+  font-size: 0.9375rem;
+}
+
+.rest-blog-detail-error-wrap {
+  position: relative;
+  min-height: 200px;
+  padding: 3rem 2rem 2.5rem;
+  text-align: center;
+}
+
+.rest-blog-detail-error-text {
+  color: #b91c1c;
+  font-size: 0.9375rem;
+  margin: 0 0 1rem;
+}
+
+.rest-blog-detail-retry {
+  padding: 0.4rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.rest-blog-detail-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: min(520px, 85vh);
+  max-height: 90vh;
+}
+
+.rest-blog-detail-visual {
+  flex: 0 0 40%;
+  min-width: 0;
+  position: relative;
+  min-height: 280px;
+  overflow: hidden;
+}
+
+.rest-blog-detail-visual--placeholder .rest-blog-detail-visual-bg--fallback {
+  background: linear-gradient(145deg, #c2410c 0%, #7c2d12 45%, #431407 100%);
+}
+
+.rest-blog-detail-visual-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.02);
+}
+
+.rest-blog-detail-visual-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.rest-blog-detail-visual-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 12, 8, 0.15) 0%,
+    rgba(20, 12, 8, 0.55) 55%,
+    rgba(12, 8, 6, 0.88) 100%
+  );
+}
+
+.rest-blog-detail-visual-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1.5rem 1.35rem 1.75rem;
+  z-index: 1;
+}
+
+.rest-blog-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rest-blog-detail-tags span {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.rest-blog-detail-visual-title {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  font-weight: 800;
+  line-height: 1.35;
+  color: #fff;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+}
+
+.rest-blog-detail-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fdf5f0;
+  position: relative;
+}
+
+.rest-blog-detail-close-fab {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #9a3412;
+  background: rgba(255, 108, 31, 0.18);
+  transition: background 0.2s, color 0.2s;
+}
+
+.rest-blog-detail-close-fab:hover {
+  background: rgba(255, 108, 31, 0.32);
+  color: #7c2d12;
+}
+
+.rest-blog-detail-panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2.25rem 2.25rem 1rem 2rem;
+  padding-right: 3.5rem;
+}
+
+.rest-blog-detail-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a18072;
+}
+
+.rest-blog-detail-id {
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #3f2e26;
+}
+
+.rest-blog-detail-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(180, 140, 120, 0.25);
+}
+
+.rest-blog-detail-meta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.rest-blog-detail-meta-icon {
+  flex-shrink: 0;
+  color: #b45309;
+  margin-top: 2px;
+}
+
+.rest-blog-detail-meta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.rest-blog-detail-meta-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a18072;
+}
+
+.rest-blog-detail-meta-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #3f2e26;
+  word-break: break-word;
+}
+
+.rest-blog-detail-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: #9ca3af;
+}
+
+.rest-blog-detail-status-dot--live {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+.rest-blog-detail-submeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #7d5c4a;
+  margin-bottom: 1.25rem;
+}
+
+.rest-blog-detail-submeta-path {
+  word-break: break-all;
+  opacity: 0.9;
+}
+
+.rest-blog-detail-main-title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.3;
+  color: #2d1b14;
+}
+
+.rest-blog-detail-prose {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: #4a372f;
+}
+
+.rest-blog-detail-html {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.rest-blog-detail-html img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.rest-blog-detail-html blockquote {
+  margin: 1rem 0;
+  padding: 1rem 1.15rem 1rem 1.25rem;
+  border-left: 4px solid #ff6c1f;
+  background: rgba(255, 108, 31, 0.1);
+  border-radius: 0 10px 10px 0;
+  font-style: italic;
+  color: #5c4035;
+}
+
+.rest-blog-detail-html p {
+  margin: 0 0 0.85rem;
+}
+
+.rest-blog-detail-html p:last-child {
+  margin-bottom: 0;
+}
+
+.rest-blog-detail-plain {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rest-blog-detail-extras {
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(180, 140, 120, 0.35);
+}
+
+.rest-blog-detail-extras-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a18072;
+  margin-bottom: 0.5rem;
+}
+
+.rest-blog-detail-extras-dl {
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) 1fr;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.rest-blog-detail-extras-dl dt {
+  margin: 0;
+  color: #a18072;
+  font-weight: 600;
+}
+
+.rest-blog-detail-extras-dl dd {
+  margin: 0;
+  color: #4a372f;
+  word-break: break-all;
+}
+
+.rest-blog-detail-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem 1.25rem;
+  border-top: 1px solid rgba(180, 140, 120, 0.28);
+  background: linear-gradient(180deg, rgba(255, 250, 247, 0.9) 0%, #fdf5f0 100%);
+}
+
+.rest-blog-detail-footer-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rest-blog-detail-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5c4035;
+  background: rgba(255, 108, 31, 0.12);
+  border: 1px solid rgba(255, 108, 31, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.rest-blog-detail-btn-secondary:hover {
+  background: rgba(255, 108, 31, 0.2);
+  border-color: rgba(255, 108, 31, 0.45);
+}
+
+.rest-blog-detail-btn-primary {
+  padding: 0.65rem 1.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 50%, #9a3412 100%);
+  box-shadow: 0 4px 16px rgba(194, 65, 12, 0.35);
+  transition: filter 0.2s, transform 0.15s;
+}
+
+.rest-blog-detail-btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.rest-blog-detail-btn-primary:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 768px) {
+  .rest-blog-detail-layout {
+    flex-direction: column;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .rest-blog-detail-visual {
+    flex: none;
+    width: 100%;
+    min-height: 200px;
+    max-height: 240px;
+  }
+
+  .rest-blog-detail-panel-scroll {
+    padding: 1.5rem 1.25rem 1rem;
+    padding-right: 1.25rem;
+  }
+
+  .rest-blog-detail-meta-row {
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .rest-blog-detail-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rest-blog-detail-footer-left {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .rest-blog-detail-btn-secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .rest-blog-detail-btn-primary {
+    width: 100%;
+  }
 }
 
 .rest-modal-head {
@@ -650,6 +1192,92 @@
 }
 
 .rest-upload-zone small {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* ── Blog image upload ── */
+.rest-blog-upload-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rest-blog-upload-zone {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 260px;
+  border: 2px dashed #e5e7eb;
+  border-radius: 0.625rem;
+  overflow: hidden;
+  cursor: pointer;
+  background: #fafafa;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.rest-blog-upload-zone:hover {
+  border-color: #FF6C1F;
+  background: #fff7ed;
+}
+
+.rest-blog-upload-preview {
+  position: absolute;
+  inset: 0;
+}
+
+.rest-blog-upload-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rest-blog-upload-remove {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.2s;
+}
+
+.rest-blog-upload-remove:hover {
+  background: rgba(220, 38, 38, 0.85);
+}
+
+.rest-blog-upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.5rem;
+  color: #9ca3af;
+  padding: 1rem;
+}
+
+.rest-blog-upload-placeholder svg {
+  color: #d1d5db;
+}
+
+.rest-blog-upload-placeholder span {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.rest-blog-upload-placeholder small {
   font-size: 0.75rem;
   color: #9ca3af;
 }

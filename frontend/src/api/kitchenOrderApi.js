@@ -1,7 +1,36 @@
 import axiosInstance from './axiosInstance';
 
 export async function apiGetPending() {
-  const response = await axiosInstance.get('/order-items/pending');
+  let response;
+  try {
+    response = await axiosInstance.get('/order-items/pending');
+  } catch (e) {
+    // 404 hoặc lỗi mạng → trả mảng rỗng, không crash
+    if (e?.response?.status === 404) return [];
+    throw e;
+  }
+  const d = response.data;
+  if (!d) return [];
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d.$values)) return d.$values;
+  if (Array.isArray(d.items)) return d.items;
+  if (Array.isArray(d.data)) return d.data;
+  return [];
+}
+
+/**
+ * GET /api/order-items/in-progress
+ * Trả về items đang nấu / sẵn sàng (bổ sung cho /pending).
+ * Nếu backend chưa triển khai route này (404), trả [] — không chặn tải /pending.
+ */
+export async function apiGetInProgress() {
+  let response;
+  try {
+    response = await axiosInstance.get('/order-items/in-progress');
+  } catch (e) {
+    if (e?.response?.status === 404) return [];
+    throw e;
+  }
   const d = response.data;
   if (!d) return [];
   if (Array.isArray(d)) return d;
@@ -41,9 +70,15 @@ export async function apiReadyAll(orderId) {
  * Response Swagger: { date, totalItems, items: [...] }
  */
 export async function apiHistoryToday(orderId) {
-  const config = orderId != null && orderId !== '' ? { params: { orderId: Number(orderId) } } : {};
-  const r = await axiosInstance.get('/order-items/history/today', config);
-  const d = r.data;
+  let response;
+  try {
+    const config = orderId != null && orderId !== '' ? { params: { orderId: Number(orderId) } } : {};
+    response = await axiosInstance.get('/order-items/history/today', config);
+  } catch (e) {
+    if (e?.response?.status === 404) return { date: null, totalItems: 0, items: [] };
+    throw e;
+  }
+  const d = response.data;
   if (!d) {
     return { date: null, totalItems: 0, items: [] };
   }

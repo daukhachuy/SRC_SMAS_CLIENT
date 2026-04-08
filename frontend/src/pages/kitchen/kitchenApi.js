@@ -3,6 +3,7 @@
  */
 export {
   apiGetPending      as fetchPendingOrderItems,
+  apiGetInProgress  as fetchInProgressOrderItems,
   apiStartItem      as patchOrderItemPreparing,
   apiReadyItem      as patchOrderItemReady,
   apiCancelItem     as postOrderItemCancel,

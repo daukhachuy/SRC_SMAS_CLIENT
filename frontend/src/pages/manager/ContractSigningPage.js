@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import { 
   ArrowLeft, FileText, ShieldCheck, Building2, User,
   CheckCircle, Download, Edit3
@@ -7,6 +8,7 @@ import {
 import '../../styles/ContractSigningPage.css';
 
 const ContractSigningPage = () => {
+  const { base, homePath } = useRoleSectionBasePath();
   const navigate = useNavigate();
   const { eventId } = useParams();
   const [isSignaturePadOpen, setIsSignaturePadOpen] = useState(false);
@@ -84,11 +86,11 @@ const ContractSigningPage = () => {
     <div className="contract-signing-page">
       {/* Breadcrumb & Header */}
       <nav className="contract-breadcrumb">
-        <span className="breadcrumb-link" onClick={() => navigate('/manager/dashboard')}>
+        <span className="breadcrumb-link" onClick={() => navigate(homePath)}>
           Trang chủ
         </span>
         <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-link" onClick={() => navigate('/manager/reservations')}>
+        <span className="breadcrumb-link" onClick={() => navigate(`${base}/reservations`)}>
           Lịch đặt bàn
         </span>
         <span className="breadcrumb-separator">/</span>

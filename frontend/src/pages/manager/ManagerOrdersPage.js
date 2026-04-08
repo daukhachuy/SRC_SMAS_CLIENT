@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
+import '../../styles/ManagerPages.css';
 import {
   AlertTriangle,
   Bike,
@@ -52,6 +54,7 @@ const SkeletonCard = () => (
 // MAIN PAGE
 // ─────────────────────────────────────────────
 const ManagerOrdersPage = () => {
+  const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
 
   const [activeOrders,   setActiveOrders]   = useState([]);
@@ -181,9 +184,9 @@ const ManagerOrdersPage = () => {
       setSelectedDelivery(order);
       setIsDeliveryModalOpen(true);
     } else if (order.icon === 'dine') {
-      navigate(`/manager/orders/dine-in/${encodeURIComponent(order.code)}`);
+      navigate(`${base}/orders/dine-in/${encodeURIComponent(order.code)}`);
     } else {
-      navigate(`/manager/orders/takeaway/${encodeURIComponent(order.code)}`);
+      navigate(`${base}/orders/takeaway/${encodeURIComponent(order.code)}`);
     }
   };
 

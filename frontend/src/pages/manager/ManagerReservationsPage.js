@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
+import '../../styles/ManagerPages.css';
 import {
   Calendar,
   Search,
@@ -29,7 +31,8 @@ import {
 import '../../styles/ManagerReservationsPage.css';
 
 const ManagerReservationsPage = () => {
-    const [eventStatusFilter, setEventStatusFilter] = useState('all');
+  const { base } = useRoleSectionBasePath();
+  const [eventStatusFilter, setEventStatusFilter] = useState('all');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('regular');
   const [searchQuery, setSearchQuery] = useState('');
@@ -730,7 +733,7 @@ const ManagerReservationsPage = () => {
                         <div className="action-buttons">
                           <button
                             className="btn-detail"
-                            onClick={() => navigate(`/manager/reservations/${event.eventId || event.bookingCode || 'detail'}`)}
+                            onClick={() => navigate(`${base}/reservations/${event.eventId || event.bookingCode || 'detail'}`)}
                             type="button"
                           >
                             <Eye size={14} />
@@ -738,7 +741,7 @@ const ManagerReservationsPage = () => {
                           </button>
                           <button
                             className="btn-contract"
-                            onClick={() => navigate(`/manager/reservations/${event.eventId || event.bookingCode || 'detail'}/contract`)}
+                            onClick={() => navigate(`${base}/reservations/${event.eventId || event.bookingCode || 'detail'}/contract`)}
                             type="button"
                           >
                             <FileText size={14} />
