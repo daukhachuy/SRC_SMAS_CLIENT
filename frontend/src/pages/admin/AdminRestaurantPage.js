@@ -1029,7 +1029,7 @@ const AdminRestaurantPage = () => {
         const payload = buildDiscountUpdatePayload(raw);
         await discountAPI.updateDiscount(discountId, payload);
         await loadDiscounts();
-        setEditingCode(null);
+      setEditingCode(null);
         setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
         setCodeModalOpen(false);
       } catch (err) {
@@ -1050,8 +1050,8 @@ const AdminRestaurantPage = () => {
       const payload = buildDiscountPayload();
       await discountAPI.createDiscount(payload);
       await loadDiscounts();
-      setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
-      setCodeModalOpen(false);
+    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
+    setCodeModalOpen(false);
     } catch (err) {
       const msg =
         (typeof err.message === 'string' && err.message) ||
@@ -1140,7 +1140,7 @@ const AdminRestaurantPage = () => {
         const payload = buildBlogUpdatePayload(imagePath, raw);
         await blogAPI.updateBlog(blogId, payload);
         await loadBlogs();
-        setEditingBlog(null);
+      setEditingBlog(null);
         setBlogForm(emptyBlogForm());
         setBlogImageFile(null);
         revokeBlogPreviewIfBlob(blogImagePreview);
@@ -1186,7 +1186,7 @@ const AdminRestaurantPage = () => {
       setBlogImageFile(null);
       setBlogImagePreview('');
       setBlogForm(emptyBlogForm());
-      setBlogModalOpen(false);
+    setBlogModalOpen(false);
     } catch (err) {
       const msg =
         (typeof err.message === 'string' && err.message) ||
@@ -1575,10 +1575,10 @@ const AdminRestaurantPage = () => {
                 setBlogForm(emptyBlogForm());
                 setBlogModalOpen(true);
               }}>
-                <Pencil size={18} />
-                Tạo bài mới
-              </button>
-            </div>
+              <Pencil size={18} />
+              Tạo bài mới
+            </button>
+          </div>
           </div>
           {blogsLoading && <p className="rest-subtitle" style={{ marginTop: 8 }}>Đang tải danh sách blog…</p>}
           {blogsLoadError && (
@@ -1707,14 +1707,14 @@ const AdminRestaurantPage = () => {
               </button>
             </p>
           )}
-          <div className="rest-reviews-layout">
-            <div className="rest-reviews-left">
-              <div className="rest-rating-card">
-                <h3 className="rest-rating-title">Tổng quan đánh giá</h3>
+        <div className="rest-reviews-layout">
+          <div className="rest-reviews-left">
+            <div className="rest-rating-card">
+              <h3 className="rest-rating-title">Tổng quan đánh giá</h3>
                 <div className="rest-rating-score">{feedbackSummary.avg != null ? feedbackSummary.avg.toFixed(1) : '—'}</div>
                 <div className="rest-rating-stars">{feedbackSummary.starsVisual}</div>
                 <p className="rest-rating-count">{feedbackSummary.countText}</p>
-                <div className="rest-rating-bars">
+              <div className="rest-rating-bars">
                   {[5, 4, 3, 2, 1].map((star) => {
                     const idx = star - 1;
                     const pct = feedbackSummary.bars[idx] ?? 0;
@@ -1728,45 +1728,45 @@ const AdminRestaurantPage = () => {
                       </div>
                     );
                   })}
-                </div>
-              </div>
-              <div className="rest-sentiment-card">
-                <h3 className="rest-sentiment-title">Sắc thái phản hồi</h3>
-                <div className="rest-sentiment-row">
-                  <div className="rest-sentiment-positive">{feedbackSummary.positivePct}% TÍCH CỰC (4–5★)</div>
-                  <div className="rest-sentiment-negative">{feedbackSummary.negativePct}% TIÊU CỰC (1–2★)</div>
-                </div>
               </div>
             </div>
-            <div className="rest-reviews-right">
-              <div className="rest-reviews-head">
+            <div className="rest-sentiment-card">
+              <h3 className="rest-sentiment-title">Sắc thái phản hồi</h3>
+              <div className="rest-sentiment-row">
+                  <div className="rest-sentiment-positive">{feedbackSummary.positivePct}% TÍCH CỰC (4–5★)</div>
+                  <div className="rest-sentiment-negative">{feedbackSummary.negativePct}% TIÊU CỰC (1–2★)</div>
+              </div>
+            </div>
+          </div>
+          <div className="rest-reviews-right">
+            <div className="rest-reviews-head">
                 <h3 className="rest-reviews-title">Phản hồi từ API</h3>
                 <select className="rest-select rest-select-sm" disabled aria-label="Sắp xếp">
-                  <option>Mới nhất</option>
-                </select>
-              </div>
+                <option>Mới nhất</option>
+              </select>
+            </div>
               {!feedbackLoading && !feedbackLoadError && feedbackRows.length === 0 && (
                 <p className="rest-subtitle" style={{ marginTop: 8 }}>Chưa có phản hồi nào.</p>
               )}
               {feedbackRows.map((r) => (
-                <div key={r.id} className="rest-review-card">
-                  <div className="rest-review-header">
+              <div key={r.id} className="rest-review-card">
+                <div className="rest-review-header">
                     {r.avatarUrl ? (
                       <img className="rest-review-avatar rest-review-avatar-img" src={r.avatarUrl} alt="" />
                     ) : (
-                      <div className="rest-review-avatar">{r.initials}</div>
+                  <div className="rest-review-avatar">{r.initials}</div>
                     )}
-                    <div>
-                      <strong>{r.name}</strong>
-                      <span className="rest-review-time">{r.time}</span>
-                    </div>
+                  <div>
+                    <strong>{r.name}</strong>
+                    <span className="rest-review-time">{r.time}</span>
                   </div>
+                </div>
                   <div className="rest-review-stars">
                     {r.stars > 0 ? '★'.repeat(r.stars) : '—'}
                   </div>
                   <p className="rest-review-comment">{r.comment || '—'}</p>
-                </div>
-              ))}
+              </div>
+            ))}
             </div>
           </div>
         </>
@@ -2479,7 +2479,7 @@ const AdminRestaurantPage = () => {
                         >
                           <X size={14} />
                         </button>
-                      </div>
+                </div>
                     ) : (
                       <div className="rest-blog-upload-placeholder">
                         <FileImage size={36} strokeWidth={1.5} />
@@ -2511,14 +2511,14 @@ const AdminRestaurantPage = () => {
                 <textarea placeholder="Có thể dùng HTML cho rich text..." value={blogForm.content} onChange={(e) => setBlogForm((f) => ({ ...f, content: e.target.value }))} rows={6} required />
               </div>
               <div className="rest-form-row2">
-                <div className="rest-form-group">
+              <div className="rest-form-group">
                   <label>Trạng thái</label>
                   <select value={blogForm.status} onChange={(e) => setBlogForm((f) => ({ ...f, status: e.target.value }))}>
                     <option value="Published">Published</option>
                     <option value="Draft">Draft</option>
                   </select>
-                </div>
-                <div className="rest-form-group">
+              </div>
+              <div className="rest-form-group">
                   <label>Ngày giờ xuất bản</label>
                   <input
                     type="datetime-local"
