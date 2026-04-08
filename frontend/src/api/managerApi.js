@@ -127,8 +127,12 @@ export async function getAllStaffSchedule() {
     getFourNewest: () => instance.get('/order/four-newest-orders'),
 
     // POST /api/order/choose-staffid-delivery
+    // Body: { orderCode: string, staffId: number }
     chooseStaffDelivery: (orderCode, staffId) =>
-      instance.post('/order/choose-staffid-delivery', { orderCode, staffId }),
+      instance.post('/order/choose-staffid-delivery', {
+        orderCode: String(orderCode || '').trim(),
+        staffId: Number(staffId),
+      }),
 
     // PATCH /api/order/change-status/{OrderCode}
     changeStatus: (orderCode) =>
@@ -720,14 +724,10 @@ export async function getAllStaffSchedule() {
     // GET /api/notification/unread
     getUnread: () => instance.get('/notification/unread'),
 
-    // PATCH (or POST fallback) /api/notification/mark-as-read/{notificationId}
-    markAsRead: async (notificationId) => {
+    // PATCH /api/notification/mark-as-read/{notificationId}
+    markAsRead: (notificationId) => {
       if (!notificationId) throw new Error('notificationId is required');
-      try {
-        return await instance.patch(`/notification/mark-as-read/${notificationId}`);
-      } catch (error) {
-        return await instance.post(`/notification/mark-as-read/${notificationId}`);
-      }
+      return instance.patch(`/notification/mark-as-read/${notificationId}`);
     },
 
     /**
