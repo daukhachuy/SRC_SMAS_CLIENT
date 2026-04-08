@@ -70,7 +70,7 @@ export const myOrderAPI = {
     }
   },
 
-  getReservations: async () => {
+  getReservations: async (status = null) => {
     const userStr = localStorage.getItem('user');
     let userId = null;
     if (userStr) {
@@ -80,8 +80,12 @@ export const myOrderAPI = {
       } catch (_) {}
     }
     if (!userId) return [];
+    const params = { userId };
+    if (status && status !== 'all') {
+      params.status = status;
+    }
     try {
-      const response = await instance.get(`/reservation/my`, { params: { userId } });
+      const response = await instance.get(`/reservation/my`, { params });
       const data = response.data;
       if (Array.isArray(data)) return data;
       if (data?.$values) return data.$values;
