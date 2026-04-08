@@ -75,6 +75,27 @@ export const myOrderAPI = {
     return response.data;
   },
 
+  // GET /api/book-event/my — danh sách đặt sự kiện của user (đang hoạt động)
+  getMyBookEvents: async () => {
+    try {
+      const response = await instance.get('/book-event/my');
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data?.$values) return data.$values;
+      if (data?.data) return data.data;
+      return [];
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 400) return [];
+      throw err;
+    }
+  },
+
+  // GET /api/book-event/{id}/detail — chi tiết một đặt sự kiện
+  getBookEventDetail: async (bookEventId) => {
+    const response = await instance.get(`/book-event/${bookEventId}/detail`);
+    return response.data;
+  },
+
   // GET /api/book-event/history — lịch sử đặt sự kiện của user
   getMyEvents: async () => {
     try {

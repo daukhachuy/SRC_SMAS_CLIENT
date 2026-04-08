@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import { 
   Calendar, Users, CheckCircle, FileText, 
   ChevronRight, Home, FileCheck, DollarSign,
@@ -9,6 +10,7 @@ import '../../styles/EventDetailPage.css';
 import TransactionHistoryModal from '../../components/TransactionHistoryModal';
 
 const EventDetailPage = () => {
+  const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
   const [showTransactionModal, setShowTransactionModal] = useState(false);
 
@@ -298,7 +300,7 @@ const EventDetailPage = () => {
                 </button>
                 <button 
                   className="btn-transaction-history"
-                  onClick={() => navigate(`/manager/reservations/${eventData.id}/contract`)}
+                  onClick={() => navigate(`${base}/reservations/${eventData.id}/contract`)}
                 >
                   Xem hợp đồng
                 </button>

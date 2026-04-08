@@ -1,79 +1,53 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import axios from 'axios';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
-  Camera,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  Edit3,
   User,
+  Phone,
+  Mail,
+  MapPin,
+  Wallet,
+  Clock3,
+  CheckCircle2,
+  BarChart3,
+  Edit3,
   X,
-  AlertCircle,
   Loader2,
+  TrendingUp,
+  Camera,
+  Building2,
+  CreditCard,
+  CalendarDays,
   TrendingDown,
-  TrendingUp
+  AlertCircle,
 } from 'lucide-react';
-import { staffApi, fetchStaffProfile } from '../../api/staffApi';
+import '../../styles/WaiterPages.css';
 import { salaryRecordAPI, staffAPI } from '../../api/managerApi';
+import { staffApi } from '../../api/staffApi';
 
-const API_BASE_ORIGIN = (process.env.REACT_APP_API_URL || '')
-  .replace(/\/api\/?$/i, '')
-  .replace(/\/$/, '');
+// Cloudinary config
+const cloudName = 'dmzuier4p';
+const uploadPreset = 'Image_profile';
+const folderName = 'image_SEP490';
 
-function resolveAvatarUrl(url) {
-  if (!url) return '';
-  if (url.startsWith('http') || url.startsWith('data:')) return url;
-  const base = API_BASE_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : '');
-  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-}
-
-function normalizeDob(raw) {
-  if (!raw) return '';
-  const s = String(raw);
-  return s.includes('T') ? s.split('T')[0] : s.slice(0, 10);
-}
-
-function formatVnDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleDateString('vi-VN');
-}
-
-function mapGenderFromApi(g) {
-  const x = String(g || '').trim().toLowerCase();
-  if (x === 'male' || x === 'nam' || x === 'm') return 'Nam';
-  if (x === 'female' || x === 'nữ' || x === 'nu' || x === 'f') return 'Nữ';
-  return 'Khác';
-}
-
-/**
- * PUT /api/Staff/staff-profile (Swagger)
- * Body: fullname, phone, email, gender, dob, address, avatarUrl, bankAccountNumber, bankName
- * @see https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/swagger/index.html
- */
-function buildStaffProfilePutBody(profileData) {
-  const dobRaw = (profileData.birthDate || '').trim();
-  const body = {
-    fullname: (profileData.fullName || '').trim(),
-    phone: (profileData.phone || '').trim(),
-    email: (profileData.email || '').trim(),
-    /** Chuỗi — gửi Nam/Nữ/Khác khớp GET (ví dụ "Nam") */
-    gender: (profileData.gender || 'Khác').trim(),
-    address: (profileData.address || '').trim(),
-    bankAccountNumber: (profileData.bankAccount || '').trim(),
-    bankName: (profileData.bankName || '').trim()
-  };
-  if (dobRaw) {
-    body.dob = dobRaw.length >= 10 ? dobRaw.slice(0, 10) : dobRaw;
+const handleAvatarUpload = async (e, onUrlReady) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
+  formData.append('folder', folderName);
+  try {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.secure_url) {
+      onUrlReady(data.secure_url);
+    }
+  } catch (err) {
+    console.error('Avatar upload failed:', err);
   }
-  const av = profileData.avatarUrl;
-  if (av && !String(av).startsWith('blob:')) {
-    body.avatarUrl = String(av).trim();
-  }
-  return body;
-}
+};
 
 function asArray(value) {
   if (Array.isArray(value)) return value;
@@ -84,8 +58,7 @@ function asArray(value) {
 
 function unwrapResponse(response) {
   if (!response) return [];
-  const d = response.data?.data ?? response.data ?? response;
-  return asArray(d);
+  return asArray(response.data?.data ?? response.data ?? response);
 }
 
 function pick(obj, keys, fallback = null) {
@@ -109,96 +82,120 @@ function normalizeMonthLabel(item, index) {
   const dateStr = pick(item, ['createdAt', 'date', 'salaryDate'], null);
   if (dateStr) {
     const d = new Date(dateStr);
-    if (!Number.isNaN(d.getTime())) return `Tháng ${d.getMonth() + 1}`;
+    if (!Number.isNaN(d.getTime())) return `T${d.getMonth() + 1}`;
   }
   return `T${index + 1}`;
 }
 
+function mapGenderFromApi(g) {
+  const x = String(g || '').trim().toLowerCase();
+  if (x === 'male' || x === 'nam' || x === 'm') return 'Nam';
+  if (x === 'female' || x === 'nữ' || x === 'nu' || x === 'f') return 'Nữ';
+  return 'Khác';
+}
+
+function normalizeDob(raw) {
+  if (!raw) return '';
+  const s = String(raw);
+  return s.includes('T') ? s.slice(0, 10) : s.slice(0, 10);
+}
+
 const KitchenProfilePage = () => {
-  const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [error, setError] = useState('');
 
-  const [profileData, setProfileData] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
-    gender: 'Nam',
-    birthDate: '',
-    address: '',
-    bankAccount: '',
+  const [profile, setProfile] = useState({
+    fullname: 'Nhân viên bếp',
+    phone: '---',
+    address: '---',
+    email: '---',
+    role: 'Bếp',
+    avatarUrl: '',
+    dob: '',
+    gender: '',
     bankName: '',
-    avatarUrl: ''
-  });
-
-  const [meta, setMeta] = useState({
+    bankAccountNumber: '',
     position: '',
-    experienceLevel: '',
-    hireDate: '',
-    hireDateReadOnly: '',
-    taxId: '',
-    role: ''
   });
 
   const [salaryStats, setSalaryStats] = useState({
     estimatedSalary: 0,
     totalHours: 0,
-    completedShifts: 0
+    completedShifts: 0,
   });
 
   const [salaryTrend, setSalaryTrend] = useState([]);
 
-  const loadAll = useCallback(async () => {
-    setMessage({ type: '', text: '' });
-    try {
-      setLoading(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fullname: '',
+    phone: '',
+    email: '',
+    gender: '',
+    dob: '',
+    address: '',
+    avatarUrl: '',
+    bankAccountNumber: '',
+    bankName: '',
+  });
 
-      const [
-        profileRes,
-        monthDetailRes,
-        sixMonthsRes,
-        monthHoursRes,
-        monthShiftsRes
-      ] = await Promise.allSettled([
-        fetchStaffProfile(),
-        salaryRecordAPI.getCurrentMonthDetail(),
-        salaryRecordAPI.getLastSixMonths(),
-        staffAPI.getSumTimeworkThisMonth(),
-        staffAPI.getSumWorkshiftThisMonth()
-      ]);
+  const fetchProfilePageData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const [profileRes, monthDetailRes, sixMonthsRes, monthHoursRes, monthShiftsRes] =
+        await Promise.allSettled([
+          staffApi.getProfile(),
+          salaryRecordAPI.getCurrentMonthDetail(),
+          salaryRecordAPI.getLastSixMonths(),
+          staffAPI.getSumTimeworkThisMonth(),
+          staffAPI.getSumWorkshiftThisMonth(),
+        ]);
 
       if (profileRes.status === 'fulfilled') {
-        const data = profileRes.value ?? {};
-        setMeta({
-          position: data.position || '',
-          experienceLevel: data.experienceLevel || '',
-          hireDate: data.hireDate || '',
-          hireDateReadOnly: data.hireDateReadOnly || '',
-          taxId: data.taxId || '',
-          role: data.role || ''
-        });
-        setProfileData({
-          fullName: data.fullName || data.fullname || '',
-          phone: data.phone || '',
-          email: data.email || '',
-          gender: mapGenderFromApi(data.gender),
-          birthDate: normalizeDob(data.dob),
-          address: data.address || '',
-          bankAccount: data.bankAccountNumber || '',
-          bankName: data.bankName || '',
-          avatarUrl: data.avatarUrl || ''
+        const p = profileRes.value?.data?.data ?? profileRes.value?.data ?? {};
+        const mapped = {
+          fullname: pick(p, ['fullname', 'fullName', 'name'], 'Nhân viên bếp'),
+          phone: pick(p, ['phone', 'phoneNumber'], '---'),
+          address: pick(p, ['address'], '---'),
+          email: pick(p, ['email'], '---'),
+          role: pick(p, ['position', 'role', 'positionName'], 'Bếp'),
+          avatarUrl: pick(p, ['avatarUrl', 'avatar', 'imageUrl'], ''),
+          dob: pick(p, ['dob', 'dateOfBirth', 'birthDate'], ''),
+          gender: mapGenderFromApi(p.gender),
+          bankName: pick(p, ['bankName'], ''),
+          bankAccountNumber: pick(p, ['bankAccountNumber', 'bankAccount'], ''),
+          position: pick(p, ['position', 'positionName'], 'Bếp'),
+        };
+        setProfile(mapped);
+        setEditForm({
+          fullname: mapped.fullname || '',
+          phone: mapped.phone === '---' ? '' : mapped.phone,
+          email: mapped.email === '---' ? '' : mapped.email,
+          gender: mapped.gender || '',
+          dob: mapped.dob ? String(mapped.dob).slice(0, 10) : '',
+          address: mapped.address === '---' ? '' : mapped.address,
+          avatarUrl: mapped.avatarUrl || '',
+          bankAccountNumber: mapped.bankAccountNumber || '',
+          bankName: mapped.bankName || '',
         });
       } else {
-        console.error('[KitchenProfile] staff-profile:', profileRes.reason);
-        setMessage({
-          type: 'error',
-          text:
-            profileRes.reason?.response?.data?.message ||
+        const status = profileRes.reason?.response?.status;
+        if (status === 401 || status === 403) {
+          setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+          setTimeout(() => {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }, 2000);
+          return;
+        }
+        setError(
+          profileRes.reason?.response?.data?.message ||
             profileRes.reason?.message ||
-            'Không tải được hồ sơ (GET /Staff/staff-profile).'
-        });
+            'Không tải được hồ sơ.'
+        );
       }
 
       const detail =
@@ -221,16 +218,18 @@ const KitchenProfilePage = () => {
       setSalaryStats({
         estimatedSalary: Number.isFinite(estimatedSalary) ? estimatedSalary : 0,
         totalHours: Number.isFinite(totalHours) ? totalHours : 0,
-        completedShifts: Number.isFinite(completedShifts) ? completedShifts : 0
+        completedShifts: Number.isFinite(completedShifts) ? completedShifts : 0,
       });
 
       const trendItemsRaw =
         sixMonthsRes.status === 'fulfilled' ? unwrapResponse(sixMonthsRes.value) : [];
       const trend = trendItemsRaw.map((item, index) => {
-        const salary = Number(pick(item, ['actualSalary', 'salary', 'totalSalary', 'income'], 0));
+        const salary = Number(
+          pick(item, ['actualSalary', 'salary', 'totalSalary', 'income'], 0)
+        );
         return {
           month: normalizeMonthLabel(item, index),
-          value: Number.isFinite(salary) ? salary : 0
+          value: Number.isFinite(salary) ? salary : 0,
         };
       });
 
@@ -238,28 +237,33 @@ const KitchenProfilePage = () => {
         setSalaryTrend(trend);
       } else {
         setSalaryTrend([
-          { month: 'Tháng 5', value: 13500000 },
-          { month: 'Tháng 6', value: 14200000 },
-          { month: 'Tháng 7', value: 15800000 },
-          { month: 'Tháng 8', value: 15100000 },
-          { month: 'Tháng 9', value: 15900000 },
-          { month: 'T10 (Nay)', value: 16200000 }
+          { month: 'T5', value: 13500000 },
+          { month: 'T6', value: 14200000 },
+          { month: 'T7', value: 15800000 },
+          { month: 'T8', value: 15100000 },
+          { month: 'T9', value: 15900000 },
+          { month: 'T10', value: 16200000 },
         ]);
       }
     } catch (err) {
-      console.error('[KitchenProfile]', err);
-      setMessage({
-        type: 'error',
-        text: err?.response?.data?.message || err?.message || 'Lỗi tải dữ liệu.'
-      });
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+        setTimeout(() => {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }, 2000);
+        return;
+      }
+      setError(err?.response?.data?.message || err?.message || 'Không thể tải dữ liệu hồ sơ.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    fetchProfilePageData();
+  }, [fetchProfilePageData]);
 
   const maxSalary = useMemo(() => {
     const maxVal = Math.max(...salaryTrend.map((x) => x.value), 1);
@@ -268,7 +272,7 @@ const KitchenProfilePage = () => {
 
   const statDeltas = useMemo(() => {
     const t = salaryTrend;
-    let salaryChange = { text: '+5%', type: 'positive' };
+    let salaryChange = { text: '+5%', type: 'up' };
     if (t.length >= 2) {
       const a = t[t.length - 1].value;
       const b = t[t.length - 2].value;
@@ -276,449 +280,377 @@ const KitchenProfilePage = () => {
         const p = ((a - b) / b) * 100;
         salaryChange = {
           text: `${p >= 0 ? '+' : ''}${p.toFixed(0)}%`,
-          type: p >= 0 ? 'positive' : 'negative'
+          type: p >= 0 ? 'up' : 'down',
         };
       }
     }
     return {
       salary: salaryChange,
-      hours: { text: '-2%', type: 'negative' },
-      shifts: { text: '+10%', type: 'positive' }
+      hours: { text: '-2%', type: 'down' },
+      shifts: { text: '+10%', type: 'up' },
     };
   }, [salaryTrend]);
 
-  const cloudName = 'dmzuier4p';
-  const uploadPreset = 'Image_profile';
-  const folderName = 'image_SEP490';
-
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setMessage({ type: '', text: '' });
-    const localUrl = URL.createObjectURL(file);
-    setProfileData((prev) => ({ ...prev, avatarUrl: localUrl }));
-
-    const uploadFormData = new FormData();
-    uploadFormData.append('file', file);
-    uploadFormData.append('upload_preset', uploadPreset);
-    uploadFormData.append('folder', folderName);
-
-    try {
-      const cloudinaryRes = await axios.post(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        uploadFormData
-      );
-      const imageUrl = cloudinaryRes.data.secure_url;
-      setProfileData((prev) => ({ ...prev, avatarUrl: imageUrl }));
-    } catch (error) {
-      console.error('Avatar upload:', error);
-      setMessage({ type: 'error', text: 'Không tải được ảnh lên. Thử lại sau.' });
-      await loadAll();
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
     setSaving(true);
-    setMessage({ type: '', text: '' });
+    setError('');
+
     try {
-      const body = buildStaffProfilePutBody(profileData);
-      if (!body.fullname) {
-        setMessage({ type: 'error', text: 'Vui lòng nhập họ và tên.' });
-        setSaving(false);
+      await staffApi.updateProfile({
+        fullname: editForm.fullname || null,
+        phone: editForm.phone || null,
+        email: editForm.email || null,
+        gender: editForm.gender || null,
+        dob: editForm.dob || null,
+        address: editForm.address || null,
+        avatarUrl: editForm.avatarUrl || null,
+        bankAccountNumber: editForm.bankAccountNumber || null,
+        bankName: editForm.bankName || null,
+      });
+
+      setShowEditModal(false);
+      await fetchProfilePageData();
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+        setTimeout(() => {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }, 2000);
         return;
       }
-      await staffApi.updateProfile(body);
-      setMessage({ type: 'success', text: 'Cập nhật hồ sơ thành công.' });
-      setShowEditModal(false);
-      await loadAll();
-    } catch (err) {
-      console.error('[KitchenProfile] PUT staff-profile:', err);
-      setMessage({
-        type: 'error',
-        text:
-          err?.response?.data?.message ||
-          err?.message ||
-          'Cập nhật thất bại. Vui lòng thử lại.'
-      });
+      setError(err?.response?.data?.message || err?.message || 'Không thể cập nhật hồ sơ.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setProfileData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const avatarDisplay = resolveAvatarUrl(profileData.avatarUrl);
-
-  if (loading) {
-    return (
-      <div className="kitchen-profile-container kprofile-page">
-        <div className="kprofile-loading">
-          <Loader2 size={28} className="kprofile-loading-icon" />
-          <p>Đang tải hồ sơ & lương…</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="kitchen-profile-container kprofile-page">
-      <header className="profile-header kprofile-header">
-        <h2 className="profile-title">Hồ sơ & Lương</h2>
-        <p className="profile-subtitle kprofile-subtitle">
-          Quản lý thông tin cá nhân và theo dõi thu nhập hàng tháng của bạn
-        </p>
+    <div className="waiter-orders-container waiter-profile-page">
+      <header className="waiter-page-header">
+        <div>
+          <h2 className="waiter-page-title">Hồ sơ & Lương</h2>
+          <p className="waiter-page-subtitle">
+            Quản lý thông tin cá nhân và theo dõi thu nhập hàng tháng của bạn
+          </p>
+        </div>
       </header>
 
-      {message.text && (
-        <div
-          className={`kprofile-alert ${message.type === 'success' ? 'kprofile-alert--ok' : 'kprofile-alert--err'}`}
-          role="alert"
-        >
-          {message.type === 'error' && <AlertCircle size={20} />}
-          <span>{message.text}</span>
+      {!!error && (
+        <div className="waiter-schedule-error">
+          <AlertCircle size={16} />
+          {error}
         </div>
       )}
 
-      {/* Thẻ hồ sơ — đầy đủ field từ GET /Staff/staff-profile */}
-      <section className="profile-card-main kprofile-card">
-        <div className="kprofile-card-row">
-          <div className="profile-avatar-section">
-            <div className="profile-avatar-wrapper kprofile-avatar">
+      {loading ? (
+        <div className="waiter-profile-loading">
+          <Loader2 size={20} className="waiter-spin" />
+          Đang tải hồ sơ...
+        </div>
+      ) : (
+        <>
+          <section className="waiter-profile-card">
+            <div className="waiter-profile-avatar-wrap">
               <img
-                src={avatarDisplay || 'https://placehold.co/160x160/f1f5f9/64748b?text=Chef'}
-                alt={profileData.fullName || 'Avatar'}
-                className="profile-avatar-img"
+                src={
+                  profile.avatarUrl ||
+                  `https://i.pravatar.cc/320?u=${encodeURIComponent(
+                    profile.email || profile.fullname
+                  )}`
+                }
+                alt={profile.fullname}
               />
-              <div className="profile-verified-badge">
-                <CheckCircle size={16} />
-              </div>
-            </div>
-          </div>
-
-          <div className="kprofile-info-wrap">
-            <div className="profile-info-grid kprofile-grid-primary">
-              <div className="profile-info-item">
-                <p className="info-label">Họ và tên</p>
-                <p className="info-value">{profileData.fullName || '—'}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Số điện thoại</p>
-                <p className="info-value">{profileData.phone || '—'}</p>
-              </div>
-              <div className="profile-info-item full-width">
-                <p className="info-label">Địa chỉ thường trú</p>
-                <p className="info-value">{profileData.address || '—'}</p>
-              </div>
+              <span className="waiter-profile-verified">
+                <CheckCircle2 size={14} />
+              </span>
             </div>
 
-            <div className="kprofile-divider" />
-
-            <div className="profile-info-grid kprofile-grid-detail">
-              <div className="profile-info-item">
-                <p className="info-label">Email</p>
-                <p className="info-value kprofile-value-sm">{profileData.email || '—'}</p>
+            <div className="waiter-profile-info-grid">
+              <div>
+                <p>Họ và tên</p>
+                <strong>
+                  {typeof profile.fullname === 'string'
+                    ? profile.fullname
+                    : profile.fullname?.toString?.() || 'Đang tải...'}
+                </strong>
               </div>
-              <div className="profile-info-item">
-                <p className="info-label">Giới tính</p>
-                <p className="info-value">{profileData.gender || '—'}</p>
+              <div>
+                <p>Số điện thoại</p>
+                <strong>
+                  {typeof profile.phone === 'string'
+                    ? profile.phone
+                    : profile.phone?.toString?.() || '---'}
+                </strong>
               </div>
-              <div className="profile-info-item">
-                <p className="info-label">Ngày sinh</p>
-                <p className="info-value">{formatVnDate(profileData.birthDate)}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Vị trí</p>
-                <p className="info-value">{meta.position || '—'}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Cấp độ kinh nghiệm</p>
-                <p className="info-value">{meta.experienceLevel || '—'}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Vai trò hệ thống</p>
-                <p className="info-value">{meta.role || '—'}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Ngày vào làm</p>
-                <p className="info-value">{formatVnDate(meta.hireDateReadOnly || meta.hireDate)}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Mã số thuế</p>
-                <p className="info-value">{meta.taxId || '—'}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Số tài khoản</p>
-                <p className="info-value">{profileData.bankAccount || '—'}</p>
-              </div>
-              <div className="profile-info-item">
-                <p className="info-label">Ngân hàng</p>
-                <p className="info-value">{profileData.bankName || '—'}</p>
+              <div className="full-row">
+                <p>Địa chỉ thường trú</p>
+                <strong>{profile.address}</strong>
               </div>
             </div>
-          </div>
 
-          <div className="profile-actions kprofile-actions">
-            <button type="button" className="profile-edit-btn" onClick={() => setShowEditModal(true)}>
-              <Edit3 size={18} />
+            <button
+              className="waiter-profile-edit-btn"
+              type="button"
+              onClick={() => setShowEditModal(true)}
+            >
+              <Edit3 size={16} />
               Cập nhật hồ sơ
             </button>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      {/* Thống kê — API lương + giờ + ca */}
-      <div className="profile-stats-grid kprofile-stats">
-        <div className="profile-stat-card">
-          <div className="stat-card-header">
-            <div className="stat-icon primary">
-              <CreditCard size={22} />
-            </div>
-            <span
-              className={`stat-change ${statDeltas.salary.type === 'positive' ? 'positive' : 'negative'}`}
-            >
-              {statDeltas.salary.type === 'positive' ? (
-                <TrendingUp size={14} />
-              ) : (
-                <TrendingDown size={14} />
-              )}{' '}
-              {statDeltas.salary.text}
-            </span>
-          </div>
-          <p className="stat-label">Lương dự tính (Tháng này)</p>
-          <p className="stat-value">{formatCurrency(salaryStats.estimatedSalary)}</p>
-        </div>
-
-        <div className="profile-stat-card">
-          <div className="stat-card-header">
-            <div className="stat-icon blue">
-              <Clock size={22} />
-            </div>
-            <span className={`stat-change ${statDeltas.hours.type === 'positive' ? 'positive' : 'negative'}`}>
-              {statDeltas.hours.type === 'positive' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{' '}
-              {statDeltas.hours.text}
-            </span>
-          </div>
-          <p className="stat-label">Tổng giờ làm</p>
-          <p className="stat-value">{salaryStats.totalHours} giờ</p>
-        </div>
-
-        <div className="profile-stat-card">
-          <div className="stat-card-header">
-            <div className="stat-icon green">
-              <CheckCircle size={22} />
-            </div>
-            <span className="stat-change positive">
-              <TrendingUp size={14} /> {statDeltas.shifts.text}
-            </span>
-          </div>
-          <p className="stat-label">Số ca hoàn thành</p>
-          <p className="stat-value">{salaryStats.completedShifts} ca</p>
-        </div>
-      </div>
-
-      {/* Biểu đồ 6 tháng — GET /SalaryRecord/last-six-months */}
-      <div className="salary-trend-card kprofile-chart-card">
-        <div className="salary-trend-header">
-          <h3 className="salary-trend-title">
-            <Activity size={22} />
-            Xu hướng lương 6 tháng gần nhất
-          </h3>
-          <div className="salary-trend-legend">
-            <span className="legend-dot" />
-            <span className="legend-label">Lương thực nhận</span>
-          </div>
-        </div>
-
-        <div className="kprofile-salary-bars">
-          {salaryTrend.map((item, index) => {
-            const height = Math.max((item.value / maxSalary) * 100, 8);
-            const isCurrent = index === salaryTrend.length - 1;
-            const mVal = item.value / 1000000;
-            return (
-              <div key={`${item.month}-${index}`} className="kprofile-bar-col">
-                <div
-                  className={`kprofile-bar ${isCurrent ? 'kprofile-bar--current' : ''}`}
-                  style={{ height: `${height}%` }}
-                >
-                  <span className="kprofile-bar-tip">{mVal >= 1 ? `${mVal.toFixed(1)}M` : formatCurrency(item.value)}</span>
-                </div>
-                <span className={`kprofile-bar-label ${isCurrent ? 'is-current' : ''}`}>{item.month}</span>
+          <section className="waiter-profile-stats-grid">
+            <article className="waiter-profile-stat-card">
+              <div className="icon orange">
+                <Wallet size={18} />
               </div>
-            );
-          })}
-        </div>
-      </div>
+              <p>Lương dự tính (Tháng này)</p>
+              <h4>{formatCurrency(salaryStats.estimatedSalary)}</h4>
+              <span className={`trend ${statDeltas.salary.type}`}>
+                <TrendingUp size={12} /> {statDeltas.salary.text}
+              </span>
+            </article>
+
+            <article className="waiter-profile-stat-card">
+              <div className="icon blue">
+                <Clock3 size={18} />
+              </div>
+              <p>Tổng giờ làm</p>
+              <h4>{salaryStats.totalHours} giờ</h4>
+              <span className={`trend ${statDeltas.hours.type}`}>
+                <TrendingDown size={12} /> {statDeltas.hours.text}
+              </span>
+            </article>
+
+            <article className="waiter-profile-stat-card">
+              <div className="icon green">
+                <CheckCircle2 size={18} />
+              </div>
+              <p>Số ca hoàn thành</p>
+              <h4>{salaryStats.completedShifts} ca</h4>
+              <span className={`trend ${statDeltas.shifts.type}`}>
+                <TrendingUp size={12} /> {statDeltas.shifts.text}
+              </span>
+            </article>
+          </section>
+
+          <section className="waiter-profile-chart-card">
+            <div className="waiter-profile-chart-head">
+              <h3>
+                <BarChart3 size={18} />
+                Xu hướng lương 6 tháng gần nhất
+              </h3>
+              <div className="legend">
+                <span className="dot"></span>
+                <small>Lương thực nhận</small>
+              </div>
+            </div>
+
+            <div className="waiter-salary-bars">
+              {salaryTrend.map((item, index) => {
+                const height = Math.max((item.value / maxSalary) * 100, 8);
+                const isCurrent = index === salaryTrend.length - 1;
+                return (
+                  <div key={`${item.month}-${index}`} className="waiter-salary-bar-col">
+                    <div
+                      className={`waiter-salary-bar ${isCurrent ? 'is-current' : ''}`}
+                      style={{ height: `${height}%` }}
+                    >
+                      <span>{(item.value / 1000000).toFixed(1)}M</span>
+                    </div>
+                    <p className={isCurrent ? 'is-current' : ''}>{item.month}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
 
       {showEditModal && (
-        <div className="kitchen-modal-overlay active" onClick={() => !saving && setShowEditModal(false)}>
-          <div className="kitchen-modal profile-edit-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="kitchen-modal-header">
-              <h3 className="kitchen-modal-title">Cập nhật thông tin cá nhân</h3>
-              <button
-                type="button"
-                className="modal-close-btn"
-                disabled={saving}
-                onClick={() => setShowEditModal(false)}
-              >
-                <X size={24} />
+        <div
+          className="waiter-profile-modal-overlay"
+          onClick={() => !saving && setShowEditModal(false)}
+        >
+          <div className="waiter-profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="waiter-profile-modal-head">
+              <h3>Cập nhật thông tin cá nhân</h3>
+              <button type="button" onClick={() => !saving && setShowEditModal(false)}>
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateProfile}>
-              <div className="kitchen-modal-content">
-                <div className="profile-edit-layout">
-                  <div className="profile-avatar-edit">
-                    <div className="avatar-edit-wrapper" aria-label="Ảnh đại diện">
-                      <img
-                        src={
-                          resolveAvatarUrl(profileData.avatarUrl) ||
-                          'https://placehold.co/120x120/e2e8f0/64748b?text=+'
-                        }
-                        alt=""
-                        className="avatar-preview"
-                      />
-                      <label
-                        htmlFor="kitchen-avatar-upload"
-                        className="avatar-change-btn"
-                        style={{ cursor: uploading || saving ? 'wait' : 'pointer' }}
-                      >
-                        <Camera size={20} />
-                      </label>
+            <form className="waiter-profile-form" onSubmit={handleSaveProfile}>
+              <div className="waiter-profile-form-content">
+                <aside className="waiter-profile-form-avatar-panel">
+                  <div className="waiter-profile-form-avatar">
+                    <img
+                      src={
+                        editForm.avatarUrl ||
+                        profile.avatarUrl ||
+                        `https://i.pravatar.cc/320?u=${encodeURIComponent(
+                          editForm.email || profile.email || profile.fullname
+                        )}`
+                      }
+                      alt={profile.fullname}
+                    />
+                    <label
+                      className="waiter-profile-avatar-camera-btn"
+                      title="Chọn ảnh mới"
+                    >
+                      <Camera size={16} />
                       <input
-                        id="kitchen-avatar-upload"
                         type="file"
                         accept="image/*"
                         style={{ display: 'none' }}
-                        disabled={uploading || saving}
-                        onChange={handleAvatarChange}
+                        onChange={(e) =>
+                          handleAvatarUpload(e, (url) =>
+                            setEditForm((p) => ({ ...p, avatarUrl: url }))
+                          )
+                        }
                       />
+                    </label>
+                  </div>
+                  <p>Ảnh đại diện</p>
+                </aside>
+
+                <div className="waiter-profile-form-sections">
+                  <section className="waiter-profile-form-section">
+                    <h4>
+                      <User size={16} />
+                      Thông tin cơ bản
+                    </h4>
+
+                    <div className="waiter-profile-form-grid">
+                      <label>
+                        <span>Họ và tên</span>
+                        <input
+                          value={editForm.fullname}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, fullname: e.target.value }))
+                          }
+                        />
+                      </label>
+
+                      <label>
+                        <span>Số điện thoại</span>
+                        <input
+                          value={editForm.phone}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, phone: e.target.value }))
+                          }
+                        />
+                      </label>
+
+                      <label className="full-row">
+                        <span>
+                          <Mail size={14} /> Email
+                        </span>
+                        <input
+                          value={editForm.email}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, email: e.target.value }))
+                          }
+                        />
+                      </label>
+
+                      <label>
+                        <span>Giới tính</span>
+                        <select
+                          value={editForm.gender}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, gender: e.target.value }))
+                          }
+                        >
+                          <option value="">Chọn giới tính</option>
+                          <option value="Nam">Nam</option>
+                          <option value="Nữ">Nữ</option>
+                          <option value="Khác">Khác</option>
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>
+                          <CalendarDays size={14} /> Ngày sinh
+                        </span>
+                        <input
+                          type="date"
+                          value={editForm.dob}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, dob: e.target.value }))
+                          }
+                        />
+                      </label>
+
+                      <label className="full-row">
+                        <span>
+                          <MapPin size={14} /> Địa chỉ thường trú
+                        </span>
+                        <textarea
+                          rows={2}
+                          value={editForm.address}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, address: e.target.value }))
+                          }
+                        ></textarea>
+                      </label>
+
+                      <label className="full-row">
+                        <span>Avatar URL</span>
+                        <input
+                          value={editForm.avatarUrl}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, avatarUrl: e.target.value }))
+                          }
+                        />
+                      </label>
                     </div>
-                    <p className="avatar-label">{uploading ? 'Đang tải ảnh…' : 'Ảnh đại diện'}</p>
-                  </div>
+                  </section>
 
-                  <div className="profile-form-fields">
-                    <section className="form-section">
-                      <div className="form-section-header">
-                        <User size={18} />
-                        <h4>Thông tin cơ bản</h4>
-                      </div>
+                  <section className="waiter-profile-form-section salary-block">
+                    <h4>
+                      <Building2 size={16} />
+                      Thông tin nhận lương
+                    </h4>
+                    <div className="waiter-profile-form-grid">
+                      <label>
+                        <span>
+                          <CreditCard size={14} /> Số tài khoản
+                        </span>
+                        <input
+                          value={editForm.bankAccountNumber}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, bankAccountNumber: e.target.value }))
+                          }
+                        />
+                      </label>
 
-                      <div className="form-grid">
-                        <div className="kitchen-form-group">
-                          <label className="kitchen-form-label">Họ và tên</label>
-                          <input
-                            type="text"
-                            className="kitchen-input"
-                            value={profileData.fullName}
-                            onChange={(e) => handleInputChange('fullName', e.target.value)}
-                            required
-                          />
-                        </div>
-
-                        <div className="kitchen-form-group">
-                          <label className="kitchen-form-label">Số điện thoại</label>
-                          <input
-                            type="tel"
-                            className="kitchen-input"
-                            value={profileData.phone}
-                            onChange={(e) => handleInputChange('phone', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="kitchen-form-group full-width">
-                          <label className="kitchen-form-label">Email</label>
-                          <input
-                            type="email"
-                            className="kitchen-input"
-                            value={profileData.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="kitchen-form-group">
-                          <label className="kitchen-form-label">Giới tính</label>
-                          <select
-                            className="kitchen-select"
-                            value={profileData.gender}
-                            onChange={(e) => handleInputChange('gender', e.target.value)}
-                          >
-                            <option value="Nam">Nam</option>
-                            <option value="Nữ">Nữ</option>
-                            <option value="Khác">Khác</option>
-                          </select>
-                        </div>
-
-                        <div className="kitchen-form-group">
-                          <label className="kitchen-form-label">Ngày sinh</label>
-                          <input
-                            type="date"
-                            className="kitchen-input"
-                            value={profileData.birthDate}
-                            onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="kitchen-form-group full-width">
-                          <label className="kitchen-form-label">Địa chỉ thường trú</label>
-                          <textarea
-                            className="kitchen-textarea"
-                            rows={2}
-                            value={profileData.address}
-                            onChange={(e) => handleInputChange('address', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="form-section">
-                      <div className="form-section-header">
-                        <CreditCard size={18} />
-                        <h4>Thông tin nhận lương</h4>
-                      </div>
-
-                      <div className="form-grid bank-info">
-                        <div className="kitchen-form-group">
-                          <label className="kitchen-form-label">Số tài khoản</label>
-                          <input
-                            type="text"
-                            className="kitchen-input"
-                            value={profileData.bankAccount}
-                            onChange={(e) => handleInputChange('bankAccount', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="kitchen-form-group">
-                          <label className="kitchen-form-label">Tên ngân hàng</label>
-                          <input
-                            type="text"
-                            className="kitchen-input"
-                            value={profileData.bankName}
-                            onChange={(e) => handleInputChange('bankName', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </section>
-                  </div>
+                      <label>
+                        <span>Tên ngân hàng</span>
+                        <input
+                          value={editForm.bankName}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, bankName: e.target.value }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </section>
                 </div>
               </div>
 
-              <div className="kitchen-modal-footer">
+              <div className="waiter-profile-form-actions">
                 <button
                   type="button"
-                  className="kitchen-btn secondary"
-                  disabled={saving}
-                  onClick={() => setShowEditModal(false)}
+                  className="ghost"
+                  onClick={() => !saving && setShowEditModal(false)}
                 >
                   Hủy
                 </button>
-                <button type="submit" className="kitchen-btn primary" disabled={saving || uploading}>
-                  {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+                <button type="submit" className="primary" disabled={saving}>
+                  {saving ? <Loader2 size={16} className="waiter-spin" /> : 'Lưu thay đổi'}
                 </button>
               </div>
             </form>

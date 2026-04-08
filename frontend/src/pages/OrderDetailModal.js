@@ -15,15 +15,29 @@ import '../styles/OrderDetailModal.css';
 const OrderDetailModal = ({ order, onClose }) => {
   if (!order) return null;
 
+  // Chuyển ISO UTC → giờ Việt Nam (UTC+7)
+  const toVietnamTime = (isoStr) => {
+    if (!isoStr) return null;
+    const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    if (!m) {
+      const d = new Date(isoStr);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const [, y, mo, d, h, mi, s] = m;
+    return new Date(Number(y), Number(mo) - 1, Number(d), Number(h) + 7, Number(mi), Number(s));
+  };
+
+  const fmtVN = (date) => {
+    if (!date) return '—';
+    return date.toLocaleString('vi-VN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
   // Xử lý dữ liệu hiển thị
   const items = order.items || [];
-  const orderDate = new Date(order.createdAt).toLocaleString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const orderDate = fmtVN(toVietnamTime(order.createdAt));
 
   const getStatusClass = (status) => {
     const s = status?.toLowerCase();

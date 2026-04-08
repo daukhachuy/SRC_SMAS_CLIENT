@@ -149,8 +149,14 @@ const AppRoutes = () => {
         {/* Admin pages */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="orders" element={<div style={{ padding: '2rem', textAlign: 'center' }}>Trang Đơn hàng đang phát triển…</div>} />
-          <Route path="reservations" element={<div style={{ padding: '2rem', textAlign: 'center' }}>Trang Đặt chỗ đang phát triển…</div>} />
+          <Route path="orders" element={<ManagerOrdersPage />} />
+          <Route path="orders/dine-in/:id" element={<DineInOrderDetailPage />} />
+          <Route path="orders/takeaway/:id" element={<TakeawayOrderDetailPage />} />
+          <Route path="dine-in" element={<DineInOrdersPage />} />
+          <Route path="takeaway" element={<TakeawayOrdersPage />} />
+          <Route path="reservations" element={<ManagerReservationsPage />} />
+          <Route path="reservations/:eventId" element={<EventDetailPage />} />
+          <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
           <Route path="tables" element={<AdminTableMap />} />
           <Route path="menu" element={<AdminMenuManagement />} />
           <Route path="inventory" element={<AdminInventoryPage />} />
