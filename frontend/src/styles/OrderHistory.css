@@ -62,6 +62,39 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+/* Hàng 1: Đơn hàng / Đặt chỗ — nổi hơn hàng trạng thái */
+.Order-Type-Tabs {
+  z-index: 101;
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.Order-Status-Tabs {
+  position: relative;
+  z-index: 99;
+  top: auto;
+  margin-top: 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Lọc phụ: Giao hàng — Pending / Confirm */
+.Delivery-Sub-Filters {
+  position: relative;
+  top: auto;
+  margin-top: -0.35rem;
+  margin-bottom: 1rem;
+  padding-top: 0;
+  border-bottom: none;
+  flex-wrap: wrap;
+}
+
+.Delivery-Sub-Filters .Order-Tab-Btn {
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
 .Order-Tab-Btn {
   padding: 10px 20px;
   border-radius: 9999px;
@@ -196,9 +229,15 @@
 }
 
 .Status-Label.Success,
-.Status-Label.Completed {
+.Status-Label.Completed,
+.Status-Label.Confirmed {
   background: #E8F5E9;
   color: var(--Success-Green);
+}
+
+.Status-Label.Seated {
+  background: #E3F2FD;
+  color: #1565C0;
 }
 
 .Status-Label.Waiting,

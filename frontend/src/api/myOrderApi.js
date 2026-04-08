@@ -10,7 +10,24 @@ const MAP_ORDER_TYPE = {
   eventBooking: 'EventBooking',
 };
 
+/**
+ * GET /api/order/history/my — lịch sử đơn của user đăng nhập (Bearer token)
+ * Response Swagger: { msgCode, message, data: Order[] }
+ */
+export async function getMyOrderHistory() {
+  const res = await instance.get('/order/history/my');
+  const body = res.data;
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body?.data)) return body.data;
+  if (Array.isArray(body?.$values)) return body.$values;
+  if (Array.isArray(body?.items)) return body.items;
+  return [];
+}
+
 export const myOrderAPI = {
+  /** Alias GET /order/history/my — dùng cho trang Lịch sử đơn (khách đăng nhập) */
+  getMyOrderHistory,
+
   getOrders: async (orderType = 'All', statusList = ['Pending', 'Confirmed', 'Processing', 'Completed', 'Cancelled']) => {
     // Swagger: POST /api/order/filter — orderType là required query param
     // pattern: ^(DineIn|TakeAway|Delivery|EventBooking)$
@@ -30,10 +47,14 @@ export const myOrderAPI = {
       }
     }
 
-    // Filter theo orderType cụ thể
-    const statusParams = statusList.filter(Boolean).map(s => `status=${s}`).join('&');
+    // POST /api/order/filter?orderType=...&status=...&status=... (Swagger: nhiều status lặp query)
+    const statuses = statusList.filter(Boolean);
+    const statusParams = statuses.map((s) => `status=${encodeURIComponent(s)}`).join('&');
     try {
-      const res = await instance.post(`/order/filter?orderType=${normalizedType}&${statusParams}`);
+      const res = await instance.post(
+        `/order/filter?orderType=${encodeURIComponent(normalizedType)}&${statusParams}`,
+        null
+      );
       const data = res.data;
       if (Array.isArray(data)) return data;
       if (data?.$values) return data.$values;
@@ -49,7 +70,7 @@ export const myOrderAPI = {
     }
   },
 
-  getReservations: async () => {
+  getReservations: async (status = null) => {
     const userStr = localStorage.getItem('user');
     let userId = null;
     if (userStr) {
@@ -59,8 +80,12 @@ export const myOrderAPI = {
       } catch (_) {}
     }
     if (!userId) return [];
+    const params = { userId };
+    if (status && status !== 'all') {
+      params.status = status;
+    }
     try {
-      const response = await instance.get(`/reservation/my`, { params: { userId } });
+      const response = await instance.get(`/reservation/my`, { params });
       const data = response.data;
       if (Array.isArray(data)) return data;
       if (data?.$values) return data.$values;

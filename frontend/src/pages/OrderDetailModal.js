@@ -135,14 +135,24 @@ const OrderDetailModal = ({ order, onClose }) => {
                   <User size={16} className="od-detail-icon" />
                   <div className="od-detail-text">
                     <label>Khách hàng</label>
-                    <p>{order.delivery?.recipientName || order.customer?.fullname || 'Khách hàng'}</p>
+                    <p>
+                      {order.delivery?.recipientName ||
+                        order.customer?.fullName ||
+                        order.customer?.fullname ||
+                        'Khách hàng'}
+                    </p>
                   </div>
                 </div>
                 <div className="od-detail-item">
                   <Phone size={16} className="od-detail-icon" />
                   <div className="od-detail-text">
                     <label>Số điện thoại</label>
-                    <p>{order.delivery?.phone || 'Chưa cập nhật'}</p>
+                    <p>
+                      {order.delivery?.phone ||
+                        order.customer?.phone ||
+                        order.delivery?.recipientPhone ||
+                        'Chưa cập nhật'}
+                    </p>
                   </div>
                 </div>
                 <div className="od-detail-item">

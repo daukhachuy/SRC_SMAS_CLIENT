@@ -40,6 +40,20 @@ const fmtRawTime = (timeStr) => {
   return `${h}:${mi}`;
 };
 
+/** Backend: 1=Pending, 2=Confirmed, 3=Cancelled, 4=Seated — dùng để lọc khớp filter (kể cả API trả lẫn status). */
+const normalizeReservationStatusNum = (res) => {
+  const raw = res.reservationStatus ?? res.status;
+  if (raw === null || raw === undefined || raw === '') return 1;
+  const n = Number(raw);
+  if (!Number.isNaN(n) && n >= 1 && n <= 4) return n;
+  const s = String(raw).trim();
+  if (s === 'Pending') return 1;
+  if (s === 'Confirmed') return 2;
+  if (s === 'Cancelled') return 3;
+  if (s === 'Seated') return 4;
+  return 1;
+};
+
 /** Kiểm tra đơn Pending quá 2 tiếng chưa xác nhận → tự đánh Cancelled */
 const applyAutoCancel = (item) => {
   const raw = item.rawStatus || item.status || item.orderStatus || '';
@@ -56,11 +70,18 @@ const applyAutoCancel = (item) => {
   return { ...item, effectiveStatus: 'Pending', autoCancelled: false };
 };
 
-/** Completed / Cancelled → sang OrderHistory; chỉ giữ lại Pending / Confirmed */
-const isForHistory = (status) => ['Completed', 'Cancelled'].includes(status);
+/** Completed / Cancelled → sang OrderHistory; chỉ giữ lại đơn đang xử lý */
+const isForHistory = (status) => ['Completed', 'Cancelled', 'Cancel'].includes(status);
+
+/** POST /api/order/filter — Giao hàng: dùng status "Confirmed" (theo thực tế backend) */
+const DELIVERY_API_STATUSES = ['Pending', 'Confirmed'];
 
 const MyOrders = () => {
   const [activeTab, setActiveTab] = useState('Delivery');
+  /** Lọc phụ tab Giao hàng: all | Pending | Confirm */
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('all');
+  /** Lọc phụ tab Đặt chỗ: all | 1-Pending | 2-Confirmed | 3-Cancelled | 4-Seated */
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -81,21 +102,23 @@ const MyOrders = () => {
   const [eventsData, setEventsData] = useState([]);
 
   const getStatusDisplay = (status) => {
-    const config = {
-      'Pending':    { text: 'Chờ xác nhận',  class: 'Waiting' },
-      'Confirmed':   { text: 'Đã xác nhận',  class: 'Success' },
-      'Processing':  { text: 'Đang xử lý',   class: 'Processing' },
-      'Completed':   { text: 'Hoàn thành',   class: 'Success' },
-      'Cancelled':   { text: 'Đã hủy',       class: 'Cancelled' },
-    };
-    return config[status] || { text: status || 'Chờ xác nhận', class: 'Waiting' };
+    const num = Number(status);
+    const str = String(status ?? '').trim();
+    if (num === 1 || str === 'Pending') return { text: 'Chờ xác nhận', class: 'Waiting' };
+    if (num === 2 || str === 'Confirmed') return { text: 'Đã xác nhận', class: 'Success' };
+    if (num === 4 || str === 'Seated') return { text: 'Đã đến', class: 'Seated' };
+    if (num === 3 || str === 'Cancelled') return { text: 'Đã hủy', class: 'Cancelled' };
+    if (str === 'Completed' || str === 'Complete') return { text: 'Hoàn thành', class: 'Success' };
+    if (str === 'Processing') return { text: 'Đang xử lý', class: 'Processing' };
+    return { text: 'Chờ xác nhận', class: 'Waiting' };
   };
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
       if (activeTab === 'Booking') {
-        const data = await myOrderAPI.getReservations();
+        const statusParam = bookingStatusFilter === 'all' ? null : bookingStatusFilter;
+        const data = await myOrderAPI.getReservations(statusParam);
         const raw = Array.isArray(data) ? data : [];
         setReservations(raw);
         setEventsData([]);
@@ -107,9 +130,8 @@ const MyOrders = () => {
         setReservations([]);
         setOrders([]);
       } else {
-        // MyOrders: chỉ hiện Pending + Confirmed; Completed → OrderHistory
-        const statuses = ['Pending', 'Confirmed'];
-        const data = await myOrderAPI.getOrders(activeTab, statuses);
+        // POST /api/order/filter — orderType=Delivery & status=Pending & status=Confirm
+        const data = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
         setOrders(Array.isArray(data) ? data : []);
         setReservations([]);
         setEventsData([]);
@@ -123,14 +145,39 @@ const MyOrders = () => {
     }
   };
 
-  useEffect(() => { fetchOrders(); setCurrentPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }, [activeTab]);
+  useEffect(() => {
+    fetchOrders();
+    setCurrentPage(1);
+    setDeliveryStatusFilter('all');
+    setBookingStatusFilter('all');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
+
+  /* ── Filter Đặt chỗ → gọi lại API kèm status ── */
+  useEffect(() => {
+    if (activeTab !== 'Booking') return;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const statusParam = bookingStatusFilter === 'all' ? null : bookingStatusFilter;
+        const data = await myOrderAPI.getReservations(statusParam);
+        setReservations(Array.isArray(data) ? data : []);
+      } catch {
+        setReservations([]);
+      } finally {
+        setLoading(false);
+        setCurrentPage(1);
+      }
+    };
+    load();
+  }, [bookingStatusFilter]);
 
   /* ── Poll: đơn hàng bị hủy từ backend → lập tức loại khỏi danh sách ── */
   useEffect(() => {
     if (activeTab !== 'Delivery') return;
 
     const poll = async () => {
-      const latest = await myOrderAPI.getOrders(activeTab, ['Pending', 'Confirmed']);
+      const latest = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
       const fresh = Array.isArray(latest) ? latest : [];
       setOrders((prev) => {
         if (fresh.length === 0) return prev;
@@ -154,14 +201,32 @@ const MyOrders = () => {
     orders
   );
 
+  const matchesDeliveryStatusFilter = (order) => {
+    if (deliveryStatusFilter === 'all') return true;
+    const st = order.orderStatus || order.status || '';
+    if (deliveryStatusFilter === 'Pending') return st === 'Pending';
+    if (deliveryStatusFilter === 'Confirmed') return st === 'Confirmed';
+    return true;
+  };
+
+  /** Lọc đặt chỗ theo đúng số status (API có thể vẫn trả lẫn → luôn lọc client). */
+  const matchesBookingStatusFilter = (res) => {
+    if (bookingStatusFilter === 'all') return true;
+    const want = Number(bookingStatusFilter);
+    if (Number.isNaN(want)) return true;
+    return normalizeReservationStatusNum(res) === want;
+  };
+
   const filteredData = allData
     .map((item) => {
       const withEffective = applyAutoCancel(item);
-      const eff = withEffective.effectiveStatus;
+      const eff = withEffective.effectiveStatus ?? withEffective.orderStatus ?? withEffective.status;
       return { ...withEffective, _isHistory: isForHistory(eff) };
     })
-    .filter((item) => !item._isHistory)            // loại Completed/Cancelled
+    .filter((item) => !item._isHistory)
     .filter((item) => {
+      if (activeTab === 'Delivery' && !matchesDeliveryStatusFilter(item)) return false;
+      if (activeTab === 'Booking' && !matchesBookingStatusFilter(item)) return false;
       if (!searchQuery.trim()) return true;
       const query = searchQuery.toLowerCase().trim();
       const code = item.orderCode || item.reservationCode || item.eventBookingCode || item.bookingCode || '';
@@ -175,7 +240,7 @@ const MyOrders = () => {
 
   /* ── Tab Đặt chỗ ── */
   const renderBookingCard = (res) => {
-    const status = getStatusDisplay(res.effectiveStatus || res.status);
+    const status = getStatusDisplay(normalizeReservationStatusNum(res));
     const isAutoCancelled = res.autoCancelled && res.effectiveStatus === 'Cancelled';
     return (
       <div key={res.reservationId} className="Order-Horizontal-Card">
@@ -310,7 +375,7 @@ const MyOrders = () => {
         </div>
         <div className="Card-Main-Grid">
           <div className="Grid-Col">
-            <p>NGƯỜI NHẬN: <span>{order.delivery?.recipientName || order.customer?.fullname || '—'}</span></p>
+            <p>NGƯỜI NHẬN: <span>{order.delivery?.recipientName || order.customer?.fullName || order.customer?.fullname || '—'}</span></p>
             <p>ĐIỆN THOẠI: <span>{order.delivery?.recipientPhone || order.customer?.phone || '—'}</span></p>
           </div>
           <div className="Grid-Col">
@@ -361,13 +426,49 @@ const MyOrders = () => {
         ))}
       </div>
 
+      {activeTab === 'Delivery' && (
+        <div className="Order-Tabs-Container Delivery-Sub-Filters" role="group" aria-label="Lọc trạng thái giao hàng">
+          <button
+            type="button"
+            className={`Order-Tab-Btn ${deliveryStatusFilter === 'all' ? 'Active' : ''}`}
+            onClick={() => { setDeliveryStatusFilter('all'); setCurrentPage(1); }}
+          >
+            Tất cả
+          </button>
+          <button
+            type="button"
+            className={`Order-Tab-Btn ${deliveryStatusFilter === 'Pending' ? 'Active' : ''}`}
+            onClick={() => { setDeliveryStatusFilter('Pending'); setCurrentPage(1); }}
+          >
+            Chờ xác nhận
+          </button>
+          <button
+            type="button"
+            className={`Order-Tab-Btn ${deliveryStatusFilter === 'Confirmed' ? 'Active' : ''}`}
+            onClick={() => { setDeliveryStatusFilter('Confirmed'); setCurrentPage(1); }}
+          >
+            Đã xác nhận
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'Booking' && (
+        <div className="Order-Tabs-Container Delivery-Sub-Filters" role="group" aria-label="Lọc trạng thái đặt chỗ">
+          <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === 'all' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('all'); setCurrentPage(1); }}>Tất cả</button>
+          <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '1' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('1'); setCurrentPage(1); }}>Chờ xác nhận</button>
+          <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '2' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('2'); setCurrentPage(1); }}>Đã xác nhận</button>
+          <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '4' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('4'); setCurrentPage(1); }}>Đã đến</button>
+          <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '3' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('3'); setCurrentPage(1); }}>Hủy</button>
+        </div>
+      )}
+
       <div className="Orders-List-Flow">
         {loading ? (
           <div className="Spinner-Wrapper"><div className="Spinner"></div><p>Đang tải dữ liệu...</p></div>
         ) : activeTab === 'Booking' ? (
           paginatedList.length > 0
             ? paginatedList.map(renderBookingCard)
-            : <div className="Empty-Box">Bạn chưa có đặt bàn nào đang chờ.</div>
+            : <div className="Empty-Box">Không tìm thấy đặt chỗ nào.</div>
         ) : activeTab === 'Event' ? (
           paginatedList.length > 0
             ? paginatedList.map(renderEventCard)
