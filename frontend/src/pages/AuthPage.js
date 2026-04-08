@@ -27,6 +27,14 @@ const AuthPage = () => {
     // Clear GIS state cookie created for auto-select heuristics
     document.cookie = 'g_state=; Max-Age=0; path=/';
 
+    // Restore remember-me state
+    const remembered = localStorage.getItem('rememberMe') === 'true';
+    const savedEmail = localStorage.getItem('savedEmail') || '';
+    if (remembered && savedEmail) {
+      setRememberMe(true);
+      setEmail(savedEmail);
+    }
+
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
@@ -107,6 +115,9 @@ const AuthPage = () => {
       if (rememberMe) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('savedEmail', trimmedEmail);
+      } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
       }
 
       setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
@@ -162,6 +173,14 @@ const AuthPage = () => {
 
       if (response?.token) {
         localStorage.setItem('accessToken', response.token);
+      }
+
+      if (rememberMe) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', email.trim());
+      } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
       }
 
       setSuccess('Đăng nhập Google thành công!');

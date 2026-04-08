@@ -42,7 +42,6 @@ import WaiterLayout from './pages/waiter/WaiterLayout';
 import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
 import WaiterSchedulePage from './pages/waiter/WaiterSchedulePage';
 import WaiterProfilePage from './pages/waiter/WaiterProfilePage';
-import QrScannerPage from './pages/waiter/QrScannerPage';
 
 import TableSessionPage from './pages/TableSessionPage';
 
@@ -198,7 +197,6 @@ const AppRoutes = () => {
           }>
             <Route index element={<Navigate to="orders" replace />} />
             <Route path="orders" element={<WaiterOrdersPage />} />
-            <Route path="qr-scanner" element={<QrScannerPage />} />
               <Route path="schedule" element={<WaiterSchedulePage />} />
               <Route path="profile" element={<WaiterProfilePage />} />
           </Route>

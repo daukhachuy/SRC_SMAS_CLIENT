@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X, QrCode } from 'lucide-react';
+import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { getProfile } from '../../api/userApi';
+import { notificationAPI, mapNotificationToUI } from '../../api/managerApi';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/WaiterLayout.css';
 import '../../styles/WaiterPages.css';
@@ -12,6 +13,7 @@ const WaiterLayout = () => {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên',
     email: 'waiter@fptres.vn',
@@ -24,6 +26,16 @@ const WaiterLayout = () => {
     const words = String(name).trim().split(' ').filter(Boolean);
     if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
     return words.slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  };
+
+  const asArray = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
+    if (Array.isArray(payload?.$values)) return payload.$values;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.notifications)) return payload.notifications;
+    return [];
   };
 
   // Load user info và ưu tiên dữ liệu thật từ Profile API
@@ -101,6 +113,33 @@ const WaiterLayout = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const res = await notificationAPI.getAll();
+        const rows = asArray(res?.data);
+        const mapped = rows.map((item, idx) => mapNotificationToUI(item, idx));
+        if (mounted) {
+          setNotifications(mapped);
+        }
+      } catch (error) {
+        console.error('Không tải được thông báo:', error);
+        if (mounted) {
+          setNotifications([]);
+        }
+      }
+    };
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+
   const handleLogout = () => {
     logout();
     navigate('/auth');
@@ -109,7 +148,6 @@ const WaiterLayout = () => {
   const navItems = useMemo(
     () => [
       { to: '/waiter/orders', label: 'Đơn hàng', icon: ClipboardList },
-      { to: '/waiter/qr-scanner', label: 'Mở bàn', icon: QrCode },
       { to: '/waiter/schedule', label: 'Lịch làm việc', icon: Calendar },
       { to: '/waiter/profile', label: 'Hồ sơ', icon: User }
     ],
@@ -184,13 +222,17 @@ const WaiterLayout = () => {
         onClick={() => setNotificationOpen(!notificationOpen)}
       >
         <Bell size={20} />
-        <span className="waiter-notification-badge" />
+        {unreadNotificationCount > 0 && (
+          <span className="waiter-notification-badge">{unreadNotificationCount}</span>
+        )}
       </button>
 
       {/* Notification Dropdown */}
       <NotificationDropdown 
         isOpen={notificationOpen}
         onClose={() => setNotificationOpen(false)}
+        notifications={notifications}
+        onNotificationsChange={setNotifications}
       />
     </div>
   );

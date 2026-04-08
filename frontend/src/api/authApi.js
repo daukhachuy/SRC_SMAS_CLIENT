@@ -198,6 +198,7 @@ export function logout() {
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
   localStorage.removeItem('rememberMe');
+  localStorage.removeItem('savedEmail');
 }
 
 export function isAuthenticated() {
