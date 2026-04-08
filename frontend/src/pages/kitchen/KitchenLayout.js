@@ -4,6 +4,7 @@ import { Bell, Calendar, ChefHat, ClipboardList, LogOut, Menu, User, X } from 'l
 import { useAuth } from '../../context/AuthContext';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { getProfile } from '../../api/userApi';
+import { mapNotificationToUI, notificationAPI } from '../../api/managerApi';
 import '../../styles/KitchenLayout.css';
 import '../../styles/KitchenPages.css';
 
@@ -12,11 +13,22 @@ const KitchenLayout = () => {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên bếp',
     email: 'kitchen@fptres.vn',
     position: 'Bếp'
   });
+
+  const asArray = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
+    if (Array.isArray(payload?.$values)) return payload.$values;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.notifications)) return payload.notifications;
+    return [];
+  };
 
   // Load user info và ưu tiên dữ liệu thật từ Profile API
   useEffect(() => {
@@ -90,6 +102,33 @@ const KitchenLayout = () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const res = await notificationAPI.getAll();
+        const rows = asArray(res?.data);
+        const mapped = rows.map((item, idx) => mapNotificationToUI(item, idx));
+        if (mounted) {
+          setNotifications(mapped);
+        }
+      } catch (error) {
+        console.error('Không tải được thông báo kitchen:', error);
+        if (mounted) {
+          setNotifications([]);
+        }
+      }
+    };
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
 
   const handleLogout = () => {
     logout();
@@ -177,13 +216,17 @@ const KitchenLayout = () => {
         onClick={() => setNotificationOpen(!notificationOpen)}
       >
         <Bell size={20} />
-        <span className="kitchen-notification-badge" />
+        {unreadNotificationCount > 0 && (
+          <span className="kitchen-notification-badge">{unreadNotificationCount}</span>
+        )}
       </button>
 
       {/* Notification Dropdown */}
       <NotificationDropdown 
         isOpen={notificationOpen}
         onClose={() => setNotificationOpen(false)}
+        notifications={notifications}
+        onNotificationsChange={setNotifications}
       />
     </div>
   );

@@ -1,13 +1,134 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   User, Calendar, Phone, Mail, Download, Edit, 
   TrendingUp, Award, AlertCircle, Utensils, 
   XCircle, Info, Camera, X, Lock, CreditCard 
 } from 'lucide-react';
+import { salaryRecordAPI } from '../../api/managerApi';
 import '../../styles/ManagerSalaryPage.css';
+
+const asArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.$values)) return payload.$values;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
+
+const extractLastSixRows = (payload) => {
+  const root = payload?.data ?? payload;
+  return (
+    asArray(root) ||
+    asArray(root?.lastSixMonths) ||
+    asArray(root?.salaryRecords) ||
+    asArray(root?.records) ||
+    asArray(root?.result) ||
+    []
+  );
+};
+
+const extractCurrentDetail = (payload) => {
+  const root = payload?.data ?? payload;
+  if (Array.isArray(root)) return root[0] || {};
+  if (root?.currentMonthDetail && typeof root.currentMonthDetail === 'object') return root.currentMonthDetail;
+  if (root?.detail && typeof root.detail === 'object') return root.detail;
+  if (root?.result && typeof root.result === 'object') return root.result;
+  return root || {};
+};
+
+const pick = (obj, keys, fallback = undefined) => {
+  for (const key of keys) {
+    const val = obj?.[key];
+    if (val !== undefined && val !== null && val !== '') return val;
+  }
+  return fallback;
+};
+
+const toNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const toDateText = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('vi-VN');
+};
+
+const toMonthLabel = (rawMonth, fallbackIndex = 0) => {
+  const monthNum = Number(rawMonth);
+  if (Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12) {
+    return `T.${monthNum}`;
+  }
+  return `T.${fallbackIndex + 1}`;
+};
+
+const DEFAULT_CHART = [
+  { month: 'T.3', amount: 14200000, height: 75, label: '14.2M' },
+  { month: 'T.4', amount: 14800000, height: 82, label: '14.8M' },
+  { month: 'T.5', amount: 15500000, height: 100, label: '15.5M', active: true },
+  { month: 'T.6', amount: 15100000, height: 88, label: '15.1M' },
+  { month: 'T.7', amount: 15400000, height: 92, label: '15.4M' },
+  { month: 'T.8', amount: 15500000, height: 100, label: '15.5M', current: true }
+];
+
+const DEFAULT_BREAKDOWN = [
+  {
+    id: 1,
+    icon: <CreditCard />,
+    label: 'Lương cơ bản',
+    description: 'Bậc 4 - Ngạch đầu bếp',
+    amount: 12000000,
+    type: 'base',
+    color: 'slate'
+  },
+  {
+    id: 2,
+    icon: <Award />,
+    label: 'Thưởng KPI & Chuyên cần',
+    description: 'Hoàn thành 110% định mức',
+    amount: 3500000,
+    type: 'bonus',
+    color: 'green'
+  },
+  {
+    id: 3,
+    icon: <XCircle />,
+    label: 'Khấu trừ kỷ luật',
+    description: 'Đi muộn 2 lần (thẻ đỏ)',
+    amount: -200000,
+    type: 'deduction',
+    color: 'red'
+  },
+  {
+    id: 4,
+    icon: <Utensils />,
+    label: 'Phụ cấp ăn ca',
+    description: 'Hỗ trợ 1 bữa/ca trực',
+    amount: 200000,
+    type: 'allowance',
+    color: 'slate'
+  }
+];
+
+const DEFAULT_HISTORY = [
+  { month: 'Tháng 08/2023', amount: 15500000, date: '10/09/2023', status: 'Xong' },
+  { month: 'Tháng 07/2023', amount: 15400000, date: '10/08/2023', status: 'Xong' },
+  { month: 'Tháng 06/2023', amount: 15100000, date: '10/07/2023', status: 'Xong' },
+  { month: 'Tháng 05/2023', amount: 15500000, date: '10/06/2023', status: 'Xong' }
+];
 
 const ManagerSalaryPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [salaryChartData, setSalaryChartData] = useState(DEFAULT_CHART);
+  const [salaryBreakdown, setSalaryBreakdown] = useState(DEFAULT_BREAKDOWN);
+  const [salaryHistory, setSalaryHistory] = useState(DEFAULT_HISTORY);
+  const [salaryTitleMonth, setSalaryTitleMonth] = useState('08/2023');
+  const [salaryPeriodText, setSalaryPeriodText] = useState('01/08 - 31/08');
+  const [salaryStatusText, setSalaryStatusText] = useState('Đã quyết toán');
+  const [salaryApiNotice, setSalaryApiNotice] = useState('');
   const [profileData, setProfileData] = useState({
     fullName: 'Nguyễn Văn A',
     gender: 'Nam',
@@ -24,66 +145,141 @@ const ManagerSalaryPage = () => {
     taxId: '8492019385'
   });
 
-  // Sample salary data for 6 months
-  const salaryChartData = [
-    { month: 'T.3', amount: 14200000, height: 75, label: '14.2M' },
-    { month: 'T.4', amount: 14800000, height: 82, label: '14.8M' },
-    { month: 'T.5', amount: 15500000, height: 100, label: '15.5M', active: true },
-    { month: 'T.6', amount: 15100000, height: 88, label: '15.1M' },
-    { month: 'T.7', amount: 15400000, height: 92, label: '15.4M' },
-    { month: 'T.8', amount: 15500000, height: 100, label: '15.5M', current: true }
-  ];
-
-  // Current month salary breakdown
-  const salaryBreakdown = [
-    {
-      id: 1,
-      icon: <CreditCard />,
-      label: 'Lương cơ bản',
-      description: 'Bậc 4 - Ngạch đầu bếp',
-      amount: 12000000,
-      type: 'base',
-      color: 'slate'
-    },
-    {
-      id: 2,
-      icon: <Award />,
-      label: 'Thưởng KPI & Chuyên cần',
-      description: 'Hoàn thành 110% định mức',
-      amount: 3500000,
-      type: 'bonus',
-      color: 'green'
-    },
-    {
-      id: 3,
-      icon: <XCircle />,
-      label: 'Khấu trừ kỷ luật',
-      description: 'Đi muộn 2 lần (thẻ đỏ)',
-      amount: -200000,
-      type: 'deduction',
-      color: 'red'
-    },
-    {
-      id: 4,
-      icon: <Utensils />,
-      label: 'Phụ cấp ăn ca',
-      description: 'Hỗ trợ 1 bữa/ca trực',
-      amount: 200000,
-      type: 'allowance',
-      color: 'slate'
-    }
-  ];
-
   const totalSalary = salaryBreakdown.reduce((sum, item) => sum + item.amount, 0);
-  const averageSalary = salaryChartData.reduce((sum, item) => sum + item.amount, 0) / salaryChartData.length;
+  const averageSalary = salaryChartData.length
+    ? salaryChartData.reduce((sum, item) => sum + item.amount, 0) / salaryChartData.length
+    : 0;
 
-  // Salary history
-  const salaryHistory = [
-    { month: 'Tháng 08/2023', amount: 15500000, date: '10/09/2023', status: 'Xong' },
-    { month: 'Tháng 07/2023', amount: 15400000, date: '10/08/2023', status: 'Xong' },
-    { month: 'Tháng 06/2023', amount: 15100000, date: '10/07/2023', status: 'Xong' },
-    { month: 'Tháng 05/2023', amount: 15500000, date: '10/06/2023', status: 'Xong' }
-  ];
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSalaryData = async () => {
+      try {
+        let loadedFromApi = false;
+        const [lastSixRes, currentRes] = await Promise.allSettled([
+          salaryRecordAPI.getLastSixMonths(),
+          salaryRecordAPI.getCurrentMonthDetail(),
+        ]);
+
+        if (lastSixRes.status === 'fulfilled') {
+          const rawList = extractLastSixRows(lastSixRes.value?.data);
+          if (rawList.length > 0) {
+            const chartBase = rawList.map((row, idx) => {
+              const amount = toNumber(pick(row, [
+                'netSalary', 'totalSalary', 'takeHome', 'actualSalary', 'salary', 'amount', 'totalAmount'
+              ], 0));
+              const month = toMonthLabel(
+                pick(row, ['month', 'salaryMonth', 'monthNumber'], idx + 1),
+                idx
+              );
+              return {
+                month,
+                amount,
+                label: `${(amount / 1000000).toFixed(1)}M`,
+                paidDate: toDateText(pick(row, ['paidDate', 'paymentDate', 'createdAt', 'updatedAt'], '')),
+                status: String(pick(row, ['status', 'paymentStatus'], 'Xong')),
+              };
+            });
+
+            const maxAmount = Math.max(...chartBase.map((x) => x.amount), 1);
+            const chartMapped = chartBase.map((row, idx) => ({
+              ...row,
+              height: Math.max(42, Math.round((row.amount / maxAmount) * 100)),
+              active: idx === chartBase.length - 2,
+              current: idx === chartBase.length - 1,
+            }));
+
+            const historyMapped = [...chartMapped]
+              .reverse()
+              .map((row, idx) => ({
+                month: `Tháng ${String(row.month).replace('T.', '').padStart(2, '0')}`,
+                amount: row.amount,
+                date: row.paidDate || '--/--/----',
+                status: row.status || 'Xong',
+              }));
+
+            if (mounted) {
+              setSalaryChartData(chartMapped);
+              setSalaryHistory(historyMapped);
+            }
+            loadedFromApi = true;
+          }
+        } else {
+          console.warn('Salary API last-six-months failed:', lastSixRes.reason);
+        }
+
+        if (currentRes.status === 'fulfilled') {
+          const detail = extractCurrentDetail(currentRes.value?.data);
+
+          const basic = toNumber(pick(detail, ['basicSalary', 'baseSalary', 'luongCoBan'], 0));
+          const bonus = toNumber(pick(detail, ['bonusAmount', 'bonus', 'kpiBonus'], 0));
+          const deductionRaw = toNumber(pick(detail, ['deductionAmount', 'deduction', 'penalty'], 0));
+          const allowance = toNumber(pick(detail, ['allowanceAmount', 'allowance', 'mealAllowance'], 0));
+          const deduction = deductionRaw > 0 ? -deductionRaw : deductionRaw;
+
+          const breakdown = [
+            { id: 1, icon: <CreditCard />, label: 'Lương cơ bản', description: 'Theo bảng lương hiện tại', amount: basic, type: 'base', color: 'slate' },
+            { id: 2, icon: <Award />, label: 'Thưởng', description: 'Thưởng KPI/hiệu suất', amount: bonus, type: 'bonus', color: 'green' },
+            { id: 3, icon: <XCircle />, label: 'Khấu trừ', description: 'Khấu trừ/vi phạm nếu có', amount: deduction, type: 'deduction', color: 'red' },
+            { id: 4, icon: <Utensils />, label: 'Phụ cấp', description: 'Phụ cấp cố định', amount: allowance, type: 'allowance', color: 'slate' },
+          ].filter((item) => item.amount !== 0);
+
+          if (mounted && breakdown.length > 0) {
+            setSalaryBreakdown(breakdown);
+          }
+
+          const month = pick(detail, ['month', 'salaryMonth'], '08');
+          const year = pick(detail, ['year', 'salaryYear'], '2023');
+          const periodStart = toDateText(pick(detail, ['periodStart', 'startDate', 'fromDate'], ''));
+          const periodEnd = toDateText(pick(detail, ['periodEnd', 'endDate', 'toDate'], ''));
+          const statusText = pick(detail, ['statusText', 'status', 'paymentStatus'], 'Đã quyết toán');
+
+          if (mounted) {
+            setSalaryTitleMonth(`${String(month).padStart(2, '0')}/${year}`);
+            setSalaryPeriodText(periodStart && periodEnd ? `${periodStart} - ${periodEnd}` : 'Kỳ thanh toán hiện tại');
+            setSalaryStatusText(statusText);
+          }
+
+          const profile = pick(detail, ['employee', 'staff', 'user'], null) || detail;
+          if (mounted) {
+            setProfileData((prev) => ({
+              ...prev,
+              fullName: pick(profile, ['fullName', 'fullname', 'name'], prev.fullName),
+              phone: pick(profile, ['phone', 'phoneNumber'], prev.phone),
+              email: pick(profile, ['email'], prev.email),
+              role: pick(profile, ['role', 'positionLabel', 'position'], prev.role),
+              department: pick(profile, ['department', 'departmentName'], prev.department),
+              joinDate: toDateText(pick(profile, ['joinDate', 'startDate', 'createdAt'], prev.joinDate)) || prev.joinDate,
+              taxId: pick(profile, ['taxId', 'taxCode'], prev.taxId),
+              bankName: pick(profile, ['bankName'], prev.bankName),
+              bankAccount: pick(profile, ['bankAccount', 'accountNumber'], prev.bankAccount),
+            }));
+          }
+          loadedFromApi = true;
+        } else {
+          console.warn('Salary API current-month-detail failed:', currentRes.reason);
+        }
+
+        if (mounted) {
+          setSalaryApiNotice(
+            loadedFromApi
+              ? ''
+              : 'Chưa lấy được dữ liệu lương từ API, hiện đang hiển thị dữ liệu mẫu.'
+          );
+        }
+      } catch (error) {
+        console.error('Không tải được dữ liệu lương:', error);
+        if (mounted) {
+          setSalaryApiNotice('Chưa lấy được dữ liệu lương từ API, hiện đang hiển thị dữ liệu mẫu.');
+        }
+      }
+    };
+
+    loadSalaryData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleInputChange = (field, value) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
@@ -101,6 +297,11 @@ const ManagerSalaryPage = () => {
 
   return (
     <div className="salary-page">
+      {salaryApiNotice && (
+        <div style={{ marginBottom: 12, border: '1px solid #fbbf24', background: '#fffbeb', color: '#92400e', borderRadius: 10, padding: '10px 12px', fontWeight: 600 }}>
+          {salaryApiNotice}
+        </div>
+      )}
       {/* Header Section */}
       <header className="salary-header">
         <div className="header-blur-effect"></div>
@@ -191,10 +392,10 @@ const ManagerSalaryPage = () => {
           <section className="salary-breakdown-section">
             <div className="breakdown-header">
               <div>
-                <h3 className="section-title">Chi tiết lương tháng 08/2023</h3>
-                <p className="section-subtitle">Kỳ thanh toán: 01/08 - 31/08</p>
+                <h3 className="section-title">Chi tiết lương tháng {salaryTitleMonth}</h3>
+                <p className="section-subtitle">Kỳ thanh toán: {salaryPeriodText}</p>
               </div>
-              <span className="status-badge status-completed">Đã quyết toán</span>
+              <span className="status-badge status-completed">{salaryStatusText}</span>
             </div>
             <div className="breakdown-list">
               {salaryBreakdown.map((item) => (

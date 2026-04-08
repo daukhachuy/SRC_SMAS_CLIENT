@@ -7,10 +7,25 @@ import {
   AlertTriangle,
   Check
 } from 'lucide-react';
+import { markNotificationAsRead } from '../api/notificationApi';
 import '../styles/NotificationDropdown.css';
 
-const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifications }) => {
+const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifications, onNotificationsChange }) => {
   const dropdownRef = useRef(null);
+
+  const getVisualByNotification = (notification) => {
+    if (notification?.icon && notification?.iconBg) {
+      return { Icon: notification.icon, iconBg: notification.iconBg };
+    }
+
+    const raw = String(notification?.type || notification?.tone || '').toLowerCase();
+    if (raw.includes('order')) return { Icon: ShoppingCart, iconBg: 'bg-orange' };
+    if (raw.includes('book')) return { Icon: Calendar, iconBg: 'bg-orange' };
+    if (raw.includes('warning') || raw.includes('error')) return { Icon: AlertTriangle, iconBg: 'bg-red' };
+    if (raw.includes('promotion')) return { Icon: Star, iconBg: 'bg-yellow' };
+    if (raw.includes('success')) return { Icon: Check, iconBg: 'bg-blue' };
+    return { Icon: Info, iconBg: 'bg-blue' };
+  };
   
   // Sample notifications data
   const defaultNotifications = [
@@ -70,6 +85,12 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
     externalNotifications || defaultNotifications
   );
 
+  useEffect(() => {
+    if (Array.isArray(externalNotifications)) {
+      setNotifications(externalNotifications);
+    }
+  }, [externalNotifications]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -87,14 +108,34 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
     };
   }, [isOpen, onClose]);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+  const handleMarkAllAsRead = async () => {
+    const unreadIds = notifications.filter((notif) => !notif.isRead).map((notif) => notif.id);
+
+    if (unreadIds.length > 0) {
+      await Promise.allSettled(unreadIds.map((id) => markNotificationAsRead(id)));
+    }
+
+    const next = notifications.map((notif) => ({ ...notif, isRead: true }));
+    setNotifications(next);
+    if (typeof onNotificationsChange === 'function') {
+      onNotificationsChange(next);
+    }
   };
 
-  const handleNotificationClick = (id) => {
-    setNotifications(notifications.map(notif => 
+  const handleNotificationClick = async (id) => {
+    try {
+      await markNotificationAsRead(id);
+    } catch (error) {
+      console.error('Mark notification as read failed:', error);
+    }
+
+    const next = notifications.map((notif) =>
       notif.id === id ? { ...notif, isRead: true } : notif
-    ));
+    );
+    setNotifications(next);
+    if (typeof onNotificationsChange === 'function') {
+      onNotificationsChange(next);
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -126,15 +167,23 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
 
         {/* Notification List */}
         <div className="notification-list">
+          {notifications.length === 0 && (
+            <div className="notification-item" style={{ justifyContent: 'center' }}>
+              <div className="notification-content">
+                <p className="notification-item-title">Chưa có thông báo</p>
+                <p className="notification-message">Hệ thống chưa có thông báo mới.</p>
+              </div>
+            </div>
+          )}
           {notifications.map((notification) => {
-            const Icon = notification.icon;
+            const { Icon, iconBg } = getVisualByNotification(notification);
             return (
               <div
                 key={notification.id}
                 className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
                 onClick={() => handleNotificationClick(notification.id)}
               >
-                <div className={`notification-icon ${notification.iconBg}`}>
+                <div className={`notification-icon ${iconBg}`}>
                   <Icon size={20} />
                 </div>
                 <div className="notification-content">

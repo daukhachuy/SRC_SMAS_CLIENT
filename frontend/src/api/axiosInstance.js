@@ -22,7 +22,10 @@ const instance = axios.create({
 // Request Interceptor - Thêm token vào tất cả requests
 instance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+    const token =
+      localStorage.getItem('authToken') ||
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('tableAccessToken');
     // Log chi tiết token và API URL để debug
     console.log('[DEBUG] API BASE URL:', API_BASE_URL);
     console.log('[DEBUG] Token FE gửi lên:', token);

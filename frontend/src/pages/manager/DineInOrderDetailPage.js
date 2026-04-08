@@ -14,6 +14,86 @@ import PaymentModal from '../../components/PaymentModal';
 import { orderAPI } from '../../api/managerApi';
 import '../../styles/DineInOrderDetailPage.css';
 
+const asArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.$values)) return value.$values;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.data?.$values)) return value.data.$values;
+  return [];
+};
+
+const mapOrderStatusLabel = (status) => {
+  const s = String(status || '').trim().toLowerCase();
+  if (s === 'pending') return { label: 'Chờ xử lý', css: 'pending' };
+  if (s === 'preparing' || s === 'processing') return { label: 'Đang chuẩn bị', css: 'preparing' };
+  if (s === 'ready') return { label: 'Sẵn sàng', css: 'ready' };
+  if (s === 'completed' || s === 'done') return { label: 'Hoàn thành', css: 'completed' };
+  if (s === 'cancelled' || s === 'canceled') return { label: 'Đã hủy', css: 'cancelled' };
+  return { label: status || '---', css: 'pending' };
+};
+
+const normalizeDetailOrder = (raw, fallbackCode) => {
+  const items = asArray(raw?.items || raw?.orderItems).map((item) => {
+    const unitPrice = Number(item?.unitPrice ?? item?.price ?? 0) || 0;
+    const quantity = Number(item?.quantity ?? 0) || 0;
+    const totalPrice = Number(item?.subtotal ?? item?.totalPrice ?? unitPrice * quantity) || 0;
+    return {
+      name: item?.itemName || item?.foodName || item?.name || '---',
+      unitPrice,
+      quantity,
+      totalPrice,
+      note: item?.note || '',
+    };
+  });
+
+  const derivedSubtotal = items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+
+  const statusMapped = mapOrderStatusLabel(raw?.orderStatus || raw?.status);
+  const tables = asArray(raw?.tables);
+  const mainTable = tables.find((t) => t?.isMainTable) || tables[0];
+
+  return {
+    ...raw,
+    code: raw?.orderCode || raw?.code || fallbackCode,
+    status: statusMapped.label,
+    statusClass: statusMapped.css,
+    items,
+    subtotal: Number(raw?.subTotal ?? raw?.subtotal ?? derivedSubtotal) || 0,
+    discount: Number(raw?.discountAmount ?? raw?.discount ?? 0) || 0,
+    total: Number(raw?.totalAmount ?? raw?.total ?? (derivedSubtotal - (Number(raw?.discountAmount ?? raw?.discount ?? 0) || 0))) || 0,
+    tableName: mainTable?.tableName || raw?.tableName || raw?.tableNumber || '',
+    orderTime: raw?.createdAt
+      ? new Date(raw.createdAt).toLocaleString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : (raw?.orderTime || ''),
+    waiter: raw?.servedBy?.fullname || raw?.waiter || '',
+    waiterImage: raw?.servedBy?.avatar || raw?.waiterImage || '',
+    customerNote: raw?.note || raw?.customerNote || '',
+  };
+};
+
+const pickItemsFromAny = (payload) => {
+  const direct = asArray(payload?.items || payload?.orderItems || payload);
+  return direct;
+};
+
+const findOrderInCollection = (rows, orderCode, orderId) => {
+  const code = String(orderCode || '').trim();
+  const idNum = Number(orderId || 0);
+  return (rows || []).find((row) => {
+    const rowCode = String(row?.orderCode || row?.code || '').trim();
+    const rowId = Number(row?.orderId || row?.id || 0);
+    return (code && rowCode === code) || (idNum > 0 && rowId === idNum);
+  });
+};
+
 function DineInOrderDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams(); // Get order ID from URL
@@ -28,18 +108,99 @@ function DineInOrderDetailPage() {
 
   useEffect(() => {
     if (!orderId) return;
-    setLoading(true);
-    setError('');
-    orderAPI.getByCode(orderId)
-      .then(res => {
-        // Nếu API trả về .data.data thì lấy sâu vào, còn không thì lấy .data
-        const data = res?.data?.data || res?.data || res;
-        setOrderData(data);
-      })
-      .catch(err => {
-        setError('Không thể tải chi tiết đơn hàng.');
-      })
-      .finally(() => setLoading(false));
+    let mounted = true;
+
+    const loadDetail = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const detailRes = await orderAPI.getByCode(orderId);
+        const detailData = detailRes?.data?.data || detailRes?.data || detailRes;
+
+        let merged = detailData;
+        const currentItems = asArray(detailData?.items || detailData?.orderItems);
+        if (currentItems.length === 0) {
+          let itemRows = [];
+
+          try {
+            const itemsRes = await orderAPI.getItems(orderId);
+            const itemsData = itemsRes?.data?.data || itemsRes?.data || itemsRes;
+            itemRows = pickItemsFromAny(itemsData);
+          } catch {
+            // Thu tiep endpoint items voi orderId so
+          }
+
+          if (itemRows.length === 0) {
+            const numericOrderId = Number(detailData?.orderId || detailData?.id || 0);
+            if (numericOrderId > 0) {
+              try {
+                const itemsResById = await orderAPI.getItems(numericOrderId);
+                const itemsDataById = itemsResById?.data?.data || itemsResById?.data || itemsResById;
+                itemRows = pickItemsFromAny(itemsDataById);
+              } catch {
+                // tiep tuc fallback history
+              }
+            }
+          }
+
+          if (itemRows.length === 0) {
+            try {
+              const [activeRes, historyRes] = await Promise.allSettled([
+                orderAPI.getActive(),
+                orderAPI.getHistory(),
+              ]);
+
+              const activeRows = activeRes.status === 'fulfilled'
+                ? asArray(activeRes.value?.data?.data || activeRes.value?.data?.items || activeRes.value?.data || [])
+                : [];
+
+              const historyRows = historyRes.status === 'fulfilled'
+                ? asArray(historyRes.value?.data?.data || historyRes.value?.data?.items || historyRes.value?.data || [])
+                : [];
+
+              const matched =
+                findOrderInCollection(activeRows, orderId, detailData?.orderId || detailData?.id) ||
+                findOrderInCollection(historyRows, orderId, detailData?.orderId || detailData?.id);
+
+              if (matched) {
+                itemRows = asArray(matched?.items || matched?.orderItems);
+                merged = {
+                  ...detailData,
+                  ...matched,
+                  items: itemRows,
+                };
+              }
+            } catch {
+              // bo qua neu history khong kha dung
+            }
+          }
+
+          if (itemRows.length > 0) {
+            merged = {
+              ...merged,
+              items: itemRows,
+            };
+          }
+        }
+
+        if (mounted) {
+          setOrderData(normalizeDetailOrder(merged, orderId));
+        }
+      } catch (err) {
+        if (mounted) {
+          setError('Không thể tải chi tiết đơn hàng.');
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDetail();
+    return () => {
+      mounted = false;
+    };
   }, [orderId]);
 
   const formatCurrency = (value) => {
@@ -124,6 +285,13 @@ function DineInOrderDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {(orderData.items || []).length === 0 && (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: '#64748b' }}>
+                          Chưa có món trong đơn hoặc dữ liệu món chưa đồng bộ.
+                        </td>
+                      </tr>
+                    )}
                     {(orderData.items || []).map((item, idx) => (
                       <tr key={idx}>
                         <td className="dinein-detail-item-name">{item.name || item.foodName}</td>
@@ -136,11 +304,6 @@ function DineInOrderDetailPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="dinein-detail-table-footer">
-                <button className="dinein-detail-add-item-btn">
-                  + Thêm món mới
-                </button>
-              </div>
             </div>
 
             {/* Processing Stages */}
@@ -150,6 +313,11 @@ function DineInOrderDetailPage() {
                 Trạng thái chế biến
               </h3>
               <div className="dinein-detail-stages">
+                {(orderData.processingStages || []).length === 0 && (
+                  <div className="dinein-detail-stages-empty">
+                    Chưa có dữ liệu trạng thái chế biến cho đơn này.
+                  </div>
+                )}
                 {(orderData.processingStages || []).map((stage, idx) => (
                   <div
                     key={idx}
@@ -177,7 +345,7 @@ function DineInOrderDetailPage() {
                 <div className="dinein-detail-info-row">
                   <span>Loại đơn</span>
                   <span className="dinein-detail-info-value">
-                    Ăn tại chỗ - {orderData.tableNumber || orderData.tableName || ''}
+                    {`Ăn tại chỗ${orderData.tableNumber || orderData.tableName ? ` - ${orderData.tableNumber || orderData.tableName}` : ''}`}
                   </span>
                 </div>
                 <div className="dinein-detail-info-row">
@@ -187,11 +355,13 @@ function DineInOrderDetailPage() {
                 <div className="dinein-detail-info-row">
                   <span>Nhân viên phục vụ</span>
                   <div className="dinein-detail-waiter-info">
-                    <img
-                      src={orderData.waiterImage || ''}
-                      alt={orderData.waiter || ''}
-                      className="dinein-detail-waiter-image"
-                    />
+                    {orderData.waiterImage ? (
+                      <img
+                        src={orderData.waiterImage}
+                        alt={orderData.waiter || ''}
+                        className="dinein-detail-waiter-image"
+                      />
+                    ) : null}
                     <span>{orderData.waiter || ''}</span>
                   </div>
                 </div>

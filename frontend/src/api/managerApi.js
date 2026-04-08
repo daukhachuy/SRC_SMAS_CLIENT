@@ -100,6 +100,9 @@ export async function getAllStaffSchedule() {
     // GET /api/order/history - lịch sử đơn hàng
     getHistory: () => instance.get('/order/history'),
 
+    // GET /api/order/history/my/seven-days - lịch sử phục vụ 7 ngày của waiter hiện tại
+    getHistoryMySevenDays: () => instance.get('/order/history/my/seven-days'),
+
     // GET /api/order/history/type?orderType=...
     getHistoryByType: (orderType) =>
       instance.get('/order/history/type', { params: { orderType } }),
@@ -122,6 +125,18 @@ export async function getAllStaffSchedule() {
 
     // GET /api/order/four-newest-orders
     getFourNewest: () => instance.get('/order/four-newest-orders'),
+
+    // POST /api/order/choose-staffid-delivery
+    chooseStaffDelivery: (orderCode, staffId) =>
+      instance.post('/order/choose-staffid-delivery', { orderCode, staffId }),
+
+    // PATCH /api/order/change-status/{OrderCode}
+    changeStatus: (orderCode) =>
+      instance.patch(`/order/change-status/${encodeURIComponent(orderCode)}`),
+
+    // POST /api/order/delete-orderdelivery/{OrderCode}
+    deleteOrderDelivery: (orderCode, payload) =>
+      instance.post(`/order/delete-orderdelivery/${encodeURIComponent(orderCode)}`, payload ?? {}),
   };
 
   // ===== HELPERS: MAP API → UI =====
@@ -699,8 +714,21 @@ export async function getAllStaffSchedule() {
 
   // ===== NOTIFICATIONS =====
   export const notificationAPI = {
-    // GET /api/notification
-    getAll: () => instance.get('/notification'),
+    // GET /api/notification/all
+    getAll: () => instance.get('/notification/all'),
+
+    // GET /api/notification/unread
+    getUnread: () => instance.get('/notification/unread'),
+
+    // PATCH (or POST fallback) /api/notification/mark-as-read/{notificationId}
+    markAsRead: async (notificationId) => {
+      if (!notificationId) throw new Error('notificationId is required');
+      try {
+        return await instance.patch(`/notification/mark-as-read/${notificationId}`);
+      } catch (error) {
+        return await instance.post(`/notification/mark-as-read/${notificationId}`);
+      }
+    },
 
     /**
      * POST /api/notification/change-workshift

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Bell, User, ShoppingCart } from 'lucide-react';
 import { getFoodByFilter, resolveFoodImageUrl } from '../api/foodApi';
 import { createPaymentLink } from '../api/paymentService';
+import { createGuestOrder } from '../api/orderApi';
 import '../styles/MenuPage.css';
 
 const CATEGORY_CHIPS = [
@@ -58,6 +59,7 @@ const GuesQRorder = () => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [cart, setCart] = useState([]);
   const [isRedirectingPayment, setIsRedirectingPayment] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
   const formatCurrency = (value) =>
     `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -138,15 +140,84 @@ const GuesQRorder = () => {
   const total = subtotal;
 
   const tableCode = searchParams.get('tableCode') || localStorage.getItem('tableCode') || '04';
+  const tableToken = searchParams.get('tableToken') || '';
   const tableLabel = String(tableCode).toUpperCase().startsWith('BÀN')
     ? String(tableCode)
     : `Bàn ${tableCode}`;
 
+  useEffect(() => {
+    if (tableCode) {
+      localStorage.setItem('tableCode', String(tableCode));
+    }
+    if (tableToken) {
+      localStorage.setItem('tableAccessToken', tableToken);
+    }
+  }, [tableCode, tableToken]);
+
   const handlePayment = async () => {
-    const orderId = Number(searchParams.get('orderId') || sessionStorage.getItem('pendingOrderId') || 0);
+    const resolveTableId = () => {
+      const raw = String(tableCode || '').trim();
+      const match = raw.match(/(\d+)/);
+      return match ? Number(match[1]) : Number(raw);
+    };
+
+    const extractOrderId = (payload) => {
+      const data = payload?.data || payload;
+      const candidates = [
+        data?.orderId,
+        data?.id,
+        data?.data?.orderId,
+        data?.data?.id,
+        data?.order?.orderId,
+        data?.order?.id,
+      ];
+      const numeric = candidates.map((v) => Number(v)).find((v) => Number.isFinite(v) && v > 0);
+      return numeric || 0;
+    };
+
+    const createOrderFromCart = async () => {
+      if (cart.length === 0) {
+        throw new Error('Vui lòng chọn món trước khi gọi món.');
+      }
+
+      const tableId = resolveTableId();
+      if (!Number.isFinite(tableId) || tableId <= 0) {
+        throw new Error('Không xác định được bàn để tạo đơn.');
+      }
+
+      const payload = {
+        orderType: 'DineIn',
+        tableIds: [tableId],
+        numberOfGuests: 1,
+        note: `QR order at table ${tableCode}`,
+        orderItems: cart.map((item) => ({
+          foodId: Number(item.id),
+          quantity: Number(item.quantity) || 1,
+          note: 'Khách đặt qua QR',
+        })),
+      };
+
+      const created = await createGuestOrder(payload);
+      const createdOrderId = extractOrderId(created);
+      if (!Number.isFinite(createdOrderId) || createdOrderId <= 0) {
+        throw new Error('Tạo đơn thành công nhưng không lấy được orderId.');
+      }
+      sessionStorage.setItem('pendingOrderId', String(createdOrderId));
+      return createdOrderId;
+    };
+
+    let orderId = Number(searchParams.get('orderId') || sessionStorage.getItem('pendingOrderId') || 0);
+
     if (!Number.isFinite(orderId) || orderId <= 0) {
-      alert('Chưa có orderId để thanh toán. Vui lòng tạo đơn trước.');
-      return;
+      try {
+        setIsPlacingOrder(true);
+        orderId = await createOrderFromCart();
+      } catch (err) {
+        alert(err?.message || 'Không thể tạo đơn gọi món.');
+        return;
+      } finally {
+        setIsPlacingOrder(false);
+      }
     }
 
     try {
@@ -166,6 +237,66 @@ const GuesQRorder = () => {
       alert(err?.response?.data?.message || err?.message || 'Lỗi kết nối API thanh toán');
     } finally {
       setIsRedirectingPayment(false);
+    }
+  };
+
+  const handlePlaceOrder = async () => {
+    const resolveTableId = () => {
+      const raw = String(tableCode || '').trim();
+      const match = raw.match(/(\d+)/);
+      return match ? Number(match[1]) : Number(raw);
+    };
+
+    const extractOrderId = (payload) => {
+      const data = payload?.data || payload;
+      const candidates = [
+        data?.orderId,
+        data?.id,
+        data?.data?.orderId,
+        data?.data?.id,
+        data?.order?.orderId,
+        data?.order?.id,
+      ];
+      const numeric = candidates.map((v) => Number(v)).find((v) => Number.isFinite(v) && v > 0);
+      return numeric || 0;
+    };
+
+    if (cart.length === 0) {
+      alert('Vui lòng chọn món trước khi gọi nhân viên.');
+      return;
+    }
+
+    const tableId = resolveTableId();
+    if (!Number.isFinite(tableId) || tableId <= 0) {
+      alert('Không xác định được bàn để gọi món.');
+      return;
+    }
+
+    try {
+      setIsPlacingOrder(true);
+      const payload = {
+        orderType: 'DineIn',
+        tableIds: [tableId],
+        numberOfGuests: 1,
+        note: `QR order at table ${tableCode}`,
+        orderItems: cart.map((item) => ({
+          foodId: Number(item.id),
+          quantity: Number(item.quantity) || 1,
+          note: 'Khách đặt qua QR',
+        })),
+      };
+      const created = await createGuestOrder(payload);
+      const createdOrderId = extractOrderId(created);
+      if (!Number.isFinite(createdOrderId) || createdOrderId <= 0) {
+        throw new Error('Tạo đơn thành công nhưng không lấy được orderId.');
+      }
+      sessionStorage.setItem('pendingOrderId', String(createdOrderId));
+      setCart([]);
+      alert('Đã gửi gọi món thành công. Nhân viên sẽ xác nhận đơn của bạn.');
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message || 'Không thể gửi gọi món.');
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
@@ -291,12 +422,16 @@ const GuesQRorder = () => {
             </div>
           </div>
           <div style={{display: 'flex', gap: 10}}>
-            <button style={{flex: 1, background: '#fff', color: '#FF7A21', border: '2px solid #FF7A21', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6}}>
-              <span style={{fontSize: 20}}>🛎️</span> GỌI NHÂN VIÊN
+            <button
+              onClick={handlePlaceOrder}
+              disabled={isPlacingOrder}
+              style={{flex: 1, background: '#fff', color: '#FF7A21', border: '2px solid #FF7A21', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isPlacingOrder ? 0.8 : 1}}
+            >
+              <span style={{fontSize: 20}}>🛎️</span> {isPlacingOrder ? 'ĐANG GỬI...' : 'GỌI NHÂN VIÊN'}
             </button>
             <button
               onClick={handlePayment}
-              disabled={isRedirectingPayment}
+              disabled={isRedirectingPayment || isPlacingOrder}
               style={{flex: 1, background: '#FF7A21', color: '#fff', border: 'none', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isRedirectingPayment ? 0.8 : 1}}
             >
               <span style={{fontSize: 20}}>🧾</span> {isRedirectingPayment ? 'ĐANG CHUYỂN...' : 'THANH TOÁN'}
