@@ -62,6 +62,23 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+/* Lọc phụ: Giao hàng — Pending / Confirm */
+.Delivery-Sub-Filters {
+  position: relative;
+  top: auto;
+  margin-top: -0.35rem;
+  margin-bottom: 1rem;
+  padding-top: 0;
+  border-bottom: none;
+  flex-wrap: wrap;
+}
+
+.Delivery-Sub-Filters .Order-Tab-Btn {
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
 .Order-Tab-Btn {
   padding: 10px 20px;
   border-radius: 9999px;

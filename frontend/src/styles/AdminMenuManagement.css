@@ -259,6 +259,37 @@
   color: #FF6C1F;
 }
 
+.menu-price-main {
+  display: block;
+}
+
+.menu-price-old {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #9ca3af;
+  text-decoration: line-through;
+  margin-top: 0.15rem;
+}
+
+.menu-featured-badge {
+  color: #f59e0b;
+  font-size: 0.85em;
+  margin-left: 0.15rem;
+}
+
+.menu-dish-meta {
+  display: block;
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+.menu-category-tag--muted {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
 .menu-category-tag {
   display: inline-block;
   padding: 0.2rem 0.5rem;

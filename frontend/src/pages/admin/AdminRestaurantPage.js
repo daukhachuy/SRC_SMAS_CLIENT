@@ -711,31 +711,27 @@ const AdminRestaurantPage = () => {
     }
   };
 
-  /** PUT /api/services/{id} — chỉ đổi isAvailable (body đầy đủ ServiceUpdateDto) */
+  /** PATCH /api/services/{id}/status?isAvailable= — chỉ đổi isAvailable (Swagger) */
   const toggleServiceAvailable = async (row) => {
     const sid = Number(row?.id);
     if (!Number.isFinite(sid) || sid <= 0) return;
     if (serviceToggleBusyId != null) return;
-    const raw = row.raw || {};
-    const nextAvailable = !row.active;
-    const p = Number(raw.servicePrice ?? raw.price);
-    const title = (raw.title || row.name || '').trim();
-    if (!title) {
-      window.alert('Thiếu tên dịch vụ, không thể cập nhật.');
-      return;
-    }
+    const next = !row.active;
+
+    // Optimistic update
+    setServices((prev) =>
+      prev.map((r) => (r.id === sid ? { ...r, active: next } : r))
+    );
     setServiceToggleBusyId(sid);
+
     try {
-      await serviceAPI.update(sid, {
-        title,
-        servicePrice: Number.isFinite(p) ? p : 0,
-        description: (raw.description || '').trim(),
-        unit: (raw.unit || '').trim(),
-        image: (raw.image || raw.imageUrl || '').toString().trim(),
-        isAvailable: nextAvailable,
-      });
-      await loadServices();
+      await serviceAPI.toggleStatus(sid, next);
+      console.info(`[AdminRestaurant] Toggle service OK — id:${sid} → isAvailable:${next}`);
     } catch (err) {
+      // Revert optimistic update
+      setServices((prev) =>
+        prev.map((r) => (r.id === sid ? { ...r, active: !next } : r))
+      );
       const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái dịch vụ.';
       window.alert(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
     } finally {

@@ -61,4 +61,21 @@ export const serviceAPI = {
     const { data } = await instance.delete(`/services/${numId}`);
     return data;
   },
+
+  /**
+   * PATCH /api/services/{id}/status?isAvailable=true|false
+   * Swagger: PATCH với query param isAvailable (boolean), body rỗng
+   */
+  toggleStatus: async (id, isAvailable) => {
+    const numId = Number(id);
+    if (!Number.isFinite(numId) || numId <= 0) {
+      throw new Error('ID dịch vụ không hợp lệ');
+    }
+    const { data } = await instance.patch(
+      `/services/${numId}/status`,
+      {},
+      { params: { isAvailable: Boolean(isAvailable) } }
+    );
+    return data;
+  },
 };

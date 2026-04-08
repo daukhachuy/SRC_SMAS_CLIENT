@@ -56,11 +56,16 @@ const applyAutoCancel = (item) => {
   return { ...item, effectiveStatus: 'Pending', autoCancelled: false };
 };
 
-/** Completed / Cancelled → sang OrderHistory; chỉ giữ lại Pending / Confirmed */
-const isForHistory = (status) => ['Completed', 'Cancelled'].includes(status);
+/** Completed / Cancelled → sang OrderHistory; chỉ giữ lại đơn đang xử lý */
+const isForHistory = (status) => ['Completed', 'Cancelled', 'Cancel'].includes(status);
+
+/** POST /api/order/filter — Giao hàng: dùng status "Confirmed" (theo thực tế backend) */
+const DELIVERY_API_STATUSES = ['Pending', 'Confirmed'];
 
 const MyOrders = () => {
   const [activeTab, setActiveTab] = useState('Delivery');
+  /** Lọc phụ tab Giao hàng: all | Pending | Confirm */
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('all');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -82,11 +87,12 @@ const MyOrders = () => {
 
   const getStatusDisplay = (status) => {
     const config = {
-      'Pending':    { text: 'Chờ xác nhận',  class: 'Waiting' },
-      'Confirmed':   { text: 'Đã xác nhận',  class: 'Success' },
-      'Processing':  { text: 'Đang xử lý',   class: 'Processing' },
-      'Completed':   { text: 'Hoàn thành',   class: 'Success' },
-      'Cancelled':   { text: 'Đã hủy',       class: 'Cancelled' },
+      Pending: { text: 'Chờ xác nhận', class: 'Waiting' },
+      Confirm: { text: 'Đã xác nhận', class: 'Success' },
+      Confirmed: { text: 'Đã xác nhận', class: 'Success' },
+      Processing: { text: 'Đang xử lý', class: 'Processing' },
+      Completed: { text: 'Hoàn thành', class: 'Success' },
+      Cancelled: { text: 'Đã hủy', class: 'Cancelled' },
     };
     return config[status] || { text: status || 'Chờ xác nhận', class: 'Waiting' };
   };
@@ -107,9 +113,8 @@ const MyOrders = () => {
         setReservations([]);
         setOrders([]);
       } else {
-        // MyOrders: chỉ hiện Pending + Confirmed; Completed → OrderHistory
-        const statuses = ['Pending', 'Confirmed'];
-        const data = await myOrderAPI.getOrders(activeTab, statuses);
+        // POST /api/order/filter — orderType=Delivery & status=Pending & status=Confirm
+        const data = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
         setOrders(Array.isArray(data) ? data : []);
         setReservations([]);
         setEventsData([]);
@@ -123,14 +128,19 @@ const MyOrders = () => {
     }
   };
 
-  useEffect(() => { fetchOrders(); setCurrentPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }, [activeTab]);
+  useEffect(() => {
+    fetchOrders();
+    setCurrentPage(1);
+    setDeliveryStatusFilter('all');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
 
   /* ── Poll: đơn hàng bị hủy từ backend → lập tức loại khỏi danh sách ── */
   useEffect(() => {
     if (activeTab !== 'Delivery') return;
 
     const poll = async () => {
-      const latest = await myOrderAPI.getOrders(activeTab, ['Pending', 'Confirmed']);
+      const latest = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
       const fresh = Array.isArray(latest) ? latest : [];
       setOrders((prev) => {
         if (fresh.length === 0) return prev;
@@ -154,14 +164,23 @@ const MyOrders = () => {
     orders
   );
 
+  const matchesDeliveryStatusFilter = (order) => {
+    if (deliveryStatusFilter === 'all') return true;
+    const st = order.orderStatus || order.status || '';
+    if (deliveryStatusFilter === 'Pending') return st === 'Pending';
+    if (deliveryStatusFilter === 'Confirmed') return st === 'Confirmed';
+    return true;
+  };
+
   const filteredData = allData
     .map((item) => {
       const withEffective = applyAutoCancel(item);
-      const eff = withEffective.effectiveStatus;
+      const eff = withEffective.effectiveStatus ?? withEffective.orderStatus ?? withEffective.status;
       return { ...withEffective, _isHistory: isForHistory(eff) };
     })
-    .filter((item) => !item._isHistory)            // loại Completed/Cancelled
+    .filter((item) => !item._isHistory)
     .filter((item) => {
+      if (activeTab === 'Delivery' && !matchesDeliveryStatusFilter(item)) return false;
       if (!searchQuery.trim()) return true;
       const query = searchQuery.toLowerCase().trim();
       const code = item.orderCode || item.reservationCode || item.eventBookingCode || item.bookingCode || '';
@@ -310,7 +329,7 @@ const MyOrders = () => {
         </div>
         <div className="Card-Main-Grid">
           <div className="Grid-Col">
-            <p>NGƯỜI NHẬN: <span>{order.delivery?.recipientName || order.customer?.fullname || '—'}</span></p>
+            <p>NGƯỜI NHẬN: <span>{order.delivery?.recipientName || order.customer?.fullName || order.customer?.fullname || '—'}</span></p>
             <p>ĐIỆN THOẠI: <span>{order.delivery?.recipientPhone || order.customer?.phone || '—'}</span></p>
           </div>
           <div className="Grid-Col">
@@ -360,6 +379,32 @@ const MyOrders = () => {
           </button>
         ))}
       </div>
+
+      {activeTab === 'Delivery' && (
+        <div className="Order-Tabs-Container Delivery-Sub-Filters" role="group" aria-label="Lọc trạng thái giao hàng">
+          <button
+            type="button"
+            className={`Order-Tab-Btn ${deliveryStatusFilter === 'all' ? 'Active' : ''}`}
+            onClick={() => { setDeliveryStatusFilter('all'); setCurrentPage(1); }}
+          >
+            Tất cả
+          </button>
+          <button
+            type="button"
+            className={`Order-Tab-Btn ${deliveryStatusFilter === 'Pending' ? 'Active' : ''}`}
+            onClick={() => { setDeliveryStatusFilter('Pending'); setCurrentPage(1); }}
+          >
+            Chờ xác nhận
+          </button>
+          <button
+            type="button"
+            className={`Order-Tab-Btn ${deliveryStatusFilter === 'Confirmed' ? 'Active' : ''}`}
+            onClick={() => { setDeliveryStatusFilter('Confirmed'); setCurrentPage(1); }}
+          >
+            Đã xác nhận
+          </button>
+        </div>
+      )}
 
       <div className="Orders-List-Flow">
         {loading ? (
