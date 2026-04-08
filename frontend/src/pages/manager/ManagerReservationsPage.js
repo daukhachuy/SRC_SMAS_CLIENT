@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
+import '../../styles/ManagerPages.css';
 import {
   Calendar,
   Search,
@@ -29,7 +31,8 @@ import {
 import '../../styles/ManagerReservationsPage.css';
 
 const ManagerReservationsPage = () => {
-    const [eventStatusFilter, setEventStatusFilter] = useState('all');
+  const { base } = useRoleSectionBasePath();
+  const [eventStatusFilter, setEventStatusFilter] = useState('all');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('regular');
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,10 +48,17 @@ const ManagerReservationsPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [uiNotice, setUiNotice] = useState('');
 
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [processingCode, setProcessingCode] = useState('');
+
+  useEffect(() => {
+    if (!uiNotice) return;
+    const timer = setTimeout(() => setUiNotice(''), 2800);
+    return () => clearTimeout(timer);
+  }, [uiNotice]);
 
   const loadReservationData = useCallback(async () => {
     setLoading(true);
@@ -217,10 +227,12 @@ const ManagerReservationsPage = () => {
     try {
       await reservationAPI.confirm(booking.reservationCode);
       await loadReservationData();
+      setUiNotice(`Đã xác nhận đặt bàn ${booking.reservationCode}.`);
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || 'Xác nhận đặt bàn thất bại';
       setError(`Lỗi ${status ?? ''} ${msg}`.trim());
+      setUiNotice(`Lỗi ${status ?? ''} ${msg}`.trim());
     } finally {
       setProcessingCode('');
     }
@@ -243,10 +255,12 @@ const ManagerReservationsPage = () => {
       await reservationAPI.cancel(cancelTarget.reservationCode, cancelReason);
       closeCancelModal();
       await loadReservationData();
+      setUiNotice(`Đã hủy đặt bàn ${cancelTarget.reservationCode}.`);
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || 'Hủy đặt bàn thất bại';
       setError(`Lỗi ${status ?? ''} ${msg}`.trim());
+      setUiNotice(`Lỗi ${status ?? ''} ${msg}`.trim());
     } finally {
       setProcessingCode('');
     }
@@ -351,8 +365,39 @@ const ManagerReservationsPage = () => {
     return configs[status] || configs.pending;
   };
 
+  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|không/i.test(uiNotice);
+
   return (
     <div className="reservations-page-container">
+      {uiNotice && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            background: noticeIsError ? 'rgba(255, 245, 240, 0.96)' : 'rgba(240, 253, 244, 0.96)',
+            border: noticeIsError ? '1px solid #ffd8bf' : '1px solid #bbf7d0',
+            color: noticeIsError ? '#9a3412' : '#166534',
+            borderRadius: 14,
+            padding: '11px 16px',
+            boxShadow: '0 12px 28px rgba(0,0,0,0.14)',
+            backdropFilter: 'blur(6px)',
+            maxWidth: 560,
+            whiteSpace: 'pre-line',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            animation: 'fadeIn 180ms ease-out',
+          }}
+        >
+          {noticeIsError ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
+          <span>{uiNotice}</span>
+        </div>
+      )}
+
       <header className="reservations-header">
         <div className="header-content">
           <div className="header-text">
@@ -374,10 +419,12 @@ const ManagerReservationsPage = () => {
                 className="search-input"
               />
             </div>
-            <button className="btn-create-event" type="button">
-              <Plus size={20} />
-              {activeTab === 'regular' ? 'Đặt bàn mới' : 'Tạo sự kiện mới'}
-            </button>
+            {activeTab !== 'regular' && (
+              <button className="btn-create-event" type="button">
+                <Plus size={20} />
+                Tạo sự kiện mới
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -686,7 +733,7 @@ const ManagerReservationsPage = () => {
                         <div className="action-buttons">
                           <button
                             className="btn-detail"
-                            onClick={() => navigate(`/manager/reservations/${event.eventId || event.bookingCode || 'detail'}`)}
+                            onClick={() => navigate(`${base}/reservations/${event.eventId || event.bookingCode || 'detail'}`)}
                             type="button"
                           >
                             <Eye size={14} />
@@ -694,7 +741,7 @@ const ManagerReservationsPage = () => {
                           </button>
                           <button
                             className="btn-contract"
-                            onClick={() => navigate(`/manager/reservations/${event.eventId || event.bookingCode || 'detail'}/contract`)}
+                            onClick={() => navigate(`${base}/reservations/${event.eventId || event.bookingCode || 'detail'}/contract`)}
                             type="button"
                           >
                             <FileText size={14} />

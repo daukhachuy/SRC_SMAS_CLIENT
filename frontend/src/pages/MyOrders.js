@@ -1,14 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { myOrderAPI } from '../api/myOrderApi';
 import OrderDetailModal from './OrderDetailModal';
+import EventOrderDetailModal from './EventOrderDetailModal';
 import '../styles/OrderHistory.css';
+
+/**
+ * Chuyển chuỗi ISO datetime (UTC) → giờ Việt Nam (UTC+7).
+ * Dùng đúng giờ địa phương, không bị lệch múi giờ trình duyệt.
+ */
+const toVietnamTime = (isoStr) => {
+  if (!isoStr) return null;
+  const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) {
+    const d = new Date(isoStr);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const [, y, mo, d, h, mi, s] = m;
+  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h) + 7, Number(mi), Number(s));
+};
+
+const fmtVN = (date) => {
+  if (!date) return '—';
+  return date.toLocaleString('vi-VN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+};
+
+const fmtVNDate = (date) => {
+  if (!date) return '—';
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const fmtRawTime = (timeStr) => {
+  if (!timeStr) return '—';
+  const m = String(timeStr).match(/^(\d{2}):(\d{2})/);
+  if (!m) return timeStr;
+  const [, h, mi] = m;
+  return `${h}:${mi}`;
+};
+
+/** Kiểm tra đơn Pending quá 2 tiếng chưa xác nhận → tự đánh Cancelled */
+const applyAutoCancel = (item) => {
+  const raw = item.rawStatus || item.status || item.orderStatus || '';
+  if (raw !== 'Pending') return item;
+  const createdAt = item.createdAt || item.reservationDate || null;
+  if (!createdAt) return item;
+  const created = toVietnamTime(createdAt);
+  if (!created) return item;
+  const now = new Date();
+  const diffMs = now - created;
+  if (diffMs > 2 * 60 * 60 * 1000) {
+    return { ...item, effectiveStatus: 'Cancelled', autoCancelled: true };
+  }
+  return { ...item, effectiveStatus: 'Pending', autoCancelled: false };
+};
+
+/** Completed / Cancelled → sang OrderHistory; chỉ giữ lại Pending / Confirmed */
+const isForHistory = (status) => ['Completed', 'Cancelled'].includes(status);
 
 const MyOrders = () => {
   const [activeTab, setActiveTab] = useState('Delivery');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,14 +78,15 @@ const MyOrders = () => {
   ];
 
   const [reservations, setReservations] = useState([]);
+  const [eventsData, setEventsData] = useState([]);
 
   const getStatusDisplay = (status) => {
     const config = {
-      'Pending': { text: 'Chờ xác nhận', class: 'Waiting' },
-      'Confirmed': { text: 'Đã xác nhận', class: 'Success' },
-      'Processing': { text: 'Đang xử lý', class: 'Processing' },
-      'Completed': { text: 'Hoàn thành', class: 'Success' },
-      'Cancelled': { text: 'Đã hủy', class: 'Cancelled' }
+      'Pending':    { text: 'Chờ xác nhận',  class: 'Waiting' },
+      'Confirmed':   { text: 'Đã xác nhận',  class: 'Success' },
+      'Processing':  { text: 'Đang xử lý',   class: 'Processing' },
+      'Completed':   { text: 'Hoàn thành',   class: 'Success' },
+      'Cancelled':   { text: 'Đã hủy',       class: 'Cancelled' },
     };
     return config[status] || { text: status || 'Chờ xác nhận', class: 'Waiting' };
   };
@@ -37,17 +96,28 @@ const MyOrders = () => {
     try {
       if (activeTab === 'Booking') {
         const data = await myOrderAPI.getReservations();
-        setReservations(Array.isArray(data) ? data : []);
+        const raw = Array.isArray(data) ? data : [];
+        setReservations(raw);
+        setEventsData([]);
+        setOrders([]);
+      } else if (activeTab === 'Event') {
+        const data = await myOrderAPI.getMyBookEvents();
+        const raw = Array.isArray(data) ? data : [];
+        setEventsData(raw);
+        setReservations([]);
         setOrders([]);
       } else {
-        const statuses = ['Pending', 'Confirmed', 'Processing', 'Completed'];
+        // MyOrders: chỉ hiện Pending + Confirmed; Completed → OrderHistory
+        const statuses = ['Pending', 'Confirmed'];
         const data = await myOrderAPI.getOrders(activeTab, statuses);
-        setOrders(data || []);
+        setOrders(Array.isArray(data) ? data : []);
         setReservations([]);
+        setEventsData([]);
       }
     } catch (err) {
       setOrders([]);
       setReservations([]);
+      setEventsData([]);
     } finally {
       setLoading(false);
     }
@@ -55,16 +125,210 @@ const MyOrders = () => {
 
   useEffect(() => { fetchOrders(); setCurrentPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }, [activeTab]);
 
-  const listData = (activeTab === 'Booking' ? reservations : orders).filter(item => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase().trim();
-    const orderCode = item.orderCode || item.reservationCode || '';
-    return orderCode.toLowerCase().includes(query);
-  });
-  const totalPages = Math.ceil(listData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedList = listData.slice(startIndex, endIndex);
+  /* ── Poll: đơn hàng bị hủy từ backend → lập tức loại khỏi danh sách ── */
+  useEffect(() => {
+    if (activeTab !== 'Delivery') return;
+
+    const poll = async () => {
+      const latest = await myOrderAPI.getOrders(activeTab, ['Pending', 'Confirmed']);
+      const fresh = Array.isArray(latest) ? latest : [];
+      setOrders((prev) => {
+        if (fresh.length === 0) return prev;
+        const cancelledIds = new Set(
+          fresh.filter((o) => o.orderStatus === 'Cancelled').map((o) => o.orderId)
+        );
+        if (cancelledIds.size === 0) return fresh;
+        return fresh.filter((o) => !cancelledIds.has(o.orderId));
+      });
+    };
+
+    const intervalId = setInterval(poll, 15_000); // 15s
+    return () => clearInterval(intervalId);
+  }, [activeTab]);
+
+  /* ── Lọc cho MyOrders: chỉ giữ lại Pending/Confirmed ── */
+
+  const allData = (
+    activeTab === 'Booking' ? reservations :
+    activeTab === 'Event' ? eventsData :
+    orders
+  );
+
+  const filteredData = allData
+    .map((item) => {
+      const withEffective = applyAutoCancel(item);
+      const eff = withEffective.effectiveStatus;
+      return { ...withEffective, _isHistory: isForHistory(eff) };
+    })
+    .filter((item) => !item._isHistory)            // loại Completed/Cancelled
+    .filter((item) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase().trim();
+      const code = item.orderCode || item.reservationCode || item.eventBookingCode || item.bookingCode || '';
+      return code.toLowerCase().includes(query);
+    });
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const currentPageSafe = Math.min(currentPage, Math.max(1, totalPages));
+  const startIndex = (currentPageSafe - 1) * itemsPerPage;
+  const paginatedList = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  /* ── Tab Đặt chỗ ── */
+  const renderBookingCard = (res) => {
+    const status = getStatusDisplay(res.effectiveStatus || res.status);
+    const isAutoCancelled = res.autoCancelled && res.effectiveStatus === 'Cancelled';
+    return (
+      <div key={res.reservationId} className="Order-Horizontal-Card">
+        <div className="Card-Top-Row">
+          <div className="Type-Header">
+            <div className="Type-Icon-Wrap">
+              <i className="fa-solid fa-house-user"></i>
+            </div>
+            <div className="Type-Text">
+              <strong>Đặt chỗ</strong>
+              <small className="Order-Code-Tag">Mã giao dịch #{res.reservationCode}</small>
+            </div>
+          </div>
+          <div className="Right-Action-Header">
+            <div className={`Status-Label ${status.class}`}>
+              {status.text}
+              {isAutoCancelled && <span style={{ fontSize: '0.75em', marginLeft: 4 }}>(quá hạn)</span>}
+            </div>
+          </div>
+        </div>
+        <div className="Card-Main-Grid">
+          <div className="Grid-Col">
+            <p>NGƯỜI ĐẶT: <span>{res.fullname || '—'}</span></p>
+            <p>ĐIỆN THOẠI: <span>{res.phone || '—'}</span></p>
+          </div>
+          <div className="Grid-Col">
+            <p>NGÀY ĐẶT: <span>{res.reservationDate ? fmtVNDate(toVietnamTime(res.reservationDate)) : (res.reservationDate || '—')}</span></p>
+            <p>GIỜ: <span>{fmtRawTime(res.reservationTime)}</span></p>
+          </div>
+          <div className="Grid-Col Total-Col">
+            <p>SỐ KHÁCH</p>
+            <h2 className="Price-Text">{res.numberOfGuests} người</h2>
+          </div>
+        </div>
+        {res.specialRequests && (
+          <div className="Card-Bottom-Address">
+            <i className="fa-solid fa-comment"></i>
+            <span>Yêu cầu: {res.specialRequests}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ── Tab Sự kiện ── */
+  const renderEventCard = (ev) => {
+    const status = getStatusDisplay(ev.effectiveStatus || ev.status || ev.bookingStatus || '');
+    const isAutoCancelled = ev.autoCancelled && ev.effectiveStatus === 'Cancelled';
+    return (
+      <div key={ev.eventBookingId || ev.id} className="Order-Horizontal-Card">
+        <div className="Card-Top-Row">
+          <div className="Type-Header">
+            <div className="Type-Icon-Wrap">
+              <i className="fa-solid fa-calendar-star"></i>
+            </div>
+            <div className="Type-Text">
+              <strong>Đặt sự kiện</strong>
+              <small className="Order-Code-Tag">#{ev.eventBookingCode || ev.bookingCode || ev.orderCode || ev.id}</small>
+            </div>
+          </div>
+          <div className="Right-Action-Header">
+            <div className={`Status-Label ${status.class}`}>
+              {status.text}
+              {isAutoCancelled && <span style={{ fontSize: '0.75em', marginLeft: 4 }}>(quá hạn)</span>}
+            </div>
+            <button
+              className="Btn-View-Detail"
+              onClick={() => {
+                setSelectedEvent(ev);
+                setShowEventModal(true);
+              }}
+            >
+              CHI TIẾT
+            </button>
+          </div>
+        </div>
+        <div className="Card-Main-Grid">
+          <div className="Grid-Col">
+            <p>TÊN SỰ KIỆN: <span>{ev.eventTitle || ev.title || '—'}</span></p>
+            <p>LOẠI: <span>{ev.eventType || '—'}</span></p>
+          </div>
+          <div className="Grid-Col">
+            <p>NGÀY: <span>{ev.bookingDate ? fmtVNDate(toVietnamTime(ev.bookingDate)) : (ev.eventDate ? fmtVNDate(toVietnamTime(ev.eventDate)) : '—')}</span></p>
+            <p>GIỜ: <span>{fmtRawTime(ev.bookingTime || ev.eventTime)}</span></p>
+          </div>
+          <div className="Grid-Col Total-Col">
+            <p>SỐ KHÁCH</p>
+            <h2 className="Price-Text">{(ev.numberOfGuests || ev.guestCount || 0)} người</h2>
+          </div>
+        </div>
+        {(ev.specialRequests || ev.note) && (
+          <div className="Card-Bottom-Address">
+            <i className="fa-solid fa-comment"></i>
+            <span>Yêu cầu: {ev.specialRequests || ev.note}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ── Tab Giao hàng (Delivery) ── */
+  const renderDeliveryCard = (order) => {
+    const status = getStatusDisplay(order.effectiveStatus || order.orderStatus);
+    const isAutoCancelled = order.autoCancelled && order.effectiveStatus === 'Cancelled';
+    return (
+      <div key={order.orderId} className="Order-Horizontal-Card">
+        <div className="Card-Top-Row">
+          <div className="Type-Header">
+            <div className="Type-Icon-Wrap">
+              <i className={`fa-solid ${
+                order.orderType === 'Delivery' ? 'fa-box' :
+                order.orderType === 'Event' ? 'fa-calendar-star' : 'fa-house-user'
+              }`}></i>
+            </div>
+            <div className="Type-Text">
+              <strong>
+                {order.orderType === 'Delivery' ? 'Giao hàng' :
+                 order.orderType === 'Event' ? 'Đặt sự kiện tại cửa hàng' : 'Đặt chỗ'}
+              </strong>
+              <small className="Order-Code-Tag">Mã giao dịch #{order.orderCode}</small>
+            </div>
+          </div>
+          <div className="Right-Action-Header">
+            <div className={`Status-Label ${status.class}`}>
+              {status.text}
+              {isAutoCancelled && <span style={{ fontSize: '0.75em', marginLeft: 4 }}>(quá hạn)</span>}
+            </div>
+            <button className="Btn-View-Detail" onClick={() => { setSelectedOrder(order); setShowModal(true); }}>
+              CHI TIẾT
+            </button>
+          </div>
+        </div>
+        <div className="Card-Main-Grid">
+          <div className="Grid-Col">
+            <p>NGƯỜI NHẬN: <span>{order.delivery?.recipientName || order.customer?.fullname || '—'}</span></p>
+            <p>ĐIỆN THOẠI: <span>{order.delivery?.recipientPhone || order.customer?.phone || '—'}</span></p>
+          </div>
+          <div className="Grid-Col">
+            <p>HÌNH THỨC: <span>{order.paymentMethod || 'Tiền mặt'}</span></p>
+            <p>THỜI GIAN: <span>{fmtVN(toVietnamTime(order.createdAt))}</span></p>
+          </div>
+          <div className="Grid-Col Total-Col">
+            <p>TỔNG THANH TOÁN</p>
+            <h2 className="Price-Text">{order.totalAmount?.toLocaleString()} đ</h2>
+          </div>
+        </div>
+        <div className="Card-Bottom-Address">
+          <i className="fa-solid fa-location-dot"></i>
+          <span>ĐỊA CHỈ: {order.delivery?.address || 'Nhận tại cửa hàng'}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="Order-History-Page">
@@ -87,9 +351,9 @@ const MyOrders = () => {
 
       <div className="Order-Tabs-Container">
         {tabs.map(tab => (
-          <button 
-            key={tab.id} 
-            className={`Order-Tab-Btn ${activeTab === tab.id ? 'Active' : ''}`} 
+          <button
+            key={tab.id}
+            className={`Order-Tab-Btn ${activeTab === tab.id ? 'Active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             <i className={`fa-solid ${tab.icon}`}></i> {tab.label}
@@ -101,115 +365,30 @@ const MyOrders = () => {
         {loading ? (
           <div className="Spinner-Wrapper"><div className="Spinner"></div><p>Đang tải dữ liệu...</p></div>
         ) : activeTab === 'Booking' ? (
-          listData.length > 0 ? (
-            paginatedList.map((res) => {
-              const status = getStatusDisplay(res.status);
-              return (
-                <div key={res.reservationId} className="Order-Horizontal-Card">
-                  <div className="Card-Top-Row">
-                    <div className="Type-Header">
-                      <div className="Type-Icon-Wrap">
-                        <i className="fa-solid fa-house-user"></i>
-                      </div>
-                      <div className="Type-Text">
-                        <strong>Đặt chỗ</strong>
-                        <small className="Order-Code-Tag">Mã giao dịch #{res.reservationCode}</small>
-                      </div>
-                    </div>
-                    <div className="Right-Action-Header">
-                      <div className={`Status-Label ${status.class}`}>{status.text}</div>
-                    </div>
-                  </div>
-                  <div className="Card-Main-Grid">
-                    <div className="Grid-Col">
-                      <p>NGƯỜI ĐẶT: <span>{typeof res.fullname === 'string' ? res.fullname : (res.fullname?.toString?.() || '')}</span></p>
-                      <p>ĐIỆN THOẠI: <span>{typeof res.phone === 'string' ? res.phone : (res.phone?.toString?.() || '')}</span></p>
-                    </div>
-                    <div className="Grid-Col">
-                      <p>NGÀY ĐẶT: <span>{res.reservationDate}</span></p>
-                      <p>GIỜ: <span>{res.reservationTime}</span></p>
-                    </div>
-                    <div className="Grid-Col Total-Col">
-                      <p>SỐ KHÁCH</p>
-                      <h2 className="Price-Text">{res.numberOfGuests} người</h2>
-                    </div>
-                  </div>
-                  {res.specialRequests && (
-                    <div className="Card-Bottom-Address">
-                      <i className="fa-solid fa-comment"></i>
-                      <span>Yêu cầu: {res.specialRequests}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <div className="Empty-Box">Bạn chưa có đặt bàn nào.</div>
-          )
-        ) : listData.length > 0 ? (
-          paginatedList.map((order) => {
-            const status = getStatusDisplay(order.orderStatus);
-            return (
-              <div key={order.orderId} className="Order-Horizontal-Card">
-                <div className="Card-Top-Row">
-                  <div className="Type-Header">
-                    <div className="Type-Icon-Wrap">
-                      <i className={`fa-solid ${
-                        order.orderType === 'Delivery' ? 'fa-box' :
-                        order.orderType === 'Event' ? 'fa-calendar-star' : 'fa-house-user'
-                      }`}></i>
-                    </div>
-                    <div className="Type-Text">
-                      <strong>
-                        {order.orderType === 'Delivery' ? 'Giao hàng' :
-                         order.orderType === 'Event' ? 'Đặt sự kiện tại cửa hàng' : 'Đặt chỗ'}
-                      </strong>
-                      <small className="Order-Code-Tag">Mã giao dịch #{order.orderCode}</small>
-                    </div>
-                  </div>
-                  <div className="Right-Action-Header">
-                    <div className={`Status-Label ${status.class}`}>{status.text}</div>
-                    <button className="Btn-View-Detail" onClick={() => { setSelectedOrder(order); setShowModal(true); }}>
-                      CHI TIẾT
-                    </button>
-                  </div>
-                </div>
-
-                <div className="Card-Main-Grid">
-                  <div className="Grid-Col">
-                    <p>NGƯỜI NHẬN: <span>{typeof order.delivery?.recipientName === 'string' ? order.delivery.recipientName : (order.delivery?.recipientName?.toString?.() || (typeof order.customer?.fullname === 'string' ? order.customer.fullname : (order.customer?.fullname?.toString?.() || '')))}</span></p>
-                    <p>ĐIỆN THOẠI: <span>{typeof order.delivery?.recipientPhone === 'string' ? order.delivery.recipientPhone : (order.delivery?.recipientPhone?.toString?.() || (typeof order.customer?.phone === 'string' ? order.customer.phone : (order.customer?.phone?.toString?.() || '')))}</span></p>
-                  </div>
-                  <div className="Grid-Col">
-                    <p>HÌNH THỨC: <span>{order.paymentMethod || 'Tiền mặt'}</span></p>
-                    <p>THỜI GIAN: <span>{new Date(order.createdAt).toLocaleString('vi-VN')}</span></p>
-                  </div>
-                  <div className="Grid-Col Total-Col">
-                    <p>TỔNG THANH TOÁN</p>
-                    <h2 className="Price-Text">{order.totalAmount?.toLocaleString()} đ</h2>
-                  </div>
-                </div>
-
-                <div className="Card-Bottom-Address">
-                  <i className="fa-solid fa-location-dot"></i>
-                  <span>ĐỊA CHỈ: {order.delivery?.address || "Nhận tại cửa hàng"}</span>
-                </div>
-              </div>
-            );
-          })
+          paginatedList.length > 0
+            ? paginatedList.map(renderBookingCard)
+            : <div className="Empty-Box">Bạn chưa có đặt bàn nào đang chờ.</div>
+        ) : activeTab === 'Event' ? (
+          paginatedList.length > 0
+            ? paginatedList.map(renderEventCard)
+            : <div className="Empty-Box">Bạn chưa có đặt sự kiện nào đang chờ.</div>
         ) : (
-          <div className="Empty-Box">Không tìm thấy đơn hàng nào trong mục này.</div>
+          paginatedList.length > 0
+            ? paginatedList.map(renderDeliveryCard)
+            : <div className="Empty-Box">Không tìm thấy đơn hàng nào đang chờ.</div>
         )}
       </div>
 
-      {listData.length > 0 && (
+      {filteredData.length > 0 && (
         <div className="Order-History-Pagination">
-          <p className="Pagination-Info">Hiển thị {startIndex + 1}-{Math.min(startIndex + itemsPerPage, listData.length)} của {listData.length} {activeTab === 'Booking' ? 'đặt bàn' : 'đơn hàng'}</p>
+          <p className="Pagination-Info">
+            Hiển thị {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredData.length)} trong {filteredData.length} đơn đang chờ
+          </p>
           <div className="Pagination-Controls">
             <button
               type="button"
               className="Page-Nav-Btn"
-              disabled={currentPage === 1}
+              disabled={currentPageSafe <= 1}
               onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             >
               <i className="fa-solid fa-chevron-left"></i>
@@ -221,7 +400,7 @@ const MyOrders = () => {
                   <button
                     key={page}
                     type="button"
-                    className={`Page-Number ${currentPage === page ? 'Active' : ''}`}
+                    className={`Page-Number ${currentPageSafe === page ? 'Active' : ''}`}
                     onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   >
                     {page}
@@ -234,7 +413,7 @@ const MyOrders = () => {
             <button
               type="button"
               className="Page-Nav-Btn"
-              disabled={currentPage === totalPages}
+              disabled={currentPageSafe >= totalPages}
               onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             >
               <i className="fa-solid fa-chevron-right"></i>
@@ -244,6 +423,12 @@ const MyOrders = () => {
       )}
 
       {showModal && <OrderDetailModal order={selectedOrder} onClose={() => setShowModal(false)} />}
+      {showEventModal && (
+        <EventOrderDetailModal
+          eventData={selectedEvent}
+          onClose={() => setShowEventModal(false)}
+        />
+      )}
     </div>
   );
 };

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../hooks/useRoleSectionBasePath';
 import { Filter, MoreHorizontal, Download, History, ChevronLeft, ChevronRight, UtensilsCrossed } from 'lucide-react';
 import '../styles/DineInOrdersPage.css';
 
 function DineInOrdersPage() {
+  const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dine');
   const [currentPage, setCurrentPage] = useState(1);
@@ -166,7 +168,7 @@ function DineInOrdersPage() {
                 key={order.code} 
                 className="dinein-order-card"
                 style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/manager/orders/dine-in/${encodeURIComponent(order.code)}`)}
+                onClick={() => navigate(`${base}/orders/dine-in/${encodeURIComponent(order.code)}`)}
               >
                 <div className="dinein-card-header">
                   <div className="dinein-card-info">

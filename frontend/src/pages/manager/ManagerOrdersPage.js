@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
+import '../../styles/ManagerPages.css';
 import {
+  AlertTriangle,
   Bike,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   History,
@@ -50,6 +54,7 @@ const SkeletonCard = () => (
 // MAIN PAGE
 // ─────────────────────────────────────────────
 const ManagerOrdersPage = () => {
+  const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
 
   const [activeOrders,   setActiveOrders]   = useState([]);
@@ -65,6 +70,13 @@ const ManagerOrdersPage = () => {
   const [isModalOpen,          setIsModalOpen]          = useState(false);
   const [selectedDelivery,     setSelectedDelivery]     = useState(null);
   const [isDeliveryModalOpen,  setIsDeliveryModalOpen]  = useState(false);
+  const [uiNotice,             setUiNotice]             = useState('');
+
+  useEffect(() => {
+    if (!uiNotice) return;
+    const timer = setTimeout(() => setUiNotice(''), 2800);
+    return () => clearTimeout(timer);
+  }, [uiNotice]);
 
   // ── fetch ─────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -172,9 +184,9 @@ const ManagerOrdersPage = () => {
       setSelectedDelivery(order);
       setIsDeliveryModalOpen(true);
     } else if (order.icon === 'dine') {
-      navigate(`/manager/orders/dine-in/${encodeURIComponent(order.code)}`);
+      navigate(`${base}/orders/dine-in/${encodeURIComponent(order.code)}`);
     } else {
-      navigate(`/manager/orders/takeaway/${encodeURIComponent(order.code)}`);
+      navigate(`${base}/orders/takeaway/${encodeURIComponent(order.code)}`);
     }
   };
 
@@ -190,9 +202,40 @@ const ManagerOrdersPage = () => {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 
+  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|không/i.test(uiNotice);
+
   // ─────────────────────────────────────────
   return (
     <div className="manager-page-grid orders-page">
+      {uiNotice && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            background: noticeIsError ? 'rgba(255, 245, 240, 0.96)' : 'rgba(240, 253, 244, 0.96)',
+            border: noticeIsError ? '1px solid #ffd8bf' : '1px solid #bbf7d0',
+            color: noticeIsError ? '#9a3412' : '#166534',
+            borderRadius: 14,
+            padding: '11px 16px',
+            boxShadow: '0 12px 28px rgba(0,0,0,0.14)',
+            backdropFilter: 'blur(6px)',
+            maxWidth: 560,
+            whiteSpace: 'pre-line',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            animation: 'fadeIn 180ms ease-out',
+          }}
+        >
+          {noticeIsError ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+          <span>{uiNotice}</span>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="manager-page-header orders-header-row">
         <div>
@@ -432,6 +475,8 @@ const ManagerOrdersPage = () => {
       <DeliveryDetailModal
         isOpen={isDeliveryModalOpen}
         deliveryData={selectedDelivery}
+        onUpdated={fetchAll}
+        onNotify={setUiNotice}
         onClose={() => { setIsDeliveryModalOpen(false); setSelectedDelivery(null); }}
       />
     </div>

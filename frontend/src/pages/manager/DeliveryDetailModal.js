@@ -39,7 +39,8 @@ const isWaiterStaff = (staff) => {
 };
 
 const mapDriver = (staff) => ({
-  id: staff?.id ?? staff?.staffId ?? staff?.userId ?? staff?.workStaffId,
+  id: staff?.staffId ?? staff?.userId ?? staff?.id ?? staff?.workStaffId,
+  staffId: staff?.staffId ?? staff?.userId ?? staff?.id ?? staff?.workStaffId,
   name: staff?.name || staff?.fullname || staff?.fullName || staff?.staffName || 'Nhân viên',
   status: staff?.status || 'Đang làm việc',
 });
@@ -54,11 +55,30 @@ const uniqueById = (list) => {
   });
 };
 
-const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
+const extractApiErrorMessage = (error, fallback) => {
+  const data = error?.response?.data;
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  if (typeof data?.title === 'string' && data.title.trim()) return data.title;
+
+  const errors = data?.errors;
+  if (errors && typeof errors === 'object') {
+    const firstError = Object.values(errors)
+      .flatMap((x) => (Array.isArray(x) ? x : [x]))
+      .map((x) => String(x || '').trim())
+      .find(Boolean);
+    if (firstError) return firstError;
+  }
+
+  if (typeof error?.message === 'string' && error.message.trim()) return error.message;
+  return fallback;
+};
+
+const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotify }) => {
   const [selectedDriver, setSelectedDriver] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [orderDetail, setOrderDetail] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [drivers, setDrivers] = useState([]);
 
@@ -141,22 +161,77 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
     setSelectedDriver(e.target.value);
   };
 
-  const handleCancelOrder = () => {
-    if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
-      console.log('Cancel order:', delivery.orderId, 'Reason:', cancelReason);
-      // TODO: Implement cancel order API call
+  const notify = (message) => {
+    if (typeof onNotify === 'function') {
+      onNotify(message);
+      return;
+    }
+    alert(message);
+  };
+
+  const handleCancelOrder = async () => {
+    const accepted = window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?');
+    if (!accepted) return;
+
+    const orderCode = String(orderDetail?.orderCode || deliveryData?.code || delivery?.orderId || '').trim();
+    if (!orderCode) {
+      notify('Không xác định được mã đơn hàng để hủy.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const payload = cancelReason.trim() ? { reason: cancelReason.trim() } : {};
+      await orderAPI.deleteOrderDelivery(orderCode, payload);
+      notify('Hủy đơn giao hàng thành công.');
+      if (typeof onUpdated === 'function') onUpdated();
       onClose();
+    } catch (e) {
+      const message = extractApiErrorMessage(e, 'Không thể hủy đơn giao hàng. Vui lòng thử lại.');
+      notify(message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleConfirmDelivery = () => {
+  const handleConfirmDelivery = async () => {
     if (!selectedDriver && !delivery.assignedDriver) {
-      alert('Vui lòng chọn nhân viên giao hàng');
+      notify('Vui lòng chọn nhân viên giao hàng');
       return;
     }
-    console.log('Confirm delivery:', delivery.orderId, 'Driver:', selectedDriver);
-    // TODO: Implement confirm delivery API call
-    onClose();
+
+    const orderCode = String(orderDetail?.orderCode || deliveryData?.code || delivery?.orderId || '').trim();
+    const assignedDriverId =
+      delivery?.assignedDriver?.staffId ??
+      delivery?.assignedDriver?.userId ??
+      delivery?.assignedDriver?.id ??
+      null;
+    const staffIdValue = selectedDriver || assignedDriverId;
+    const staffId = Number(staffIdValue);
+
+    if (!orderCode) {
+      notify('Không xác định được mã đơn hàng để giao.');
+      return;
+    }
+
+    if (!Number.isFinite(staffId) || staffId <= 0) {
+      notify('Mã nhân viên giao hàng không hợp lệ.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await orderAPI.chooseStaffDelivery(orderCode, staffId);
+      await orderAPI.changeStatus(orderCode);
+      notify('Xác nhận giao hàng thành công.');
+      if (typeof onUpdated === 'function') onUpdated();
+      onClose();
+    } catch (e) {
+      const message = extractApiErrorMessage(e, 'Không thể xác nhận giao hàng. Vui lòng thử lại.');
+      notify(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getStatusBadgeClass = () => {
@@ -349,6 +424,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
         <div className="delivery-modal-footer">
           <button 
             className="delivery-btn-cancel-order"
+            disabled={submitting}
             onClick={handleCancelOrder}
           >
             <XCircle size={20} />
@@ -360,10 +436,11 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData }) => {
             </button>
             <button 
               className="delivery-btn-confirm"
+              disabled={submitting}
               onClick={handleConfirmDelivery}
             >
               <Send size={20} />
-              Xác nhận & Giao hàng
+              {submitting ? 'Đang xử lý...' : 'Xác nhận & Giao hàng'}
             </button>
           </div>
         </div>

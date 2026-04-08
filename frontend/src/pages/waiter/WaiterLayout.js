@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X, QrCode } from 'lucide-react';
+import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { getProfile } from '../../api/userApi';
+import { notificationAPI, mapNotificationToUI } from '../../api/managerApi';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/WaiterLayout.css';
 import '../../styles/WaiterPages.css';
@@ -12,6 +13,7 @@ const WaiterLayout = () => {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên',
     email: 'waiter@fptres.vn',
@@ -24,6 +26,32 @@ const WaiterLayout = () => {
     const words = String(name).trim().split(' ').filter(Boolean);
     if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
     return words.slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  };
+
+  const asArray = (payload) => {
+    let source = payload;
+    if (typeof source === 'string') {
+      try {
+        source = JSON.parse(source);
+      } catch {
+        return [];
+      }
+    }
+
+    if (Array.isArray(source)) return source;
+    if (Array.isArray(source?.data)) return source.data;
+    if (Array.isArray(source?.data?.$values)) return source.data.$values;
+    if (Array.isArray(source?.$values)) return source.$values;
+    if (Array.isArray(source?.items)) return source.items;
+    if (Array.isArray(source?.notifications)) return source.notifications;
+    if (source?.notificationId != null || source?.id != null) return [source];
+    if (source?.data && (source.data.notificationId != null || source.data.id != null)) return [source.data];
+    return [];
+  };
+
+  const getNotificationId = (item, idx = 0) => {
+    const id = item?.id ?? item?.notificationId ?? item?.notificationID ?? item?.Id ?? item?.NotificationId;
+    return id != null ? String(id) : `fallback-${idx}`;
   };
 
   // Load user info và ưu tiên dữ liệu thật từ Profile API
@@ -101,6 +129,60 @@ const WaiterLayout = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const [allRes, unreadRes] = await Promise.all([
+          notificationAPI.getAll(),
+          notificationAPI.getUnread(),
+        ]);
+        const allRows = asArray(allRes?.data);
+        const unreadRows = asArray(unreadRes?.data);
+        const unreadIdSet = new Set(unreadRows.map((item, idx) => getNotificationId(item, idx)));
+
+        const hasExplicitReadFlag = allRows.some(
+          (item) => item?.isRead != null || item?.read != null || item?.isSeen != null
+        );
+        const hasAnyReadInAll = allRows.some((item) =>
+          Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false)
+        );
+        const unreadSourceLooksBroken =
+          allRows.length > 0 &&
+          unreadIdSet.size === allRows.length &&
+          hasExplicitReadFlag &&
+          hasAnyReadInAll;
+
+        const mapped = allRows.map((item, idx) => {
+          const rowId = getNotificationId(item, idx);
+          const base = mapNotificationToUI(item, idx);
+          const isMarkedUnreadByEndpoint = !unreadSourceLooksBroken && unreadIdSet.has(rowId);
+          return {
+            ...base,
+            id: base.id ?? rowId,
+            isRead: isMarkedUnreadByEndpoint ? false : base.isRead,
+          };
+        });
+        if (mounted) {
+          setNotifications(mapped);
+        }
+      } catch (error) {
+        console.error('Không tải được thông báo:', error);
+        if (mounted) {
+          setNotifications([]);
+        }
+      }
+    };
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+
   const handleLogout = () => {
     logout();
     navigate('/auth');
@@ -109,7 +191,6 @@ const WaiterLayout = () => {
   const navItems = useMemo(
     () => [
       { to: '/waiter/orders', label: 'Đơn hàng', icon: ClipboardList },
-      { to: '/waiter/qr-scanner', label: 'Mở bàn', icon: QrCode },
       { to: '/waiter/schedule', label: 'Lịch làm việc', icon: Calendar },
       { to: '/waiter/profile', label: 'Hồ sơ', icon: User }
     ],
@@ -184,13 +265,17 @@ const WaiterLayout = () => {
         onClick={() => setNotificationOpen(!notificationOpen)}
       >
         <Bell size={20} />
-        <span className="waiter-notification-badge" />
+        {unreadNotificationCount > 0 && (
+          <span className="waiter-notification-badge">{unreadNotificationCount}</span>
+        )}
       </button>
 
       {/* Notification Dropdown */}
       <NotificationDropdown 
         isOpen={notificationOpen}
         onClose={() => setNotificationOpen(false)}
+        notifications={notifications}
+        onNotificationsChange={setNotifications}
       />
     </div>
   );

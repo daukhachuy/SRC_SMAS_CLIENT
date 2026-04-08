@@ -7,68 +7,42 @@ import {
   AlertTriangle,
   Check
 } from 'lucide-react';
+import { markNotificationAsRead } from '../api/notificationApi';
 import '../styles/NotificationDropdown.css';
 
-const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifications }) => {
+const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifications, onNotificationsChange }) => {
   const dropdownRef = useRef(null);
-  
-  // Sample notifications data
-  const defaultNotifications = [
-    {
-      id: 1,
-      type: 'order',
-      title: 'Đơn hàng mới #DH123',
-      message: 'Một đơn hàng mới vừa được tạo từ Table B12 đang chờ bạn xác nhận.',
-      time: '5 phút trước',
-      isRead: false,
-      icon: ShoppingCart,
-      iconBg: 'bg-orange',
-    },
-    {
-      id: 2,
-      type: 'booking',
-      title: 'Yêu cầu đặt bàn mới',
-      message: 'Khách hàng Anh Minh vừa gửi yêu cầu đặt bàn 6 người vào lúc 19:00 tối nay.',
-      time: '15 phút trước',
-      isRead: false,
-      icon: Calendar,
-      iconBg: 'bg-orange',
-    },
-    {
-      id: 3,
-      type: 'system',
-      title: 'Cập nhật hệ thống thành công',
-      message: 'Phiên bản v2.4.0 đã được triển khai với các tính năng tối ưu hóa kho hàng.',
-      time: '2 giờ trước',
-      isRead: true,
-      icon: Info,
-      iconBg: 'bg-blue',
-    },
-    {
-      id: 4,
-      type: 'promotion',
-      title: 'Chiến dịch Marketing tháng 6',
-      message: 'Chương trình khuyến mãi tháng 6 đã sẵn sàng để áp dụng cho khách VIP.',
-      time: '5 giờ trước',
-      isRead: true,
-      icon: Star,
-      iconBg: 'bg-yellow',
-    },
-    {
-      id: 5,
-      type: 'warning',
-      title: 'Cảnh báo tồn kho',
-      message: 'Nguyên liệu "Cá hồi Na Uy" đang ở mức dưới hạn mức tối thiểu.',
-      time: '1 ngày trước',
-      isRead: true,
-      icon: AlertTriangle,
-      iconBg: 'bg-red',
-    },
-  ];
+  const [showAll, setShowAll] = useState(false);
+
+  const getVisualByNotification = (notification) => {
+    if (notification?.icon && notification?.iconBg) {
+      return { Icon: notification.icon, iconBg: notification.iconBg };
+    }
+
+    const raw = String(notification?.type || notification?.tone || '').toLowerCase();
+    if (raw.includes('order')) return { Icon: ShoppingCart, iconBg: 'bg-orange' };
+    if (raw.includes('book')) return { Icon: Calendar, iconBg: 'bg-orange' };
+    if (raw.includes('warning') || raw.includes('error')) return { Icon: AlertTriangle, iconBg: 'bg-red' };
+    if (raw.includes('promotion')) return { Icon: Star, iconBg: 'bg-yellow' };
+    if (raw.includes('success')) return { Icon: Check, iconBg: 'bg-blue' };
+    return { Icon: Info, iconBg: 'bg-blue' };
+  };
 
   const [notifications, setNotifications] = useState(
-    externalNotifications || defaultNotifications
+    Array.isArray(externalNotifications) ? externalNotifications : []
   );
+
+  useEffect(() => {
+    if (Array.isArray(externalNotifications)) {
+      setNotifications(externalNotifications);
+    }
+  }, [externalNotifications]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowAll(false);
+    }
+  }, [isOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -87,17 +61,40 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
     };
   }, [isOpen, onClose]);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+  const handleMarkAllAsRead = async () => {
+    const unreadIds = notifications.filter((notif) => !notif.isRead).map((notif) => notif.id);
+
+    if (unreadIds.length > 0) {
+      await Promise.allSettled(unreadIds.map((id) => markNotificationAsRead(id)));
+    }
+
+    const next = notifications.map((notif) => ({ ...notif, isRead: true }));
+    setNotifications(next);
+    if (typeof onNotificationsChange === 'function') {
+      onNotificationsChange(next);
+    }
   };
 
-  const handleNotificationClick = (id) => {
-    setNotifications(notifications.map(notif => 
+  const handleNotificationClick = async (id) => {
+    try {
+      await markNotificationAsRead(id);
+    } catch (error) {
+      console.error('Mark notification as read failed:', error);
+    }
+
+    const next = notifications.map((notif) =>
       notif.id === id ? { ...notif, isRead: true } : notif
-    ));
+    );
+    setNotifications(next);
+    if (typeof onNotificationsChange === 'function') {
+      onNotificationsChange(next);
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const visibleNotifications = showAll
+    ? notifications
+    : notifications.filter((n) => !n.isRead);
 
   if (!isOpen) return null;
 
@@ -126,15 +123,27 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
 
         {/* Notification List */}
         <div className="notification-list">
-          {notifications.map((notification) => {
-            const Icon = notification.icon;
+          {visibleNotifications.length === 0 && (
+            <div className="notification-item" style={{ justifyContent: 'center' }}>
+              <div className="notification-content">
+                <p className="notification-item-title">
+                  {showAll ? 'Chưa có thông báo' : 'Không có thông báo chưa đọc'}
+                </p>
+                <p className="notification-message">
+                  {showAll ? 'Hệ thống chưa có thông báo mới.' : 'Bạn đã đọc tất cả thông báo.'}
+                </p>
+              </div>
+            </div>
+          )}
+          {visibleNotifications.map((notification) => {
+            const { Icon, iconBg } = getVisualByNotification(notification);
             return (
               <div
                 key={notification.id}
                 className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
                 onClick={() => handleNotificationClick(notification.id)}
               >
-                <div className={`notification-icon ${notification.iconBg}`}>
+                <div className={`notification-icon ${iconBg}`}>
                   <Icon size={20} />
                 </div>
                 <div className="notification-content">
@@ -152,9 +161,14 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
 
         {/* Footer */}
         <div className="notification-footer">
-          <button className="view-all-notifications-btn">
-            Xem tất cả thông báo
-          </button>
+          {!showAll && (
+            <button
+              className="view-all-notifications-btn"
+              onClick={() => setShowAll(true)}
+            >
+              Xem tất cả thông báo
+            </button>
+          )}
         </div>
       </div>
     </>

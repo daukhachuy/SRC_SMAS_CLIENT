@@ -3,6 +3,42 @@ import { myOrderAPI } from '../api/myOrderApi';
 import OrderDetailModal from './OrderDetailModal';
 import '../styles/OrderHistory.css';
 
+/**
+ * Chuyển chuỗi ISO datetime (UTC) → giờ Việt Nam (UTC+7).
+ */
+const toVietnamTime = (isoStr) => {
+  if (!isoStr) return null;
+  const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) {
+    const d = new Date(isoStr);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const [, y, mo, d, h, mi, s] = m;
+  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h) + 7, Number(mi), Number(s));
+};
+
+const fmtVNDate = (date) => {
+  if (!date) return '—';
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+/**
+ * Đơn Pending quá 2 tiếng chưa xác nhận → tự đánh Cancelled.
+ */
+const applyAutoCancel = (item) => {
+  const raw = item.displayStatus || item.status || item.orderStatus || '';
+  if (raw !== 'Pending') return item;
+  const createdAt = item.displayDate || item.createdAt || item.reservationDate || null;
+  if (!createdAt) return item;
+  const created = toVietnamTime(createdAt);
+  if (!created) return item;
+  const diffMs = new Date() - created;
+  if (diffMs > 2 * 60 * 60 * 1000) {
+    return { ...item, effectiveStatus: 'Cancelled', autoCancelled: true };
+  }
+  return { ...item, effectiveStatus: 'Pending', autoCancelled: false };
+};
+
 const OrderHistory = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [orders, setOrders] = useState([]);
@@ -58,7 +94,8 @@ const OrderHistory = () => {
         displayEvent: order.eventName,
         displayTotal: order.totalAmount,
         typeName: order.orderType === 'Delivery' ? 'Giao hàng' :
-                   order.orderType === 'Event' ? 'Đặt sự kiện tại cửa hàng' : 'Đặt chỗ'
+                   order.orderType === 'Event' ? 'Đặt sự kiện tại cửa hàng' : 'Đặt chỗ',
+        rawStatus: order.orderStatus,
       }));
 
       const processedReservations = (reservationData || []).map(res => ({
@@ -73,7 +110,8 @@ const OrderHistory = () => {
         displayTable: res.tableNumber || '—',
         displayEvent: res.specialRequests || '—',
         displayTotal: 0,
-        typeName: 'Đặt bàn ăn'
+        typeName: 'Đặt bàn ăn',
+        rawStatus: res.status,
       }));
 
       setOrders(processedOrders);
@@ -93,12 +131,12 @@ const OrderHistory = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
 
-  const allHistory = [...orders, ...reservations];
+  const allHistory = [...orders, ...reservations].map(applyAutoCancel);
 
   const filteredHistory = allHistory.filter(item => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'completed') return item.displayStatus === 'Completed';
-    if (activeTab === 'cancelled') return item.displayStatus === 'Cancelled';
+    if (activeTab === 'completed') return item.effectiveStatus === 'Completed';
+    if (activeTab === 'cancelled') return item.effectiveStatus === 'Cancelled';
     return true;
   }).filter(item => {
     if (!searchQuery.trim()) return true;
@@ -150,8 +188,8 @@ const OrderHistory = () => {
           <div className="Empty-Box">Bạn chưa có đơn hàng nào.</div>
         ) : (
           paginatedHistory.map(item => {
-            const status = getStatusDisplay(item.displayStatus);
-            const formattedDate = item.displayDate ? new Date(item.displayDate).toLocaleDateString('vi-VN') : '—';
+            const status = getStatusDisplay(item.effectiveStatus || item.displayStatus);
+            const formattedDate = item.displayDate ? fmtVNDate(toVietnamTime(item.displayDate)) : '—';
             
             return (
               <div key={item.displayId} className="Order-Horizontal-Card">

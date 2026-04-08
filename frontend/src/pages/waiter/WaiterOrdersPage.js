@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -26,6 +26,8 @@ import { getFoodByFilter, getBuffetLists, getComboLists } from '../../api/foodAp
 import { patchOrderItemServed } from '../../api/orderItemApi';
 import { createPaymentLink, payOrderCash } from '../../api/paymentService';
 import { getWaiterTables } from '../../api/waiterApiTable';
+import { initTableSession } from '../../api/tableSessionApi';
+import TableQRCode from '../../components/TableQRCode';
 
 // Helper: formatCurrency
 const formatCurrency = (value) => {
@@ -63,6 +65,7 @@ const asArray = (payload) => {
   if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
   if (Array.isArray(payload?.items)) return payload.items;
   if (Array.isArray(payload?.orders)) return payload.orders;
+  if (Array.isArray(payload?.history)) return payload.history;
   return [];
 };
 
@@ -94,6 +97,99 @@ const toCurrencyNumber = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 };
+
+const isOrderLikeHistoryRow = (item) =>
+  Boolean(item?.orderId || item?.orderCode || item?.createdAt || item?.orderStatus || item?.closedAt || item?.items);
+
+const mapServiceHistoryItem = (item, idx) => {
+  const rawDate = item?.date || item?.workDate || item?.servedDate || item?.createdAt || item?.day;
+  const date = rawDate
+    ? new Date(rawDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : `Ngày ${idx + 1}`;
+
+  const totalOrders = Number(
+    item?.totalOrders ?? item?.orderCount ?? item?.orders ?? item?.count ?? 0
+  );
+
+  const revenueNumber = toCurrencyNumber(
+    item?.revenue ?? item?.totalRevenue ?? item?.totalAmount ?? item?.amount ?? 0
+  );
+
+  const rawRating = item?.rating ?? item?.avgRating ?? item?.averageRating;
+  const rating = rawRating == null || rawRating === '' ? '-' : String(rawRating);
+
+  const status =
+    item?.statusLabel ||
+    item?.status ||
+    (totalOrders > 0 ? 'Hoàn thành' : 'Chưa có dữ liệu');
+
+  return {
+    date,
+    totalOrders,
+    revenue: formatCurrency(revenueNumber),
+    rating,
+    status,
+    statusClass: status === 'Hoàn thành' ? 'status-completed' : 'status-pending',
+  };
+};
+
+const aggregateServiceHistoryFromOrders = (orders) => {
+  const grouped = new Map();
+
+  (orders || []).forEach((order) => {
+    if (!order?.createdAt) return;
+    const dateObj = new Date(order.createdAt);
+    if (Number.isNaN(dateObj.getTime())) return;
+
+    const key = dateObj.toISOString().slice(0, 10);
+    const current = grouped.get(key) || {
+      dateObj,
+      totalOrders: 0,
+      revenueNumber: 0,
+      processingCount: 0,
+      doneCount: 0,
+    };
+
+    current.totalOrders += 1;
+    current.revenueNumber += toCurrencyNumber(order?.totalAmount ?? order?.subTotal ?? 0);
+
+    const normalizedOrderStatus = normalizeStatus(order?.orderStatus || order?.status);
+    const isDone =
+      Boolean(order?.closedAt) ||
+      ['completed', 'done', 'paid', 'closed'].includes(normalizedOrderStatus);
+
+    if (isDone) current.doneCount += 1;
+    else current.processingCount += 1;
+
+    grouped.set(key, current);
+  });
+
+  return Array.from(grouped.values())
+    .sort((a, b) => b.dateObj - a.dateObj)
+    .slice(0, 7)
+    .map((row) => {
+      const status = row.processingCount > 0 ? 'Đang phục vụ' : 'Hoàn thành';
+      return {
+        date: row.dateObj.toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+        totalOrders: row.totalOrders,
+        revenue: formatCurrency(row.revenueNumber),
+        rating: '-',
+        status,
+        statusClass: row.processingCount > 0 ? 'status-pending' : 'status-completed',
+      };
+    });
+};
+
+const normalizeSearchText = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 
 const toOrderItem = (item, idx) => ({
   name: item?.foodName || item?.name || item?.itemName || `Món ${idx + 1}`,
@@ -131,6 +227,9 @@ const mapApiOrderToWaiter = (order) => {
     tableName = order.tableName || order.tableCode || order.tableNumber || '';
   }
   const isDineIn = String(order?.orderType || '').toLowerCase().includes('dine');
+  const tableCodeValue = Array.isArray(order.tables) && order.tables.length > 0
+    ? (order.tables.find(t => t.isMainTable)?.tableId || order.tables[0]?.tableId || tableName)
+    : (order.tableCode || order.tableNumber || tableName);
   const customerName = order?.customer?.fullname || order?.customerName || order?.guestName || order?.receiverName || (isDineIn ? (tableName ? `Khách tại ${tableName}` : 'Khách tại bàn') : 'Khách hàng');
   return {
     id: orderCode,
@@ -141,6 +240,7 @@ const mapApiOrderToWaiter = (order) => {
     status: mappedStatus.status,
     statusLabel: mappedStatus.statusLabel,
     tableNumber: isDineIn ? (tableName || 'Bàn --') : '',
+    tableCode: String(tableCodeValue || '').trim(),
     guests: Number(order?.numberOfGuests || order?.guestCount || order?.guests || 0),
     customerName,
     channel: isDineIn ? 'dineIn' : order.orderType || '',
@@ -236,6 +336,7 @@ const mapApiOrderToWaiter = (order) => {
   };
   const [showAddItemsModal, setShowAddItemsModal] = useState(false);
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+  const [showTableQrModal, setShowTableQrModal] = useState(false);
   const [showOrderInfoModal, setShowOrderInfoModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTablePickerModal, setShowTablePickerModal] = useState(false);
@@ -255,6 +356,10 @@ const mapApiOrderToWaiter = (order) => {
   const [activePaymentMethod, setActivePaymentMethod] = useState('cash');
   const [isPaying, setIsPaying] = useState(false);
   const [uiNotice, setUiNotice] = useState('');
+  const [tableQrValue, setTableQrValue] = useState('');
+  const [tableQrCode, setTableQrCode] = useState('');
+  const [tableQrLoading, setTableQrLoading] = useState(false);
+  const [tableQrError, setTableQrError] = useState('');
 
   const alert = (message) => {
     setUiNotice(String(message ?? ''));
@@ -277,6 +382,94 @@ const mapApiOrderToWaiter = (order) => {
   const [selectedBuffetIds, setSelectedBuffetIds] = useState([]);
   const [showBuffetFoods, setShowBuffetFoods] = useState(false);
   const [lockedBuffetId, setLockedBuffetId] = useState(null);
+  const searchKeyword = normalizeSearchText(menuSearch);
+
+  const filteredMenuItems = useMemo(() => {
+    if (!searchKeyword) return menuItems;
+    return (menuItems || []).filter((food) =>
+      normalizeSearchText(food?.name || food?.foodName || '').includes(searchKeyword)
+    );
+  }, [menuItems, searchKeyword]);
+
+  const filteredComboMenus = useMemo(() => {
+    if (!searchKeyword) return comboMenus;
+    return (comboMenus || []).filter((combo) =>
+      normalizeSearchText(combo?.comboName || combo?.name || '').includes(searchKeyword)
+    );
+  }, [comboMenus, searchKeyword]);
+
+  const filteredBuffetMenus = useMemo(() => {
+    if (!searchKeyword) return buffetMenus;
+    return (buffetMenus || []).filter((buffet) =>
+      normalizeSearchText(buffet?.name || buffet?.buffetName || '').includes(searchKeyword)
+    );
+  }, [buffetMenus, searchKeyword]);
+
+  const filteredBuffetFoods = useMemo(() => {
+    if (!searchKeyword) return buffetFoods;
+    return (buffetFoods || []).filter((food) =>
+      normalizeSearchText(food?.name || food?.foodName || '').includes(searchKeyword)
+    );
+  }, [buffetFoods, searchKeyword]);
+
+  const buffetFoodIdSet = useMemo(() => {
+    return new Set(
+      (buffetFoods || [])
+        .map((item) => Number(item?.foodId || item?.id || 0))
+        .filter((id) => id > 0)
+    );
+  }, [buffetFoods]);
+
+  const extractFoodIdFromCartItem = (item) => {
+    const direct = Number(item?.foodId || 0);
+    if (direct > 0) return direct;
+
+    const rawId = String(item?.id || '');
+    if (!rawId || rawId.startsWith('combo-') || rawId.startsWith('buffet-')) return 0;
+
+    const match = rawId.match(/(?:food-|buffet-food-)?(\d+)$/);
+    return match ? Number(match[1]) : 0;
+  };
+
+  const normalizeCartItemsByBuffetFoods = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+
+    const merged = new Map();
+
+    items.forEach((item) => {
+      if (item?.type === 'buffet' || item?.type === 'combo') {
+        merged.set(`raw:${item.id}`, { ...item });
+        return;
+      }
+
+      const foodId = extractFoodIdFromCartItem(item);
+      const includedInBuffet = foodId > 0 && buffetFoodIdSet.has(foodId);
+      const stableId = foodId > 0 ? `food-${foodId}` : String(item.id);
+      const key = foodId > 0 ? `food:${foodId}` : `raw:${item.id}`;
+
+      const normalizedItem = {
+        ...item,
+        id: stableId,
+        foodId: foodId > 0 ? foodId : item.foodId,
+        price: includedInBuffet ? 0 : Number(item.price || 0)
+      };
+
+      const current = merged.get(key);
+      if (!current) {
+        merged.set(key, normalizedItem);
+        return;
+      }
+
+      merged.set(key, {
+        ...current,
+        quantity: Number(current.quantity || 0) + Number(normalizedItem.quantity || 0),
+        price: includedInBuffet ? 0 : Number(current.price || 0),
+        note: current.note || normalizedItem.note || ''
+      });
+    });
+
+    return Array.from(merged.values());
+  };
 
   // --- FIX: BỔ SUNG STATE createOrderType ---
   const [createOrderType, setCreateOrderType] = useState('reservation');
@@ -390,9 +583,11 @@ const mapApiOrderToWaiter = (order) => {
 
     const normalized = (Array.isArray(rows) ? rows : []).map((item, idx) => ({
       id: item.foodId || item.id || `${item.buffetId || 'buffet'}-${idx}`,
+      foodId: Number(item.foodId || item.id || 0),
       buffetId: Number(item.buffetId || item.bufferId || item.idBuffer || 0),
       name: item.foodName || item.name || item.itemName || `Món ${idx + 1}`,
-      price: Number(item.price || item.unitPrice || item.mainPrice || 0),
+      // Mon trong goi buffet khong tinh tien le, chi tinh theo gia goi buffet.
+      price: 0,
     }));
 
     const filtered = buffetIds.length > 0
@@ -478,6 +673,7 @@ const mapApiOrderToWaiter = (order) => {
   const [dineInOrders, setDineInOrders] = useState([]);
   const [takeawayOrders, setTakeawayOrders] = useState([]);
   const [serviceHistory, setServiceHistory] = useState([]);
+  const [showAllServiceHistory, setShowAllServiceHistory] = useState(false);
 
   // Đổi fetchWaiterOrders thành function thường, không dùng useCallback
   async function fetchWaiterOrders() {
@@ -506,15 +702,36 @@ const mapApiOrderToWaiter = (order) => {
     }
   }
 
+  async function fetchWaiterServiceHistory() {
+    try {
+      const res = await orderAPI.getHistoryMySevenDays();
+      const payload = res?.data;
+      const rows = asArray(payload?.data ?? payload);
+      const mapped = rows.some(isOrderLikeHistoryRow)
+        ? aggregateServiceHistoryFromOrders(rows)
+        : rows.map(mapServiceHistoryItem);
+      setServiceHistory(mapped);
+    } catch (error) {
+      console.error('Không lấy được lịch sử phục vụ 7 ngày:', error);
+      setServiceHistory([]);
+    }
+  }
+
   // Luôn load đơn khi trang mount
   useEffect(() => {
     fetchWaiterOrders();
+    fetchWaiterServiceHistory();
   }, []);
 
   useEffect(() => {
     if (!showPaymentModal || !selectedOrder) return;
     setReceivedMoney('');
   }, [showPaymentModal, selectedOrder]);
+
+  useEffect(() => {
+    if (!buffetFoodIdSet.size) return;
+    setCartItems((prev) => normalizeCartItemsByBuffetFoods(prev));
+  }, [buffetFoodIdSet]);
 
   useEffect(() => {
     if (!uiNotice) return;
@@ -553,10 +770,64 @@ const mapApiOrderToWaiter = (order) => {
     }
   };
 
-  const openOrderDetail = (order) => {
+  const normalizeTableCode = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const onlyDigits = raw.match(/(\d+)/);
+    if (onlyDigits) return onlyDigits[1];
+    return raw;
+  };
+
+  const buildGuestQrUrl = (tableCode, accessToken) => {
+    const url = new URL('/guest-qr-order', window.location.origin);
+    url.searchParams.set('tableCode', String(tableCode));
+    if (accessToken) {
+      url.searchParams.set('tableToken', accessToken);
+    }
+    return url.toString();
+  };
+
+  const initQrForOrder = async (order) => {
+    const resolvedTableCode = normalizeTableCode(order?.tableCode || order?.tableNumber);
+    if (!resolvedTableCode) {
+      setTableQrError('Không tìm thấy mã bàn để tạo QR.');
+      return;
+    }
+
+    try {
+      setTableQrLoading(true);
+      setTableQrError('');
+      const data = await initTableSession(resolvedTableCode);
+      const accessToken = data?.accessToken || '';
+      const qrUrl = buildGuestQrUrl(data?.tableCode || resolvedTableCode, accessToken);
+      setTableQrCode(String(data?.tableCode || resolvedTableCode));
+      setTableQrValue(qrUrl);
+    } catch (err) {
+      setTableQrError(err?.message || 'Không tạo được QR cho bàn này.');
+      setTableQrValue('');
+      setTableQrCode('');
+    } finally {
+      setTableQrLoading(false);
+    }
+  };
+
+  const openOrderDetail = async (order) => {
     setSelectedOrder(order);
     setOrderItemsState(order.items.map(item => ({ ...item }))); // clone để thao tác trạng thái
     setShowOrderDetailModal(true);
+    setTableQrValue('');
+    setTableQrCode('');
+    setTableQrError('');
+    await initQrForOrder(order);
+  };
+
+  const openOrderQrModal = async (order) => {
+    setSelectedOrder(order);
+    setTableQrValue('');
+    setTableQrCode('');
+    setTableQrError('');
+    setShowTableQrModal(true);
+    await initQrForOrder(order);
   };
 
   const updateCartQuantity = (itemId, delta) => {
@@ -718,12 +989,7 @@ const mapApiOrderToWaiter = (order) => {
     )
     .reduce((sum, table) => sum + table.seats, 0);
 
-  const shiftStats = {
-    workHours: '5h 42m',
-    efficiency: '94%'
-  };
-
-  const pendingDeliveries = deliveryOrders.filter((order) => order.status === 'ready').slice(0, 2);
+  const displayedServiceHistory = showAllServiceHistory ? serviceHistory : serviceHistory.slice(0, 7);
   // Orders tab counts and currentOrders
   const dineInCount = dineInOrders.length;
   const takeawayCount = takeawayOrders.length;
@@ -818,7 +1084,12 @@ const mapApiOrderToWaiter = (order) => {
               const allServed = Array.isArray(order.items) && order.items.length > 0 && order.items.every(item => item.dishStatus === 'served');
               const canPayThisOrder = canOrderProceedToPayment(order);
               return (
-                <div key={order.id} className={`order-card${hasReady ? ' order-card-ready' : ''}${allServed ? '' : ''}`}>
+                <div
+                  key={order.id}
+                  className={`order-card${hasReady ? ' order-card-ready' : ''}${allServed ? '' : ''}`}
+                  onClick={() => openOrderQrModal(order)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className="order-card-header">
                     <div>
                       <h4 className="order-id">
@@ -860,12 +1131,13 @@ const mapApiOrderToWaiter = (order) => {
                 </div>
 
                 <div className="order-card-actions">
-                  <button className="btn-order-detail" onClick={() => openOrderDetail(order)}>
+                  <button className="btn-order-detail" onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}>
                     Chi tiết
                   </button>
                   <button
                     className="btn-order-pay"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (!canPayThisOrder) {
                         alert('Không thể thanh toán: còn món chưa được phục vụ.');
                         return;
@@ -888,7 +1160,13 @@ const mapApiOrderToWaiter = (order) => {
           <div className="service-history-section">
             <div className="section-header">
               <h3 className="section-title">Lịch sử phục vụ 7 ngày</h3>
-              <button className="btn-view-all">Xem tất cả</button>
+              <button
+                className="btn-view-all"
+                type="button"
+                onClick={() => setShowAllServiceHistory((prev) => !prev)}
+              >
+                {showAllServiceHistory ? 'Thu gọn' : 'Xem tất cả'}
+              </button>
             </div>
 
             <div className="history-table-container">
@@ -903,14 +1181,23 @@ const mapApiOrderToWaiter = (order) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {serviceHistory.map((record, index) => (
+                  {displayedServiceHistory.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', color: '#7a6f66' }}>
+                        Chưa có dữ liệu lịch sử 7 ngày.
+                      </td>
+                    </tr>
+                  )}
+                  {displayedServiceHistory.map((record, index) => (
                     <tr key={index}>
                       <td>{record.date}</td>
                       <td className="font-medium">{record.totalOrders}</td>
                       <td>{record.revenue}</td>
                       <td>{record.rating || '-'}</td>
                       <td>
-                        <span className="status-completed">✓ {record.status}</span>
+                        <span className={record.statusClass || 'status-pending'}>
+                          {record.status}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -920,46 +1207,6 @@ const mapApiOrderToWaiter = (order) => {
           </div>
         </section>
 
-        <aside className="orders-sidebar">
-          <div className="sidebar-card">
-            <h3 className="sidebar-card-title">
-              <ShoppingBag size={20} className="title-icon" />
-              Đơn vận chuyển ({pendingDeliveries.length})
-            </h3>
-
-            <div className="delivery-orders-list">
-              {pendingDeliveries.map((order) => (
-                <div key={order.id} className="delivery-order-item">
-                  <div className="delivery-order-header">
-                    <span className="delivery-order-id">#{order.id}</span>
-                    <span className="delivery-order-time">{order.time}</span>
-                  </div>
-                  <h5 className="delivery-customer-name">{order.customerName}</h5>
-                  <p className="delivery-address">
-                    <MapPin size={12} />
-                    {order.address}
-                  </p>
-                  <button className="btn-start-delivery">Bắt đầu giao</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="sidebar-card stats-card">
-            <h3 className="sidebar-card-title">Thống kê ca làm</h3>
-
-            <div className="stats-grid">
-              <div className="stat-item">
-                <p className="stat-label">Thời gian</p>
-                <p className="stat-value">{shiftStats.workHours}</p>
-              </div>
-              <div className="stat-item">
-                <p className="stat-label">Hiệu suất</p>
-                <p className="stat-value stat-success">{shiftStats.efficiency}</p>
-              </div>
-            </div>
-          </div>
-        </aside>
       </div>
 
       {showCreateModal && (
@@ -1559,6 +1806,19 @@ const mapApiOrderToWaiter = (order) => {
             </div>
 
             <div className="dinein-detail-body">
+              <div style={{ marginBottom: 16, border: '1px dashed #e0dcd8', borderRadius: 12, padding: 12, background: '#fffaf5' }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>QR gọi món của bàn</h4>
+                {tableQrLoading && <p style={{ margin: 0, color: '#7a6f66' }}>Đang tạo QR từ token bàn...</p>}
+                {!tableQrLoading && tableQrError && <p style={{ margin: 0, color: '#cf1322' }}>{tableQrError}</p>}
+                {!tableQrLoading && !tableQrError && tableQrValue && (
+                  <TableQRCode
+                    qrValue={tableQrValue}
+                    tableName={tableQrCode || selectedOrder.tableNumber || selectedOrder.tableCode || 'N/A'}
+                    size={128}
+                  />
+                )}
+              </div>
+
               <h4>
                 <Utensils size={16} /> Danh sách món ăn
               </h4>
@@ -1659,6 +1919,47 @@ const mapApiOrderToWaiter = (order) => {
                   <CreditCard size={18} /> Thanh toán
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTableQrModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowTableQrModal(false)}>
+          <div className="modal-container modal-small" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">QR gọi món - {selectedOrder.tableNumber || selectedOrder.tableCode || 'Bàn'}</h3>
+              <button className="modal-close-btn" onClick={() => setShowTableQrModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {tableQrLoading && <p style={{ margin: 0, color: '#7a6f66' }}>Đang tạo QR từ token bàn...</p>}
+              {!tableQrLoading && tableQrError && <p style={{ margin: 0, color: '#cf1322' }}>{tableQrError}</p>}
+              {!tableQrLoading && !tableQrError && tableQrValue && (
+                <div>
+                  <TableQRCode
+                    qrValue={tableQrValue}
+                    tableName={tableQrCode || selectedOrder.tableNumber || selectedOrder.tableCode || 'N/A'}
+                    size={180}
+                  />
+                  <div style={{ marginTop: 10, textAlign: 'center' }}>
+                    <a
+                      href={tableQrValue}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#c25a18', fontWeight: 700, textDecoration: 'none', borderBottom: '1px solid rgba(194,90,24,0.45)', paddingBottom: 2, letterSpacing: 0.2 }}
+                    >
+                      Mở trang gọi món và thanh toán qua liên kết này
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer end">
+              <button className="btn-cancel" onClick={() => setShowTableQrModal(false)}>
+                Đóng
+              </button>
             </div>
           </div>
         </div>
@@ -1893,8 +2194,8 @@ const mapApiOrderToWaiter = (order) => {
                   <div className="menu-card-grid">
                     {menuLoading && <p>Đang tải món ăn...</p>}
                     {menuError && <p style={{color:'red'}}>{menuError}</p>}
-                    {!menuLoading && !menuError && menuItems.length === 0 && <p>Không có món ăn nào.</p>}
-                    {!menuLoading && !menuError && menuItems.map((food) => (
+                    {!menuLoading && !menuError && filteredMenuItems.length === 0 && <p>{searchKeyword ? 'Không tìm thấy món phù hợp.' : 'Không có món ăn nào.'}</p>}
+                    {!menuLoading && !menuError && filteredMenuItems.map((food) => (
                       <div className="menu-food-card" key={food.foodId || food.id}>
                         <div>
                           <h5>{food.name || food.foodName}</h5>
@@ -1904,20 +2205,24 @@ const mapApiOrderToWaiter = (order) => {
                           type="button"
                           onClick={() =>
                             setCartItems((prev) => {
-                              const id = food.foodId || food.id;
-                              const found = prev.find((x) => x.id === id);
+                              const foodId = Number(food.foodId || food.id || 0);
+                              const stableId = foodId > 0 ? `food-${foodId}` : String(food.foodId || food.id);
+                              const includedInBuffet = foodId > 0 && buffetFoodIdSet.has(foodId);
+                              const found = prev.find((x) => Number(x.foodId || 0) === foodId || String(x.id) === stableId);
                               if (found) {
                                 return prev.map((x) =>
-                                  x.id === id ? { ...x, quantity: x.quantity + 1 } : x
+                                  (Number(x.foodId || 0) === foodId || String(x.id) === stableId)
+                                    ? { ...x, id: stableId, foodId, quantity: x.quantity + 1, price: includedInBuffet ? 0 : Number(x.price || food.price || 0) }
+                                    : x
                                 );
                               }
                               return [
                                 ...prev,
                                 {
-                                  id,
-                                  foodId: food.foodId || food.id,
+                                  id: stableId,
+                                  foodId,
                                   name: food.name || food.foodName,
-                                  price: food.price,
+                                  price: includedInBuffet ? 0 : Number(food.price || 0),
                                   quantity: 1,
                                   note: ''
                                 }
@@ -1936,8 +2241,8 @@ const mapApiOrderToWaiter = (order) => {
                   <div className="menu-card-grid">
                     {comboLoading && <p>Đang tải combo...</p>}
                     {comboError && <p style={{ color: 'red' }}>{comboError}</p>}
-                    {!comboLoading && !comboError && comboMenus.length === 0 && <p>Không có combo nào.</p>}
-                    {!comboLoading && !comboError && comboMenus.map((combo) => {
+                    {!comboLoading && !comboError && filteredComboMenus.length === 0 && <p>{searchKeyword ? 'Không tìm thấy combo phù hợp.' : 'Không có combo nào.'}</p>}
+                    {!comboLoading && !comboError && filteredComboMenus.map((combo) => {
                       const comboId = Number(combo.comboId || combo.id || 0);
                       const displayName = combo.comboName || combo.name || `Combo #${comboId}`;
                       const displayPrice = Number(combo.comboPrice || combo.price || 0);
@@ -2002,18 +2307,51 @@ const mapApiOrderToWaiter = (order) => {
                       {!showBuffetFoods && buffetLoading && <p>Đang tải buffet...</p>}
                       {!showBuffetFoods && buffetError && <p style={{ color: 'red' }}>{buffetError}</p>}
 
-                      {showBuffetFoods && buffetFoods.length === 0 && <p>Chưa có món buffet trong đơn này.</p>}
-                      {showBuffetFoods && buffetFoods.map((food) => (
+                      {showBuffetFoods && filteredBuffetFoods.length === 0 && <p>{searchKeyword ? 'Không tìm thấy món buffet phù hợp.' : 'Chưa có món buffet trong đơn này.'}</p>}
+                      {showBuffetFoods && filteredBuffetFoods.map((food) => (
                         <div className="menu-food-card buffet-child" key={`buffet-food-${food.id}`}>
                           <div>
                             <h5>{food.name}</h5>
-                            <p>{formatCurrency(food.price)}</p>
+                            <p style={{ color: '#666' }}>Đã gồm trong giá buffet</p>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCartItems((prev) => {
+                                const foodId = Number(food.foodId || food.id || 0);
+                                const cartId = `food-${foodId}`;
+                                const found = prev.find((x) => Number(x.foodId || 0) === foodId || String(x.id) === cartId);
+                                if (found) {
+                                  return prev.map((x) =>
+                                    (Number(x.foodId || 0) === foodId || String(x.id) === cartId)
+                                      ? { ...x, id: cartId, foodId, quantity: x.quantity + 1, price: 0 }
+                                      : x
+                                  );
+                                }
+
+                                return [
+                                  ...prev,
+                                  {
+                                    id: cartId,
+                                    foodId,
+                                    name: food.name,
+                                    price: 0,
+                                    quantity: 1,
+                                    note: ''
+                                  }
+                                ];
+                              })
+                            }
+                            disabled={Number(food.foodId || food.id || 0) <= 0}
+                            title={Number(food.foodId || food.id || 0) <= 0 ? 'Không xác định được mã món để thêm' : 'Thêm món vào giỏ'}
+                          >
+                            <Plus size={16} />
+                          </button>
                         </div>
                       ))}
 
-                      {!showBuffetFoods && !buffetLoading && !buffetError && buffetMenus.length === 0 && <p>Không có gói buffet nào.</p>}
-                      {!showBuffetFoods && !buffetLoading && !buffetError && buffetMenus.map((buffet) => {
+                      {!showBuffetFoods && !buffetLoading && !buffetError && filteredBuffetMenus.length === 0 && <p>{searchKeyword ? 'Không tìm thấy gói buffet phù hợp.' : 'Không có gói buffet nào.'}</p>}
+                      {!showBuffetFoods && !buffetLoading && !buffetError && filteredBuffetMenus.map((buffet) => {
                         const buffetId = Number(buffet.buffetId || buffet.id || 0);
                         const displayName = buffet.name || buffet.buffetName || `Buffet #${buffetId}`;
                         const adultPrice = Number(buffet.mainPrice || buffet.price || 0);

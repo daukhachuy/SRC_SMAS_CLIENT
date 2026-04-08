@@ -45,6 +45,29 @@ export async function openTable(tableCode, userId) {
 }
 
 /* =====================================================
+   INIT TABLE SESSION - Khởi tạo session + token cho QR
+   POST /api/tables/{tableCode}/init
+   Response: { accessToken, refreshToken, tableCode, tableName, expiresInSeconds }
+===================================================== */
+export async function initTableSession(tableCode) {
+  try {
+    const url = `/tables/${encodeURIComponent(tableCode)}/init`;
+    const response = await instance.post(url);
+    const data = response?.data || {};
+
+    if (data?.accessToken) localStorage.setItem('tableAccessToken', data.accessToken);
+    if (data?.refreshToken) localStorage.setItem('tableRefreshToken', data.refreshToken);
+    if (data?.tableCode) localStorage.setItem('tableCode', String(data.tableCode));
+
+    console.log('✅ Table session initialized:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to init table session:', error);
+    throw handleApiError(error);
+  }
+}
+
+/* =====================================================
    EXCHANGE QR TICKET - Customer trao đổi QR ticket lấy access token
    POST /api/tables/exchange-ticket
    Body: { tableCode, qrTicket }

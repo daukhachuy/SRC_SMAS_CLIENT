@@ -1,13 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Plus, X, Phone, Mail, MapPin, FileText, BarChart3, Calendar, Clock, Lock, Eye } from 'lucide-react';
 import '../../styles/AdminStaff.css';
+import {
+  getCustomersList,
+  patchUserStatus,
+  getStaffsList,
+  patchStaffStatus,
+  updateStaffDetail,
+  createStaffByUserId,
+  createStaffNew,
+} from '../../api/userApi';
 
-const MOCK_CUSTOMERS = [
-  { id: 1, customerId: 'CUS-8821', name: 'Nguyễn Văn A', phone: '+84 901 234 567', email: 'nguyen.a@email.com', address: '123 Lê Loi, Quận 1, TP.HCM', created: '15/03/2023', lastUpdated: 'Hôm qua, 14:20', active: true, isVip: true, ordersPlaced: 42, ordersCanceled: 3, noShow: 1, totalSpending: 12450000 },
-  { id: 2, name: 'Trần Thị Bình', customerId: 'CUS-7702', phone: '0988 777 666', email: 'binh.tran@email.vn', address: '45 Nguyễn Huệ, Quận 1, TP.HCM', created: '20/08/2023', lastUpdated: '02/01/2024', active: false, isVip: false, ordersPlaced: 8, ordersCanceled: 1, noShow: 0, totalSpending: 2100000 },
-  { id: 3, name: 'Lê Hoàng Cường', customerId: 'CUS-5513', phone: '0971 555 990', email: 'cuonglh@demo.com', address: '78 Trần Hưng Đạo, Quận 5, TP.HCM', created: '05/01/2024', lastUpdated: 'Hôm nay', active: true, isVip: false, ordersPlaced: 5, ordersCanceled: 0, noShow: 0, totalSpending: 890000 },
-  { id: 4, name: 'Phạm Minh Đạo', customerId: 'CUS-3344', phone: '0934 111 222', email: 'daopm@service.com', address: '22 Lý Tự Trọng, Quận 3, TP.HCM', created: '15/02/2024', lastUpdated: 'Tuần trước', active: true, isVip: true, ordersPlaced: 18, ordersCanceled: 2, noShow: 0, totalSpending: 5600000 },
-];
+const formatCustomerCreatedAt = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const mapCustomerDtoToRow = (dto) => {
+  const userId = dto.userId ?? dto.id;
+  const isLocked = dto.isDeleted === true;
+  return {
+    id: userId,
+    customerId: userId != null ? `CUS-${String(userId).padStart(4, '0')}` : '—',
+    name: dto.fullname || '—',
+    phone: dto.phone || '—',
+    email: dto.email || '—',
+    address: dto.address || '',
+    created: formatCustomerCreatedAt(dto.createdAt),
+    lastUpdated: '—',
+    active: !isLocked,
+    isVip: false,
+    ordersPlaced: 0,
+    ordersCanceled: 0,
+    noShow: 0,
+    totalSpending: 0,
+  };
+};
 
 const POSITION_OPTIONS = [
   { value: 'manager', label: 'Quản lý' },
@@ -17,12 +47,36 @@ const POSITION_OPTIONS = [
   { value: 'cashier', label: 'Thu ngân' },
 ];
 
-const MOCK_STAFF = [
-  { id: 1, name: 'Phạm Hoàng Nam', email: 'nam.pham@foodie.vn', phone: '0982 358 678', address: '123 Đường ABC, Quận 1, TP.HCM', startDate: '01/01/2022', position: 'manager', positionLabel: 'Quản lý', active: true, salary: 15000000, taxId: '0123456789', bankName: 'Vietcombank', bankAccount: '012345678910' },
-  { id: 2, name: 'Lê Minh Quân', email: 'quan.lq@foodie.vn', phone: '0987 173 430', address: '', startDate: '15/03/2023', position: 'kitchen', positionLabel: 'Bếp', active: true, salary: 12000000, taxId: '', bankName: '', bankAccount: '' },
-  { id: 3, name: 'Trần Phương Thảo', email: 'thao.tp@foodie.vn', phone: '0945 888 998', address: '', startDate: '10/06/2023', position: 'thuongtin', positionLabel: 'Thường tín', active: false, salary: 8000000, taxId: '', bankName: '', bankAccount: '' },
-  { id: 4, name: 'Nguyễn Văn Đại', email: 'dai.nv@foodie.vn', phone: '0902 888 880', address: '', startDate: '01/12/2023', position: 'server', positionLabel: 'Phục vụ', active: true, salary: 7000000, taxId: '8123456789', bankName: 'Vietcombank', bankAccount: '012345678910' },
-];
+const getPositionLabel = (positionValue) => {
+  const opt = POSITION_OPTIONS.find((o) => o.value === positionValue);
+  return opt ? opt.label : positionValue || '—';
+};
+
+const formatDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const mapStaffDtoToRow = (dto) => {
+  const userId = dto.userId ?? dto.id;
+  return {
+    id: userId,
+    name: dto.fullname || '—',
+    email: dto.email || '—',
+    phone: dto.phone || '—',
+    address: dto.address || '',
+    startDate: formatDate(dto.hireDate),
+    position: dto.position || '',
+    positionLabel: getPositionLabel(dto.position),
+    active: dto.isDeleted !== true,
+    salary: 0,
+    taxId: '',
+    bankName: '',
+    bankAccount: '',
+  };
+};
 
 const getInitials = (name) => {
   return name
@@ -40,15 +94,25 @@ const TABS = [
 
 const defaultStaffForm = () => ({
   name: '', email: '', phone: '', address: '', password: '',
+  gender: 'Male',
   position: '', salary: '', taxId: '', bankName: '', bankAccount: '',
 });
+
+const parseSalaryNumber = (s) => {
+  const n = parseInt(String(s).replace(/,/g, '').trim(), 10);
+  return Number.isFinite(n) ? n : NaN;
+};
 
 const AdminStaffPage = () => {
   const [tab, setTab] = useState('customers');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [customers, setCustomers] = useState(MOCK_CUSTOMERS);
-  const [staff, setStaff] = useState(MOCK_STAFF);
+  const [customers, setCustomers] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState(null);
+  const [staff, setStaff] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [editStaffForm, setEditStaffForm] = useState(null);
@@ -60,13 +124,113 @@ const AdminStaffPage = () => {
   const [addStaffMode, setAddStaffMode] = useState('from_customer');
   const [addStaffForm, setAddStaffForm] = useState(defaultStaffForm);
   const [addStaffCustomerSearch, setAddStaffCustomerSearch] = useState('');
+  const [addStaffSelectedUserId, setAddStaffSelectedUserId] = useState(null);
+  const [addStaffSubmitting, setAddStaffSubmitting] = useState(false);
+  const [customerToggleBusyId, setCustomerToggleBusyId] = useState(null);
+  const [staffToggleBusyId, setStaffToggleBusyId] = useState(null);
 
-  const toggleCustomer = (id) => {
-    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c)));
+  const loadCustomers = useCallback(async (options = {}) => {
+    const silent = options.silent === true;
+    const syncSelectedUserId = options.syncSelectedUserId;
+
+    if (!silent) {
+      setCustomersLoading(true);
+      setCustomersError(null);
+    }
+    try {
+      const list = await getCustomersList();
+      const rows = (Array.isArray(list) ? list : []).map(mapCustomerDtoToRow);
+      setCustomers(rows);
+      if (syncSelectedUserId != null) {
+        setSelectedCustomer((prev) => {
+          if (!prev || prev.id !== syncSelectedUserId) return prev;
+          return rows.find((r) => r.id === syncSelectedUserId) || prev;
+        });
+      }
+      if (!silent) setCustomersError(null);
+    } catch (err) {
+      if (!silent) {
+        setCustomersError(err?.message || 'Không tải được danh sách khách hàng.');
+        setCustomers([]);
+      } else {
+        throw err;
+      }
+    } finally {
+      if (!silent) setCustomersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  const toggleCustomer = async (id) => {
+    if (id == null || customerToggleBusyId != null) return;
+    setCustomerToggleBusyId(id);
+    try {
+      await patchUserStatus(id);
+      await loadCustomers({ silent: true, syncSelectedUserId: id });
+    } catch (err) {
+      window.alert(err?.message || 'Không cập nhật được trạng thái tài khoản.');
+    } finally {
+      setCustomerToggleBusyId(null);
+    }
   };
 
-  const toggleStaff = (id) => {
-    setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
+  const loadStaffs = useCallback(async (options = {}) => {
+    const silent = options.silent === true;
+    const syncSelectedId = options.syncSelectedId;
+
+    if (!silent) {
+      setStaffLoading(true);
+      setStaffError(null);
+    }
+    try {
+      const list = await getStaffsList();
+      const rows = (Array.isArray(list) ? list : []).map(mapStaffDtoToRow);
+      setStaff(rows);
+      if (syncSelectedId != null) {
+        setSelectedStaff((prev) => {
+          if (!prev || prev.id !== syncSelectedId) return prev;
+          return rows.find((r) => r.id === syncSelectedId) || prev;
+        });
+      }
+      if (!silent) setStaffError(null);
+    } catch (err) {
+      if (!silent) {
+        setStaffError(err?.message || 'Không tải được danh sách nhân viên.');
+        setStaff([]);
+      } else {
+        throw err;
+      }
+    } finally {
+      if (!silent) setStaffLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStaffs();
+  }, [loadStaffs]);
+
+  const closeAddStaffModal = useCallback(() => {
+    setAddStaffOpen(false);
+    setAddStaffForm(defaultStaffForm());
+    setAddStaffCustomerSearch('');
+    setAddStaffSelectedUserId(null);
+    setAddStaffSubmitting(false);
+  }, []);
+
+  const toggleStaff = async (id) => {
+    if (id == null || staffToggleBusyId != null) return;
+    setStaffToggleBusyId(id);
+    try {
+      await patchStaffStatus(id);
+      await loadStaffs({ silent: true, syncSelectedId: id });
+    } catch (err) {
+      window.alert(err?.message || 'Không cập nhật được trạng thái nhân viên.');
+    } finally {
+      setStaffToggleBusyId(null);
+    }
   };
 
   const openStaffDetail = (row) => {
@@ -86,63 +250,176 @@ const AdminStaffPage = () => {
     });
   };
 
-  const handleSaveStaffInfo = (e) => {
+  const handleSaveStaffInfo = async (e) => {
     e.preventDefault();
     if (!selectedStaff || !editStaffForm) return;
     const salaryNum = parseInt(String(editStaffForm.salary).replace(/,/g, ''), 10) || 0;
-    const positionOpt = POSITION_OPTIONS.find((o) => o.value === editStaffForm.position);
-    setStaff((prev) =>
-      prev.map((s) =>
-        s.id === selectedStaff.id
-          ? {
-              ...s,
-              name: editStaffForm.name,
-              email: editStaffForm.email,
-              phone: editStaffForm.phone,
-              address: editStaffForm.address,
-              position: editStaffForm.position || s.position,
-              positionLabel: positionOpt ? positionOpt.label : s.positionLabel,
-              salary: salaryNum,
-              taxId: editStaffForm.taxId,
-              bankName: editStaffForm.bankName,
-              bankAccount: editStaffForm.bankAccount,
-            }
-          : s
-      )
-    );
-    setSelectedStaff(null);
-    setEditStaffForm(null);
+    try {
+      await updateStaffDetail(selectedStaff.id, {
+        fullname: editStaffForm.name,
+        phone: editStaffForm.phone,
+        email: editStaffForm.email,
+        address: editStaffForm.address,
+        position: editStaffForm.position,
+        salary: salaryNum,
+        taxId: editStaffForm.taxId,
+        bankName: editStaffForm.bankName,
+        bankAccountNumber: editStaffForm.bankAccount,
+      });
+      await loadStaffs({ silent: true, syncSelectedId: selectedStaff.id });
+      setSelectedStaff(null);
+      setEditStaffForm(null);
+    } catch (err) {
+      window.alert(err?.message || 'Không cập nhật được thông tin nhân viên.');
+    }
   };
 
-  const handleAddStaff = (e) => {
+  const handleAddStaff = async (e) => {
     e.preventDefault();
-    window.alert('Đã thêm nhân viên (mock). Nhân viên sẽ nhận email hướng dẫn đăng nhập.');
-    setAddStaffOpen(false);
-    setAddStaffForm(defaultStaffForm());
-    setAddStaffCustomerSearch('');
+    if (addStaffSubmitting) return;
+
+    const position = (addStaffForm.position || '').trim();
+    const salaryNum = parseSalaryNumber(addStaffForm.salary);
+    const taxId = (addStaffForm.taxId || '').trim();
+    const bankName = (addStaffForm.bankName || '').trim() || null;
+    const bankAccountNumber = (addStaffForm.bankAccount || '').trim() || null;
+
+    if (!position) {
+      window.alert('Vui lòng chọn vị trí / vai trò.');
+      return;
+    }
+
+    if (addStaffMode === 'from_customer') {
+      if (addStaffSelectedUserId == null) {
+        window.alert('Vui lòng chọn một khách hàng trong danh sách.');
+        return;
+      }
+      if (!Number.isFinite(salaryNum) || salaryNum < 1) {
+        window.alert('Mức lương phải là số và tối thiểu 1 (theo API).');
+        return;
+      }
+      if (!taxId) {
+        window.alert('Vui lòng nhập mã số thuế.');
+        return;
+      }
+      setAddStaffSubmitting(true);
+      try {
+        await createStaffByUserId({
+          userId: addStaffSelectedUserId,
+          salary: salaryNum,
+          position,
+          bankAccountNumber,
+          bankName,
+          taxId,
+        });
+        await loadStaffs({ silent: true });
+        window.alert('Đã thêm nhân viên từ tài khoản khách hàng.');
+        closeAddStaffModal();
+      } catch (err) {
+        window.alert(err?.message || 'Không thêm được nhân viên.');
+      } finally {
+        setAddStaffSubmitting(false);
+      }
+      return;
+    }
+
+    const fullname = (addStaffForm.name || '').trim();
+    const email = (addStaffForm.email || '').trim();
+    const phone = (addStaffForm.phone || '').trim();
+    const address = (addStaffForm.address || '').trim() || null;
+    const pwd = addStaffForm.password || '';
+
+    if (!fullname) {
+      window.alert('Vui lòng nhập họ tên.');
+      return;
+    }
+    if (!email) {
+      window.alert('Vui lòng nhập email.');
+      return;
+    }
+    if (!phone) {
+      window.alert('Vui lòng nhập số điện thoại.');
+      return;
+    }
+    if (pwd.length < 6) {
+      window.alert('Mật khẩu phải có ít nhất 6 ký tự (theo API passwordHash).');
+      return;
+    }
+    if (!Number.isFinite(salaryNum) || salaryNum < 0) {
+      window.alert('Mức lương phải là số hợp lệ (≥ 0).');
+      return;
+    }
+    if (!taxId) {
+      window.alert('Vui lòng nhập mã số thuế.');
+      return;
+    }
+
+    const gender = addStaffForm.gender;
+    const genderOk = gender === 'Male' || gender === 'Female' || gender === 'Other';
+    setAddStaffSubmitting(true);
+    try {
+      await createStaffNew({
+        fullname,
+        gender: genderOk ? gender : 'Male',
+        phone,
+        email,
+        address,
+        passwordHash: pwd,
+        salary: salaryNum,
+        position,
+        bankAccountNumber,
+        bankName,
+        taxId,
+      });
+      await loadStaffs({ silent: true });
+      window.alert('Đã tạo nhân viên mới thành công.');
+      closeAddStaffModal();
+    } catch (err) {
+      window.alert(err?.message || 'Không tạo được nhân viên.');
+    } finally {
+      setAddStaffSubmitting(false);
+    }
   };
 
   const filteredCustomers = customers.filter((c) => {
+    const phoneStr = String(c.phone || '');
     const matchSearch =
       !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search);
+      phoneStr.includes(search);
     const matchStatus =
       statusFilter === 'all' || (statusFilter === 'active' && c.active) || (statusFilter === 'locked' && !c.active);
     return matchSearch && matchStatus;
   });
 
   const filteredStaff = staff.filter((s) => {
+    const phoneStr = String(s.phone || '');
     const matchSearch =
       !search ||
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase()) ||
-      s.phone.includes(search);
+      phoneStr.includes(search);
     const matchStatus =
       statusFilter === 'all' || (statusFilter === 'active' && s.active) || (statusFilter === 'inactive' && !s.active);
     return matchSearch && matchStatus;
   });
+
+  const addStaffCustomerMatches = useMemo(() => {
+    const q = addStaffCustomerSearch.trim().toLowerCase();
+    const list = q
+      ? customers.filter((c) => {
+          const phoneStr = String(c.phone || '').replace(/\s/g, '');
+          const qPhone = addStaffCustomerSearch.trim().replace(/\s/g, '');
+          return (
+            c.name.toLowerCase().includes(q) ||
+            (c.email && c.email.toLowerCase().includes(q)) ||
+            phoneStr.includes(qPhone)
+          );
+        })
+      : customers;
+    return list.slice(0, 12);
+  }, [customers, addStaffCustomerSearch]);
 
   return (
     <div className="admin-staff">
@@ -205,7 +482,26 @@ const AdminStaffPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((row) => (
+                {customersError ? (
+                  <tr>
+                    <td colSpan={5} className="staff-table-empty">
+                      {customersError}
+                    </td>
+                  </tr>
+                ) : customersLoading ? (
+                  <tr>
+                    <td colSpan={5} className="staff-table-empty">
+                      Đang tải danh sách khách hàng...
+                    </td>
+                  </tr>
+                ) : filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="staff-table-empty">
+                      Không có khách hàng nào.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map((row) => (
                   <tr key={row.id} className="staff-row-clickable" onClick={() => setSelectedCustomer(row)}>
                     <td>
                       <div className="staff-info-cell">
@@ -230,18 +526,27 @@ const AdminStaffPage = () => {
                         type="button"
                         className={`staff-toggle ${row.active ? 'active' : ''}`}
                         onClick={() => toggleCustomer(row.id)}
+                        disabled={customerToggleBusyId === row.id}
+                        aria-busy={customerToggleBusyId === row.id}
                         aria-label={row.active ? 'Khóa' : 'Mở khóa'}
                       >
                         <span className="staff-toggle-slider" />
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
           <div className="staff-pagination">
-            <span>Hiển thị 1-{filteredCustomers.length} trong {customers.length} tài khoản</span>
+            <span>
+              {customersLoading || customersError
+                ? '—'
+                : filteredCustomers.length === 0
+                  ? `0 trong ${customers.length} tài khoản`
+                  : `Hiển thị 1-${filteredCustomers.length} trong ${customers.length} tài khoản`}
+            </span>
             <div className="staff-pagination-btns">
               <button type="button" className="staff-page-btn">&lt;</button>
               <button type="button" className="staff-page-btn active">1</button>
@@ -267,7 +572,26 @@ const AdminStaffPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredStaff.map((row) => (
+                {staffError ? (
+                  <tr>
+                    <td colSpan={5} className="staff-table-empty">
+                      {staffError}
+                    </td>
+                  </tr>
+                ) : staffLoading ? (
+                  <tr>
+                    <td colSpan={5} className="staff-table-empty">
+                      Đang tải danh sách nhân viên...
+                    </td>
+                  </tr>
+                ) : filteredStaff.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="staff-table-empty">
+                      Không có nhân viên nào.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStaff.map((row) => (
                   <tr key={row.id} className="staff-row-clickable" onClick={() => openStaffDetail(row)}>
                     <td>
                       <div className="staff-info-cell">
@@ -292,18 +616,27 @@ const AdminStaffPage = () => {
                         type="button"
                         className={`staff-toggle ${row.active ? 'active' : ''}`}
                         onClick={() => toggleStaff(row.id)}
+                        disabled={staffToggleBusyId === row.id}
+                        aria-busy={staffToggleBusyId === row.id}
                         aria-label={row.active ? 'Tắt' : 'Bật'}
                       >
                         <span className="staff-toggle-slider" />
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
           <div className="staff-pagination">
-            <span>Hiển thị 1-{filteredStaff.length} trong {staff.length} nhân viên</span>
+            <span>
+              {staffLoading || staffError
+                ? '—'
+                : filteredStaff.length === 0
+                  ? `0 trong ${staff.length} nhân viên`
+                  : `Hiển thị 1-${filteredStaff.length} trong ${staff.length} nhân viên`}
+            </span>
             <div className="staff-pagination-btns">
               <button type="button" className="staff-page-btn">&lt;</button>
               <button type="button" className="staff-page-btn active">1</button>
@@ -476,15 +809,27 @@ const AdminStaffPage = () => {
       )}
 
       {addStaffOpen && (
-        <div className="staff-modal-overlay" onClick={() => { setAddStaffOpen(false); setAddStaffForm(defaultStaffForm()); setAddStaffCustomerSearch(''); }}>
+        <div className="staff-modal-overlay" onClick={closeAddStaffModal}>
           <div className="staff-add-modal" onClick={(e) => e.stopPropagation()}>
             <div className="staff-add-modal-head">
               <h2 className="staff-add-modal-title">Thêm nhân viên mới</h2>
-              <button type="button" className="staff-modal-close" onClick={() => { setAddStaffOpen(false); setAddStaffForm(defaultStaffForm()); setAddStaffCustomerSearch(''); }} aria-label="Đóng"><X size={20} /></button>
+              <button type="button" className="staff-modal-close" onClick={closeAddStaffModal} aria-label="Đóng"><X size={20} /></button>
             </div>
             <div className="staff-add-modal-options">
-              <button type="button" className={`staff-add-option ${addStaffMode === 'from_customer' ? 'active' : ''}`} onClick={() => setAddStaffMode('from_customer')}>Chọn từ khách hàng cũ</button>
-              <button type="button" className={`staff-add-option ${addStaffMode === 'new' ? 'active' : ''}`} onClick={() => setAddStaffMode('new')}>Tạo mới hoàn toàn</button>
+              <button
+                type="button"
+                className={`staff-add-option ${addStaffMode === 'from_customer' ? 'active' : ''}`}
+                onClick={() => { setAddStaffMode('from_customer'); setAddStaffSelectedUserId(null); }}
+              >
+                Chọn từ khách hàng cũ
+              </button>
+              <button
+                type="button"
+                className={`staff-add-option ${addStaffMode === 'new' ? 'active' : ''}`}
+                onClick={() => { setAddStaffMode('new'); setAddStaffSelectedUserId(null); }}
+              >
+                Tạo mới hoàn toàn
+              </button>
             </div>
             <form onSubmit={handleAddStaff} className="staff-add-modal-form">
               {addStaffMode === 'from_customer' && (
@@ -496,7 +841,73 @@ const AdminStaffPage = () => {
                       <Search size={18} className="staff-search-icon" />
                       <input type="text" className="staff-search staff-search-full" placeholder="Nhập tên, email hoặc số điện thoại khách hàng..." value={addStaffCustomerSearch} onChange={(e) => setAddStaffCustomerSearch(e.target.value)} />
                     </div>
-                    <p className="staff-form-hint">* Chỉ các tài khoản có vai trò &apos;Khách hàng&apos; mới xuất hiện tại đây.</p>
+                    <p className="staff-form-hint">* Danh sách lấy từ API khách hàng đã tải. Để trống ô tìm để xem tối đa 12 khách đầu.</p>
+                    {addStaffCustomerMatches.length === 0 ? (
+                      <p className="staff-form-hint">Không có khách hàng phù hợp.</p>
+                    ) : (
+                      <div className="staff-table-wrap" style={{ marginTop: 10, maxHeight: 220, overflowY: 'auto' }}>
+                        <table className="staff-table">
+                          <tbody>
+                            {addStaffCustomerMatches.map((c) => (
+                              <tr
+                                key={c.id}
+                                className="staff-row-clickable"
+                                style={addStaffSelectedUserId === c.id ? { background: 'rgba(255, 140, 0, 0.12)' } : undefined}
+                                onClick={() => setAddStaffSelectedUserId(c.id)}
+                              >
+                                <td>
+                                  <div className="staff-name">{c.name}</div>
+                                  <div className="staff-meta">{c.email}</div>
+                                </td>
+                                <td className="staff-meta">{c.phone}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {addStaffSelectedUserId != null && (
+                      <p className="staff-form-hint">
+                        Đã chọn userId <strong>{addStaffSelectedUserId}</strong>
+                        {' · '}
+                        <button type="button" className="staff-modal-btn staff-modal-btn-secondary" onClick={() => setAddStaffSelectedUserId(null)}>
+                          Bỏ chọn
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {addStaffMode === 'new' && (
+                <div className="staff-add-section">
+                  <h3 className="staff-add-section-title">THÔNG TIN TÀI KHOẢN MỚI</h3>
+                  <div className="staff-form-group">
+                    <label>Họ tên</label>
+                    <input type="text" value={addStaffForm.name} onChange={(e) => setAddStaffForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nguyễn Văn A" />
+                  </div>
+                  <div className="staff-form-group">
+                    <label>Giới tính</label>
+                    <select value={addStaffForm.gender} onChange={(e) => setAddStaffForm((f) => ({ ...f, gender: e.target.value }))}>
+                      <option value="Male">Nam (Male)</option>
+                      <option value="Female">Nữ (Female)</option>
+                      <option value="Other">Khác (Other)</option>
+                    </select>
+                  </div>
+                  <div className="staff-form-group">
+                    <label>Email</label>
+                    <input type="email" value={addStaffForm.email} onChange={(e) => setAddStaffForm((f) => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
+                  </div>
+                  <div className="staff-form-group">
+                    <label>Số điện thoại</label>
+                    <input type="text" value={addStaffForm.phone} onChange={(e) => setAddStaffForm((f) => ({ ...f, phone: e.target.value }))} />
+                  </div>
+                  <div className="staff-form-group">
+                    <label>Địa chỉ</label>
+                    <input type="text" value={addStaffForm.address} onChange={(e) => setAddStaffForm((f) => ({ ...f, address: e.target.value }))} placeholder="Tùy chọn" />
+                  </div>
+                  <div className="staff-form-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" value={addStaffForm.password} onChange={(e) => setAddStaffForm((f) => ({ ...f, password: e.target.value }))} placeholder="Tối thiểu 6 ký tự" autoComplete="new-password" />
                   </div>
                 </div>
               )}
@@ -535,8 +946,12 @@ const AdminStaffPage = () => {
                 Lưu ý: Nhân viên sau khi được thêm sẽ nhận được email thông báo về thông tin tài khoản và hướng dẫn đăng nhập vào hệ thống.
               </div>
               <div className="staff-add-modal-actions">
-                <button type="button" className="staff-modal-btn staff-modal-btn-secondary" onClick={() => { setAddStaffOpen(false); setAddStaffForm(defaultStaffForm()); setAddStaffCustomerSearch(''); }}>Hủy bỏ</button>
-                <button type="submit" className="staff-modal-btn staff-modal-btn-primary">Xác nhận thêm nhân viên</button>
+                <button type="button" className="staff-modal-btn staff-modal-btn-secondary" onClick={closeAddStaffModal} disabled={addStaffSubmitting}>
+                  Hủy bỏ
+                </button>
+                <button type="submit" className="staff-modal-btn staff-modal-btn-primary" disabled={addStaffSubmitting}>
+                  {addStaffSubmitting ? 'Đang xử lý...' : 'Xác nhận thêm nhân viên'}
+                </button>
               </div>
             </form>
           </div>

@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Ticket, Copy, BookOpen, Utensils, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Header from '../components/Header';
@@ -25,13 +25,18 @@ const Promotion = () => {
             try {
                 const [blogRes, discountRes, comboRes, foodDiscountRes] = await Promise.all([
                     axios.get(`${API_BASE}/blogs/lists`),
-                    axios.get(`${API_BASE}/discount/lists`),
+                    axios.get(`${API_BASE}/discount`),
                     axios.get(`${API_BASE}/combo`),
                     axios.get(`${API_BASE}/food/discount`)
                 ]);
 
                 setBlogs(blogRes.data || []);
-                setVouchers(discountRes.data || []);
+                const discRaw = discountRes.data;
+                setVouchers(
+                  Array.isArray(discRaw)
+                    ? discRaw
+                    : discRaw?.data ?? discRaw?.items ?? []
+                );
                 setCombos(comboRes.data || []);
                 setFoodDiscounts(foodDiscountRes.data || []);
             } catch (err) {

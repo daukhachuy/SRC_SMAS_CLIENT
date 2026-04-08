@@ -152,7 +152,7 @@ const UserLayout = () => {
               </NavLink>
 
               <NavLink to="/order-history" className={({ isActive }) => isActive ? "Nav-Item Active" : "Nav-Item"}>
-                <span>Lịch Sử Giao Dịch</span>
+                <span>Lịch Sử Đơn Hàng</span>
                 <i className="fa-solid fa-clock-rotate-left"></i>
               </NavLink>
               

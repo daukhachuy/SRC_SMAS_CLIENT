@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import {
   Filter,
   MoreHorizontal,
@@ -72,6 +73,7 @@ const takeawayHistory = [
 ];
 
 const TakeawayOrdersPage = () => {
+  const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('takeaway');
 
@@ -146,7 +148,7 @@ const TakeawayOrdersPage = () => {
               key={order.code} 
               className="takeaway-order-card"
               style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/manager/orders/takeaway/${order.code}`)}
+              onClick={() => navigate(`${base}/orders/takeaway/${order.code}`)}
             >
               <div className="takeaway-card-header">
                 <div className="takeaway-card-info">

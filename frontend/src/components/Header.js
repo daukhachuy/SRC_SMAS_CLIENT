@@ -3,6 +3,7 @@ import { Bell, ShoppingBag, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import NotificationDropdown from './NotificationDropdown';
+import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../api/notificationApi';
 import '../styles/Header.css';
 
 const MENU_ITEMS = [
@@ -14,6 +15,44 @@ const MENU_ITEMS = [
 
 const normalizeRole = (role) => String(role || '').trim().toLowerCase();
 
+const getNotificationId = (item, idx = 0) => {
+  const id = item?.id ?? item?.notificationId ?? item?.notificationID ?? item?.Id ?? item?.NotificationId;
+  return id != null ? String(id) : `fallback-${idx}`;
+};
+
+const timeAgoVi = (value) => {
+  if (!value) return 'Vừa xong';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+
+  const diffMs = Date.now() - d.getTime();
+  const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMin < 1) return 'Vừa xong';
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} giờ trước`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} ngày trước`;
+};
+
+const mapNotificationType = (type) => {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('warn') || t.includes('error')) return 'warning';
+  if (t.includes('book')) return 'booking';
+  if (t.includes('promo') || t.includes('discount')) return 'promotion';
+  if (t.includes('order')) return 'order';
+  return 'system';
+};
+
+const mapNotificationItem = (item, idx) => ({
+  id: item?.id || item?.notificationId || idx + 1,
+  type: mapNotificationType(item?.type || item?.notificationType),
+  title: item?.title || item?.subject || item?.message || `Thông báo #${idx + 1}`,
+  message: item?.message || item?.content || item?.description || 'Bạn có thông báo mới.',
+  time: timeAgoVi(item?.createdAt || item?.time || item?.sentAt),
+  isRead: Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false),
+});
+
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,6 +60,7 @@ const Header = () => {
   const [activeId, setActiveId] = useState('');
   const [shrink, setShrink] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   
   // --- THÊM STATE ĐỂ LƯU TỔNG SỐ LƯỢNG GIỎ HÀNG ---
   const [cartCount, setCartCount] = useState(0);
@@ -46,6 +86,66 @@ const Header = () => {
       window.removeEventListener('storage', updateCartBadge);
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const [allPayload, unreadPayload] = await Promise.all([
+          getAllNotifications(),
+          getUnreadNotifications(),
+        ]);
+
+        const allRows = normalizeNotificationList(allPayload);
+        const unreadRows = normalizeNotificationList(unreadPayload);
+        const unreadIds = new Set(
+          unreadRows
+            .map((item, idx) => getNotificationId(item, idx))
+            .filter(Boolean)
+        );
+
+        const hasExplicitReadFlag = allRows.some(
+          (item) => item?.isRead != null || item?.read != null || item?.isSeen != null
+        );
+        const hasAnyReadInAll = allRows.some((item) =>
+          Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false)
+        );
+        const unreadSourceLooksBroken =
+          allRows.length > 0 &&
+          unreadIds.size === allRows.length &&
+          hasExplicitReadFlag &&
+          hasAnyReadInAll;
+
+        const mapped = allRows.map((item, idx) => {
+          const mappedItem = mapNotificationItem(item, idx);
+          const rowId = getNotificationId(item, idx);
+          const isMarkedUnreadByEndpoint = !unreadSourceLooksBroken && unreadIds.has(rowId);
+          return {
+            ...mappedItem,
+            id: rowId,
+            isRead: isMarkedUnreadByEndpoint ? false : mappedItem.isRead,
+          };
+        });
+
+        if (mounted) {
+          setNotifications(mapped);
+        }
+      } catch (error) {
+        console.error('Load notifications failed:', error);
+        if (mounted) {
+          setNotifications([]);
+        }
+      }
+    };
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
 
   // Map path -> id
   const pathToId = useMemo(() => {
@@ -218,7 +318,9 @@ const Header = () => {
             onClick={() => setNotificationOpen((prev) => !prev)}
           >
             <Bell size={22} />
-            <span className="hd-badge badge-red">5</span>
+            {unreadNotificationCount > 0 && (
+              <span className="hd-badge badge-red">{unreadNotificationCount}</span>
+            )}
           </div>
 
           <div 
@@ -248,6 +350,8 @@ const Header = () => {
         <NotificationDropdown
           isOpen={notificationOpen}
           onClose={() => setNotificationOpen(false)}
+          notifications={notifications}
+          onNotificationsChange={setNotifications}
         />
 
       </div>
