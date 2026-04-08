@@ -39,7 +39,8 @@ const isWaiterStaff = (staff) => {
 };
 
 const mapDriver = (staff) => ({
-  id: staff?.id ?? staff?.staffId ?? staff?.userId ?? staff?.workStaffId,
+  id: staff?.staffId ?? staff?.userId ?? staff?.id ?? staff?.workStaffId,
+  staffId: staff?.staffId ?? staff?.userId ?? staff?.id ?? staff?.workStaffId,
   name: staff?.name || staff?.fullname || staff?.fullName || staff?.staffName || 'Nhân viên',
   status: staff?.status || 'Đang làm việc',
 });
@@ -52,6 +53,24 @@ const uniqueById = (list) => {
     seen.add(key);
     return true;
   });
+};
+
+const extractApiErrorMessage = (error, fallback) => {
+  const data = error?.response?.data;
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  if (typeof data?.title === 'string' && data.title.trim()) return data.title;
+
+  const errors = data?.errors;
+  if (errors && typeof errors === 'object') {
+    const firstError = Object.values(errors)
+      .flatMap((x) => (Array.isArray(x) ? x : [x]))
+      .map((x) => String(x || '').trim())
+      .find(Boolean);
+    if (firstError) return firstError;
+  }
+
+  if (typeof error?.message === 'string' && error.message.trim()) return error.message;
+  return fallback;
 };
 
 const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotify }) => {
@@ -168,7 +187,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
       if (typeof onUpdated === 'function') onUpdated();
       onClose();
     } catch (e) {
-      const message = e?.response?.data?.message || e?.response?.data?.title || 'Không thể hủy đơn giao hàng. Vui lòng thử lại.';
+      const message = extractApiErrorMessage(e, 'Không thể hủy đơn giao hàng. Vui lòng thử lại.');
       notify(message);
     } finally {
       setSubmitting(false);
@@ -182,7 +201,11 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     }
 
     const orderCode = String(orderDetail?.orderCode || deliveryData?.code || delivery?.orderId || '').trim();
-    const assignedDriverId = delivery?.assignedDriver?.id ?? delivery?.assignedDriver?.staffId ?? null;
+    const assignedDriverId =
+      delivery?.assignedDriver?.staffId ??
+      delivery?.assignedDriver?.userId ??
+      delivery?.assignedDriver?.id ??
+      null;
     const staffIdValue = selectedDriver || assignedDriverId;
     const staffId = Number(staffIdValue);
 
@@ -204,7 +227,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
       if (typeof onUpdated === 'function') onUpdated();
       onClose();
     } catch (e) {
-      const message = e?.response?.data?.message || e?.response?.data?.title || 'Không thể xác nhận giao hàng. Vui lòng thử lại.';
+      const message = extractApiErrorMessage(e, 'Không thể xác nhận giao hàng. Vui lòng thử lại.');
       notify(message);
     } finally {
       setSubmitting(false);
