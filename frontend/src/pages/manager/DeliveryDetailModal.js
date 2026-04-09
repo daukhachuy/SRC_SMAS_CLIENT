@@ -154,6 +154,12 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     const accepted = window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?');
     if (!accepted) return;
 
+    const reason = cancelReason.trim();
+    if (!reason) {
+      notify('Vui lòng nhập lý do hủy đơn hàng.');
+      return;
+    }
+
     const orderCode = String(orderDetail?.orderCode || deliveryData?.code || delivery?.orderId || '').trim();
     if (!orderCode) {
       notify('Không xác định được mã đơn hàng để hủy.');
@@ -162,7 +168,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
 
     try {
       setSubmitting(true);
-      const payload = cancelReason.trim() ? { reason: cancelReason.trim() } : {};
+      const payload = { cancellationReason: reason };
       await orderAPI.deleteOrderDelivery(orderCode, payload);
       notify('Hủy đơn giao hàng thành công.');
       if (typeof onUpdated === 'function') onUpdated();

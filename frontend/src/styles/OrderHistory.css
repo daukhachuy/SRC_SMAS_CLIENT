@@ -298,6 +298,30 @@
   letter-spacing: -0.02em;
 }
 
+.Btn-Deposit-Pay {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--Primary-Orange);
+  background: #fff7ed;
+  color: var(--Primary-Orange);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.Btn-Deposit-Pay:hover {
+  background: var(--Primary-Orange);
+  color: #fff;
+}
+
+.Btn-Deposit-Pay:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 /* Địa chỉ */
 .Card-Bottom-Address {
   background: #F8F9FA;

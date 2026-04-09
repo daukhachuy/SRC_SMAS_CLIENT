@@ -84,6 +84,7 @@ export async function getAllStaffSchedule() {
   export const orderAPI = {
           // API dành riêng cho Waiter lấy đơn của chính mình
           getPreparingMy: () => instance.get('/order/preparing/my'),
+          getDeliveryMy: () => instance.get('/order/delivery/my'),
         // POST /api/order/filter - lấy đơn theo staffId và tableCode
         filterByStaffTable: (staffId, tableCode, orderType, status) =>
           instance.post('/order/filter', { staffId, tableCode, orderType, status }),
@@ -312,6 +313,13 @@ export async function getAllStaffSchedule() {
         return res;
       }),
 
+    // GET /api/book-event/{id}/detail
+    getDetailById: (bookEventId) => instance.get(`/book-event/${bookEventId}/detail`)
+      .then(res => {
+        console.log('[eventBookingAPI] getDetailById response:', res.status, res.data);
+        return res;
+      }),
+
     // GET /api/events/upcoming-events
     getUpcomingEvents: () => instance.get('/events/upcoming-events')
       .then(res => {
@@ -338,6 +346,46 @@ export async function getAllStaffSchedule() {
       }),
   };
 
+  export const contractAPI = {
+    // GET /api/contract/{bookingCode}
+    getByBookingCode: (bookingCode) => instance.get(`/contract/${encodeURIComponent(bookingCode)}`)
+      .then(res => {
+        console.log('[contractAPI] getByBookingCode response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/contract/{id}/send-sign
+    sendSign: (contractId) => instance.post(`/contract/${contractId}/send-sign`)
+      .then(res => {
+        console.log('[contractAPI] sendSign response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/contract/{id}/deposit
+    sendDepositRequest: (contractId) => instance.post(`/contract/${contractId}/deposit`)
+      .then(res => {
+        console.log('[contractAPI] sendDepositRequest response:', res.status, res.data);
+        return res;
+      }),
+  };
+
+  export const contractTokenAPI = {
+    // GET /api/contract/sign?token=...
+    getBySignToken: (token) => instance.get('/contract/sign', { params: { token } })
+      .then(res => {
+        console.log('[contractTokenAPI] getBySignToken response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/contract/sign
+    // Body: { token: string }
+    confirmSignByToken: (token) => instance.post('/contract/sign', { token })
+      .then(res => {
+        console.log('[contractTokenAPI] confirmSignByToken response:', res.status, res.data);
+        return res;
+      }),
+  };
+
   function pick(obj, keys, fallback = null) {
     for (const key of keys) {
       const val = obj?.[key];
@@ -359,7 +407,10 @@ export async function getAllStaffSchedule() {
   }
 
   function normalizeStatus(status) {
-    return String(status || '').toLowerCase();
+    return String(status || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '');
   }
 
   /**
@@ -479,17 +530,27 @@ export async function getAllStaffSchedule() {
     // Debug log raw item
     console.log('[mapEventToUI] Input item:', item);
 
-    const statusRaw = normalizeStatus(pick(item, ['status', 'contractStatus', 'bookingStatus'], 'pending'));
+    const statusRaw = normalizeStatus(pick(item, ['contractStatus', 'status', 'bookingStatus'], 'pending'));
     const statusMap = {
-      signed: { status: 'signed', statusText: 'Đã ký kết' },
-      confirmed: { status: 'signed', statusText: 'Đã ký kết' },
-      pending: { status: 'pending', statusText: 'Chưa có hợp đồng' },
-      deposit: { status: 'deposit', statusText: 'Chờ đặt cọc' },
-      active: { status: 'pending', statusText: 'Đang hoạt động' },
+      // BookEvent statuses
+      pending: { status: 'nosigned', statusText: 'Chờ duyệt / Chờ xử lý' },
+      approved: { status: 'unsigned', statusText: 'Đã duyệt' },
+      rejected: { status: 'rejected', statusText: 'Từ chối' },
+      confirmed: { status: 'signed', statusText: 'Đã xác nhận' },
+      active: { status: 'signed', statusText: 'Đang diễn ra' },
       cancelled: { status: 'cancelled', statusText: 'Đã hủy' },
+      canceled: { status: 'cancelled', statusText: 'Đã hủy' },
       cancel: { status: 'cancelled', statusText: 'Đã hủy' },
+      completed: { status: 'completed', statusText: 'Đã hoàn thành' },
+
+      // Contract statuses
+      draft: { status: 'nosigned', statusText: 'Nháp' },
+      sent: { status: 'unsigned', statusText: 'Đã gửi ký / Chờ khách ký' },
+      signed: { status: 'signed', statusText: 'Đã ký' },
+      deposited: { status: 'deposit', statusText: 'Đã đặt cọc' },
+      deposit: { status: 'deposit', statusText: 'Đã đặt cọc' },
     };
-    const normalized = statusMap[statusRaw] || { status: 'pending', statusText: 'Chưa có hợp đồng' };
+    const normalized = statusMap[statusRaw] || { status: 'nosigned', statusText: 'Chưa có hợp đồng' };
 
     // Lấy thông tin khách hàng - thử nhiều field
     const customerName = pick(item, [
@@ -534,21 +595,33 @@ export async function getAllStaffSchedule() {
       time = dateInfo.time;
     }
 
-    // Lấy event type - ưu tiên eventId mapping, fallback sang text field
-    const eventIdRaw = pick(item, ['eventId', 'eventTypeId']);
+    // Lấy loại sự kiện - ưu tiên eventTitle từ API book-event
+    const eventIdRaw = pick(item, ['bookEventId', 'eventId', 'EventId', 'eventTypeId', 'EventTypeId']);
     const eventId = Number(eventIdRaw);
-    
-    // Thử lấy từ eventId trước
-    let eventTypeName = null;
+
+    const eventTitleRaw = item?.eventTitle
+      ?? item?.EventTitle
+      ?? item?.eventName
+      ?? item?.EventName
+      ?? item?.title
+      ?? item?.Title
+      ?? item?.event?.title
+      ?? item?.event?.name
+      ?? null;
+    let eventTypeName = typeof eventTitleRaw === 'string' ? eventTitleRaw.trim() : null;
     let eventTypeColor = 'blue';
+
+    // Fallback màu theo eventId, đồng thời chỉ set tên theo map nếu chưa có eventTitle
     if (eventId && EVENT_TYPE_MAP[eventId]) {
-      eventTypeName = EVENT_TYPE_MAP[eventId].name;
       eventTypeColor = EVENT_TYPE_MAP[eventId].color;
+      if (!eventTypeName) {
+        eventTypeName = EVENT_TYPE_MAP[eventId].name;
+      }
     }
     
     // Fallback: thử match theo eventType text (Wedding, Conference, Birthday...)
     if (!eventTypeName) {
-      const eventTypeText = pick(item, ['eventType', 'eventTypeName', 'eventName', 'type', 'category'], '');
+      const eventTypeText = pick(item, ['eventType', 'EventType', 'eventTypeName', 'EventTypeName', 'eventName', 'type', 'category'], '');
       // Map API eventType (Wedding, Conference...) sang tiếng Việt
       const typeTextMap = {
         'Wedding': 'Tiệc Cưới',
@@ -568,9 +641,12 @@ export async function getAllStaffSchedule() {
       eventTypeColor = typeColorMap[eventTypeText] || 'blue';
     }
 
+    const bookEventId = pick(item, ['bookEventId', 'bookingId', 'id', 'eventId']);
+
     return {
-      id: pick(item, ['bookEventId', 'eventId', 'id', 'bookingId']),
-      eventId: pick(item, ['bookEventId', 'eventId', 'id', 'bookingId']),
+      id: bookEventId,
+      bookEventId,
+      eventId,
       bookingCode: pick(item, ['bookingCode', 'eventCode', 'code', 'bookEventCode'], ''),
       customer: customerName,
       contact: contactName,

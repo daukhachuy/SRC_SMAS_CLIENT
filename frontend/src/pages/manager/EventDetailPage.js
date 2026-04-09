@@ -1,114 +1,246 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
+import { eventBookingAPI } from '../../api/managerApi';
 import { 
   Calendar, Users, CheckCircle, FileText, 
-  ChevronRight, Home, FileCheck, DollarSign,
-  UtensilsCrossed, Scale, Flower2, Music
+  ChevronRight, DollarSign,
+  UtensilsCrossed, Scale
 } from 'lucide-react';
 import '../../styles/EventDetailPage.css';
 import TransactionHistoryModal from '../../components/TransactionHistoryModal';
 
+const createEmptyEventData = (eventId) => ({
+  id: eventId || '',
+  bookingCode: '',
+  title: 'Chưa có dữ liệu sự kiện',
+  venue: 'Chưa cập nhật',
+  date: '--/--/----',
+  time: '--:--',
+  tables: 0,
+  guests: 0,
+  status: 'pending',
+  statusText: 'Chưa có hợp đồng',
+  comboName: 'Chưa cập nhật',
+  menu: [],
+  policies: [],
+  services: [],
+  payment: {
+    pricePerTable: 0,
+    quantity: 0,
+    subtotal: 0,
+    serviceVAT: 0,
+    decoration: 0,
+    total: 0,
+    deposit: 0,
+    remaining: 0,
+  },
+});
+
 const EventDetailPage = () => {
   const { base } = useRoleSectionBasePath();
+  const { eventId } = useParams();
   const navigate = useNavigate();
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [eventData, setEventData] = useState(() => createEmptyEventData(eventId));
 
-  // Event data
-  const eventData = {
-    id: 'SK-2024-001',
-    title: 'Tiệc cưới Thành Nam & Khánh Huyền',
-    venue: 'Sảnh A Cao Cấp',
-    date: '15/12/2024',
-    time: '18:00',
-    tables: 50,
-    guests: 500,
-    status: 'confirmed',
-    statusText: 'Đã xác nhận',
-    comboName: 'Combo Tiệc Cưới VIP',
-    
-    menu: [
-      {
-        category: 'Khai vị',
-        items: [
-          {
-            name: 'Súp hải sản tóc tiên',
-            description: 'Hải sản tươi, nấm linh chi',
-            price: 450000,
-            note: 'Phục vụ nóng, ít tiêu'
-          },
-          {
-            name: 'Gỏi ngó sen tôm thịt',
-            description: 'Tôm đất, thịt ba chỉ, bánh phồng tôm',
-            price: 380000,
-            note: 'Độ cay vừa phải'
-          }
-        ]
-      },
-      {
-        category: 'Món chính',
-        items: [
-          {
-            name: 'Bò hầm rượu vang & Bánh mì',
-            description: 'Thăn bò Úc, vang đỏ Bordeaux',
-            price: 850000,
-            note: 'Thịt mềm, không quá nhừ'
-          },
-          {
-            name: 'Cá chẽm hấp Hong Kong',
-            description: 'Cá tươi sống, nước tương đặc biệt',
-            price: 620000,
-            note: 'Trang trí hành gừng tươi'
-          }
-        ]
-      },
-      {
-        category: 'Tráng miệng & Đồ uống',
-        items: [
-          {
-            name: 'Chè tổ yến hạt sen',
-            description: '',
-            price: 250000,
-            note: 'Độ ngọt thanh'
-          },
-          {
-            name: 'Gói bia Heineken & Nước ngọt',
-            description: 'Phục vụ không giới hạn trong 2 giờ',
-            price: 1200000,
-            note: 'Luôn ướp lạnh, kèm đá sạch'
-          }
-        ]
-      }
-    ],
-
-    policies: [
-      'Đặt cọc 30% giá trị tiệc ngay khi ký hợp đồng.',
-      'Hủy tiệc trước 30 ngày: Hoàn trả 50% tiền cọc.',
-      'Thay đổi số lượng bàn (+/- 10%) báo trước 7 ngày.'
-    ],
-
-    services: [
-      'Trang trí hoa tươi bàn tiệc',
-      'Hệ thống âm thanh & Ánh sáng',
-      'Màn hình LED 500 inch',
-      'MC & Ban nhạc Acoustic'
-    ],
-
-    payment: {
-      pricePerTable: 3750000,
-      quantity: 50,
-      subtotal: 187500000,
-      serviceVAT: 18750000,
-      decoration: 15000000,
-      total: 221250000,
-      deposit: 66375000,
-      remaining: 154875000
-    }
+  const statusLabelMap = {
+    pending: 'Chờ duyệt / Chờ xử lý',
+    approved: 'Đã duyệt',
+    rejected: 'Từ chối',
+    confirmed: 'Đã xác nhận',
+    active: 'Đang diễn ra',
+    cancelled: 'Đã hủy',
+    canceled: 'Đã hủy',
+    completed: 'Đã hoàn thành',
+    draft: 'Nháp',
+    sent: 'Đã gửi ký / Chờ khách ký',
+    signed: 'Đã ký',
+    deposited: 'Đã đặt cọc',
   };
+
+  const toDateTime = (dateStr, timeStr) => {
+    if (!dateStr) return { date: '--/--/----', time: '--:--' };
+    const raw = /^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))
+      ? `${dateStr}T${timeStr || '00:00:00'}`
+      : dateStr;
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return { date: '--/--/----', time: '--:--' };
+    return {
+      date: date.toLocaleDateString('vi-VN'),
+      time: date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    };
+  };
+
+  const pickField = (obj, keys, fallback = null) => {
+    for (const key of keys) {
+      const value = obj?.[key];
+      if (value !== undefined && value !== null && value !== '') return value;
+    }
+    return fallback;
+  };
+
+  const toNum = (value, fallback = 0) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  useEffect(() => {
+    const loadDetail = async () => {
+      if (!eventId) {
+        setLoading(false);
+        setLoadError('Thiếu mã sự kiện.');
+        return;
+      }
+
+      setLoading(true);
+      setLoadError('');
+      try {
+        const res = await eventBookingAPI.getDetailById(eventId);
+        const body = res?.data;
+        const payload = body?.data?.data ?? body?.data ?? body;
+        const detail = Array.isArray(payload) ? payload[0] : payload;
+
+        if (!detail || typeof detail !== 'object') {
+          setEventData(createEmptyEventData(eventId));
+          return;
+        }
+
+        const customer = detail?.customer || {};
+        const eventInfo = detail?.eventInfo || {};
+        const contract = detail?.contract || {};
+        const paymentData = detail?.payment || {};
+
+        const statusRaw = String(
+          pickField(
+            {
+              contractStatus: contract?.status,
+              status: detail?.status,
+              bookingStatus: detail?.bookingStatus,
+            },
+            ['contractStatus', 'status', 'bookingStatus'],
+            'pending'
+          )
+        ).toLowerCase();
+        const dt = toDateTime(
+          pickField(eventInfo, ['reservationDate', 'eventDate', 'date'])
+            ?? pickField(detail, ['reservationDate', 'eventDate', 'date']),
+          pickField(eventInfo, ['reservationTime', 'eventTime', 'time'])
+            ?? pickField(detail, ['reservationTime', 'eventTime', 'time'])
+        );
+
+        const total = toNum(pickField(paymentData, ['totalAmount', 'total', 'grandTotal'], 0));
+        const deposit = toNum(pickField(paymentData, ['depositAmount', 'depositedAmount', 'deposit'], 0));
+        const paidAmount = toNum(pickField(paymentData, ['paidAmount'], 0));
+        const remainingRaw = pickField(paymentData, ['remainingAmount', 'remainAmount']);
+        const remaining = remainingRaw !== null ? toNum(remainingRaw, 0) : Math.max(total - deposit, 0);
+
+        const explicitTables = pickField(eventInfo, ['numberOfTables', 'tableCount', 'tables'])
+          ?? pickField(detail, ['numberOfTables', 'tableCount', 'tables']);
+        const guestsRaw = toNum(
+          pickField(eventInfo, ['numberOfGuests', 'guestCount', 'guests'])
+            ?? pickField(detail, ['numberOfGuests', 'guestCount', 'guests'], 0)
+        );
+
+        // Backend hiện trả numberOfGuests theo ngữ cảnh số bàn ở một số API detail.
+        // Nếu thiếu số bàn rõ ràng, dùng numberOfGuests làm số bàn và quy đổi khách = bàn * 10.
+        const quantity = explicitTables !== null && explicitTables !== undefined
+          ? toNum(explicitTables, 0)
+          : guestsRaw;
+        const computedGuests = explicitTables !== null && explicitTables !== undefined
+          ? (guestsRaw || (quantity * 10))
+          : (quantity * 10);
+        const pricePerTable = toNum(
+          pickField(paymentData, ['pricePerTable', 'unitPrice'])
+            ?? pickField(detail, ['pricePerTable', 'unitPrice'], 0)
+        );
+        const subtotal = toNum(
+          pickField(paymentData, ['subtotal', 'subTotal']),
+          pricePerTable * quantity || total
+        );
+
+        const menuItems = pickField(detail, ['foods', 'menuItems', 'items'], []);
+        const menu = Array.isArray(menuItems) && menuItems.length
+          ? [{
+            category: 'Thực đơn',
+            items: menuItems.map((m) => ({
+              name: pickField(m, ['name', 'dishName', 'foodName'], 'Món ăn'),
+              description: pickField(m, ['description', 'note'], ''),
+              price: toNum(pickField(m, ['subtotal'], toNum(pickField(m, ['price', 'unitPrice'], 0)))),
+              note: pickField(m, ['note', 'cookingNote'], ''),
+            })),
+          }]
+          : [];
+
+        const services = Array.isArray(detail?.services)
+          ? detail.services.map((s) => {
+            const name = pickField(s, ['name', 'serviceName'], 'Dịch vụ');
+            const qty = toNum(pickField(s, ['quantity'], 0));
+            const value = toNum(pickField(s, ['subtotal', 'unitPrice'], 0));
+            if (qty > 0 && value > 0) return `${name} x${qty} - ${new Intl.NumberFormat('vi-VN').format(value)}đ`;
+            if (qty > 0) return `${name} x${qty}`;
+            return name;
+          })
+          : [];
+
+        const terms = pickField(contract, ['termsAndConditions', 'terms', 'note'], '');
+        const policies = terms
+          ? String(terms)
+            .split(/\r?\n|\.|;/)
+            .map((x) => x.trim())
+            .filter(Boolean)
+          : [];
+
+        setEventData({
+          id: pickField(detail, ['bookEventId', 'bookingCode', 'id'], eventId),
+          bookingCode: pickField(detail, ['bookingCode'], ''),
+          title: pickField(detail, ['eventTitle', 'eventName', 'title'], pickField(eventInfo, ['title', 'eventTitle'], `Sự kiện ${pickField(detail, ['bookingCode'], '')}`)),
+          venue: pickField(detail, ['venue', 'hallName', 'location'], 'Chưa cập nhật'),
+          date: dt.date,
+          time: dt.time,
+          tables: quantity,
+          guests: computedGuests,
+          status: statusRaw,
+          statusText: statusLabelMap[statusRaw] || pickField(detail, ['status', 'contractStatus'], 'Chưa có hợp đồng'),
+          comboName: pickField(detail, ['comboName', 'packageName', 'menuPackageName'], pickField(eventInfo, ['note'], 'Chưa cập nhật')),
+          menu,
+          policies,
+          services,
+          payment: {
+            pricePerTable,
+            quantity,
+            subtotal,
+            serviceVAT: toNum(pickField(paymentData, ['serviceVAT', 'serviceFee', 'vat'], 0)),
+            decoration: toNum(pickField(paymentData, ['decorationFee', 'decoration', 'extraFee'], 0)),
+            total,
+            deposit: Math.max(deposit, paidAmount),
+            remaining,
+          },
+        });
+      } catch (err) {
+        console.error('Lỗi tải chi tiết đặt sự kiện:', err);
+        setLoadError(err?.response?.data?.message || 'Không tải được chi tiết sự kiện.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDetail();
+  }, [eventId]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
   };
+
+  if (loading) {
+    return <div className="event-detail-page" style={{ padding: 24 }}>Đang tải chi tiết sự kiện...</div>;
+  }
+
+  if (loadError) {
+    return <div className="event-detail-page" style={{ padding: 24, color: '#b91c1c' }}>{loadError}</div>;
+  }
 
   return (
     <div className="event-detail-page">
@@ -122,7 +254,7 @@ const EventDetailPage = () => {
           <span className="breadcrumb-item active">#{eventData.id}</span>
         </div>
         <h1 className="event-title">Chi tiết Sự kiện #{eventData.id}</h1>
-        <p className="event-subtitle">{eventData.title} - {eventData.venue}</p>
+        <p className="event-subtitle">{eventData.title}{eventData.venue ? ` - ${eventData.venue}` : ''}</p>
       </div>
 
       {/* Info Cards */}
@@ -184,6 +316,13 @@ const EventDetailPage = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {eventData.menu.length === 0 && (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center', color: '#94a3b8', padding: '14px 0' }}>
+                        Chưa có dữ liệu thực đơn từ hệ thống.
+                      </td>
+                    </tr>
+                  )}
                   {eventData.menu.map((category, catIndex) => (
                     <React.Fragment key={catIndex}>
                       <tr className="category-row">
@@ -220,6 +359,9 @@ const EventDetailPage = () => {
               <div className="terms-column">
                 <h4 className="terms-subtitle">Chính sách & Quy định</h4>
                 <ul className="policy-list">
+                  {eventData.policies.length === 0 && (
+                    <li className="policy-item" style={{ color: '#94a3b8' }}>Chưa có điều khoản.</li>
+                  )}
                   {eventData.policies.map((policy, index) => (
                     <li key={index} className="policy-item">
                       <CheckCircle size={16} className="policy-icon" />
@@ -233,6 +375,9 @@ const EventDetailPage = () => {
               <div className="terms-column">
                 <h4 className="terms-subtitle">Dịch vụ đi kèm</h4>
                 <div className="services-grid">
+                  {eventData.services.length === 0 && (
+                    <div className="service-badge" style={{ color: '#94a3b8' }}>Chưa có dịch vụ đi kèm.</div>
+                  )}
                   {eventData.services.map((service, index) => (
                     <div key={index} className="service-badge">
                       {service}
@@ -300,7 +445,10 @@ const EventDetailPage = () => {
                 </button>
                 <button 
                   className="btn-transaction-history"
-                  onClick={() => navigate(`${base}/reservations/${eventData.id}/contract`)}
+                  onClick={() => {
+                    const bookingQuery = eventData.bookingCode ? `?bookingCode=${encodeURIComponent(eventData.bookingCode)}` : '';
+                    navigate(`${base}/reservations/${eventData.id}/contract${bookingQuery}`);
+                  }}
                 >
                   Xem hợp đồng
                 </button>

@@ -67,6 +67,7 @@ const MyOrders = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [payingEventId, setPayingEventId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,9 +85,15 @@ const MyOrders = () => {
     const config = {
       'Pending':    { text: 'Chờ xác nhận',  class: 'Waiting' },
       'Confirmed':   { text: 'Đã xác nhận',  class: 'Success' },
+      'Approved':    { text: 'Đã duyệt',     class: 'Success' },
+      'Active':      { text: 'Đang diễn ra', class: 'Processing' },
       'Processing':  { text: 'Đang xử lý',   class: 'Processing' },
+      'Delivering':  { text: 'Đang giao',    class: 'Processing' },
       'Completed':   { text: 'Hoàn thành',   class: 'Success' },
       'Cancelled':   { text: 'Đã hủy',       class: 'Cancelled' },
+      'Deposited':   { text: 'Đã đặt cọc',   class: 'Success' },
+      'Signed':      { text: 'Đã ký',        class: 'Success' },
+      'Draft':       { text: 'Bản nháp',     class: 'Waiting' },
     };
     return config[status] || { text: status || 'Chờ xác nhận', class: 'Waiting' };
   };
@@ -221,9 +228,151 @@ const MyOrders = () => {
   };
 
   /* ── Tab Sự kiện ── */
+  const toNumOrNull = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const getEventBookingId = (ev) =>
+    toNumOrNull(ev?.bookEventId || ev?.eventBookingId || ev?.id || ev?.raw?.bookEventId || ev?.raw?.eventBookingId);
+
+  const getEventCustomerId = (ev) =>
+    toNumOrNull(ev?.customerId || ev?.userId || ev?.raw?.customerId || ev?.raw?.userId);
+
+  const getEventContractId = (ev) =>
+    toNumOrNull(ev?.contractId || ev?.contract?.contractId || ev?.raw?.contractId || ev?.raw?.contract?.contractId);
+
+  const getEventBookingCode = (ev) =>
+    String(ev?.bookingCode || ev?.eventBookingCode || ev?.raw?.bookingCode || '').trim();
+
+  const getEventCheckoutUrl = (ev) => {
+    const contractId = Number(
+      ev?.contractId
+      || ev?.contract?.contractId
+      || ev?.raw?.contractId
+      || ev?.raw?.contract?.contractId
+      || 0
+    );
+
+    const list = [
+      ev,
+      ev?.contract,
+      ev?.payment,
+      ev?.paymentInfo,
+      ev?.raw,
+      ev?.raw?.contract,
+      ev?.raw?.payment,
+      ev?.raw?.paymentInfo,
+    ].filter(Boolean);
+
+    for (const item of list) {
+      const candidateId = Number(item?.contractId || item?.id || 0);
+      const url =
+        item?.checkoutUrl
+        || item?.CheckoutUrl
+        || item?.paymentUrl
+        || item?.PaymentUrl
+        || item?.depositUrl
+        || item?.depositCheckoutUrl
+        || '';
+      if (url && (!contractId || !candidateId || contractId === candidateId)) {
+        return url;
+      }
+    }
+
+    return '';
+  };
+
+  const handlePayEventDeposit = async (ev) => {
+    const eventBookingId = getEventBookingId(ev);
+    const eventContractId = getEventContractId(ev);
+    const eventCustomerId = getEventCustomerId(ev);
+    const eventBookingCode = getEventBookingCode(ev);
+
+    try {
+      setPayingEventId(eventBookingId || ev?.id || null);
+
+      let checkoutUrl = getEventCheckoutUrl(ev);
+      let resolvedContractId = eventContractId;
+      let resolvedCustomerId = eventCustomerId;
+
+      // Fallback customer-safe: lấy theo bookingCode để tìm checkoutUrl vừa được manager gửi.
+      if (!checkoutUrl && eventBookingCode) {
+        try {
+          const contractResp = await myOrderAPI.getContractByBookingCode(eventBookingCode);
+          const contractPayload = contractResp?.data ?? contractResp ?? {};
+          const contract = Array.isArray(contractPayload) ? contractPayload[0] : contractPayload;
+
+          const contractIdFromApi = toNumOrNull(
+            contract?.contractId
+            || contract?.id
+            || contract?.contract?.contractId
+          );
+
+          const paymentItems = Array.isArray(contract?.payment?.payments)
+            ? contract.payment.payments
+            : Array.isArray(contract?.payments)
+              ? contract.payments
+              : [];
+
+          const firstPaymentWithUrl = paymentItems.find((p) => (
+            p?.checkoutUrl || p?.paymentUrl || p?.url || p?.payUrl
+          ));
+
+          const urlFromContract =
+            contract?.checkoutUrl
+            || contract?.payment?.checkoutUrl
+            || contract?.deposit?.checkoutUrl
+            || firstPaymentWithUrl?.checkoutUrl
+            || firstPaymentWithUrl?.paymentUrl
+            || firstPaymentWithUrl?.url
+            || firstPaymentWithUrl?.payUrl
+            || '';
+
+          if (contractIdFromApi != null) {
+            resolvedContractId = contractIdFromApi;
+          }
+
+          if (!eventContractId || !contractIdFromApi || eventContractId === contractIdFromApi) {
+            if (urlFromContract) checkoutUrl = urlFromContract;
+          }
+        } catch (_) {
+          // Endpoint có thể không cho customer hoặc chưa có dữ liệu link.
+        }
+      }
+
+      if (!checkoutUrl) {
+        alert('Đơn này chưa có link thanh toán đặt cọc. Vui lòng đợi quản lý gửi yêu cầu thanh toán.');
+        return;
+      }
+
+      // Đồng bộ lại state card hiện tại để lần bấm sau mở trực tiếp, không cần tính lại.
+      setEventsData((prev) => prev.map((item) => {
+        const itemBookEventId = getEventBookingId(item);
+        const itemContractId = getEventContractId(item);
+        const matchByContract = resolvedContractId && itemContractId && resolvedContractId === itemContractId;
+        const matchByEvent = eventBookingId && itemBookEventId && eventBookingId === itemBookEventId;
+        if (!matchByContract && !matchByEvent) return item;
+        return {
+          ...item,
+          contractId: resolvedContractId ?? item.contractId ?? null,
+          customerId: resolvedCustomerId ?? item.customerId ?? null,
+          checkoutUrl,
+        };
+      }));
+
+      window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Không lấy được link thanh toán. Vui lòng thử lại.');
+    } finally {
+      setPayingEventId(null);
+    }
+  };
+
   const renderEventCard = (ev) => {
     const status = getStatusDisplay(ev.effectiveStatus || ev.status || ev.bookingStatus || '');
     const isAutoCancelled = ev.autoCancelled && ev.effectiveStatus === 'Cancelled';
+    const eventBookingId = ev.eventBookingId || ev.bookEventId || ev.id;
     return (
       <div key={ev.eventBookingId || ev.id} className="Order-Horizontal-Card">
         <div className="Card-Top-Row">
@@ -264,6 +413,14 @@ const MyOrders = () => {
           <div className="Grid-Col Total-Col">
             <p>SỐ KHÁCH</p>
             <h2 className="Price-Text">{(ev.numberOfGuests || ev.guestCount || 0)} người</h2>
+            <button
+              type="button"
+              className="Btn-Deposit-Pay"
+              onClick={() => handlePayEventDeposit(ev)}
+              disabled={payingEventId === eventBookingId}
+            >
+              {payingEventId === eventBookingId ? 'ĐANG MỞ LINK...' : 'THANH TOÁN ĐẶT CỌC'}
+            </button>
           </div>
         </div>
         {(ev.specialRequests || ev.note) && (

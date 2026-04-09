@@ -8,6 +8,7 @@ import {
   CreditCard,
   LayoutGrid,
   MapPin,
+  Phone,
   Plus,
   Receipt,
   Search,
@@ -58,6 +59,16 @@ const getDishStatus = (status) => {
   }
 }
 
+const getDeliveryActionClass = (label) => {
+  const normalized = normalizeStatus(label);
+  if (normalized.includes('hoan thanh') || normalized.includes('hoàn thành')) return 'delivery-complete';
+  if (normalized.includes('bat dau') || normalized.includes('bắt đầu')) return 'delivery-start';
+  if (normalized.includes('cho thanh toan') || normalized.includes('chờ thanh toán')) return 'delivery-wait-pay';
+  if (normalized.includes('da giao') || normalized.includes('đã giao')) return 'delivery-done';
+  if (normalized.includes('da huy') || normalized.includes('đã hủy')) return 'delivery-cancelled';
+  return 'delivery-start';
+};
+
 const asArray = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.$values)) return payload.$values;
@@ -71,10 +82,25 @@ const asArray = (payload) => {
 
 const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
 
+const normalizeOrderType = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '');
+
+const isDineInOrder = (order) => normalizeOrderType(order?.channel || order?.orderType) === 'dinein';
+
+const resolveOrderCode = (order) =>
+  String(order?.orderCode || order?.id || order?.code || '')
+    .replace(/^#/, '')
+    .trim();
+
 const mapOrderStatus = (status) => {
   const s = normalizeStatus(status);
   if (s === 'pending') return { status: 'pending', statusLabel: 'Chờ xử lý' };
+  if (s === 'confirmed') return { status: 'pending', statusLabel: 'Chờ xử lý' };
   if (s === 'preparing' || s === 'processing') return { status: 'preparing', statusLabel: 'Đang làm' };
+  if (s === 'delivering' || s === 'shipping') return { status: 'delivering', statusLabel: 'Đang giao' };
   if (s === 'ready') return { status: 'ready', statusLabel: 'Sẵn sàng' };
   if (s === 'completed' || s === 'done') return { status: 'completed', statusLabel: 'Hoàn thành' };
   if ([
@@ -91,6 +117,46 @@ const mapDishStatus = (status) => {
   if (s === 'served' || s === 'delivered') return 'served';
   if (s === 'preparing' || s === 'processing' || s === 'cooking') return 'preparing';
   return 'pending';
+};
+
+const canStartDeliveryByItems = (order) => {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  if (items.length === 0) return false;
+  return items.every((item) => ['ready', 'served', 'completed'].includes(String(item?.dishStatus || '').toLowerCase()));
+};
+
+const mapDeliveryWorkflowStatus = (status) => {
+  const s = normalizeStatus(status);
+  if (['pickingup', 'assigned', 'confirmed', 'pending'].includes(s)) {
+    return { status: 'pending', statusLabel: 'Chờ lấy hàng', actionLabel: 'BẮT ĐẦU GIAO' };
+  }
+  if (['delivering', 'shipping', 'onroute', 'intransit'].includes(s)) {
+    return { status: 'delivering', statusLabel: 'Đang giao', actionLabel: 'HOÀN THÀNH GIAO' };
+  }
+  if (['completed', 'done', 'delivered', 'success'].includes(s)) {
+    return { status: 'completed', statusLabel: 'Đã giao', actionLabel: 'ĐÃ GIAO' };
+  }
+  if (['cancelled', 'canceled', 'failed'].includes(s)) {
+    return { status: 'cancelled', statusLabel: 'Giao thất bại', actionLabel: 'ĐÃ HỦY' };
+  }
+  return { status: 'pending', statusLabel: 'Chờ xử lý', actionLabel: 'CẬP NHẬT TRẠNG THÁI' };
+};
+
+const isPaidOrder = (order) => {
+  const normalizedOrderStatus = normalizeStatus(order?.orderStatus || order?.status);
+  if (['paid', 'completed', 'done', 'closed'].includes(normalizedOrderStatus)) return true;
+
+  const paidAmount = Number(order?.paidAmount ?? order?.payment?.paidAmount ?? 0);
+  const totalAmount = Number(order?.totalAmount ?? order?.payment?.totalAmount ?? 0);
+  if (Number.isFinite(paidAmount) && Number.isFinite(totalAmount) && totalAmount > 0 && paidAmount >= totalAmount) {
+    return true;
+  }
+
+  const payments = Array.isArray(order?.payments) ? order.payments : [];
+  return payments.some((p) => {
+    const s = normalizeStatus(p?.status || p?.paymentStatus || p?.state);
+    return ['paid', 'success', 'completed', 'done'].includes(s);
+  });
 };
 
 const toCurrencyNumber = (value) => {
@@ -129,7 +195,7 @@ const mapServiceHistoryItem = (item, idx) => {
     revenue: formatCurrency(revenueNumber),
     rating,
     status,
-    statusClass: status === 'Hoàn thành' ? 'status-completed' : 'status-pending',
+    statusClass: status === 'Hoàn thành' ? 'history-status-completed' : 'history-status-pending',
   };
 };
 
@@ -179,7 +245,7 @@ const aggregateServiceHistoryFromOrders = (orders) => {
         revenue: formatCurrency(row.revenueNumber),
         rating: '-',
         status,
-        statusClass: row.processingCount > 0 ? 'status-pending' : 'status-completed',
+        statusClass: row.processingCount > 0 ? 'history-status-pending' : 'history-status-completed',
       };
     });
 };
@@ -190,6 +256,17 @@ const normalizeSearchText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+
+const normalizePhoneForDisplay = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  // Convert +84xxxxxxxxx -> 0xxxxxxxxx for waiter-friendly display.
+  if (raw.startsWith('+84')) {
+    const local = raw.slice(3).replace(/\s+/g, '');
+    return local ? `0${local}` : raw;
+  }
+  return raw;
+};
 
 const toOrderItem = (item, idx) => ({
   name: item?.foodName || item?.name || item?.itemName || `Món ${idx + 1}`,
@@ -202,7 +279,12 @@ const toOrderItem = (item, idx) => ({
 const mapApiOrderToWaiter = (order) => {
   // Lấy đúng trường từ API thực tế
   const orderCode = order?.orderCode || order?.code || `DH-${order?.orderId || order?.id || '---'}`;
-  const mappedStatus = mapOrderStatus(order?.orderStatus || order?.status);
+  const isDelivery = normalizeOrderType(order?.orderType) === 'delivery';
+  const deliveryInfo = order?.delivery || order?.deliveryInfo || order?.shipping || {};
+  const deliveryFlow = mapDeliveryWorkflowStatus(deliveryInfo?.deliveryStatus || order?.deliveryStatus);
+  const mappedStatus = isDelivery
+    ? { status: deliveryFlow.status, statusLabel: deliveryFlow.statusLabel }
+    : mapOrderStatus(order?.orderStatus || order?.status);
   // Map items đúng trường
   const orderItems = Array.isArray(order?.items)
     ? order.items.map((item, idx) => ({
@@ -227,26 +309,60 @@ const mapApiOrderToWaiter = (order) => {
     tableName = order.tableName || order.tableCode || order.tableNumber || '';
   }
   const isDineIn = String(order?.orderType || '').toLowerCase().includes('dine');
+  const paid = isPaidOrder(order);
+  const finalDeliveryActionLabel = isDelivery && deliveryFlow.actionLabel === 'HOÀN THÀNH GIAO' && !paid
+    ? 'CHỜ THANH TOÁN'
+    : deliveryFlow.actionLabel;
+
   const tableCodeValue = Array.isArray(order.tables) && order.tables.length > 0
     ? (order.tables.find(t => t.isMainTable)?.tableId || order.tables[0]?.tableId || tableName)
     : (order.tableCode || order.tableNumber || tableName);
-  const customerName = order?.customer?.fullname || order?.customerName || order?.guestName || order?.receiverName || (isDineIn ? (tableName ? `Khách tại ${tableName}` : 'Khách tại bàn') : 'Khách hàng');
+  const customerName =
+    deliveryInfo?.recipientName ||
+    order?.receiverName ||
+    order?.customer?.fullname ||
+    order?.customerName ||
+    order?.guestName ||
+    (isDineIn ? (tableName ? `Khách tại ${tableName}` : 'Khách tại bàn') : 'Khách hàng');
+  const phone = normalizePhoneForDisplay(
+    deliveryInfo?.recipientPhone ||
+    order?.receiverPhone ||
+    order?.phone ||
+    order?.customerPhone ||
+    order?.customer?.phone ||
+    ''
+  );
+  const address =
+    deliveryInfo?.address ||
+    deliveryInfo?.deliveryAddress ||
+    order?.deliveryAddress ||
+    order?.receiverAddress ||
+    order?.shippingAddress ||
+    order?.address ||
+    '';
+  const rawGuests = order?.numberOfGuests ?? order?.guestCount ?? order?.guests;
+  const guests = rawGuests == null || rawGuests === '' ? null : Number(rawGuests);
+
   return {
     id: orderCode,
+    orderCode,
     orderId: order?.orderId || order?.id || null,
     time: order?.createdAt
       ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       : '--:--',
     status: mappedStatus.status,
     statusLabel: mappedStatus.statusLabel,
-    tableNumber: isDineIn ? (tableName || 'Bàn --') : '',
+    tableNumber: isDineIn ? (tableName || '') : '',
     tableCode: String(tableCodeValue || '').trim(),
-    guests: Number(order?.numberOfGuests || order?.guestCount || order?.guests || 0),
+    guests: Number.isFinite(guests) ? guests : null,
     customerName,
     channel: isDineIn ? 'dineIn' : order.orderType || '',
+    deliveryActionLabel: isDelivery ? finalDeliveryActionLabel : 'THANH TOÁN',
+    deliveryWorkflowStatus: normalizeStatus(deliveryInfo?.deliveryStatus || order?.deliveryStatus),
+    isPaid: paid,
     items: orderItems,
-    address: order?.deliveryAddress || order?.address || '',
-    phone: order?.customer?.phone || order?.customerPhone || order?.phone || order?.receiverPhone || '',
+    address,
+    phone,
     note: order?.note || order?.customerNote || '',
     deliveryFee: Number(order?.deliveryPrice || order?.deliveryFee || 0),
     discount: Number(order?.discountAmount || order?.discount || 0),
@@ -355,6 +471,7 @@ const mapApiOrderToWaiter = (order) => {
   const [receivedMoney, setReceivedMoney] = useState('');
   const [activePaymentMethod, setActivePaymentMethod] = useState('cash');
   const [isPaying, setIsPaying] = useState(false);
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [uiNotice, setUiNotice] = useState('');
   const [tableQrValue, setTableQrValue] = useState('');
   const [tableQrCode, setTableQrCode] = useState('');
@@ -672,6 +789,7 @@ const mapApiOrderToWaiter = (order) => {
   const [deliveryOrders, setDeliveryOrders] = useState([]);
   const [dineInOrders, setDineInOrders] = useState([]);
   const [takeawayOrders, setTakeawayOrders] = useState([]);
+  const [changingDeliveryOrderCode, setChangingDeliveryOrderCode] = useState('');
   const [serviceHistory, setServiceHistory] = useState([]);
   const [showAllServiceHistory, setShowAllServiceHistory] = useState(false);
 
@@ -680,20 +798,36 @@ const mapApiOrderToWaiter = (order) => {
     setLoadingOrders(true);
     setOrdersError('');
     try {
-      const res = await orderAPI.getPreparingMy();
-      console.log('[RAW API]', res.data);
-      // Lấy danh sách đơn hàng từ res.data.data hoặc res.data.orders hoặc []
-      const rawOrders = Array.isArray(res.data?.data)
-        ? res.data.data
-        : Array.isArray(res.data?.orders)
-        ? res.data.orders
-        : [];
-      console.log('[ORDERS]', rawOrders);
-      const mapped = rawOrders.map(mapApiOrderToWaiter);
-      console.log('[MAPPED]', mapped);
-      setDineInOrders(mapped);
-      setTakeawayOrders([]);
-      setDeliveryOrders([]);
+      const [preparingRes, deliveryRes] = await Promise.all([
+        orderAPI.getPreparingMy(),
+        orderAPI.getDeliveryMy(),
+      ]);
+
+      const preparingRows = asArray(preparingRes?.data?.data ?? preparingRes?.data);
+      const deliveryRows = asArray(deliveryRes?.data?.data ?? deliveryRes?.data);
+
+      const mappedPreparing = preparingRows.map(mapApiOrderToWaiter);
+      const mappedDelivery = deliveryRows.map(mapApiOrderToWaiter);
+
+      const dineIn = mappedPreparing.filter((order) => {
+        const t = normalizeOrderType(order.channel);
+        return t === 'dinein' || t === '';
+      });
+
+      const takeaway = mappedPreparing.filter((order) => {
+        const t = normalizeOrderType(order.channel);
+        return t === 'takeaway' || t === 'takeout' || t === 'carryout' || t === 'mangdi';
+      });
+
+      const deliveryByCode = new Map();
+      [...mappedDelivery, ...mappedPreparing.filter((order) => normalizeOrderType(order.channel) === 'delivery')]
+        .forEach((order) => {
+          deliveryByCode.set(order.id, order);
+        });
+
+      setDineInOrders(dineIn);
+      setTakeawayOrders(takeaway);
+      setDeliveryOrders(Array.from(deliveryByCode.values()));
     } catch (error) {
       console.error(error);
       setOrdersError('Không lấy được đơn hàng của waiter');
@@ -818,16 +952,95 @@ const mapApiOrderToWaiter = (order) => {
     setTableQrValue('');
     setTableQrCode('');
     setTableQrError('');
-    await initQrForOrder(order);
+
+    if (normalizeOrderType(order?.channel || order?.orderType) === 'delivery') {
+      const orderCode = resolveOrderCode(order);
+      if (orderCode) {
+        try {
+          const detailRes = await orderAPI.getByCode(orderCode);
+          const detailPayload = detailRes?.data?.data || detailRes?.data || {};
+          const mappedDetail = mapApiOrderToWaiter(detailPayload);
+          setSelectedOrder((prev) => ({ ...prev, ...mappedDetail }));
+          setOrderItemsState((mappedDetail?.items || []).map((item) => ({ ...item })));
+        } catch (err) {
+          console.warn('[Waiter] Không lấy được chi tiết đơn giao hàng, dùng dữ liệu danh sách.', err?.message || err);
+        }
+      }
+    }
+
+    if (isDineInOrder(order)) {
+      await initQrForOrder(order);
+    }
   };
 
   const openOrderQrModal = async (order) => {
+    if (!isDineInOrder(order)) {
+      return;
+    }
     setSelectedOrder(order);
     setTableQrValue('');
     setTableQrCode('');
     setTableQrError('');
     setShowTableQrModal(true);
     await initQrForOrder(order);
+  };
+
+  const openCancelModal = (order) => {
+    setSelectedOrder(order);
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const closeCancelModal = () => {
+    setShowCancelModal(false);
+    setCancelReason('');
+  };
+
+  const handleCancelOrder = async () => {
+    const reason = String(cancelReason || '').trim();
+    if (!reason) {
+      alert('Vui lòng nhập lý do hủy đơn.');
+      return;
+    }
+
+    const orderCode = resolveOrderCode(selectedOrder);
+    if (!orderCode) {
+      alert('Không tìm thấy mã đơn để hủy.');
+      return;
+    }
+
+    try {
+      setIsCancellingOrder(true);
+      const res = await orderAPI.deleteOrderDelivery(orderCode, { cancellationReason: reason });
+      const successMessage =
+        typeof res?.data === 'string'
+          ? res.data
+          : res?.data?.message || 'Hủy đơn giao hàng thành công.';
+
+      setUiNotice(successMessage);
+      closeCancelModal();
+      setShowOrderDetailModal(false);
+      await fetchWaiterOrders();
+    } catch (err) {
+      const data = err?.response?.data;
+      const detailText = typeof data?.detail === 'string' ? data.detail.trim() : '';
+      const rawText = typeof data === 'string' ? data.trim() : '';
+      const detail = data?.errors && typeof data.errors === 'object'
+        ? Object.entries(data.errors)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : String(msgs)}`)
+            .join('\n')
+        : '';
+      const msg =
+        data?.message ||
+        data?.title ||
+        detailText ||
+        rawText ||
+        err?.message ||
+        'Không thể hủy đơn giao hàng.';
+      alert(detail ? `${msg}\n${detail}` : msg);
+    } finally {
+      setIsCancellingOrder(false);
+    }
   };
 
   const updateCartQuantity = (itemId, delta) => {
@@ -870,6 +1083,51 @@ const mapApiOrderToWaiter = (order) => {
     (order?.items || []).every(
       (item) => item.dishStatus === 'served' || item.dishStatus === 'completed'
     );
+
+  const openOrderPaymentLink = (order) => {
+    setSelectedOrder(order);
+    setShowPaymentModal(true);
+  };
+
+  const handleAdvanceDeliveryStatus = async (order) => {
+    const orderCode = resolveOrderCode(order);
+    if (!orderCode) {
+      alert('Không tìm thấy mã đơn giao hàng.');
+      return;
+    }
+
+    const doneStates = ['completed', 'done', 'delivered', 'success', 'cancelled', 'canceled', 'failed'];
+    if (doneStates.includes(String(order?.deliveryWorkflowStatus || '').toLowerCase())) {
+      return;
+    }
+
+    const isStartAction = String(order?.deliveryActionLabel || '').trim().toUpperCase() === 'BẮT ĐẦU GIAO';
+    if (isStartAction && !canStartDeliveryByItems(order)) {
+      setUiNotice('Bếp chưa làm xong món. Chỉ bắt đầu giao khi tất cả món đã sẵn sàng.');
+      return;
+    }
+
+    const isDelivering = ['delivering', 'shipping', 'onroute', 'intransit'].includes(
+      String(order?.deliveryWorkflowStatus || '').toLowerCase()
+    );
+    if (isDelivering && !order?.isPaid) {
+      setUiNotice('Đơn chưa thanh toán. Cần thanh toán trước khi hoàn thành giao hàng.');
+      return;
+    }
+
+    try {
+      setChangingDeliveryOrderCode(orderCode);
+      const res = await orderAPI.changeStatus(orderCode);
+      const message = typeof res?.data === 'string' ? res.data : (res?.data?.message || 'Cập nhật trạng thái giao hàng thành công.');
+      setUiNotice(message);
+      await fetchWaiterOrders();
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || err?.message || 'Không cập nhật được trạng thái giao hàng.';
+      alert(msg);
+    } finally {
+      setChangingDeliveryOrderCode('');
+    }
+  };
 
   const handleProceedPayment = async () => {
     if (!selectedOrder) return;
@@ -1075,19 +1333,28 @@ const mapApiOrderToWaiter = (order) => {
 
           <div className="orders-grid">
             {loadingOrders && <p className="order-items">Đang tải danh sách đơn hàng...</p>}
-            {!loadingOrders && dineInOrders.length === 0 && (
+            {!loadingOrders && currentOrders.length === 0 && (
               <p className="order-items">Chưa có đơn hàng nào trong mục này.</p>
             )}
-            {!loadingOrders && dineInOrders.map((order) => {
-              // Nếu còn ít nhất 1 món 'ready' thì viền xanh, khi tất cả món đều 'served' thì về mặc định
-              const hasReady = Array.isArray(order.items) && order.items.some(item => item.dishStatus === 'ready');
+            {!loadingOrders && currentOrders.map((order) => {
+              // Với đơn giao hàng: chỉ tô viền xanh ở trạng thái "BẮT ĐẦU GIAO" và món đã sẵn sàng.
+              const isDeliveryOrder = normalizeOrderType(order.channel) === 'delivery';
+              const canStartDelivery = isDeliveryOrder ? canStartDeliveryByItems(order) : true;
+              const isStartDeliveryAction = isDeliveryOrder && String(order?.deliveryActionLabel || '').trim().toUpperCase() === 'BẮT ĐẦU GIAO';
+              const hasReady = isDeliveryOrder
+                ? (isStartDeliveryAction && canStartDelivery)
+                : (Array.isArray(order.items) && order.items.some(item => item.dishStatus === 'ready'));
               const allServed = Array.isArray(order.items) && order.items.length > 0 && order.items.every(item => item.dishStatus === 'served');
               const canPayThisOrder = canOrderProceedToPayment(order);
+              const isDoneDelivery = ['completed', 'done', 'delivered', 'success', 'cancelled', 'canceled', 'failed']
+                .includes(String(order?.deliveryWorkflowStatus || '').toLowerCase());
+              const isChangingDelivery = changingDeliveryOrderCode === String(order.id || '');
+              const deliveryActionClass = isDeliveryOrder ? getDeliveryActionClass(order.deliveryActionLabel) : '';
               return (
                 <div
                   key={order.id}
                   className={`order-card${hasReady ? ' order-card-ready' : ''}${allServed ? '' : ''}`}
-                  onClick={() => openOrderQrModal(order)}
+                  onClick={() => (isDineInOrder(order) ? openOrderQrModal(order) : openOrderDetail(order))}
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="order-card-header">
@@ -1134,10 +1401,29 @@ const mapApiOrderToWaiter = (order) => {
                   <button className="btn-order-detail" onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}>
                     Chi tiết
                   </button>
+                  {isDeliveryOrder && !isDoneDelivery && (
+                    <button
+                      className="btn-danger-outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openCancelModal(order);
+                      }}
+                    >
+                      Hủy đơn
+                    </button>
+                  )}
                   <button
-                    className="btn-order-pay"
+                    className={`btn-order-pay ${isDeliveryOrder ? deliveryActionClass : ''}`.trim()}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (isDeliveryOrder) {
+                        if (order?.deliveryActionLabel === 'CHỜ THANH TOÁN') {
+                          openOrderPaymentLink(order);
+                          return;
+                        }
+                        handleAdvanceDeliveryStatus(order);
+                        return;
+                      }
                       if (!canPayThisOrder) {
                         alert('Không thể thanh toán: còn món chưa được phục vụ.');
                         return;
@@ -1146,11 +1432,17 @@ const mapApiOrderToWaiter = (order) => {
                       setSelectedOrder(order);
                       setShowPaymentModal(true);
                     }}
-                    aria-disabled={!canPayThisOrder}
-                    title={canPayThisOrder ? '' : 'Cần phục vụ xong tất cả món trước khi thanh toán'}
-                    style={!canPayThisOrder ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                    aria-disabled={isDeliveryOrder ? (isDoneDelivery || isChangingDelivery) : !canPayThisOrder}
+                    title={isDeliveryOrder
+                      ? (isStartDeliveryAction && !canStartDelivery ? 'Bếp chưa làm xong món, chưa thể bắt đầu giao.' : '')
+                      : (canPayThisOrder ? '' : 'Cần phục vụ xong tất cả món trước khi thanh toán')}
+                    style={(isDeliveryOrder ? (isDoneDelivery || isChangingDelivery || (isStartDeliveryAction && !canStartDelivery)) : !canPayThisOrder)
+                      ? { opacity: 0.6, cursor: 'not-allowed' }
+                      : undefined}
                   >
-                    Thanh toán
+                    {isDeliveryOrder
+                      ? (isChangingDelivery ? 'ĐANG CẬP NHẬT...' : order.deliveryActionLabel)
+                      : 'Thanh toán'}
                   </button>
                 </div>
               </div>
@@ -1786,38 +2078,80 @@ const mapApiOrderToWaiter = (order) => {
               </button>
             </div>
 
-            <div className="dinein-detail-top">
-              <div className="dinein-info-card">
-                <p>Số bàn</p>
-                <strong>{selectedOrder.tableNumber || 'Bàn 05'}</strong>
+            {isDineInOrder(selectedOrder) ? (
+              <div className="dinein-detail-top">
+                <div className="dinein-info-card">
+                  <p>Số bàn</p>
+                  <strong>{selectedOrder.tableNumber || 'Bàn --'}</strong>
+                </div>
+                <div className="dinein-info-card">
+                  <p>Số lượng khách</p>
+                  <strong>
+                    <Users size={15} /> {selectedOrder.guests ?? '—'}
+                  </strong>
+                </div>
+                <div className="dinein-info-card">
+                  <p>Trạng thái chung</p>
+                  <span className={`order-status ${getStatusClass(selectedOrder.status)}`}>
+                    {selectedOrder.statusLabel}
+                  </span>
+                </div>
               </div>
-              <div className="dinein-info-card">
-                <p>Số lượng khách</p>
-                <strong>
-                  <Users size={15} /> {selectedOrder.guests || 4}
-                </strong>
+            ) : (
+              <div className="dinein-detail-top single">
+                <div className="dinein-info-card">
+                  <p>Trạng thái chung</p>
+                  <span className={`order-status ${getStatusClass(selectedOrder.status)}`}>
+                    {selectedOrder.statusLabel}
+                  </span>
+                </div>
               </div>
-              <div className="dinein-info-card">
-                <p>Trạng thái chung</p>
-                <span className={`order-status ${getStatusClass(selectedOrder.status)}`}>
-                  {selectedOrder.statusLabel}
-                </span>
-              </div>
-            </div>
+            )}
 
             <div className="dinein-detail-body">
-              <div style={{ marginBottom: 16, border: '1px dashed #e0dcd8', borderRadius: 12, padding: 12, background: '#fffaf5' }}>
-                <h4 style={{ margin: '0 0 8px 0' }}>QR gọi món của bàn</h4>
-                {tableQrLoading && <p style={{ margin: 0, color: '#7a6f66' }}>Đang tạo QR từ token bàn...</p>}
-                {!tableQrLoading && tableQrError && <p style={{ margin: 0, color: '#cf1322' }}>{tableQrError}</p>}
-                {!tableQrLoading && !tableQrError && tableQrValue && (
-                  <TableQRCode
-                    qrValue={tableQrValue}
-                    tableName={tableQrCode || selectedOrder.tableNumber || selectedOrder.tableCode || 'N/A'}
-                    size={128}
-                  />
-                )}
-              </div>
+              {isDineInOrder(selectedOrder) && (
+                <div style={{ marginBottom: 16, border: '1px dashed #e0dcd8', borderRadius: 12, padding: 12, background: '#fffaf5' }}>
+                  <h4 style={{ margin: '0 0 8px 0' }}>QR gọi món của bàn</h4>
+                  {tableQrLoading && <p style={{ margin: 0, color: '#7a6f66' }}>Đang tạo QR từ token bàn...</p>}
+                  {!tableQrLoading && tableQrError && <p style={{ margin: 0, color: '#cf1322' }}>{tableQrError}</p>}
+                  {!tableQrLoading && !tableQrError && tableQrValue && (
+                    <TableQRCode
+                      qrValue={tableQrValue}
+                      tableName={tableQrCode || selectedOrder.tableNumber || selectedOrder.tableCode || 'N/A'}
+                      showTableLabel={false}
+                      size={128}
+                    />
+                  )}
+                </div>
+              )}
+
+              {!isDineInOrder(selectedOrder) && (
+                <div className="waiter-delivery-customer-box">
+                  <h4>
+                    <User size={16} /> Thông tin khách hàng
+                  </h4>
+                  <div className="waiter-delivery-customer-grid">
+                    <div className="waiter-delivery-customer-item">
+                      <p className="waiter-delivery-customer-label">Tên khách hàng</p>
+                      <strong className="waiter-delivery-customer-value">
+                        <User size={15} /> {selectedOrder.customerName || 'Chưa có thông tin'}
+                      </strong>
+                    </div>
+                    <div className="waiter-delivery-customer-item">
+                      <p className="waiter-delivery-customer-label">Số điện thoại</p>
+                      <strong className="waiter-delivery-customer-value">
+                        <Phone size={15} /> {selectedOrder.phone || 'Chưa có thông tin'}
+                      </strong>
+                    </div>
+                    <div className="waiter-delivery-customer-item full">
+                      <p className="waiter-delivery-customer-label">Địa chỉ giao hàng</p>
+                      <strong className="waiter-delivery-customer-value">
+                        <MapPin size={15} /> {selectedOrder.address || 'Chưa có thông tin'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <h4>
                 <Utensils size={16} /> Danh sách món ăn
@@ -1887,9 +2221,21 @@ const mapApiOrderToWaiter = (order) => {
                   <span>Tạm tính</span>
                   <strong>{formatCurrency(calculateOrderSubtotal(selectedOrder))}</strong>
                 </div>
+                {(selectedOrder?.deliveryFee || 0) > 0 && (
+                  <div>
+                    <span>Phí ship</span>
+                    <strong>{formatCurrency(selectedOrder.deliveryFee || 0)}</strong>
+                  </div>
+                )}
+                {(selectedOrder?.discount || 0) > 0 && (
+                  <div>
+                    <span>Giảm giá</span>
+                    <strong>-{formatCurrency(selectedOrder.discount || 0)}</strong>
+                  </div>
+                )}
                 <div className="grand-total">
                   <span>Tổng cộng</span>
-                  <strong>{formatCurrency(calculateOrderSubtotal(selectedOrder))}</strong>
+                  <strong>{formatCurrency(calculateOrderTotal(selectedOrder))}</strong>
                 </div>
               </div>
             </div>
@@ -1899,9 +2245,11 @@ const mapApiOrderToWaiter = (order) => {
                 Đóng
               </button>
               <div className="detail-footer-actions">
-                <button className="btn-add-outline" onClick={() => setShowAddItemsModal(true)}>
-                  <Plus size={16} /> Thêm món
-                </button>
+                {isDineInOrder(selectedOrder) && (
+                  <button className="btn-add-outline" onClick={() => setShowAddItemsModal(true)}>
+                    <Plus size={16} /> Thêm món
+                  </button>
+                )}
                 <button
                   className="btn-continue"
                   onClick={() => {
@@ -1966,11 +2314,11 @@ const mapApiOrderToWaiter = (order) => {
       )}
 
       {showCancelModal && selectedOrder && (
-        <div className="modal-overlay" onClick={() => setShowCancelModal(false)}>
+        <div className="modal-overlay" onClick={closeCancelModal}>
           <div className="modal-container modal-small" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Hủy đơn hàng #{selectedOrder.id}</h3>
-              <button className="modal-close-btn" onClick={() => setShowCancelModal(false)}>
+              <button className="modal-close-btn" onClick={closeCancelModal}>
                 <X size={20} />
               </button>
             </div>
@@ -1992,10 +2340,10 @@ const mapApiOrderToWaiter = (order) => {
               </div>
             </div>
             <div className="modal-footer end">
-              <button className="btn-cancel" onClick={() => setShowCancelModal(false)}>
+              <button className="btn-cancel" onClick={closeCancelModal}>
                 Quay lại
               </button>
-              <button className="btn-danger-solid" disabled={!cancelReason.trim()}>
+              <button className="btn-danger-solid" onClick={handleCancelOrder} disabled={!cancelReason.trim() || isCancellingOrder}>
                 <Trash2 size={16} /> Xác nhận hủy đơn
               </button>
             </div>

@@ -285,9 +285,10 @@ const ManagerReservationsPage = () => {
     let filtered = eventsData;
     if (eventStatusFilter !== 'all') {
       filtered = filtered.filter((event) => {
-        if (eventStatusFilter === 'signed') return event.status === 'signed';
-        if (eventStatusFilter === 'pending') return event.status === 'pending' || event.status === 'deposit';
+        if (eventStatusFilter === 'signed') return event.status === 'signed' || event.status === 'deposit' || event.status === 'completed';
+        if (eventStatusFilter === 'pending') return event.status === 'unsigned';
         if (eventStatusFilter === 'nosigned') return !event.status || event.status === 'nosigned' || event.statusText?.toLowerCase().includes('chưa có hợp đồng');
+        if (eventStatusFilter === 'cancelled') return event.status === 'cancelled' || event.status === 'rejected';
         return true;
       });
     }
@@ -328,10 +329,35 @@ const ManagerReservationsPage = () => {
         textColor: 'text-amber-700',
         icon: <AlertCircle size={14} />,
       },
-      deposit: {
+      unsigned: {
         bgColor: 'bg-amber-100',
         textColor: 'text-amber-700',
+        icon: <Clock3 size={14} />,
+      },
+      nosigned: {
+        bgColor: 'bg-slate-100',
+        textColor: 'text-slate-700',
         icon: <AlertCircle size={14} />,
+      },
+      deposit: {
+        bgColor: 'bg-blue-100',
+        textColor: 'text-blue-700',
+        icon: <AlertCircle size={14} />,
+      },
+      rejected: {
+        bgColor: 'bg-red-100',
+        textColor: 'text-red-700',
+        icon: <XCircle size={14} />,
+      },
+      completed: {
+        bgColor: 'bg-violet-100',
+        textColor: 'text-violet-700',
+        icon: <CheckCircle size={14} />,
+      },
+      cancelled: {
+        bgColor: 'bg-slate-100',
+        textColor: 'text-slate-700',
+        icon: <XCircle size={14} />,
       },
     };
     return configs[status] || configs.pending;
@@ -588,6 +614,13 @@ const ManagerReservationsPage = () => {
                   onMouseOver={e => { if(eventStatusFilter!=='nosigned')e.target.style.background='#f3f4f6'; }}
                   onMouseOut={e => { if(eventStatusFilter!=='nosigned')e.target.style.background='transparent'; }}
                 >Chưa có hợp đồng</button>
+                <button
+                  className={`filter-btn${eventStatusFilter === 'cancelled' ? ' active' : ''}`}
+                  style={{ padding: '5px 14px', borderRadius: 16, border: 'none', background: eventStatusFilter === 'cancelled' ? '#ef4444' : 'transparent', color: eventStatusFilter === 'cancelled' ? '#fff' : '#2d3748', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.18s', boxShadow: eventStatusFilter === 'cancelled' ? '0 2px 8px #ef444422' : 'none' }}
+                  onClick={() => setEventStatusFilter('cancelled')}
+                  onMouseOver={e => { if(eventStatusFilter!=='cancelled')e.target.style.background='#f3f4f6'; }}
+                  onMouseOut={e => { if(eventStatusFilter!=='cancelled')e.target.style.background='transparent'; }}
+                >Đã hủy</button>
               </>}
             </div>
           </div>
@@ -698,12 +731,16 @@ const ManagerReservationsPage = () => {
                 )}
                 {filteredEvents.map((event) => {
                   const statusConfig = getStatusConfig(event.status);
+                  const eventCode = event.bookingCode || event.raw?.bookingCode || event.raw?.eventCode || 'N/A';
+                  const detailId = event.bookEventId || event.raw?.bookEventId || event.id || event.eventId;
+                  const canOpenDetailByStatus = event.status === 'unsigned';
                   return (
-                    <tr key={event.id} className={event.urgent ? 'urgent-row' : ''}>
+                    <tr key={event.id || event.bookingCode || event.eventId} className={event.urgent ? 'urgent-row' : ''}>
                       <td>
                         <div className="customer-info">
                           <div className="customer-name">{event.customer}</div>
                           <div className="customer-contact">Người liên hệ: {event.contact} ({event.phone})</div>
+                          <div className="customer-contact">Mã sự kiện: {eventCode}</div>
                         </div>
                       </td>
                       <td>
@@ -724,7 +761,13 @@ const ManagerReservationsPage = () => {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-badge ${statusConfig.bgColor} ${statusConfig.textColor}`}>
+                        <span
+                          className={`status-badge ${statusConfig.bgColor} ${statusConfig.textColor}`}
+                          role={canOpenDetailByStatus ? 'button' : undefined}
+                          onClick={canOpenDetailByStatus && detailId ? () => navigate(`${base}/reservations/${detailId}`) : undefined}
+                          style={canOpenDetailByStatus ? { cursor: 'pointer' } : undefined}
+                          title={canOpenDetailByStatus ? 'Mở chi tiết sự kiện' : undefined}
+                        >
                           {statusConfig.icon}
                           {event.statusText}
                         </span>
@@ -733,16 +776,18 @@ const ManagerReservationsPage = () => {
                         <div className="action-buttons">
                           <button
                             className="btn-detail"
-                            onClick={() => navigate(`${base}/reservations/${event.eventId || event.bookingCode || 'detail'}`)}
+                            onClick={() => detailId && navigate(`${base}/reservations/${detailId}`)}
                             type="button"
+                            disabled={!detailId}
                           >
                             <Eye size={14} />
                             Chi tiết
                           </button>
                           <button
                             className="btn-contract"
-                            onClick={() => navigate(`${base}/reservations/${event.eventId || event.bookingCode || 'detail'}/contract`)}
+                            onClick={() => detailId && navigate(`${base}/reservations/${detailId}/contract`)}
                             type="button"
+                            disabled={!detailId}
                           >
                             <FileText size={14} />
                             Hợp đồng

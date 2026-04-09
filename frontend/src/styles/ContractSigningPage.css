@@ -595,8 +595,11 @@
   border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: center;
+  gap: 0.875rem;
+  flex-wrap: wrap;
 }
 
+.btn-send-customer-sign,
 .btn-sign-contract {
   display: flex;
   align-items: center;
@@ -616,11 +619,54 @@
   box-shadow: 0 8px 16px rgba(255, 109, 31, 0.3);
 }
 
+.btn-send-customer-sign {
+  background: #1f2937;
+  box-shadow: 0 8px 16px rgba(31, 41, 55, 0.25);
+}
+
+.btn-send-customer-sign:hover {
+  background: #111827;
+  box-shadow: 0 12px 24px rgba(31, 41, 55, 0.35);
+}
+
+.btn-send-customer-sign:disabled,
+.btn-sign-contract:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-request-deposit {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  border: 1.5px solid #f97316;
+  color: #f97316;
+  background: #fff7ed;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-request-deposit:hover {
+  background: #ffedd5;
+}
+
+.btn-request-deposit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-sign-contract:hover {
   background: #e85d0d;
   box-shadow: 0 12px 24px rgba(255, 109, 31, 0.4);
 }
 
+.btn-send-customer-sign:active,
 .btn-sign-contract:active {
   transform: scale(0.98);
 }
@@ -769,7 +815,8 @@
     grid-template-columns: 1fr;
   }
 
-  .btn-sign-contract {
+  .btn-sign-contract,
+  .btn-send-customer-sign {
     width: 100%;
     min-width: auto;
   }

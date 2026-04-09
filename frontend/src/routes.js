@@ -38,6 +38,7 @@ import ManagerTablesPage from './pages/manager/ManagerTablesPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 import PaymentResult from './pages/PaymentResult';
+import ContractCustomerSignPage from './pages/ContractCustomerSignPage';
 import WaiterLayout from './pages/waiter/WaiterLayout';
 import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
 import WaiterSchedulePage from './pages/waiter/WaiterSchedulePage';
@@ -170,6 +171,7 @@ const AppRoutes = () => {
         </Route>
 
         <Route path="/payment-result" element={<PaymentResult />} />
+        <Route path="/contract/sign" element={<ContractCustomerSignPage />} />
 
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={

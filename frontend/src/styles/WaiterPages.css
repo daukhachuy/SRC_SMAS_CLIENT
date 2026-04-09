@@ -136,26 +136,48 @@
 
 .order-status {
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: 999px;
+  border: 1px solid transparent;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
+.status-pending {
+  background: rgba(245, 158, 11, 0.16);
+  color: #9a3412;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
 .status-preparing {
-  background: rgba(234, 179, 8, 0.15);
-  color: #a16207;
+  background: rgba(217, 119, 6, 0.12);
+  color: #9a3412;
+  border-color: rgba(217, 119, 6, 0.3);
 }
 
 .status-ready {
-  background: rgba(34, 197, 94, 0.15);
-  color: #15803d;
+  background: rgba(16, 185, 129, 0.14);
+  color: #065f46;
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .status-delivering {
-  background: rgba(59, 130, 246, 0.15);
-  color: #1e40af;
+  background: rgba(79, 70, 229, 0.14);
+  color: #3730a3;
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.status-completed {
+  background: rgba(22, 163, 74, 0.16);
+  color: #166534;
+  border-color: rgba(22, 163, 74, 0.32);
+}
+
+.status-cancelled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .order-card-body {
@@ -250,6 +272,39 @@
 
 .btn-order-pay:hover {
   background: rgba(255, 109, 31, 0.18);
+}
+
+.btn-order-pay.delivery-start {
+  background: rgba(37, 99, 235, 0.14);
+  color: #1d4ed8;
+}
+
+.btn-order-pay.delivery-start:hover {
+  background: rgba(37, 99, 235, 0.22);
+}
+
+.btn-order-pay.delivery-complete {
+  background: rgba(22, 163, 74, 0.14);
+  color: #15803d;
+}
+
+.btn-order-pay.delivery-complete:hover {
+  background: rgba(22, 163, 74, 0.22);
+}
+
+.btn-order-pay.delivery-done,
+.btn-order-pay.delivery-cancelled {
+  background: rgba(148, 163, 184, 0.18);
+  color: #334155;
+}
+
+.btn-order-pay.delivery-wait-pay {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.btn-order-pay.delivery-wait-pay:hover {
+  background: rgba(245, 158, 11, 0.26);
 }
 
 /* Service History */
@@ -347,8 +402,16 @@
   color: #e0dcd8;
 }
 
-.status-completed {
+.history-status-completed {
   color: #15803d;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-status-pending {
+  color: #b45309;
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -2602,6 +2665,10 @@
   padding: 18px 24px 0;
 }
 
+.dinein-detail-top.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .dinein-info-card {
   border: 1px solid #ece5de;
   border-radius: 14px;
@@ -2635,6 +2702,50 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.waiter-delivery-customer-box {
+  margin-bottom: 16px;
+  border: 1px solid #ece5de;
+  border-radius: 14px;
+  background: #faf8f5;
+  padding: 14px;
+}
+
+.waiter-delivery-customer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.waiter-delivery-customer-item {
+  border: 1px solid #efe8e1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.waiter-delivery-customer-item.full {
+  grid-column: 1 / -1;
+}
+
+.waiter-delivery-customer-label {
+  margin: 0 0 6px;
+  color: #8f8277;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.waiter-delivery-customer-value {
+  margin: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #2b221c;
+  font-size: 15px;
+  line-height: 1.4;
 }
 
 .dish-table td:nth-child(2),
@@ -3321,6 +3432,10 @@
   }
 
   .dinein-detail-top {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-delivery-customer-grid {
     grid-template-columns: 1fr;
   }
 

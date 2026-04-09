@@ -1,5 +1,96 @@
 import instance from './axiosInstance';
 
+const firstDefined = (...vals) => vals.find((v) => v !== undefined && v !== null && v !== '');
+
+const toNumOrNull = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const normalizeBookEventItem = (raw) => {
+  const contractId = toNumOrNull(
+    firstDefined(
+      raw?.contractId,
+      raw?.ContractId,
+      raw?.contract?.contractId,
+      raw?.contract?.id,
+      raw?.payment?.contractId,
+      raw?.paymentInfo?.contractId
+    )
+  );
+
+  const checkoutUrl = firstDefined(
+    raw?.checkoutUrl,
+    raw?.CheckoutUrl,
+    raw?.paymentUrl,
+    raw?.PaymentUrl,
+    raw?.depositUrl,
+    raw?.depositCheckoutUrl,
+    raw?.contract?.checkoutUrl,
+    raw?.contract?.paymentUrl,
+    raw?.payment?.checkoutUrl,
+    raw?.paymentInfo?.checkoutUrl,
+    raw?.lastDeposit?.checkoutUrl
+  ) || '';
+
+  const eventTitle = firstDefined(
+    raw?.eventTitle,
+    raw?.title,
+    raw?.event?.title,
+    raw?.event?.eventTitle
+  ) || '';
+
+  const eventType = firstDefined(
+    raw?.eventType,
+    raw?.event?.eventType,
+    raw?.event?.type
+  ) || '';
+
+  const bookingDate = firstDefined(
+    raw?.bookingDate,
+    raw?.eventDate,
+    raw?.reservationDate
+  ) || '';
+
+  const bookingTime = firstDefined(
+    raw?.bookingTime,
+    raw?.eventTime,
+    raw?.reservationTime
+  ) || '';
+
+  const customerId = toNumOrNull(
+    firstDefined(
+      raw?.customerId,
+      raw?.userId,
+      raw?.customer?.userId,
+      raw?.customer?.customerId
+    )
+  );
+
+  const eventBookingId = toNumOrNull(
+    firstDefined(raw?.eventBookingId, raw?.bookEventId, raw?.id)
+  );
+
+  return {
+    ...raw,
+    id: eventBookingId ?? raw?.id,
+    eventBookingId: eventBookingId ?? raw?.eventBookingId,
+    bookEventId: eventBookingId ?? raw?.bookEventId,
+    eventBookingCode: firstDefined(raw?.eventBookingCode, raw?.bookingCode, raw?.orderCode) || '',
+    eventTitle,
+    title: eventTitle || raw?.title || '',
+    eventType,
+    bookingDate,
+    bookingTime,
+    customerId,
+    numberOfGuests: Number(raw?.numberOfGuests || raw?.guestCount || 0) || 0,
+    note: firstDefined(raw?.note, raw?.specialRequests) || '',
+    contractId,
+    checkoutUrl,
+    raw,
+  };
+};
+
 // Map frontend type → backend orderType (theo Swagger pattern: ^(DineIn|TakeAway|Delivery|EventBooking)$)
 const MAP_ORDER_TYPE = {
   dinein: 'DineIn',
@@ -80,9 +171,14 @@ export const myOrderAPI = {
     try {
       const response = await instance.get('/book-event/my');
       const data = response.data;
-      if (Array.isArray(data)) return data;
-      if (data?.$values) return data.$values;
-      if (data?.data) return data.data;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.$values)
+          ? data.$values
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      return list.map(normalizeBookEventItem);
       return [];
     } catch (err) {
       if (err?.response?.status === 404 || err?.response?.status === 400) return [];
@@ -96,14 +192,31 @@ export const myOrderAPI = {
     return response.data;
   },
 
+  // POST /api/contract/{id}/deposit — tạo link thanh toán đặt cọc (PayOS)
+  createContractDeposit: async (contractId) => {
+    const response = await instance.post(`/contract/${contractId}/deposit`);
+    return response.data;
+  },
+
+  // GET /api/contract/{bookingCode} — lấy hợp đồng theo bookingCode (fallback để tìm checkoutUrl)
+  getContractByBookingCode: async (bookingCode) => {
+    const response = await instance.get(`/contract/${encodeURIComponent(bookingCode)}`);
+    return response.data;
+  },
+
   // GET /api/book-event/history — lịch sử đặt sự kiện của user
   getMyEvents: async () => {
     try {
       const response = await instance.get('/book-event/history');
       const data = response.data;
-      if (Array.isArray(data)) return data;
-      if (data?.$values) return data.$values;
-      if (data?.data) return data.data;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.$values)
+          ? data.$values
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      return list.map(normalizeBookEventItem);
       return [];
     } catch (err) {
       if (err?.response?.status === 404 || err?.response?.status === 400) return [];
