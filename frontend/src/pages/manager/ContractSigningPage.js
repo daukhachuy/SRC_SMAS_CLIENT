@@ -89,19 +89,33 @@ const ContractSigningPage = () => {
     };
   };
 
+  const resolveBookingCode = (detail, fallback = '') => {
+    const direct =
+      detail?.bookingCode ||
+      detail?.bookEventCode ||
+      detail?.eventCode ||
+      detail?.code ||
+      detail?.eventInfo?.bookingCode ||
+      detail?.eventInfo?.bookEventCode ||
+      detail?.eventInfo?.eventCode ||
+      detail?.eventInfo?.code ||
+      '';
+    return String(direct || fallback || '').trim();
+  };
+
   useEffect(() => {
     const loadContract = async () => {
       setLoading(true);
       setLoadError('');
       try {
-        let bookingCode = searchParams.get('bookingCode');
+        let bookingCode = String(searchParams.get('bookingCode') || '').trim();
         let detail = null;
 
         if (eventId) {
           const detailRes = await eventBookingAPI.getDetailById(eventId);
           const detailPayload = detailRes?.data?.data?.data ?? detailRes?.data?.data ?? detailRes?.data;
           detail = Array.isArray(detailPayload) ? detailPayload[0] : detailPayload;
-          bookingCode = detail?.bookingCode || '';
+          bookingCode = resolveBookingCode(detail, bookingCode);
         }
 
         if (!bookingCode) {
@@ -183,7 +197,9 @@ const ContractSigningPage = () => {
         });
       } catch (err) {
         console.error('Lỗi tải hợp đồng theo bookingCode:', err);
-        setLoadError(err?.response?.data?.detail || err?.message || 'Không tải được hợp đồng.');
+        const errorCode = err?.response?.status ? ` (HTTP ${err.response.status})` : '';
+        const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Không tải được hợp đồng.';
+        setLoadError(`${detail}${errorCode}`);
       } finally {
         setLoading(false);
       }
