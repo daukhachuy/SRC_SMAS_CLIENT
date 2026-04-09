@@ -2323,6 +2323,10 @@
   border-collapse: collapse;
 }
 
+.detail-table thead {
+  background: #4f6fd8;
+}
+
 .detail-table th,
 .detail-table td {
   padding: 12px 10px;
@@ -2335,7 +2339,12 @@
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #8b7f74;
+  color: #f8fafc;
+  font-weight: 800;
+}
+
+.detail-table td {
+  color: #1f2937;
 }
 
 .detail-table td:nth-child(n + 2),
@@ -2763,10 +2772,11 @@
 .dish-table td p {
   margin: 0;
   font-weight: 700;
+  color: #1f2937;
 }
 
 .dish-table td small {
-  color: #8f837a;
+  color: #4b5563;
   font-size: 11px;
 }
 

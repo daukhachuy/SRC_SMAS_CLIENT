@@ -162,6 +162,8 @@ const UserLayout = () => {
                 className="Btn-Logout" 
                 onClick={() => {
                   // KHÔNG dùng localStorage.clear() để tránh mất ảnh đại diện đã lưu vĩnh viễn
+                  localStorage.removeItem("authToken");
+                  localStorage.removeItem("accessToken");
                   localStorage.removeItem("token");
                   localStorage.removeItem("user");
                   navigate('/auth');
