@@ -538,42 +538,6 @@ const KitchenOrdersPage = () => {
     }
   };
 
-  /** Xóa / hủy tất cả món trong group → gọi cancel cho mỗi order rồi load lại */
-  const handleGroupCancelAll = async (group) => {
-    const uniqueOrderIds = [...new Set(group.orderIds)];
-    setOrderBusyId(group.key);
-    setError('');
-    try {
-      // Thu thập orderItemId từ allOrders cho món thuộc group này
-      const toCancel = [];
-      allOrders.forEach((order) => {
-        if (!uniqueOrderIds.includes(order.orderId ?? order.id)) return;
-        (order.items || []).forEach((item) => {
-          const key = item.foodId ?? item.name ?? `__${item.id}`;
-          if (key === group.key && item.status !== 'ready') {
-            toCancel.push(item.orderItemId ?? item.id);
-          }
-        });
-      });
-      // Xác nhận trước khi hủy nhiều món
-      if (toCancel.length === 0) return;
-      const ok = window.confirm(
-        `Hủy ${toCancel.length} món "${group.name}" khỏi các đơn liên quan?`
-      );
-      if (!ok) {
-        setOrderBusyId(null);
-        return;
-      }
-      await Promise.all(toCancel.map((id) => postOrderItemCancel(id, 'Hủy từ bếp')));
-      await loadOrders({ silent: true });
-      setToastMsg(`Đã hủy ${toCancel.length} món.`);
-    } catch (e) {
-      setError(e?.response?.data?.message || e?.message || 'Hủy nhóm món thất bại.');
-    } finally {
-      setOrderBusyId(null);
-    }
-  };
-
   /** Hoàn thành tất cả món trong group → load lại full */
   const handleGroupCompleteAll = async (group) => {
     const uniqueOrderIds = [...new Set(group.orderIds)];
@@ -736,35 +700,22 @@ const KitchenOrdersPage = () => {
                             </td>
                             <td className="kds-item-td kds-item-td-actions">
                               <div className="kds-item-action-btns">
-                                {rowStatus === 'pending' ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="kds-item-pill-btn kds-item-pill-btn--start"
-                                      disabled={orderBusyId === group.key || group.pendingQty === 0}
-                                      onClick={() => handleGroupStartAll(group)}
-                                    >
-                                      {orderBusyId === group.key ? '...' : 'BẮT ĐẦU'}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="kds-item-pill-btn kds-item-pill-btn--cancel"
-                                      disabled={orderBusyId === group.key}
-                                      onClick={() => handleGroupCancelAll(group)}
-                                    >
-                                      {orderBusyId === group.key ? '...' : 'HỦY'}
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="kds-item-pill-btn kds-item-pill-btn--complete"
-                                    disabled={orderBusyId === group.key}
-                                    onClick={() => handleGroupCompleteAll(group)}
-                                  >
-                                    {orderBusyId === group.key ? '...' : 'HOÀN THÀNH'}
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  className="kds-item-pill-btn kds-item-pill-btn--complete"
+                                  disabled={orderBusyId === group.key}
+                                  onClick={() => handleGroupCompleteAll(group)}
+                                >
+                                  {orderBusyId === group.key ? '...' : 'HOÀN THÀNH'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="kds-item-pill-btn kds-item-pill-btn--start"
+                                  disabled={orderBusyId === group.key || group.pendingQty === 0}
+                                  onClick={() => handleGroupStartAll(group)}
+                                >
+                                  {orderBusyId === group.key ? '...' : 'BẮT ĐẦU'}
+                                </button>
                               </div>
                             </td>
                           </tr>

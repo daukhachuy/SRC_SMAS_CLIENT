@@ -1,106 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X,
-  ShoppingBag,
-  User,
-  Phone,
-  MapPin,
-  Calendar,
-  Utensils,
+import React from 'react';
+import { 
+  X, 
+  ShoppingBag, 
+  User, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  Utensils, 
   ChevronRight,
-  Info,
+  Info
 } from 'lucide-react';
-import { myOrderAPI } from '../api/myOrderApi';
 import '../styles/OrderDetailModal.css';
 
-const normalizeLineItem = (item) => {
-  const qty = Number(item.quantity) || 0;
-  const unit = Number(item.unitPrice ?? item.price ?? 0);
-  const line =
-    item.subtotal != null
-      ? Number(item.subtotal)
-      : item.lineTotal != null
-        ? Number(item.lineTotal)
-        : item.subTotal != null
-          ? Number(item.subTotal)
-          : qty * unit;
-  const name = item.itemName ?? item.foodName ?? item.name ?? '—';
-  return { ...item, itemName: name, quantity: qty, unitPrice: unit, lineTotal: line };
-};
-
-const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = false, error: errorProp = '' }) => {
-  const [displayOrder, setDisplayOrder] = useState(orderProp);
-  const [detailLoading, setDetailLoading] = useState(() => Boolean(orderProp?.orderCode));
-  const [fetchError, setFetchError] = useState('');
-
-  useEffect(() => {
-    if (!orderProp?.orderCode) {
-      setDisplayOrder(orderProp);
-      setDetailLoading(false);
-      setFetchError('');
-      return;
-    }
-    setDisplayOrder(orderProp);
-    setFetchError('');
-    setDetailLoading(true);
-    let cancelled = false;
-    const type = orderProp.orderType || 'Delivery';
-    (async () => {
-      try {
-        const [fromFilter, fromGet, items] = await Promise.all([
-          myOrderAPI.getOrderByCodeViaFilter(orderProp.orderCode, type).catch(() => null),
-          myOrderAPI.getOrderByOrderCode(orderProp.orderCode).catch(() => null),
-          myOrderAPI.getOrderItemsByOrderCode(orderProp.orderCode).catch(() => []),
-        ]);
-        if (cancelled) return;
-        const itemList = Array.isArray(items) ? items : [];
-        const merged = {
-          ...orderProp,
-          ...(fromGet && typeof fromGet === 'object' ? fromGet : {}),
-          ...(fromFilter && typeof fromFilter === 'object' ? fromFilter : {}),
-          items:
-            itemList.length > 0
-              ? itemList
-              : fromFilter?.items ||
-                fromFilter?.orderItems ||
-                fromGet?.items ||
-                orderProp.items ||
-                [],
-          orderStatus:
-            fromFilter?.orderStatus ??
-            fromGet?.orderStatus ??
-            orderProp.orderStatus ??
-            orderProp.displayStatus,
-          status:
-            fromFilter?.orderStatus ??
-            fromGet?.orderStatus ??
-            orderProp.status ??
-            orderProp.displayStatus,
-        };
-        setDisplayOrder(merged);
-      } catch (e) {
-        if (!cancelled) {
-          setFetchError(
-            e?.response?.data?.message ||
-              e?.response?.data?.title ||
-              e?.message ||
-              'Không tải được chi tiết đơn.'
-          );
-        }
-      } finally {
-        if (!cancelled) setDetailLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orderProp?.orderCode, orderProp?.orderType]);
-
-  if (!orderProp) return null;
-
-  const order = displayOrder ?? orderProp;
-  const loading = detailLoading || loadingProp;
-  const error = fetchError || errorProp;
+const OrderDetailModal = ({ order, onClose }) => {
+  if (!order) return null;
 
   // Chuyển ISO UTC → giờ Việt Nam (UTC+7)
   const toVietnamTime = (isoStr) => {
@@ -122,66 +35,21 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
     });
   };
 
-  const items = (order.items || []).map(normalizeLineItem);
+  // Xử lý dữ liệu hiển thị
+  const items = order.items || [];
   const orderDate = fmtVN(toVietnamTime(order.createdAt));
 
-  const sumFromLines = items.reduce(
-    (sum, item) => sum + (item.lineTotal ?? item.quantity * item.unitPrice),
-    0
-  );
-  const apiSub = order.subTotal != null ? Number(order.subTotal) : null;
-  const subtotal =
-    apiSub != null && !Number.isNaN(apiSub) ? apiSub : sumFromLines;
-
-  const deliveryFee =
-    Number(
-      order.deliveryPrice ??
-        order.deliveryFee ??
-        order.shippingFee ??
-        order.delivery?.fee ??
-        order.delivery?.shippingFee ??
-        0
-    ) || 0;
-  const discountAmount = Number(order.discountAmount ?? order.discount ?? 0) || 0;
-  const taxAmount = Number(order.taxAmount ?? 0) || 0;
-
-  const apiTotal = order.totalAmount != null ? Number(order.totalAmount) : null;
-  const computedTotal = subtotal + deliveryFee + taxAmount - discountAmount;
-  const grandTotal =
-    apiTotal != null && !Number.isNaN(apiTotal) ? apiTotal : computedTotal;
-
-  const statusLabel = order.orderStatus || order.status || order.displayStatus || 'Đang xử lý';
-
-  const fmtMoney = (amount) => (amount ?? 0).toLocaleString();
-
   const getStatusClass = (status) => {
-    const s = String(status ?? '').toLowerCase();
+    const s = status?.toLowerCase();
     if (s === 'pending' || s === 'chờ') return 'od-status-orange';
     if (s === 'shipping' || s === 'đang giao') return 'od-status-blue';
-    if (s === 'completed' || s === 'complete' || s === 'xong' || s === 'thành công') return 'od-status-green';
-    if (s === 'cancelled' || s === 'canceled' || s === 'cancel') return 'od-status-gray';
+    if (s === 'completed' || s === 'xong' || s === 'thành công') return 'od-status-green';
     return 'od-status-gray';
   };
 
   return (
     <div className="od-modal-overlay" onClick={(e) => e.target.className === 'od-modal-overlay' && onClose()}>
-      <div className="od-modal-container" style={{ position: 'relative' }}>
-        {loading && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 10,
-              background: 'rgba(255,255,255,0.75)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 'inherit',
-            }}
-          >
-            <span style={{ fontSize: '0.95rem', color: '#64748b' }}>Đang tải chi tiết…</span>
-          </div>
-        )}
+      <div className="od-modal-container">
         
         {/* HEADER SECTION */}
         <div className="od-modal-header">
@@ -192,8 +60,8 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
             <div className="od-title-area">
               <div className="od-title-row">
                 <h2 className="od-modal-title">Chi tiết đơn hàng</h2>
-                <span className={`od-status-badge ${getStatusClass(statusLabel)}`}>
-                  {statusLabel}
+                <span className={`od-status-badge ${getStatusClass(order.status)}`}>
+                  {order.status || 'Đang xử lý'}
                 </span>
               </div>
               <p className="od-subtitle">Mã đơn: <strong>#{order.orderCode}</strong></p>
@@ -203,21 +71,6 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
             <X size={24} />
           </button>
         </div>
-
-        {error ? (
-          <div
-            style={{
-              margin: '0 24px 12px',
-              padding: '10px 12px',
-              background: '#fef2f2',
-              color: '#b91c1c',
-              borderRadius: 8,
-              fontSize: '0.875rem',
-            }}
-          >
-            {error}
-          </div>
-        ) : null}
 
         {/* BODY SECTION */}
         <div className="od-modal-body">
@@ -238,24 +91,17 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
                     </tr>
                   </thead>
                   <tbody>
-                    {items.length === 0 && !loading && (
-                      <tr>
-                        <td colSpan={3} style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                          Không có dòng món chi tiết (API không trả danh sách).
-                        </td>
-                      </tr>
-                    )}
                     {items.map((item, idx) => (
                       <tr key={idx}>
                         <td>
                           <div className="od-item-info">
                             <span className="od-item-name">{item.itemName}</span>
-                            <span className="od-item-unit">{fmtMoney(item.unitPrice)}đ</span>
+                            <span className="od-item-unit">{item.unitPrice?.toLocaleString()}đ</span>
                           </div>
                         </td>
                         <td className="text-center">{item.quantity}</td>
                         <td className="text-right od-item-price">
-                          {fmtMoney(item.lineTotal ?? item.quantity * item.unitPrice)}đ
+                          {(item.quantity * item.unitPrice).toLocaleString()}đ
                         </td>
                       </tr>
                     ))}
@@ -267,27 +113,15 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
             <div className="od-billing-card">
               <div className="od-billing-row">
                 <span>Tạm tính</span>
-                <span>{fmtMoney(subtotal)}đ</span>
+                <span>{order.totalAmount?.toLocaleString()}đ</span>
               </div>
               <div className="od-billing-row">
                 <span>Phí vận chuyển</span>
-                <span>{deliveryFee > 0 ? `+${fmtMoney(deliveryFee)}đ` : 'Miễn phí'}</span>
+                <span>+0đ</span>
               </div>
-              {taxAmount > 0 && (
-                <div className="od-billing-row">
-                  <span>Thuế</span>
-                  <span>+{fmtMoney(taxAmount)}đ</span>
-                </div>
-              )}
-              {discountAmount > 0 && (
-                <div className="od-billing-row" style={{ color: '#16a34a' }}>
-                  <span>Giảm giá</span>
-                  <span>-{fmtMoney(discountAmount)}đ</span>
-                </div>
-              )}
               <div className="od-billing-total">
                 <span className="od-total-label">TỔNG CỘNG</span>
-                <span className="od-total-amount">{fmtMoney(grandTotal)}đ</span>
+                <span className="od-total-amount">{order.totalAmount?.toLocaleString()}đ</span>
               </div>
             </div>
           </div>

@@ -223,8 +223,7 @@ const MyOrders = () => {
       const eff = withEffective.effectiveStatus ?? withEffective.orderStatus ?? withEffective.status;
       return { ...withEffective, _isHistory: isForHistory(eff) };
     })
-    /* Tab Đặt chỗ: hiển thị mọi trạng thái từ GET /reservation/my (kể cả Cancelled) theo bộ lọc */
-    .filter((item) => activeTab === 'Booking' || !item._isHistory)
+    .filter((item) => !item._isHistory)
     .filter((item) => {
       if (activeTab === 'Delivery' && !matchesDeliveryStatusFilter(item)) return false;
       if (activeTab === 'Booking' && !matchesBookingStatusFilter(item)) return false;
