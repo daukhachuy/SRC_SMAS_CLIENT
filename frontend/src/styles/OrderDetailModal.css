@@ -1,26 +1,22 @@
-/* Tổng thể Overlay — z-index > .hd-wrapper (Header.css z-index: 9999) để không bị che */
+/* Tổng thể Overlay */
 .od-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10050;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  padding-top: max(1rem, env(safe-area-inset-top, 0px));
   background-color: rgba(35, 22, 15, 0.6);
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 /* Container chính của Modal */
 .od-modal-container {
-  position: relative;
-  z-index: 1;
   background-color: white;
   width: 100%;
   max-width: 72rem;
-  max-height: min(90vh, calc(100dvh - 2rem));
+  max-height: 90vh;
   border-radius: 1rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   display: flex;

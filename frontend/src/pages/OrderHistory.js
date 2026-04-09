@@ -22,27 +22,32 @@ const fmtVNDate = (date) => {
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-/** Đơn hàng giao hàng (lịch sử): chỉ Completed / Cancelled — chuẩn hóa không phân biệt hoa thường */
+/** Đơn hàng giao hàng: chỉ Completed / Cancelled */
 const normalizeOrderEffectiveStatus = (orderStatus) => {
-  if (orderStatus === null || orderStatus === undefined || orderStatus === '') return null;
-  const s = String(orderStatus).trim().toLowerCase();
-  if (s === 'completed' || s === 'complete') return 'Completed';
-  if (s === 'cancelled' || s === 'cancel' || s === 'canceled') return 'Cancelled';
+  const s = String(orderStatus ?? '').trim();
+  if (s === 'Completed' || s === 'Complete') return 'Completed';
+  if (s === 'Cancelled' || s === 'Cancel' || s === 'Canceled') return 'Cancelled';
   return null;
 };
 
-/** Lấy trạng thái đơn từ nhiều khả năng tên field (backend / serializer) */
-const pickOrderStatusRaw = (order) =>
-  order?.orderStatus ?? order?.status ?? order?.Status ?? order?.order_state;
+const isDeliveryOrder = (order) => String(order.orderType ?? '').trim() === 'Delivery';
 
-const isDeliveryOrder = (order) =>
-  String(order?.orderType ?? order?.OrderType ?? '')
-    .trim()
-    .toLowerCase() === 'delivery';
+/** Đặt chỗ lịch sử: chỉ Seated (4) | Cancelled (3) */
+const normalizeReservationEffective = (res) => {
+  const raw = res.status ?? res.reservationStatus;
+  if (raw === null || raw === undefined) return 'Cancelled';
+  const num = Number(raw);
+  const str = String(raw).trim();
+  if (num === 3 || str === 'Cancelled') return 'Cancelled';
+  if (num === 4 || str === 'Seated') return 'Seated';
+  return 'Seated';
+};
 
 const OrderHistory = () => {
+  const [listType, setListType] = useState('order');
   const [activeTab, setActiveTab] = useState('all-order');
   const [orders, setOrders] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +60,13 @@ const OrderHistory = () => {
     { id: 'cancelled', label: 'Đã hủy' },
   ];
 
+  const reservationTabs = [
+    { id: 'seated', label: 'Đã đến' },
+    { id: 'res-cancelled', label: 'Đã hủy' },
+  ];
+
+  const currentTabs = listType === 'reservation' ? reservationTabs : orderTabs;
+
   const getIconForType = (typeName) => {
     if (typeName?.includes('sự kiện')) return 'fa-solid fa-carrot';
     if (typeName?.includes('bàn ăn') || typeName?.includes('tại chỗ')) return 'fa-solid fa-utensils';
@@ -66,11 +78,10 @@ const OrderHistory = () => {
 
   const mapOrderTypeLabel = (orderType) => {
     const t = String(orderType || '').trim();
-    const u = t.toLowerCase();
-    if (u === 'dinein') return 'Đặt bàn / Tại chỗ';
-    if (u === 'takeaway') return 'Mang đi';
-    if (u === 'delivery') return 'Giao hàng';
-    if (u === 'eventbooking' || u === 'event') return 'Đặt sự kiện tại cửa hàng';
+    if (t === 'DineIn') return 'Đặt bàn / Tại chỗ';
+    if (t === 'TakeAway' || t === 'Takeaway') return 'Mang đi';
+    if (t === 'Delivery') return 'Giao hàng';
+    if (t === 'EventBooking' || t === 'Event') return 'Đặt sự kiện tại cửa hàng';
     return t || 'Đơn hàng';
   };
 
@@ -101,62 +112,76 @@ const OrderHistory = () => {
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await myOrderAPI.getMyOrderHistory();
-      console.log('[OrderHistory] raw orderData:', res);
-      console.log('[OrderHistory] total items:', Array.isArray(res) ? res.length : 'not array');
-      if (Array.isArray(res) && res.length > 0) {
-        console.log('[OrderHistory] first item keys:', Object.keys(res[0]));
-        console.log('[OrderHistory] first item:', JSON.stringify(res[0]));
-      }
-      const orderData = Array.isArray(res) ? res : [];
+      const [orderSettled, reservationSettled] = await Promise.allSettled([
+        myOrderAPI.getMyOrderHistory(),
+        myOrderAPI.getReservations(),
+      ]);
+      const orderData = orderSettled.status === 'fulfilled' ? orderSettled.value : [];
+      const reservationData = reservationSettled.status === 'fulfilled' ? reservationSettled.value : [];
+      if (orderSettled.status === 'rejected') console.error('GET /order/history/my:', orderSettled.reason);
+      if (reservationSettled.status === 'rejected') console.error('getReservations:', reservationSettled.reason);
 
-      const processedOrders = orderData
+      const processedOrders = (orderData || [])
         .map((order) => {
-          const statusRaw = pickOrderStatusRaw(order);
-          const effectiveStatus = normalizeOrderEffectiveStatus(statusRaw);
+          const effectiveStatus = normalizeOrderEffectiveStatus(order.orderStatus);
           const cust = order.customer || {};
           const displayCustomer =
-            order.delivery?.recipientName ||
-            cust.fullName ||
-            cust.fullname ||
-            cust.FullName ||
-            'Khách hàng';
+            order.delivery?.recipientName || cust.fullName || cust.fullname || 'Khách hàng';
           const displayPhone =
             order.delivery?.recipientPhone || cust.phone || order.delivery?.phone || null;
           const displayTable =
             formatTablesDisplay(order.tables) || order.tableNumber || null;
 
-            return {
+          return {
             ...order,
-            orderId: order.orderId ?? order.OrderId,
             itemType: 'order',
-            displayId: order.orderCode ?? order.OrderCode,
-            displayStatus: statusRaw,
-            displayDate: order.createdAt ?? order.CreatedAt,
+            displayId: order.orderCode,
+            displayStatus: order.orderStatus,
+            displayDate: order.createdAt,
             displayCustomer,
             displayPhone,
             displayGuests: order.numberOfGuests,
             displayTable,
             displayEvent: order.eventName || order.note || '—',
             displayTotal: order.totalAmount,
-            typeName: mapOrderTypeLabel(order.orderType ?? order.OrderType),
-            rawStatus: statusRaw,
-            status: statusRaw,
-            orderCode: order.orderCode ?? order.OrderCode,
-            createdAt: order.createdAt ?? order.CreatedAt,
+            typeName: mapOrderTypeLabel(order.orderType),
+            rawStatus: order.orderStatus,
+            status: order.orderStatus,
+            orderCode: order.orderCode,
+            createdAt: order.createdAt,
             totalAmount: order.totalAmount,
             items: order.items || order.orderItems || [],
             effectiveStatus,
           };
         })
-        .filter((o) => o.effectiveStatus != null);
+        .filter((o) => isDeliveryOrder(o) && o.effectiveStatus);
 
-      console.log('[OrderHistory] processedOrders (effectiveStatus != null):', processedOrders.length, processedOrders.map(o => ({ orderCode: o.orderCode, status: o.rawStatus, effectiveStatus: o.effectiveStatus })));
+      const processedReservations = (reservationData || []).map((res) => {
+        const effectiveStatus = normalizeReservationEffective(res);
+        const statusRaw = res.status ?? res.reservationStatus ?? 1;
+        return {
+          ...res,
+          itemType: 'reservation',
+          displayId: res.reservationCode,
+          displayStatus: statusRaw,
+          displayDate: res.reservationDate,
+          displayCustomer: res.fullname || res.customerName || '—',
+          displayPhone: res.phone || '—',
+          displayGuests: res.numberOfGuests,
+          displayTable: res.tableNumber || res.tableCode || '—',
+          displayEvent: res.specialRequests || '—',
+          displayTotal: 0,
+          typeName: 'Đặt bàn ăn',
+          effectiveStatus,
+        };
+      });
 
       setOrders(processedOrders);
+      setReservations(processedReservations);
     } catch (err) {
       console.error('Lỗi khi lấy lịch sử:', err);
       setOrders([]);
+      setReservations([]);
     } finally {
       setLoading(false);
     }
@@ -169,10 +194,17 @@ const OrderHistory = () => {
   useEffect(() => {
     setCurrentPage(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab]);
+  }, [activeTab, listType]);
 
-  const filteredHistory = orders
+  const baseList = listType === 'reservation' ? reservations : orders;
+
+  const filteredHistory = baseList
     .filter((item) => {
+      if (listType === 'reservation') {
+        if (activeTab === 'seated') return item.effectiveStatus === 'Seated';
+        if (activeTab === 'res-cancelled') return item.effectiveStatus === 'Cancelled';
+        return true;
+      }
       if (activeTab === 'all-order') return true;
       if (activeTab === 'completed') return item.effectiveStatus === 'Completed';
       if (activeTab === 'cancelled') return item.effectiveStatus === 'Cancelled';
@@ -183,18 +215,19 @@ const OrderHistory = () => {
       return item.displayId?.toLowerCase().includes(searchQuery.toLowerCase().trim());
     });
 
-  console.log('[OrderHistory] orders state count:', orders.length);
-  console.log('[OrderHistory] activeTab:', activeTab);
-  console.log('[OrderHistory] filteredHistory count:', filteredHistory.length);
-
   const totalItems = filteredHistory.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedHistory = filteredHistory.slice(startIndex, startIndex + itemsPerPage);
 
-  const paginationUnit = 'đơn hàng';
+  const paginationUnit = listType === 'reservation' ? 'đặt chỗ' : 'đơn hàng';
 
   const emptyMessage = () => {
+    if (listType === 'reservation') {
+      if (activeTab === 'seated') return 'Không có lịch đặt chỗ nào đã đến.';
+      if (activeTab === 'res-cancelled') return 'Không có lịch đặt chỗ nào bị hủy.';
+      return 'Không có lịch đặt chỗ nào.';
+    }
     if (activeTab === 'completed') return 'Không có đơn giao hàng nào hoàn thành.';
     if (activeTab === 'cancelled') return 'Không có đơn giao hàng nào bị hủy.';
     return 'Không có đơn giao hàng (giao tận nơi) hoàn thành hoặc đã hủy.';
@@ -222,8 +255,33 @@ const OrderHistory = () => {
         )}
       </div>
 
+      <div className="Order-Tabs-Container Order-Type-Tabs">
+        <button
+          type="button"
+          className={`Order-Tab-Btn ${listType === 'order' ? 'Active' : ''}`}
+          onClick={() => {
+            setListType('order');
+            setActiveTab('all-order');
+            setCurrentPage(1);
+          }}
+        >
+          <i className="fa-solid fa-box"></i> Đơn hàng
+        </button>
+        <button
+          type="button"
+          className={`Order-Tab-Btn ${listType === 'reservation' ? 'Active' : ''}`}
+          onClick={() => {
+            setListType('reservation');
+            setActiveTab('seated');
+            setCurrentPage(1);
+          }}
+        >
+          <i className="fa-solid fa-utensils"></i> Đặt chỗ
+        </button>
+      </div>
+
       <div className="Order-Tabs-Container Order-Status-Tabs">
-        {orderTabs.map((tab) => (
+        {currentTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
