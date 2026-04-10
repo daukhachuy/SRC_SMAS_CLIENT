@@ -17,7 +17,7 @@ function normalizeEventsResponse(body) {
  * API Sự kiện — khớp Swagger /api/events
  * EventCreateDto: title, createdBy (bắt buộc), description?, eventType?, image?, minGuests?, maxGuests?, basePrice?, isActive?
  * EventUpdateDto: title (bắt buộc), description?, eventType?, image?, minGuests?, maxGuests?, basePrice?, isActive?
- * PATCH /api/events/{id}/status — EventStatusPatchDto: { isActive }
+ * PATCH /api/events/{id}/status?isActive= — Swagger: query boolean, không body
  */
 export const eventsAPI = {
   /** GET /api/events — danh sách sự kiện */
@@ -69,15 +69,16 @@ export const eventsAPI = {
   },
 
   /**
-   * PATCH /api/events/{id}/status
-   * Body: EventStatusPatchDto — { isActive: boolean } (bắt buộc)
+   * PATCH /api/events/{id}/status?isActive=
    */
   patchStatus: async (id, isActive) => {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new Error('ID sự kiện không hợp lệ');
     }
-    const { data } = await instance.patch(`/events/${numId}/status`, { isActive: Boolean(isActive) });
+    const { data } = await instance.patch(`/events/${numId}/status`, null, {
+      params: { isActive: Boolean(isActive) },
+    });
     return data;
   },
 };

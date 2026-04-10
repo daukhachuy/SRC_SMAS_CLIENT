@@ -536,12 +536,6 @@ const AdminRestaurantPage = () => {
     }
   }, [tab, loadBlogs]);
 
-  useEffect(() => {
-    if (tab === 'reviews') {
-      loadFeedback();
-    }
-  }, [tab, loadFeedback]);
-
   /* ── Services ── */
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
@@ -796,6 +790,12 @@ const AdminRestaurantPage = () => {
     }
   }, [tab, loadEvents]);
 
+  useEffect(() => {
+    if (tab === 'reviews') {
+      loadFeedback();
+    }
+  }, [tab, loadFeedback]);
+
   const closeEventModal = () => {
     setEventModalOpen(false);
     setEditingEvent(null);
@@ -947,7 +947,7 @@ const AdminRestaurantPage = () => {
     }
   };
 
-  /** PATCH /api/events/{id}/status — EventStatusPatchDto { isActive } */
+  /** PATCH /api/events/{id}/status?isActive= — true = Mở, false = Tắt */
   const toggleEventActive = async (row) => {
     const eid = Number(row?.id);
     if (!Number.isFinite(eid) || eid <= 0) return;
@@ -1462,14 +1462,14 @@ const AdminRestaurantPage = () => {
         <button type="button" className={`rest-tab ${tab === 'blog' ? 'active' : ''}`} onClick={() => setTab('blog')}>
           Blog
         </button>
-        <button type="button" className={`rest-tab ${tab === 'reviews' ? 'active' : ''}`} onClick={() => setTab('reviews')}>
-          Đánh giá
-        </button>
         <button type="button" className={`rest-tab ${tab === 'services' ? 'active' : ''}`} onClick={() => setTab('services')}>
           Phục vụ
         </button>
         <button type="button" className={`rest-tab ${tab === 'events' ? 'active' : ''}`} onClick={() => setTab('events')}>
           Sự kiện
+        </button>
+        <button type="button" className={`rest-tab ${tab === 'reviews' ? 'active' : ''}`} onClick={() => setTab('reviews')}>
+          Đánh giá
         </button>
       </div>
 
@@ -1992,12 +1992,12 @@ const AdminRestaurantPage = () => {
                             onClick={() => toggleEventActive(row)}
                             disabled={!!eventDeletingId || eventToggleBusyId === row.id}
                             aria-busy={eventToggleBusyId === row.id}
-                            aria-label={row.active ? 'Tắt sự kiện' : 'Bật sự kiện'}
+                            aria-label={row.active ? 'Tắt sự kiện (isActive=false)' : 'Mở sự kiện (isActive=true)'}
                           >
                             <span className="rest-toggle-slider" />
                           </button>
                           <span className={`rest-status-text ${row.active ? 'rest-status-on' : 'rest-status-off'}`}>
-                            {row.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}
+                            {row.active ? 'Mở' : 'Tắt'}
                           </span>
                         </div>
                       </td>

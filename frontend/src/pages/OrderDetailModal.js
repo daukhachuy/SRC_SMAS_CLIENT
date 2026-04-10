@@ -9,9 +9,26 @@ import {
   Utensils,
   ChevronRight,
   Info,
+  Star,
+  Truck,
+  Package,
+  Headphones,
+  Tag,
+  CheckCircle,
 } from 'lucide-react';
 import { myOrderAPI } from '../api/myOrderApi';
+import { createOrUpdateFeedback } from '../api/feedbackApi';
 import '../styles/OrderDetailModal.css';
+
+const FEEDBACK_TAGS = [
+  { value: 'Chất lượng món', Icon: Utensils },
+  { value: 'Giao hàng', Icon: Truck },
+  { value: 'Đóng gói', Icon: Package },
+  { value: 'Dịch vụ', Icon: Headphones },
+  { value: 'Giá cả', Icon: Tag },
+];
+
+const RATING_LABELS = ['', 'Rất không hài lòng', 'Không hài lòng', 'Bình thường', 'Hài lòng', 'Rất tuyệt vời'];
 
 const normalizeLineItem = (item) => {
   const qty = Number(item.quantity) || 0;
@@ -32,6 +49,13 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
   const [displayOrder, setDisplayOrder] = useState(orderProp);
   const [detailLoading, setDetailLoading] = useState(() => Boolean(orderProp?.orderCode));
   const [fetchError, setFetchError] = useState('');
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackTag, setFeedbackTag] = useState(FEEDBACK_TAGS[0].value);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
     if (!orderProp?.orderCode) {
@@ -96,6 +120,12 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
     };
   }, [orderProp?.orderCode, orderProp?.orderType]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   if (!orderProp) return null;
 
   const order = displayOrder ?? orderProp;
@@ -151,8 +181,51 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
     apiTotal != null && !Number.isNaN(apiTotal) ? apiTotal : computedTotal;
 
   const statusLabel = order.orderStatus || order.status || order.displayStatus || 'Đang xử lý';
+  /** Hiện nút đánh giá: đúng `order.status === 'Completed'` hoặc backend trả orderStatus/COMPLETED */
+  const rawForCompleted = String(order.status ?? order.orderStatus ?? order.displayStatus ?? '').trim();
+  const isCompleted =
+    order.status === 'Completed' ||
+    order.orderStatus === 'Completed' ||
+    rawForCompleted.toLowerCase() === 'completed' ||
+    rawForCompleted.toLowerCase() === 'complete';
 
   const fmtMoney = (amount) => (amount ?? 0).toLocaleString();
+
+  const openFeedbackModal = () => {
+    setFeedbackRating(5);
+    setFeedbackTag(FEEDBACK_TAGS[0].value);
+    setFeedbackComment('');
+    setShowFeedbackModal(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    const code = order.orderCode;
+    if (!code) {
+      setToast({ type: 'error', message: 'Thiếu mã đơn hàng.' });
+      return;
+    }
+    setFeedbackSubmitting(true);
+    try {
+      await createOrUpdateFeedback({
+        orderCode: String(code),
+        rating: feedbackRating,
+        comment: (feedbackComment || '').trim(),
+        feedbackType: feedbackTag,
+      });
+      setShowFeedbackModal(false);
+      setFeedbackSubmitted(true);
+      setToast({ type: 'success', message: 'Cảm ơn bạn đã đánh giá dịch vụ!' });
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.title ||
+        e?.message ||
+        'Gửi đánh giá thất bại. Vui lòng thử lại.';
+      setToast({ type: 'error', message: msg });
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
 
   const getStatusClass = (status) => {
     const s = String(status ?? '').toLowerCase();
@@ -342,7 +415,11 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
               <div style={{ display: 'flex', gap: '8px', color: '#64748b' }}>
                 <Info size={16} />
                 <p style={{ fontSize: '0.85rem', margin: 0 }}>
-                  Bạn chỉ có thể đánh giá dịch vụ sau khi đơn hàng đã được giao và thanh toán thành công.
+                  {isCompleted
+                    ? feedbackSubmitted
+                      ? 'Cảm ơn bạn đã gửi đánh giá.'
+                      : 'Đơn đã hoàn thành — bạn có thể đánh giá dịch vụ bằng nút bên dưới.'
+                    : 'Bạn chỉ có thể đánh giá dịch vụ sau khi đơn hàng đã hoàn thành.'}
                 </p>
               </div>
             </div>
@@ -351,12 +428,149 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
 
         {/* FOOTER SECTION */}
         <div className="od-modal-footer">
-          <button className="od-btn-secondary" onClick={onClose}>Đóng</button>
-          <button className="od-btn-primary" onClick={onClose}>
-            Xác nhận <ChevronRight size={16} />
-          </button>
+          <div className="od-modal-footer-left">
+            {isCompleted && !feedbackSubmitted && (
+              <button
+                type="button"
+                className="od-btn-feedback"
+                onClick={openFeedbackModal}
+                disabled={!!loading}
+              >
+                Đánh giá dịch vụ
+              </button>
+            )}
+            {feedbackSubmitted && (
+              <span className="od-feedback-sent-label">Đã gửi đánh giá</span>
+            )}
+          </div>
+          <div className="od-modal-footer-actions">
+            <button type="button" className="od-btn-secondary" onClick={onClose}>
+              Đóng
+            </button>
+            <button type="button" className="od-btn-primary" onClick={onClose}>
+              Xác nhận <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
 
+        {showFeedbackModal && (
+          <div
+            className="od-feedback-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="od-feedback-order-label"
+            onClick={() => !feedbackSubmitting && setShowFeedbackModal(false)}
+          >
+            <div className="od-feedback-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="od-feedback-head">
+                <div className="od-feedback-head-icon" aria-hidden>
+                  <ShoppingBag size={22} />
+                </div>
+                <div className="od-feedback-head-text">
+                  <span id="od-feedback-order-label" className="od-feedback-order-label">
+                    Mã đơn hàng
+                  </span>
+                  <strong className="od-feedback-order-code">Order #{order.orderCode}</strong>
+                </div>
+                <button
+                  type="button"
+                  className="od-close-button od-feedback-close"
+                  onClick={() => !feedbackSubmitting && setShowFeedbackModal(false)}
+                  aria-label="Đóng"
+                >
+                  <X size={22} />
+                </button>
+              </div>
+
+              <div className="od-feedback-body">
+                <div>
+                  <p className="od-feedback-section-title">Đánh giá chung</p>
+                  <div className="od-feedback-stars" role="group" aria-label="Chọn từ 1 đến 5 sao">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`od-feedback-star-btn ${n <= feedbackRating ? 'od-feedback-star-btn--on' : ''}`}
+                        onClick={() => setFeedbackRating(n)}
+                        aria-label={`${n} sao`}
+                        aria-pressed={n <= feedbackRating}
+                      >
+                        <Star size={32} strokeWidth={1.25} fill={n <= feedbackRating ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="od-feedback-rating-label">{RATING_LABELS[feedbackRating]}</p>
+                </div>
+
+                <div>
+                  <p className="od-feedback-tags-title">Bạn hài lòng về điều gì?</p>
+                  <div className="od-feedback-tags">
+                    {FEEDBACK_TAGS.map(({ value, Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`od-feedback-tag ${feedbackTag === value ? 'od-feedback-tag--selected' : ''}`}
+                        onClick={() => setFeedbackTag(value)}
+                      >
+                        <Icon size={16} />
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="od-feedback-label-comment" htmlFor="od-feedback-comment">
+                    Chia sẻ thêm cảm nhận
+                  </label>
+                  <textarea
+                    id="od-feedback-comment"
+                    className="od-feedback-textarea"
+                    placeholder="Món ăn rất vừa miệng, nóng hổi khi đến nơi. Tôi rất hài lòng!"
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    maxLength={2000}
+                    rows={5}
+                  />
+                </div>
+              </div>
+
+              <div className="od-feedback-footer">
+                <button
+                  type="button"
+                  className="od-feedback-btn-submit"
+                  disabled={feedbackSubmitting}
+                  onClick={handleSubmitFeedback}
+                >
+                  {feedbackSubmitting ? (
+                    'Đang gửi…'
+                  ) : (
+                    <>
+                      <span className="od-feedback-submit-icon-wrap">
+                        <CheckCircle size={14} strokeWidth={2.5} />
+                      </span>
+                      Xác nhận
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="od-feedback-btn-close"
+                  disabled={feedbackSubmitting}
+                  onClick={() => setShowFeedbackModal(false)}
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <div className={`od-toast od-toast--${toast.type}`} role="status">
+            {toast.message}
+          </div>
+        )}
       </div>
     </div>
   );
