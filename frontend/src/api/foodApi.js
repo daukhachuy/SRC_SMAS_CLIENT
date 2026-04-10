@@ -1,4 +1,21 @@
 import instance from './axiosInstance';
+import { extractUserFromToken } from '../utils/jwtHelper';
+
+function getComboCreatedBy() {
+  const token =
+    localStorage.getItem('authToken') ||
+    localStorage.getItem('accessToken');
+  const fromJwt = extractUserFromToken(token);
+  if (fromJwt?.userId != null && !Number.isNaN(Number(fromJwt.userId))) {
+    return Number(fromJwt.userId);
+  }
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    return Number(u.userId) || 0;
+  } catch {
+    return 0;
+  }
+}
 
 const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
@@ -98,13 +115,16 @@ export async function getBuffetLists() {
 
 /**
  * COMBO API - Lấy danh sách gói Combo
- * Endpoint: /api/combo
+ * Endpoint: GET /api/combo  hoặc  GET /api/combo?id=
  */
-export async function getComboLists() {
+export async function getComboLists(options = {}) {
   try {
-    console.log('🍱 Fetching combo lists...');
-    const response = await instance.get('/combo');
-    console.log('✅ Combo lists loaded:', response.data);
+    const { id } = options;
+    const params =
+      id != null && id !== ''
+        ? { id: Number(id) }
+        : undefined;
+    const response = await instance.get('/combo', params ? { params } : {});
     return response.data;
   } catch (error) {
     console.error('❌ Failed to fetch combo lists:', error.response?.data || error.message);
@@ -113,6 +133,139 @@ export async function getComboLists() {
       message: error.response?.data?.message || 'Failed to load combo lists.',
       error
     };
+  }
+}
+
+/** Chuẩn hóa mảng từ GET /api/combo */
+export function normalizeComboListResponse(data) {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.$values)) return data.$values;
+  if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
+}
+
+/**
+ * POST /api/combo — tạo combo (Swagger: JSON hoặc multipart nếu có ảnh)
+ */
+export async function createCombo(payload) {
+  try {
+    const createdBy = payload.createdBy ?? getComboCreatedBy();
+    const maxUsage =
+      payload.maxUsage === '' || payload.maxUsage == null
+        ? 2147483647
+        : Math.max(0, Number(payload.maxUsage) || 0);
+    const base = {
+      name: payload.name ?? '',
+      description: payload.description ?? '',
+      price: Number(payload.price) || 0,
+      discountPercent: Math.min(100, Math.max(0, Number(payload.discountPercent) || 0)),
+      image: payload.image ?? '',
+      startDate: payload.startDate || '2000-01-01',
+      expiryDate: payload.expiryDate || '2099-12-31',
+      maxUsage,
+      isAvailable: payload.isAvailable !== false,
+      createdBy: Number(createdBy) || 0,
+    };
+
+    if (payload.imageFile instanceof File) {
+      const fd = new FormData();
+      fd.append('name', base.name);
+      fd.append('description', base.description);
+      fd.append('price', String(base.price));
+      fd.append('discountPercent', String(base.discountPercent));
+      fd.append('startDate', base.startDate);
+      fd.append('expiryDate', base.expiryDate);
+      fd.append('maxUsage', String(base.maxUsage));
+      fd.append('isAvailable', String(base.isAvailable));
+      fd.append('createdBy', String(base.createdBy));
+      fd.append('image', payload.imageFile);
+      const resp = await instance.post('/combo', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return resp.data;
+    }
+
+    const resp = await instance.post('/combo', base);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] createCombo error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * PUT /api/combo/{id} — cập nhật combo
+ */
+export async function updateCombo(id, payload) {
+  try {
+    const maxUsage =
+      payload.maxUsage === '' || payload.maxUsage == null
+        ? 2147483647
+        : Math.max(0, Number(payload.maxUsage) || 0);
+    const base = {
+      name: payload.name ?? '',
+      description: payload.description ?? '',
+      price: Number(payload.price) || 0,
+      discountPercent: Math.min(100, Math.max(0, Number(payload.discountPercent) || 0)),
+      image: payload.image ?? '',
+      startDate: payload.startDate || '2000-01-01',
+      expiryDate: payload.expiryDate || '2099-12-31',
+      maxUsage,
+      isAvailable: payload.isAvailable !== false,
+    };
+
+    if (payload.imageFile instanceof File) {
+      const fd = new FormData();
+      fd.append('name', base.name);
+      fd.append('description', base.description);
+      fd.append('price', String(base.price));
+      fd.append('discountPercent', String(base.discountPercent));
+      fd.append('startDate', base.startDate);
+      fd.append('expiryDate', base.expiryDate);
+      fd.append('maxUsage', String(base.maxUsage));
+      fd.append('isAvailable', String(base.isAvailable));
+      fd.append('image', payload.imageFile);
+      const resp = await instance.put(`/combo/${id}`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return resp.data;
+    }
+
+    const resp = await instance.put(`/combo/${id}`, base);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] updateCombo error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * DELETE /api/combo/{id}
+ */
+export async function deleteCombo(id) {
+  try {
+    const resp = await instance.delete(`/combo/${id}`);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] deleteCombo error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * PATCH /api/combo/{id}/status?isAvailable=
+ */
+export async function patchComboStatus(id, isAvailable) {
+  try {
+    const resp = await instance.patch(`/combo/${id}/status`, null, {
+      params: { isAvailable: Boolean(isAvailable) },
+    });
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] patchComboStatus error:', err.response?.data || err.message);
+    throw err;
   }
 }
 
@@ -245,13 +398,12 @@ export async function deleteFood(id) {
 }
 
 /**
- * PATCH /api/food/{id}/status — Đang kinh doanh ↔ Ngừng kinh doanh (Swagger: body thường map với isAvailable)
+ * PATCH /api/food/{id}/status?isAvailable= — Swagger: query param isAvailable (boolean), không gửi body.
  */
 export async function toggleFoodStatus(id, newStatus) {
   try {
-    const resp = await instance.patch(`/food/${id}/status`, {
-      status: newStatus,
-      isAvailable: newStatus
+    const resp = await instance.patch(`/food/${id}/status`, null, {
+      params: { isAvailable: Boolean(newStatus) },
     });
     return resp.data;
   } catch (err) {

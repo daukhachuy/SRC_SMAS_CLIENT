@@ -228,8 +228,53 @@
   border-top: 1px solid #f1f5f9;
   background: #f8fafc;
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
+}
+
+.od-modal-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.od-modal-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.od-btn-feedback {
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 108, 31, 0.45);
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  color: #c2410c;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.od-btn-feedback:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(255, 108, 31, 0.25);
+  transform: translateY(-1px);
+}
+
+.od-btn-feedback:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.od-feedback-sent-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #16a34a;
 }
 
 .od-btn-secondary {
@@ -259,3 +304,279 @@
 /* Helpers */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
+
+/* Nested feedback modal (above main modal content) */
+.od-feedback-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(35, 22, 15, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.od-feedback-modal {
+  width: 100%;
+  max-width: 28rem;
+  max-height: min(90vh, calc(100dvh - 2rem));
+  overflow: auto;
+  background: #fff;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 108, 31, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.od-feedback-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  border-radius: 1rem 1rem 0 0;
+}
+
+.od-feedback-head-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.od-feedback-head-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.od-feedback-order-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.od-feedback-order-code {
+  font-size: 1rem;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.od-feedback-close {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.od-feedback-body {
+  padding: 1.25rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.od-feedback-section-title {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.od-feedback-stars {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.od-feedback-star-btn {
+  border: none;
+  background: transparent;
+  padding: 0.2rem;
+  color: #e2e8f0;
+  cursor: pointer;
+  line-height: 0;
+  transition: color 0.15s, transform 0.15s;
+}
+
+.od-feedback-star-btn--on {
+  color: #fbbf24;
+}
+
+.od-feedback-star-btn:hover {
+  transform: scale(1.08);
+}
+
+.od-feedback-rating-label {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.od-feedback-tags-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.od-feedback-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.od-feedback-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.od-feedback-tag--selected {
+  background: #fff7ed;
+  border-color: #fb923c;
+  color: #c2410c;
+}
+
+.od-feedback-label-comment {
+  display: block;
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.od-feedback-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 6rem;
+}
+
+.od-feedback-textarea:focus {
+  outline: none;
+  border-color: #ff6c1f;
+  box-shadow: 0 0 0 3px rgba(255, 108, 31, 0.12);
+  background: #fff;
+}
+
+.od-feedback-footer {
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.od-feedback-btn-submit {
+  flex: 1 1 10rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  border: none;
+  border-radius: 0.65rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ff8a3d 0%, #ff6c1f 50%, #ea580c 100%);
+  box-shadow: 0 10px 20px -8px rgba(255, 108, 31, 0.45);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.od-feedback-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.od-feedback-btn-submit:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.od-feedback-submit-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.od-feedback-btn-close {
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.65rem;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.od-feedback-btn-close:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.od-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: min(90%, 24rem);
+  padding: 0.65rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+.od-toast--success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+
+.od-toast--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}

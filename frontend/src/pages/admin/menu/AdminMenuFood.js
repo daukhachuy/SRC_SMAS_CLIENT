@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Plus, Search, Pencil, Trash2, X, UploadCloud, AlertCircle,
-  CheckCircle, RefreshCw
+  CheckCircle, RefreshCw, Sparkles, Store,
 } from 'lucide-react';
 import {
-  getAllFoods,
+  getFoodCategories,
+  normalizeFoodCategoryPayload,
   createFood,
   updateFood,
   deleteFood,
@@ -80,9 +81,9 @@ function normalizeFood(raw) {
     categories: uniqueCats,
     price,
     priceDisplay: hasPromo
-      ? `${formatPrice(promo)}₫`
-      : `${formatPrice(price)}₫`,
-    priceListDisplay: hasPromo ? `${formatPrice(price)}₫` : null,
+      ? `${formatPrice(promo)}đ`
+      : `${formatPrice(price)}đ`,
+    priceListDisplay: hasPromo ? `${formatPrice(price)}đ` : null,
     unit: raw.unit ?? 'Dĩa',
     image: raw.image ?? '',
     imageUrl: resolveFoodImageUrl(raw.image),
@@ -91,10 +92,13 @@ function normalizeFood(raw) {
     isDirectSale: raw.isDirectSale === true,
     isFeatured: raw.isFeatured === true,
     preparationTime: raw.preparationTime != null ? Number(raw.preparationTime) : null,
-    notes: raw.notes ?? '',
+    notes: raw.notes ?? raw.note ?? '',
     promotionalPrice: Number.isFinite(promo) ? promo : 0,
+    /** Chuỗi hiển thị cột phân loại: "A, B, C" */
+    categoriesLabel: uniqueCats.length ? uniqueCats.join(', ') : '—',
   };
 }
+
 
 /** Lấy categoryId từ categoryName (dựa vào categories đã load) */
 function categoryLabel(c) {
@@ -120,6 +124,12 @@ const AdminMenuFood = () => {
   /* ── Filter / Search ── */
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+
+  /* ── Pagination ── */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  const pageSizeOptions = [5, 10, 20];
 
   /* ── Modal thêm ── */
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -151,9 +161,10 @@ const AdminMenuFood = () => {
       setApiError('');
     }
     try {
-      // GET /api/food — nguồn chính (Swagger)
-      const foodList = await getAllFoods();
-      const normFoods = (Array.isArray(foodList) ? foodList : [])
+      // GET /api/food/category — danh sách món (Swagger: mảng món + categories lồng nhau)
+      const payload = await getFoodCategories();
+      const flatList = normalizeFoodCategoryPayload(payload);
+      const normFoods = (Array.isArray(flatList) ? flatList : [])
         .map(normalizeFood)
         .filter(Boolean);
       setFoods(normFoods);
@@ -170,7 +181,13 @@ const AdminMenuFood = () => {
         setCategories([]);
       }
     } catch (e) {
-      setApiError(e?.response?.data?.message || e?.message || 'Không tải được danh sách món ăn (GET /api/food).');
+      const msg =
+        (typeof e?.message === 'string' && e.message) ||
+        e?.response?.data?.message ||
+        e?.error?.response?.data?.message ||
+        e?.error?.message ||
+        'Không tải được danh sách món ăn (GET /api/food/category).';
+      setApiError(msg);
       setFoods([]);
     } finally {
       if (!options.silent) setLoading(false);
@@ -189,11 +206,29 @@ const AdminMenuFood = () => {
   }, [toastMsg]);
 
   /* ── Filtered list ── */
-  const filtered = foods.filter((d) => {
-    const matchSearch = !search || (d.name || '').toLowerCase().includes(search.toLowerCase());
-    const matchCat = !categoryFilter || d.categories.includes(categoryFilter) || d.category === categoryFilter;
-    return matchSearch && matchCat;
-  });
+  const filtered = useMemo(() => {
+    const list = foods.filter((d) => {
+      const matchSearch = !search || (d.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchCat = !categoryFilter || d.categories.includes(categoryFilter) || d.category === categoryFilter;
+      return matchSearch && matchCat;
+    });
+    return list;
+  }, [foods, search, categoryFilter]);
+
+  /* ── Paginated slice ── */
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
+  /* Reset page when filter changes */
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter]);
 
   /* ── Helpers form ── */
   const setFormErrorsFn = (setter) => (errors) => setter(typeof errors === 'function' ? errors({}) : errors);
@@ -626,7 +661,7 @@ const AdminMenuFood = () => {
         </div>
       )}
 
-      {/* ── Bảng món ăn ── */}
+      {/* ── Bảng món ăn (GET /api/food/category) ── */}
       <div className="menu-table-card">
         {loading ? (
           <div className="menu-loading-wrap">
@@ -635,31 +670,33 @@ const AdminMenuFood = () => {
           </div>
         ) : (
           <>
-            <table className="menu-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 80 }}>HÌNH ẢNH</th>
-                  <th>TÊN MÓN</th>
-                  <th style={{ width: 130 }}>DANH MỤC</th>
-                  <th style={{ width: 120 }}>GIÁ BÁN</th>
-                  <th style={{ width: 100 }}>TRẠNG THÁI</th>
-                  <th style={{ width: 100 }}>THAO TÁC</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="menu-table-scroll">
+        <table className="menu-table">
+          <thead>
+            <tr>
+                  <th style={{ width: 72 }}>HÌNH ẢNH</th>
+                  <th style={{ minWidth: 160 }}>TÊN MÓN</th>
+                  <th style={{ width: 120 }}>GIÁ</th>
+                  <th style={{ minWidth: 180 }}>PHÂN LOẠI</th>
+                  <th style={{ minWidth: 200 }}>MÔ TẢ</th>
+                  <th style={{ width: 140 }}>TRẠNG THÁI</th>
+                  <th style={{ width: 104 }}>THAO TÁC</th>
+            </tr>
+          </thead>
+          <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="menu-empty-row">
+                      <td colSpan={7} className="menu-empty-row">
                       {search || categoryFilter
                         ? 'Không có món ăn phù hợp với bộ lọc.'
                         : 'Chưa có món ăn nào. Nhấn "Thêm món mới" để bắt đầu.'}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((row) => (
+                  paginated.map((row) => (
                     <tr key={row.id} className={!row.status ? 'row-inactive' : ''}>
-                      <td>
-                        <div className="menu-table-img">
+                <td>
+                  <div className="menu-table-img">
                           {row.imageUrl && row.imageUrl !== FIXED_PRODUCT_IMAGE ? (
                             <img src={row.imageUrl} alt={row.name} onError={(e) => { e.target.style.display = 'none'; }} />
                           ) : (
@@ -667,32 +704,26 @@ const AdminMenuFood = () => {
                               <span>{row.name?.[0]?.toUpperCase() ?? '?'}</span>
                             </div>
                           )}
-                        </div>
-                      </td>
+                  </div>
+                </td>
                       <td className="menu-cell-name">
-                        <span className="menu-dish-name">
-                          {row.name}
-                          {row.isFeatured ? (
-                            <span className="menu-featured-badge" title="Món nổi bật"> ★</span>
-                          ) : null}
-                        </span>
-                        {row.description && (
-                          <span className="menu-dish-desc">{row.description}</span>
+                        <span className="menu-dish-name">{row.name}</span>
+                        {(row.isFeatured || row.isDirectSale) && (
+                          <div className="menu-food-tag-row">
+                            {row.isFeatured && (
+                              <span className="menu-food-tag-pill menu-food-tag-pill--featured" title="Món nổi bật">
+                                <Sparkles size={12} aria-hidden />
+                                Nổi bật
+                              </span>
+                            )}
+                            {row.isDirectSale && (
+                              <span className="menu-food-tag-pill menu-food-tag-pill--direct" title="Bán lẻ / trực tiếp">
+                                <Store size={12} aria-hidden />
+                                Bán lẻ
+                              </span>
+                            )}
+                          </div>
                         )}
-                        {row.preparationTime != null && row.preparationTime > 0 && (
-                          <span className="menu-dish-meta">~{row.preparationTime} phút</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="menu-category-tags">
-                          {row.categories.length ? (
-                            row.categories.slice(0, 2).map((cat) => (
-                              <span key={cat} className="menu-category-tag">{cat}</span>
-                            ))
-                          ) : (
-                            <span className="menu-category-tag menu-category-tag--muted">—</span>
-                          )}
-                        </div>
                       </td>
                       <td className="menu-cell-price">
                         <span className="menu-price-main">{row.priceDisplay}</span>
@@ -701,52 +732,124 @@ const AdminMenuFood = () => {
                         )}
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className={`menu-toggle ${row.status ? 'active' : ''}`}
-                          aria-label="Toggle trạng thái"
-                          disabled={toggleBusyId === row.id}
-                          onClick={() => handleToggleStatus(row)}
-                        >
-                          <span className="menu-toggle-thumb" />
-                        </button>
-                      </td>
+                        <span className="menu-categories-text" title={row.categoriesLabel}>
+                          {row.categoriesLabel}
+                        </span>
+                </td>
                       <td>
-                        <div className="menu-actions-cell">
-                          <button
-                            type="button"
-                            className="menu-icon-btn"
-                            aria-label="Sửa"
-                            onClick={() => openEditModal(row)}
+                        <div className="menu-status-stack">
+                          <span
+                            className={`menu-stock-badge ${row.status ? 'menu-stock-badge--in' : 'menu-stock-badge--out'}`}
                           >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="menu-icon-btn menu-icon-btn-danger"
-                            aria-label="Xóa"
-                            onClick={() => openDeleteModal(row)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                            {row.status ? 'Còn hàng' : 'Hết hàng'}
+                          </span>
+                  <button
+                    type="button"
+                    className={`menu-toggle ${row.status ? 'active' : ''}`}
+                            aria-label={row.status ? 'Chuyển sang hết hàng' : 'Chuyển sang còn hàng'}
+                            disabled={toggleBusyId === row.id}
+                            onClick={() => handleToggleStatus(row)}
+                  >
+                    <span className="menu-toggle-thumb" />
+                  </button>
                         </div>
                       </td>
-                    </tr>
+                      <td>
+                        <span className="menu-desc-text">{row.description || '—'}</span>
+                </td>
+                <td>
+                  <div className="menu-actions-cell">
+                    <button
+                      type="button"
+                      className="menu-icon-btn"
+                      aria-label="Sửa"
+                      onClick={() => openEditModal(row)}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="menu-icon-btn menu-icon-btn-danger"
+                      aria-label="Xóa"
+                            onClick={() => openDeleteModal(row)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
                   ))
                 )}
-              </tbody>
-            </table>
-
-            <div className="menu-pagination">
-              <span>
-                Hiển thị {filtered.length} / {foods.length} món ăn
-              </span>
-              <div className="menu-pagination-btns">
-                <button type="button" className="menu-page-btn" disabled>‹</button>
-                <button type="button" className="menu-page-btn active">1</button>
-                <button type="button" className="menu-page-btn" disabled>›</button>
-              </div>
+          </tbody>
+        </table>
             </div>
+
+        <div className="menu-pagination">
+          <div className="menu-pagination-info">
+            <span>
+              Hiển thị {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, totalItems)} của {totalItems} món ăn
+            </span>
+            <div className="menu-page-size-wrap">
+              <label htmlFor="page-size-select">Hiển thị:</label>
+              <select
+                id="page-size-select"
+                className="menu-page-size-select"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {pageSizeOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <span>/ trang</span>
+            </div>
+          </div>
+          <div className="menu-pagination-btns">
+            <button
+              type="button"
+              className="menu-page-btn"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+            >
+              ‹
+            </button>
+
+            {(() => {
+              const pages = [];
+              const maxVisible = 5;
+              let startPage = Math.max(1, safePage - Math.floor(maxVisible / 2));
+              let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+              if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+              }
+              for (let i = startPage; i <= endPage; i++) {
+                pages.push(
+                  <button
+                    key={i}
+                    type="button"
+                    className={`menu-page-btn ${i === safePage ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(i)}
+                  >
+                    {i}
+                  </button>
+                );
+              }
+              return pages;
+            })()}
+
+            <button
+              type="button"
+              className="menu-page-btn"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+            >
+              ›
+            </button>
+          </div>
+        </div>
           </>
         )}
       </div>
@@ -794,7 +897,7 @@ const AdminMenuFood = () => {
             </div>
             <div className="kds-modal-content">
               <p>Bạn có chắc chắn muốn xóa món <strong>{deletingFood.name}</strong> khỏi danh sách?</p>
-            </div>
+          </div>
             <div className="kds-modal-footer">
               <button
                 type="button"
@@ -804,15 +907,15 @@ const AdminMenuFood = () => {
               >
                 Quay lại
               </button>
-              <button
-                type="button"
+                    <button
+                      type="button"
                 className="kds-btn danger"
                 onClick={handleConfirmDelete}
                 disabled={deleteLoading}
               >
                 <Trash2 size={18} />
                 {deleteLoading ? 'Đang xóa...' : 'Xác nhận xóa'}
-              </button>
+                    </button>
             </div>
           </div>
         </div>
