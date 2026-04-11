@@ -28,6 +28,7 @@ import { patchOrderItemServed } from '../../api/orderItemApi';
 import { createPaymentLink, payOrderCash } from '../../api/paymentService';
 import { getWaiterTables } from '../../api/waiterApiTable';
 import { initTableSession } from '../../api/tableSessionApi';
+import { getProfile } from '../../api/userApi';
 import TableQRCode from '../../components/TableQRCode';
 
 // Helper: formatCurrency
@@ -276,6 +277,56 @@ const toOrderItem = (item, idx) => ({
   note: item?.note || ''
 });
 
+const isBuffetPackageLine = (item) => {
+  const name = normalizeSearchText(item?.name || '');
+  const buffetId = Number(item?.buffetId || item?.bufferId || item?.idBuffer || 0);
+  const foodId = Number(item?.foodId || 0);
+  const comboId = Number(item?.comboId || 0);
+  const itemType = normalizeSearchText(item?.itemType || item?.type || '');
+  const looksBuffetByName = name.startsWith('buffet') || name.includes(' buffet ');
+  const looksBuffetByType = itemType.includes('buffet');
+
+  // Dòng đại diện gói buffet: có dấu hiệu buffet nhưng không phải món lẻ trong gói.
+  return (looksBuffetByName || looksBuffetByType || buffetId > 0) && foodId <= 0 && comboId <= 0;
+};
+
+const mergeDuplicateOrderItems = (items) => {
+  const grouped = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const key = [
+      Number(item?.foodId || 0),
+      Number(item?.comboId || 0),
+      Number(item?.buffetId || 0),
+      normalizeSearchText(item?.name || ''),
+      Number(item?.price || 0),
+      String(item?.dishStatus || ''),
+      String(item?.note || ''),
+    ].join('|');
+
+    const currentId = item?.id || item?.orderItemId || item?.itemId || item?.foodId;
+    const currentIds = [currentId, ...(Array.isArray(item?.orderItemIds) ? item.orderItemIds : [])]
+      .map((x) => Number(x || 0))
+      .filter((x) => Number.isFinite(x) && x > 0);
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        ...item,
+        quantity: Number(item?.quantity || 0),
+        orderItemIds: Array.from(new Set(currentIds)),
+      });
+      return;
+    }
+
+    const existing = grouped.get(key);
+    existing.quantity = Number(existing.quantity || 0) + Number(item?.quantity || 0);
+    existing.orderItemIds = Array.from(new Set([...(existing.orderItemIds || []), ...currentIds]));
+    grouped.set(key, existing);
+  });
+
+  return Array.from(grouped.values());
+};
+
 const mapApiOrderToWaiter = (order) => {
   // Lấy đúng trường từ API thực tế
   const orderCode = order?.orderCode || order?.code || `DH-${order?.orderId || order?.id || '---'}`;
@@ -297,8 +348,14 @@ const mapApiOrderToWaiter = (order) => {
         orderItemId: item.orderItemId,
         itemId: item.itemId,
         foodId: item.foodId,
+        comboId: item.comboId,
+        buffetId: item.buffetId || item.bufferId || item.idBuffer,
+        itemType: item.itemType || item.type,
+        orderItemIds: [item.id, item.orderItemId, item.itemId].filter(Boolean),
       }))
+      .filter((item) => !isBuffetPackageLine(item))
     : [];
+  const mergedOrderItems = mergeDuplicateOrderItems(orderItems);
   const totalAmount = Number(order?.totalAmount || order?.total || 0);
   // Lấy tên bàn chính
   let tableName = '';
@@ -315,7 +372,19 @@ const mapApiOrderToWaiter = (order) => {
     : deliveryFlow.actionLabel;
 
   const tableCodeValue = Array.isArray(order.tables) && order.tables.length > 0
-    ? (order.tables.find(t => t.isMainTable)?.tableId || order.tables[0]?.tableId || tableName)
+    ? (
+      order.tables.find(t => t.isMainTable)?.tableCode ||
+      order.tables.find(t => t.isMainTable)?.code ||
+      order.tables.find(t => t.isMainTable)?.tableId ||
+      order.tables.find(t => t.isMainTable)?.id ||
+      order.tables.find(t => t.isMainTable)?.tableName ||
+      order.tables[0]?.tableCode ||
+      order.tables[0]?.code ||
+      order.tables[0]?.tableId ||
+      order.tables[0]?.id ||
+      order.tables[0]?.tableName ||
+      tableName
+    )
     : (order.tableCode || order.tableNumber || tableName);
   const customerName =
     deliveryInfo?.recipientName ||
@@ -360,7 +429,7 @@ const mapApiOrderToWaiter = (order) => {
     deliveryActionLabel: isDelivery ? finalDeliveryActionLabel : 'THANH TOÁN',
     deliveryWorkflowStatus: normalizeStatus(deliveryInfo?.deliveryStatus || order?.deliveryStatus),
     isPaid: paid,
-    items: orderItems,
+    items: mergedOrderItems,
     address,
     phone,
     note: order?.note || order?.customerNote || '',
@@ -744,6 +813,7 @@ const mapApiOrderToWaiter = (order) => {
     orderType: 'at-place',
     fullName: '',
     phone: '',
+    email: '',
     guests: '',
     bookingDate: '',
     bookingTime: '',
@@ -873,12 +943,29 @@ const mapApiOrderToWaiter = (order) => {
     return () => clearTimeout(timer);
   }, [uiNotice]);
 
-  const calculateOrderSubtotal = (order) =>
-    (order.items || []).reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const calculateOrderSubtotal = (order) => {
+    const itemsSubtotal = (order?.items || []).reduce(
+      (sum, item) => sum + Number(item?.price || 0) * Number(item?.quantity || 0),
+      0
+    );
+
+    const backendSubtotalCandidates = [
+      Number(order?.subTotal),
+      Number(order?.subtotal),
+      Number(order?.totalBeforeDiscount),
+      Number(order?.totalAmount) - Number(order?.deliveryFee || 0) + Number(order?.discount || 0),
+    ].filter((n) => Number.isFinite(n) && n > 0);
+
+    const backendSubtotal = backendSubtotalCandidates.length > 0 ? backendSubtotalCandidates[0] : 0;
+    return Math.max(itemsSubtotal, backendSubtotal);
+  };
 
 
-  const calculateOrderTotal = (order) =>
-    calculateOrderSubtotal(order) + (order.deliveryFee || 0) - (order.discount || 0);
+  const calculateOrderTotal = (order) => {
+    const backendTotal = Number(order?.totalAmount || 0);
+    if (Number.isFinite(backendTotal) && backendTotal > 0) return backendTotal;
+    return calculateOrderSubtotal(order) + Number(order?.deliveryFee || 0) - Number(order?.discount || 0);
+  };
 
   const paymentTotal = Number(calculateOrderTotal(selectedOrder || { items: [] }) || 0);
   const receivedMoneyValue = Number(receivedMoney || 0);
@@ -912,9 +999,63 @@ const mapApiOrderToWaiter = (order) => {
     return raw;
   };
 
-  const buildGuestQrUrl = (tableCode, accessToken) => {
+  const resolveTableCandidates = (order) => {
+    const mainTable = Array.isArray(order?.tables) && order.tables.length > 0
+      ? (order.tables.find((t) => t.isMainTable) || order.tables[0])
+      : null;
+
+    const rawCandidates = [
+      order?.tableCode,
+      order?.tableNumber,
+      order?.tableName,
+      mainTable?.tableCode,
+      mainTable?.code,
+      mainTable?.tableId,
+      mainTable?.id,
+      mainTable?.tableName,
+    ];
+
+    const expanded = [];
+    rawCandidates.forEach((value) => {
+      const raw = String(value || '').trim();
+      if (!raw) return;
+      expanded.push(raw);
+      const normalized = normalizeTableCode(raw);
+      if (normalized && normalized !== raw) {
+        expanded.push(normalized);
+      }
+    });
+
+    const orderLabel = String(order?.tableNumber || order?.tableName || '').trim().toLowerCase();
+    const orderDigits = normalizeTableCode(orderLabel);
+
+    const matchedFromTables = (tables || []).find((table) => {
+      const name = String(table?.name || '').trim().toLowerCase();
+      const code = String(table?.code || '').trim().toLowerCase();
+      if (orderLabel && (name === orderLabel || code === orderLabel)) return true;
+      if (orderDigits) {
+        return normalizeTableCode(name) === orderDigits || normalizeTableCode(code) === orderDigits;
+      }
+      return false;
+    });
+
+    if (matchedFromTables) {
+      expanded.push(String(matchedFromTables.code || '').trim());
+      expanded.push(String(matchedFromTables.id || '').trim());
+      expanded.push(String(matchedFromTables.name || '').trim());
+      const normalizedName = normalizeTableCode(matchedFromTables.name);
+      if (normalizedName) expanded.push(normalizedName);
+    }
+
+    return Array.from(new Set(expanded.filter(Boolean)));
+  };
+
+  const buildGuestQrUrl = (tableCode, accessToken, tableName) => {
     const url = new URL('/guest-qr-order', window.location.origin);
     url.searchParams.set('tableCode', String(tableCode));
+    if (tableName) {
+      url.searchParams.set('tableName', String(tableName));
+    }
     if (accessToken) {
       url.searchParams.set('tableToken', accessToken);
     }
@@ -922,8 +1063,8 @@ const mapApiOrderToWaiter = (order) => {
   };
 
   const initQrForOrder = async (order) => {
-    const resolvedTableCode = normalizeTableCode(order?.tableCode || order?.tableNumber);
-    if (!resolvedTableCode) {
+    const candidates = resolveTableCandidates(order);
+    if (candidates.length === 0) {
       setTableQrError('Không tìm thấy mã bàn để tạo QR.');
       return;
     }
@@ -931,11 +1072,29 @@ const mapApiOrderToWaiter = (order) => {
     try {
       setTableQrLoading(true);
       setTableQrError('');
-      const data = await initTableSession(resolvedTableCode);
-      const accessToken = data?.accessToken || '';
-      const qrUrl = buildGuestQrUrl(data?.tableCode || resolvedTableCode, accessToken);
-      setTableQrCode(String(data?.tableCode || resolvedTableCode));
-      setTableQrValue(qrUrl);
+      let lastError = null;
+
+      for (const candidate of candidates) {
+        try {
+          const data = await initTableSession(candidate);
+          const accessToken = data?.accessToken || '';
+          const finalTableCode = String(data?.tableCode || normalizeTableCode(candidate) || candidate);
+          const displayTableName =
+            order?.tableNumber ||
+            order?.tableName ||
+            data?.tableName ||
+            data?.tableCode ||
+            finalTableCode;
+          const qrUrl = buildGuestQrUrl(finalTableCode, accessToken, displayTableName);
+          setTableQrCode(finalTableCode);
+          setTableQrValue(qrUrl);
+          return;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      throw lastError || new Error('Không thể khởi tạo phiên QR cho bàn này.');
     } catch (err) {
       setTableQrError(err?.message || 'Không tạo được QR cho bàn này.');
       setTableQrValue('');
@@ -968,9 +1127,6 @@ const mapApiOrderToWaiter = (order) => {
       }
     }
 
-    if (isDineInOrder(order)) {
-      await initQrForOrder(order);
-    }
   };
 
   const openOrderQrModal = async (order) => {
@@ -1643,26 +1799,37 @@ const mapApiOrderToWaiter = (order) => {
                   } else if (createOrderType === 'member') {
                     try {
                       const keyword = searchInput.trim();
-                      const data = await lookupOrder('contact', keyword);
-                      const rows = Array.isArray(data)
-                        ? data
-                        : data?.data?.items ?? data?.data?.$values ?? data?.items ?? data?.$values ?? (data ? [data] : []);
-                      const found = rows[0];
+                      const isEmail = keyword.includes('@');
+
+                      let found = null;
+
+                      // Ưu tiên endpoint profile theo contact vì backend lookup trả Invalid type.
+                      try {
+                        const profileData = await getProfile(keyword);
+                        const profilePayload = profileData?.data || profileData || {};
+                        found = Array.isArray(profilePayload)
+                          ? profilePayload[0]
+                          : (Array.isArray(profilePayload?.items) ? profilePayload.items[0] : profilePayload);
+                      } catch {
+                        // Nếu không tra cứu được profile thì giữ fallback điền tay từ input.
+                        found = null;
+                      }
 
                       if (found) {
                         setOrderForm(prev => ({
                           ...prev,
                           fullName: found.fullName || found.fullname || found.customerName || found.name || prev.fullName,
-                          phone: found.phone || prev.phone,
+                          phone: found.phone || found.phoneNumber || prev.phone,
+                          email: found.email || prev.email,
                           guests: String(found.numberOfGuests || found.guests || prev.guests || ''),
                           orderCode: found.reservationCode || found.orderCode || prev.orderCode,
                           bookingDate: found.reservationDate || found.bookingDate || prev.bookingDate,
                           bookingTime: String(found.reservationTime || found.bookingTime || '').slice(0, 5) || prev.bookingTime,
                         }));
                       } else {
-                        const isEmail = keyword.includes('@');
                         setOrderForm(prev => ({
                           ...prev,
+                          email: isEmail ? keyword : prev.email,
                           phone: isEmail ? '' : keyword
                         }));
                       }
@@ -1672,6 +1839,7 @@ const mapApiOrderToWaiter = (order) => {
                       console.warn('Lookup member failed:', err?.response?.status, err?.response?.data || err?.message);
                       setOrderForm(prev => ({
                         ...prev,
+                        email: isEmail ? keyword : prev.email,
                         phone: isEmail ? '' : keyword
                       }));
                     }
@@ -1895,9 +2063,19 @@ const mapApiOrderToWaiter = (order) => {
                     // member
                     const keyword = searchInput.trim();
                     const isEmail = keyword.includes('@');
+                    const contactEmail = isEmail ? keyword : String(orderForm.email || '').trim();
+                    const contactPhone = isEmail ? String(orderForm.phone || '').trim() : keyword;
+
+                    if (!contactEmail && !contactPhone) {
+                      alert('Vui lòng nhập SĐT hoặc Email hợp lệ cho khách thành viên.');
+                      return;
+                    }
+
                     payload = {
+                      tableIds,
                       orderType: apiOrderType,
-                      ...(isEmail ? { email: keyword } : { phone: keyword }),
+                      ...(contactPhone ? { phone: contactPhone } : {}),
+                      ...(contactEmail ? { email: contactEmail } : {}),
                       numberOfGuests: Number(orderForm.guests) || 1,
                       note: orderForm.note
                     };
@@ -2109,22 +2287,6 @@ const mapApiOrderToWaiter = (order) => {
             )}
 
             <div className="dinein-detail-body">
-              {isDineInOrder(selectedOrder) && (
-                <div style={{ marginBottom: 16, border: '1px dashed #e0dcd8', borderRadius: 12, padding: 12, background: '#fffaf5' }}>
-                  <h4 style={{ margin: '0 0 8px 0' }}>QR gọi món của bàn</h4>
-                  {tableQrLoading && <p style={{ margin: 0, color: '#7a6f66' }}>Đang tạo QR từ token bàn...</p>}
-                  {!tableQrLoading && tableQrError && <p style={{ margin: 0, color: '#cf1322' }}>{tableQrError}</p>}
-                  {!tableQrLoading && !tableQrError && tableQrValue && (
-                    <TableQRCode
-                      qrValue={tableQrValue}
-                      tableName={tableQrCode || selectedOrder.tableNumber || selectedOrder.tableCode || 'N/A'}
-                      showTableLabel={false}
-                      size={128}
-                    />
-                  )}
-                </div>
-              )}
-
               {!isDineInOrder(selectedOrder) && (
                 <div className="waiter-delivery-customer-box">
                   <h4>
@@ -2189,13 +2351,25 @@ const mapApiOrderToWaiter = (order) => {
                                 onClick={async () => {
                                   // Gọi API PATCH để cập nhật trạng thái món ăn
                                   try {
-                                    // orderItemsState[idx] phải có orderItemId hoặc id
-                                    const orderItemId = item.id || item.orderItemId || item.itemId;
-                                    if (!orderItemId) {
+                                    const ids = Array.from(
+                                      new Set(
+                                        [
+                                          ...(Array.isArray(item.orderItemIds) ? item.orderItemIds : []),
+                                          item.id,
+                                          item.orderItemId,
+                                          item.itemId,
+                                        ]
+                                          .map((x) => Number(x || 0))
+                                          .filter((x) => Number.isFinite(x) && x > 0)
+                                      )
+                                    );
+
+                                    if (ids.length === 0) {
                                       alert('Không tìm thấy ID món ăn!');
                                       return;
                                     }
-                                    await patchOrderItemServed(orderItemId);
+
+                                    await Promise.all(ids.map((id) => patchOrderItemServed(id)));
                                     setOrderItemsState(prev => prev.map((it, i) => i === idx ? { ...it, dishStatus: 'completed' } : it));
                                   } catch (err) {
                                     alert('Lỗi cập nhật trạng thái món ăn!');
@@ -2288,7 +2462,7 @@ const mapApiOrderToWaiter = (order) => {
                 <div>
                   <TableQRCode
                     qrValue={tableQrValue}
-                    tableName={tableQrCode || selectedOrder.tableNumber || selectedOrder.tableCode || 'N/A'}
+                    tableName={selectedOrder.tableNumber || selectedOrder.tableName || selectedOrder.tableCode || tableQrCode || 'N/A'}
                     size={180}
                   />
                   <div style={{ marginTop: 10, textAlign: 'center' }}>

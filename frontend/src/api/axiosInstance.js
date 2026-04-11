@@ -47,6 +47,7 @@ instance.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message;
+    const requestUrl = String(error?.config?.url || '').toLowerCase();
     
     console.error(`[API Error] Status: ${status}, Message: ${message}`);
 

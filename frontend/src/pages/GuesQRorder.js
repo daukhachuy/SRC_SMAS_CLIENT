@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bell, User, ShoppingCart } from 'lucide-react';
-import { getFoodByFilter, resolveFoodImageUrl } from '../api/foodApi';
+import { Bell, User, ShoppingCart, CreditCard } from 'lucide-react';
+import { getBuffetDetail, getBuffetLists, getComboLists, resolveFoodImageUrl } from '../api/foodApi';
 import { createPaymentLink } from '../api/paymentService';
-import { createGuestOrder } from '../api/orderApi';
+import { addItemToOrder, addItemsToOrder, createGuestOrder, getCurrentOrderSession, getFoodsBufferByOrderCode, getOrderSessionMenu } from '../api/orderApi';
 import '../styles/MenuPage.css';
+
+const MENU_TABS = ['Food', 'Combo', 'Buffet'];
 
 const CATEGORY_CHIPS = [
   { key: 'all', label: 'Tất cả' },
@@ -48,6 +50,279 @@ const categoryLabelByKey = {
   dessert: 'Tráng miệng',
 };
 
+const normalizeArrayPayload = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.$values)) return payload.$values;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
+  if (Array.isArray(payload?.foods)) return payload.foods;
+  if (Array.isArray(payload?.combos)) return payload.combos;
+  if (Array.isArray(payload?.buffets)) return payload.buffets;
+  if (Array.isArray(payload?.menuItems)) return payload.menuItems;
+  if (Array.isArray(payload?.data?.foods)) return payload.data.foods;
+  if (Array.isArray(payload?.data?.combos)) return payload.data.combos;
+  if (Array.isArray(payload?.data?.buffets)) return payload.data.buffets;
+  if (Array.isArray(payload?.data?.menuItems)) return payload.data.menuItems;
+  return [];
+};
+
+const extractRowsByMenuType = (payload, menuType) => {
+  const direct = normalizeArrayPayload(payload);
+  if (direct.length > 0) return direct;
+
+  const data = payload?.data || payload || {};
+  const normalizedType = String(menuType || '').toLowerCase();
+
+  const bucketsByType = normalizedType === 'combo'
+    ? [
+      data?.combos,
+      data?.combo,
+      data?.comboMenus,
+      data?.comboItems,
+      data?.data?.combos,
+      data?.data?.combo,
+    ]
+    : (normalizedType === 'buffet'
+      ? [
+        data?.buffets,
+        data?.buffet,
+        data?.buffetMenus,
+        data?.buffetItems,
+        data?.data?.buffets,
+        data?.data?.buffet,
+      ]
+      : [
+        data?.foods,
+        data?.foodsMenu,
+        data?.foodItems,
+        data?.food,
+        data?.menuFoods,
+        data?.data?.foods,
+        data?.data?.food,
+      ]);
+
+  for (const bucket of bucketsByType) {
+    const rows = normalizeArrayPayload(bucket);
+    if (rows.length > 0) return rows;
+  }
+
+  // Last resort: flatten all array-like fields from object payload.
+  const objectCandidates = [data, data?.data].filter(Boolean);
+  for (const obj of objectCandidates) {
+    for (const value of Object.values(obj)) {
+      const rows = normalizeArrayPayload(value);
+      if (rows.length > 0) return rows;
+    }
+  }
+
+  return [];
+};
+
+const extractBuffetIncludes = (item) => {
+  const buckets = [
+    item?.foods,
+    item?.menuBuffets,
+    item?.foodItems,
+    item?.items,
+    item?.menuItems,
+    item?.details,
+  ];
+
+  for (const bucket of buckets) {
+    const rows = normalizeArrayPayload(bucket);
+    if (rows.length > 0) {
+      return rows
+        .map((x) => x?.foodName || x?.name || x?.itemName || x?.menuName || '')
+        .map((x) => String(x || '').trim())
+        .filter(Boolean);
+    }
+  }
+
+  const textCandidates = [
+    item?.menuDescription,
+    item?.includeMenu,
+    item?.includes,
+  ];
+
+  for (const text of textCandidates) {
+    const raw = String(text || '').trim();
+    if (!raw) continue;
+    const lines = raw
+      .split(/\r?\n|•|\-|;/)
+      .map((x) => String(x || '').trim())
+      .filter(Boolean);
+    if (lines.length > 1) return lines;
+  }
+
+  return [];
+};
+
+const mapMenuItem = (item, idx, forcedType) => {
+  const forced = String(forcedType || '').trim();
+  const rawType = forced || String(item.type || item.itemType || '').toLowerCase();
+  const itemType = String(rawType).toLowerCase().includes('combo')
+    ? 'Combo'
+    : (String(rawType).toLowerCase().includes('buffet') ? 'Buffet' : 'Food');
+  const rawId =
+    itemType === 'Combo'
+      ? (item.comboId || item.id)
+      : (itemType === 'Buffet' ? (item.buffetId || item.id) : (item.foodId || item.id));
+  const id = rawId || idx + 1;
+  const foodName = item.foodName || item.comboName || item.buffetName || item.name || `Món ${id}`;
+  const rawPrice = Number(item.price ?? item.unitPrice ?? item.amount ?? 0);
+  const categoryRaw = String(item.categoryName || item.foodCategoryName || item.category || '').trim();
+  const categoryKey = categoryRaw
+    ? normalizeCategoryKey(categoryRaw)
+    : inferCategoryKeyFromName(foodName);
+
+  return {
+    id,
+    cartKey: `${itemType}-${id}`,
+    itemType,
+    foodId: itemType === 'Food' ? Number(id) : 0,
+    comboId: itemType === 'Combo' ? Number(id) : 0,
+    buffetId: itemType === 'Buffet' ? Number(id) : 0,
+    name: foodName,
+    price: Number.isFinite(rawPrice) ? rawPrice : 0,
+    img: resolveFoodImageUrl(item.image || item.imageUrl || item.thumbnail),
+    desc: item.description || item.note || 'Món ăn đặc sắc của nhà hàng.',
+    buffetPriceAdult: Number(item.priceOfAdult ?? item.mainPrice ?? item.priceAdult ?? item.adultPrice ?? item.adultAmount ?? item.price ?? 0),
+    buffetPriceChild: Number(item.priceOfChildren ?? item.childrenPrice ?? item.priceChild ?? item.childPrice ?? item.childAmount ?? 0),
+    buffetIncludes: itemType === 'Buffet' ? extractBuffetIncludes(item) : [],
+    buffetFoods: [],
+    category: categoryRaw || categoryLabelByKey[categoryKey] || 'Món chính',
+    categoryKey,
+    tag: item.isBestSeller || item.isChefChoice ? `CHEF'S CHOICE` : '',
+  };
+};
+
+const getBuffetPriceLines = (item) => {
+  const adult = Number(item?.buffetPriceAdult ?? 0);
+  const child = Number(item?.buffetPriceChild ?? 0);
+  const lines = [];
+
+  if (Number.isFinite(adult) && adult > 0) {
+    lines.push(`Suất Người Lớn: ${adult.toLocaleString('vi-VN')} đ`);
+  }
+  if (Number.isFinite(child) && child > 0) {
+    lines.push(`Suất Trẻ Em: ${child.toLocaleString('vi-VN')} đ`);
+  }
+
+  return lines;
+};
+
+const normalizeTableToken = (raw) => {
+  const base = String(raw || '').trim();
+  if (!base) return '';
+  // Defensive normalize: tránh trường hợp token bị dính prefix hoặc khoảng trắng khi copy URL.
+  return base.replace(/^Bearer\s+/i, '').replace(/\s+/g, '');
+};
+
+const enrichBuffetIncludesWithDetail = async (items) => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const enriched = await Promise.all(
+    items.map(async (item) => {
+      if (item?.itemType !== 'Buffet') return item;
+      if (Array.isArray(item?.buffetIncludes) && item.buffetIncludes.length > 0) return item;
+
+      const buffetId = Number(item?.buffetId || item?.id || 0);
+      if (!Number.isFinite(buffetId) || buffetId <= 0) return item;
+
+      try {
+        const detail = await getBuffetDetail(buffetId);
+        const detailRows = normalizeArrayPayload(detail?.foods || detail?.data?.foods || detail);
+        const detailFoods = detailRows
+          .map((x, idx) => {
+            const foodId = Number(x?.foodId || x?.id || 0);
+            const foodName = x?.foodName || x?.name || x?.itemName || `Món ${idx + 1}`;
+            return {
+              foodId,
+              name: String(foodName || '').trim(),
+            };
+          })
+          .filter((x) => Number.isFinite(x.foodId) && x.foodId > 0 && x.name);
+        const includeNames = detailRows
+          .map((x) => x?.foodName || x?.name || x?.itemName || '')
+          .map((x) => String(x || '').trim())
+          .filter(Boolean);
+
+        if (includeNames.length === 0 && detailFoods.length === 0) return item;
+        return {
+          ...item,
+          buffetIncludes: includeNames.length > 0 ? includeNames : item.buffetIncludes,
+          buffetFoods: detailFoods,
+        };
+      } catch {
+        return item;
+      }
+    })
+  );
+
+  return enriched;
+};
+
+const extractCurrentOrderItems = (payload) => {
+  const data = payload?.data || payload || {};
+  const candidates = [
+    data?.orderItems,
+    data?.items,
+    data?.orderDetails,
+    data?.details,
+    data?.currentOrderItems,
+    data?.order?.orderItems,
+    data?.order?.items,
+    data?.order?.orderDetails,
+    data?.order?.details,
+    data?.data?.orderItems,
+    data?.data?.items,
+    data?.data?.orderDetails,
+    data?.data?.details,
+  ];
+
+  for (const candidate of candidates) {
+    const arr = normalizeArrayPayload(candidate);
+    if (arr.length > 0) return arr;
+  }
+
+  return [];
+};
+
+const mapCurrentOrderItem = (item) => {
+  const rawType = String(item.type || item.itemType || item.menuType || '').toLowerCase();
+  const hasComboId = Number(item.comboId || item.idCombo || 0) > 0;
+  const hasBuffetId = Number(item.buffetId || item.bufferId || item.idBuffer || 0) > 0;
+  const itemType = rawType.includes('combo')
+    ? 'Combo'
+    : (rawType.includes('buffet') ? 'Buffet' : (hasBuffetId ? 'Buffet' : (hasComboId ? 'Combo' : 'Food')));
+  const id =
+    itemType === 'Combo'
+      ? (item.comboId || item.idCombo || item.id || item.itemId || item.menuItemId)
+      : (itemType === 'Buffet'
+        ? (item.buffetId || item.bufferId || item.idBuffer || item.id || item.itemId || item.menuItemId)
+        : (item.foodId || item.id || item.menuItemId || item.itemId));
+  const quantity = Number(item.quantity || item.qty || 1);
+  const price = Number(item.price ?? item.unitPrice ?? item.amount ?? 0);
+
+  return {
+    id,
+    cartKey: `${itemType}-${id}`,
+    itemType,
+    foodId: Number(item.foodId || (itemType === 'Food' ? id : 0) || 0),
+    comboId: Number(item.comboId || item.idCombo || (itemType === 'Combo' ? id : 0) || 0),
+    buffetId: Number(item.buffetId || item.bufferId || item.idBuffer || (itemType === 'Buffet' ? id : 0) || 0),
+    name: item.foodName || item.name || item.itemName || 'Món ăn',
+    price: Number.isFinite(price) ? price : 0,
+    childrenPrice: Number(item.childrenPrice || item.priceOfChildren || item.childPrice || 0),
+    quantityBufferChildent: Number(item.quantityBufferChildent || item.quantityBuffetChildren || item.quantityChild || 0),
+    img: resolveFoodImageUrl(item.image || item.imageUrl || item.thumbnail),
+    desc: item.description || item.note || '',
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+  };
+};
+
 
 // Trang đặt món theo QR cho khách (Guest QR Order) - style đồng bộ hệ thống
 const GuesQRorder = () => {
@@ -55,11 +330,25 @@ const GuesQRorder = () => {
   const [foods, setFoods] = useState([]);
   const [loadingFoods, setLoadingFoods] = useState(true);
   const [foodsError, setFoodsError] = useState('');
+  const [activeMenuType, setActiveMenuType] = useState('Food');
   const [searchText, setSearchText] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [cart, setCart] = useState([]);
+  const [buffetDraftQty, setBuffetDraftQty] = useState({});
   const [isRedirectingPayment, setIsRedirectingPayment] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [lockedBuffetId, setLockedBuffetId] = useState(0);
+  const [orderBuffetFoods, setOrderBuffetFoods] = useState([]);
+  const [showOrderBuffetFoods, setShowOrderBuffetFoods] = useState(false);
+
+  const tableCode = searchParams.get('tableCode') || localStorage.getItem('tableCode') || '04';
+  const tableName = searchParams.get('tableName') || localStorage.getItem('tableName') || '';
+  const tableToken = normalizeTableToken(searchParams.get('tableToken') || localStorage.getItem('tableAccessToken') || '');
+  const tableLabel = tableName
+    ? String(tableName)
+    : (String(tableCode).toUpperCase().startsWith('BÀN')
+      ? String(tableCode)
+      : `Bàn ${tableCode}`);
 
   const formatCurrency = (value) =>
     `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -69,110 +358,474 @@ const GuesQRorder = () => {
       setLoadingFoods(true);
       setFoodsError('');
       try {
-        const rows = await getFoodByFilter(new URLSearchParams());
-        const mapped = (Array.isArray(rows) ? rows : []).map((item, idx) => {
-          const id = item.foodId || item.id || idx + 1;
-          const foodName = item.foodName || item.name || `Món ${id}`;
-          const rawPrice = Number(item.price ?? item.unitPrice ?? item.amount ?? 0);
-          const categoryRaw = String(item.categoryName || item.foodCategoryName || item.category || '').trim();
-          const categoryKey = categoryRaw
-            ? normalizeCategoryKey(categoryRaw)
-            : inferCategoryKeyFromName(foodName);
-          const category = categoryRaw || categoryLabelByKey[categoryKey] || 'Món chính';
-          return {
-            id,
-            name: foodName,
-            price: Number.isFinite(rawPrice) ? rawPrice : 0,
-            img: resolveFoodImageUrl(item.image || item.imageUrl || item.thumbnail),
-            desc: item.description || item.note || 'Món ăn đặc sắc của nhà hàng.',
-            category,
-            categoryKey,
-            tag: item.isBestSeller || item.isChefChoice ? `CHEF'S CHOICE` : '',
-          };
+        // Đảm bảo request session dùng đúng token bàn ngay từ lần load đầu.
+        if (tableToken) {
+          localStorage.setItem('tableAccessToken', tableToken);
+        }
+
+        const typeCandidates = [
+          activeMenuType,
+          String(activeMenuType || '').toLowerCase(),
+          String(activeMenuType || '').toUpperCase(),
+          undefined,
+        ];
+
+        let rows = [];
+        for (const typeValue of typeCandidates) {
+          const menuPayload = await getOrderSessionMenu({
+            type: typeValue,
+            keyword: searchText.trim() || undefined,
+          });
+          rows = extractRowsByMenuType(menuPayload, activeMenuType);
+          if (rows.length === 0) {
+            console.debug('[GuestQR] Empty menu payload for type:', typeValue, menuPayload);
+          }
+          if (rows.length > 0) break;
+        }
+
+        let mapped = rows.map((item, idx) => mapMenuItem(item, idx, activeMenuType)).filter((item) => {
+          if (activeMenuType === 'Food') return item.itemType === 'Food';
+          if (activeMenuType === 'Combo') return item.itemType === 'Combo';
+          if (activeMenuType === 'Buffet') return item.itemType === 'Buffet';
+          return true;
         });
+
+        if (mapped.length === 0 && activeMenuType === 'Combo') {
+          const comboPayload = await getComboLists();
+          const comboRows = Array.isArray(comboPayload)
+            ? comboPayload
+            : comboPayload?.$values || comboPayload?.data?.$values || comboPayload?.data || [];
+          mapped = (Array.isArray(comboRows) ? comboRows : [])
+            .filter((c) => c?.isAvailable !== false)
+            .map((item, idx) => mapMenuItem(item, idx, 'Combo'));
+        }
+
+        if (mapped.length === 0 && activeMenuType === 'Buffet') {
+          const buffetPayload = await getBuffetLists();
+          const buffetRows = Array.isArray(buffetPayload)
+            ? buffetPayload
+            : buffetPayload?.$values || buffetPayload?.data?.$values || buffetPayload?.data || buffetPayload?.items || [];
+          mapped = (Array.isArray(buffetRows) ? buffetRows : [])
+            .filter((b) => b?.isAvailable !== false)
+            .map((item, idx) => mapMenuItem(item, idx, 'Buffet'));
+        }
+
+        if (activeMenuType === 'Buffet' && mapped.length > 0) {
+          mapped = await enrichBuffetIncludesWithDetail(mapped);
+        }
+
         setFoods(mapped);
       } catch (err) {
-        setFoodsError(err?.response?.data?.message || err?.message || 'Không tải được danh sách món ăn');
+        const apiMessage = String(err?.response?.data?.message || err?.message || '').trim();
+        if (apiMessage.toLowerCase().includes('token bàn không hợp lệ')) {
+          localStorage.removeItem('tableAccessToken');
+          setFoodsError('Token bàn không hợp lệ hoặc đã hết hạn. Vui lòng quét lại QR mới từ nhân viên.');
+        } else {
+          setFoodsError(apiMessage || 'Không tải được danh sách món ăn');
+        }
         setFoods([]);
       } finally {
         setLoadingFoods(false);
       }
     };
 
-    loadFoods();
-  }, []);
+    const timer = window.setTimeout(() => {
+      loadFoods();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [activeMenuType, searchText, tableToken]);
+
+  useEffect(() => {
+    const loadCurrentOrder = async () => {
+      try {
+        if (tableToken) {
+          localStorage.setItem('tableAccessToken', tableToken);
+        }
+        const current = await getCurrentOrderSession();
+        const rows = extractCurrentOrderItems(current);
+        const mapped = rows.map(mapCurrentOrderItem).filter((item) => Number.isFinite(Number(item.id)) && Number(item.id) > 0);
+        if (mapped.length > 0) {
+          setCart(mapped);
+        }
+
+        const buffetIdFromItems = Array.from(
+          new Set(
+            rows
+              .map((x) => Number(x?.buffetId || x?.bufferId || x?.idBuffer || 0))
+              .filter((id) => id > 0)
+          )
+        )[0] || 0;
+
+        const { orderCode: currentOrderCode } = extractOrderMeta(current);
+        const candidateOrderCodes = Array.from(
+          new Set(
+            [
+              currentOrderCode,
+              searchParams.get('orderCode'),
+              sessionStorage.getItem('pendingOrderCode'),
+            ]
+              .map((x) => String(x || '').trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (buffetIdFromItems > 0) {
+          setLockedBuffetId(buffetIdFromItems);
+        }
+
+        if (candidateOrderCodes.length > 0) {
+          let loadedOrderBuffetFoods = [];
+          let loadedBuffetId = buffetIdFromItems;
+
+          for (const code of candidateOrderCodes) {
+            try {
+              const buffetRowsPayload = await getFoodsBufferByOrderCode(code);
+              const buffetRows = Array.isArray(buffetRowsPayload)
+                ? buffetRowsPayload
+                : buffetRowsPayload?.$values || buffetRowsPayload?.data?.$values || buffetRowsPayload?.data || buffetRowsPayload?.items || [];
+              const safeRows = Array.isArray(buffetRows) ? buffetRows : [];
+              if (safeRows.length === 0) continue;
+
+              const ids = Array.from(
+                new Set(
+                  safeRows
+                    .map((x) => Number(x?.buffetId || x?.bufferId || x?.idBuffer || 0))
+                    .filter((id) => id > 0)
+                )
+              );
+
+              if (ids.length > 0 && loadedBuffetId <= 0) {
+                loadedBuffetId = ids[0];
+              }
+
+              loadedOrderBuffetFoods = safeRows.map((item, idx) => ({
+                foodId: Number(item?.foodId || item?.id || 0),
+                name: String(item?.foodName || item?.name || item?.itemName || `Món ${idx + 1}`).trim(),
+              })).filter((x) => Number.isFinite(x.foodId) && x.foodId > 0 && x.name);
+
+              if (loadedOrderBuffetFoods.length > 0) {
+                break;
+              }
+            } catch {
+              // thử mã order khác
+            }
+          }
+
+          if (loadedOrderBuffetFoods.length > 0) {
+            setOrderBuffetFoods(loadedOrderBuffetFoods);
+            setShowOrderBuffetFoods(true);
+          } else {
+            setOrderBuffetFoods([]);
+            setShowOrderBuffetFoods(false);
+          }
+
+          if (loadedBuffetId > 0) {
+            setLockedBuffetId(loadedBuffetId);
+          }
+        }
+      } catch (err) {
+        // Session hiện tại có thể chưa có order, giữ cart local rỗng là hợp lệ.
+        const apiMessage = String(err?.response?.data?.message || err?.message || '').trim();
+        if (apiMessage.toLowerCase().includes('token bàn không hợp lệ')) {
+          localStorage.removeItem('tableAccessToken');
+        }
+        setOrderBuffetFoods([]);
+        setShowOrderBuffetFoods(false);
+        console.debug('Không lấy được đơn hiện tại theo session:', err?.response?.data || err?.message);
+      }
+    };
+
+    loadCurrentOrder();
+  }, [tableToken, searchParams]);
 
   const filteredFoods = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
     return foods.filter((food) => {
-      const byCategory = activeCategory === 'all' || food.categoryKey === activeCategory;
+      const byCategory = activeMenuType !== 'Food' || activeCategory === 'all' || food.categoryKey === activeCategory;
       const bySearch =
         !keyword ||
         food.name.toLowerCase().includes(keyword) ||
         food.desc.toLowerCase().includes(keyword);
       return byCategory && bySearch;
     });
-  }, [foods, activeCategory, searchText]);
+  }, [foods, activeCategory, activeMenuType, searchText]);
+
+  const selectedBuffetId = useMemo(() => {
+    const picked = cart.find((item) => item.itemType === 'Buffet');
+    return Number(picked?.buffetId || 0) || Number(lockedBuffetId || 0);
+  }, [cart, lockedBuffetId]);
+
+  const selectedBuffetMenu = useMemo(() => {
+    if (!selectedBuffetId) return null;
+    return foods.find((x) => Number(x?.buffetId || 0) === selectedBuffetId) || null;
+  }, [foods, selectedBuffetId]);
+
+  const selectedBuffetFoodsForView = useMemo(() => {
+    if (Array.isArray(orderBuffetFoods) && orderBuffetFoods.length > 0) {
+      return orderBuffetFoods;
+    }
+    return Array.isArray(selectedBuffetMenu?.buffetFoods) ? selectedBuffetMenu.buffetFoods : [];
+  }, [orderBuffetFoods, selectedBuffetMenu]);
 
   const addToCart = (food) => {
     setCart((prev) => {
-      const found = prev.find((item) => item.id === food.id);
+      if (food.itemType === 'Buffet') {
+        if (Number(lockedBuffetId || 0) > 0 && Number(food.buffetId || 0) !== Number(lockedBuffetId || 0)) {
+          alert('Đơn này đã khóa theo một loại buffet khác. Bạn chỉ có thể thêm đúng loại buffet đó.');
+          return prev;
+        }
+
+        const existingBuffet = prev.find((item) => item.itemType === 'Buffet');
+        if (existingBuffet && existingBuffet.cartKey !== food.cartKey) {
+          alert('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.');
+          return prev;
+        }
+
+        const draft = buffetDraftQty[food.cartKey] || { adult: 1, child: 0 };
+        const adultQty = Math.max(0, Number(draft.adult) || 0);
+        const childQty = Math.max(0, Number(draft.child) || 0);
+        if (adultQty + childQty <= 0) {
+          alert('Vui lòng chọn ít nhất 1 suất (người lớn hoặc trẻ em).');
+          return prev;
+        }
+
+        const found = prev.find((item) => item.cartKey === food.cartKey);
+        if (found) {
+          return prev.map((item) =>
+            item.cartKey === food.cartKey
+              ? {
+                ...item,
+                quantity: item.quantity + adultQty,
+                quantityBufferChildent: Number(item.quantityBufferChildent || 0) + childQty,
+              }
+              : item
+          );
+        }
+
+        return [
+          ...prev,
+          {
+            ...food,
+            price: Number(food.buffetPriceAdult || food.price || 0),
+            childrenPrice: Number(food.buffetPriceChild || 0),
+            quantity: adultQty,
+            quantityBufferChildent: childQty,
+          },
+        ];
+      }
+
+      const found = prev.find((item) => item.cartKey === food.cartKey);
       if (found) {
         return prev.map((item) =>
-          item.id === food.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.cartKey === food.cartKey ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
       return [...prev, { ...food, quantity: 1 }];
     });
+
+    if (food.itemType === 'Buffet' && Number(food.buffetId || 0) > 0) {
+      setLockedBuffetId(Number(food.buffetId));
+    }
   };
 
-  const updateQty = (foodId, delta) => {
+  const updateBuffetDraftQty = (cartKey, field, delta) => {
+    setBuffetDraftQty((prev) => {
+      const current = prev[cartKey] || { adult: 1, child: 0 };
+      const nextValue = Math.max(0, Number(current[field] || 0) + delta);
+      return {
+        ...prev,
+        [cartKey]: {
+          ...current,
+          [field]: nextValue,
+        },
+      };
+    });
+  };
+
+  const updateQty = (cartKey, delta) => {
     setCart((prev) =>
       prev
         .map((item) =>
-          item.id === foodId ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
+          item.cartKey === cartKey ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
         )
-        .filter((item) => item.quantity > 0)
+        .filter((item) => {
+          if (item.itemType === 'Buffet') {
+            return Number(item.quantity || 0) > 0 || Number(item.quantityBufferChildent || 0) > 0;
+          }
+          return Number(item.quantity || 0) > 0;
+        })
     );
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const total = subtotal;
+  const updateBuffetChildQty = (cartKey, delta) => {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.cartKey !== cartKey) return item;
+          const next = Math.max(0, Number(item.quantityBufferChildent || 0) + delta);
+          return { ...item, quantityBufferChildent: next };
+        })
+        .filter((item) => {
+          if (item.itemType !== 'Buffet') return true;
+          return Number(item.quantity || 0) > 0 || Number(item.quantityBufferChildent || 0) > 0;
+        })
+    );
+  };
 
-  const tableCode = searchParams.get('tableCode') || localStorage.getItem('tableCode') || '04';
-  const tableToken = searchParams.get('tableToken') || '';
-  const tableLabel = String(tableCode).toUpperCase().startsWith('BÀN')
-    ? String(tableCode)
-    : `Bàn ${tableCode}`;
+  const addBuffetFoodToCart = (buffetFood) => {
+    const foodId = Number(buffetFood?.foodId || 0);
+    if (!Number.isFinite(foodId) || foodId <= 0) return;
+
+    const cartKey = `Food-${foodId}`;
+    const name = String(buffetFood?.name || `Món ${foodId}`).trim();
+
+    setCart((prev) => {
+      const found = prev.find((item) => item.cartKey === cartKey);
+      if (found) {
+        return prev.map((item) =>
+          item.cartKey === cartKey ? { ...item, quantity: Number(item.quantity || 0) + 1 } : item
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          id: foodId,
+          cartKey,
+          itemType: 'Food',
+          foodId,
+          comboId: 0,
+          buffetId: 0,
+          name,
+          price: 0,
+          img: resolveFoodImageUrl(''),
+          desc: 'Đã gồm trong giá buffet',
+          quantity: 1,
+        },
+      ];
+    });
+  };
+
+  const toGuestOrderItemPayload = (item) => {
+    const base = {
+      quantity: Number(item.quantity) || 1,
+      note: 'Khách đặt qua QR',
+    };
+
+    if (Number(item.comboId) > 0) {
+      return { ...base, comboId: Number(item.comboId) };
+    }
+    if (Number(item.buffetId) > 0) {
+      return {
+        ...base,
+        buffetId: Number(item.buffetId),
+        quantityBufferChildent: Math.max(0, Number(item.quantityBufferChildent) || 0),
+      };
+    }
+    return { ...base, foodId: Number(item.foodId || item.id) };
+  };
+
+  const extractOrderMeta = (payload) => {
+    const data = payload?.data || payload || {};
+    const orderIdCandidates = [
+      data?.orderId,
+      data?.id,
+      data?.data?.orderId,
+      data?.data?.id,
+      data?.order?.orderId,
+      data?.order?.id,
+    ];
+    const orderCodeCandidates = [
+      data?.orderCode,
+      data?.code,
+      data?.data?.orderCode,
+      data?.data?.code,
+      data?.order?.orderCode,
+      data?.order?.code,
+    ];
+
+    const orderId = orderIdCandidates.map((v) => Number(v)).find((v) => Number.isFinite(v) && v > 0) || 0;
+    const orderCode = orderCodeCandidates.map((v) => String(v || '').trim()).find(Boolean) || '';
+
+    return { orderId, orderCode };
+  };
+
+  const toOrderItemEndpointPayload = (item) => {
+    const payload = {
+      quantity: Math.max(0, Number(item.quantity) || 0),
+      note: 'Khách đặt qua QR',
+    };
+
+    const foodId = Number(item.foodId) || 0;
+    const comboId = Number(item.comboId) || 0;
+    const buffetId = Number(item.buffetId) || 0;
+    const childQty = Math.max(0, Number(item.quantityBufferChildent) || 0);
+
+    if (foodId > 0) payload.foodId = foodId;
+    if (comboId > 0) payload.comboId = comboId;
+    if (buffetId > 0) {
+      payload.buffetId = buffetId;
+      payload.quantityBufferChildent = childQty;
+    }
+
+    return payload;
+  };
+
+  const addCartItemsToOrderCode = async (orderCode) => {
+    const safeOrderCode = String(orderCode || '').trim();
+    if (!safeOrderCode) {
+      throw new Error('Không tìm thấy mã đơn để thêm món.');
+    }
+    const validItems = cart
+      .filter((x) => (Number(x.quantity) || 0) > 0 || (Number(x.quantityBufferChildent) || 0) > 0)
+      .map(toOrderItemEndpointPayload)
+      .filter((x) => Number(x.foodId || 0) > 0 || Number(x.comboId || 0) > 0 || Number(x.buffetId || 0) > 0);
+
+    if (validItems.length === 0) {
+      throw new Error('Không có món hợp lệ để thêm vào đơn.');
+    }
+
+    const hasComboOrBuffet = validItems.some((x) => Number(x.comboId || 0) > 0 || Number(x.buffetId || 0) > 0);
+
+    // Giống luồng waiter: combo/buffet thêm qua endpoint add-{orderCode}-items để tránh lỗi validate foodId.
+    if (hasComboOrBuffet) {
+      await addItemsToOrder(safeOrderCode, validItems);
+      return;
+    }
+
+    for (const item of validItems) {
+      await addItemToOrder(safeOrderCode, item);
+    }
+  };
+
+  const subtotal = cart.reduce((sum, item) => {
+    if (item.itemType === 'Buffet') {
+      const adult = Number(item.price || 0) * Number(item.quantity || 0);
+      const child = Number(item.childrenPrice || 0) * Number(item.quantityBufferChildent || 0);
+      return sum + adult + child;
+    }
+    return sum + Number(item.price || 0) * Number(item.quantity || 0);
+  }, 0);
+  const total = subtotal;
 
   useEffect(() => {
     if (tableCode) {
       localStorage.setItem('tableCode', String(tableCode));
     }
+    if (tableName) {
+      localStorage.setItem('tableName', String(tableName));
+    }
     if (tableToken) {
       localStorage.setItem('tableAccessToken', tableToken);
     }
-  }, [tableCode, tableToken]);
+  }, [tableCode, tableName, tableToken]);
 
   const handlePayment = async () => {
     const resolveTableId = () => {
       const raw = String(tableCode || '').trim();
       const match = raw.match(/(\d+)/);
       return match ? Number(match[1]) : Number(raw);
-    };
-
-    const extractOrderId = (payload) => {
-      const data = payload?.data || payload;
-      const candidates = [
-        data?.orderId,
-        data?.id,
-        data?.data?.orderId,
-        data?.data?.id,
-        data?.order?.orderId,
-        data?.order?.id,
-      ];
-      const numeric = candidates.map((v) => Number(v)).find((v) => Number.isFinite(v) && v > 0);
-      return numeric || 0;
     };
 
     const createOrderFromCart = async () => {
@@ -190,23 +843,39 @@ const GuesQRorder = () => {
         tableIds: [tableId],
         numberOfGuests: 1,
         note: `QR order at table ${tableCode}`,
-        orderItems: cart.map((item) => ({
-          foodId: Number(item.id),
-          quantity: Number(item.quantity) || 1,
-          note: 'Khách đặt qua QR',
-        })),
+        orderItems: cart.map(toGuestOrderItemPayload),
       };
 
       const created = await createGuestOrder(payload);
-      const createdOrderId = extractOrderId(created);
+      const { orderId: createdOrderId, orderCode: createdOrderCode } = extractOrderMeta(created);
       if (!Number.isFinite(createdOrderId) || createdOrderId <= 0) {
         throw new Error('Tạo đơn thành công nhưng không lấy được orderId.');
       }
       sessionStorage.setItem('pendingOrderId', String(createdOrderId));
+      if (createdOrderCode) {
+        sessionStorage.setItem('pendingOrderCode', String(createdOrderCode));
+      }
       return createdOrderId;
     };
 
     let orderId = Number(searchParams.get('orderId') || sessionStorage.getItem('pendingOrderId') || 0);
+
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      try {
+        const current = await getCurrentOrderSession();
+        const { orderId: currentOrderId, orderCode: currentOrderCode } = extractOrderMeta(current);
+        if (currentOrderCode && cart.length > 0) {
+          await addCartItemsToOrderCode(currentOrderCode);
+          sessionStorage.setItem('pendingOrderCode', String(currentOrderCode));
+        }
+        if (currentOrderId > 0) {
+          orderId = currentOrderId;
+          sessionStorage.setItem('pendingOrderId', String(currentOrderId));
+        }
+      } catch {
+        // Không có đơn hiện tại theo session thì tạo đơn mới ở bước dưới.
+      }
+    }
 
     if (!Number.isFinite(orderId) || orderId <= 0) {
       try {
@@ -234,7 +903,11 @@ const GuesQRorder = () => {
       }
       alert(res?.data?.message || 'Không tạo được link thanh toán');
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Lỗi kết nối API thanh toán');
+      if (Number(err?.response?.status || 0) === 401) {
+        alert('Phiên QR hiện tại không có quyền tạo link thanh toán. Vui lòng gọi nhân viên hỗ trợ thanh toán.');
+      } else {
+        alert(err?.response?.data?.message || err?.message || 'Lỗi kết nối API thanh toán');
+      }
     } finally {
       setIsRedirectingPayment(false);
     }
@@ -245,20 +918,6 @@ const GuesQRorder = () => {
       const raw = String(tableCode || '').trim();
       const match = raw.match(/(\d+)/);
       return match ? Number(match[1]) : Number(raw);
-    };
-
-    const extractOrderId = (payload) => {
-      const data = payload?.data || payload;
-      const candidates = [
-        data?.orderId,
-        data?.id,
-        data?.data?.orderId,
-        data?.data?.id,
-        data?.order?.orderId,
-        data?.order?.id,
-      ];
-      const numeric = candidates.map((v) => Number(v)).find((v) => Number.isFinite(v) && v > 0);
-      return numeric || 0;
     };
 
     if (cart.length === 0) {
@@ -274,23 +933,50 @@ const GuesQRorder = () => {
 
     try {
       setIsPlacingOrder(true);
+
+      let currentOrderCode = String(searchParams.get('orderCode') || sessionStorage.getItem('pendingOrderCode') || '').trim();
+      let currentOrderId = Number(searchParams.get('orderId') || sessionStorage.getItem('pendingOrderId') || 0);
+
+      if (!currentOrderCode) {
+        try {
+          const current = await getCurrentOrderSession();
+          const meta = extractOrderMeta(current);
+          currentOrderCode = meta.orderCode;
+          if (meta.orderId > 0) {
+            currentOrderId = meta.orderId;
+          }
+        } catch {
+          // bỏ qua, fallback tạo order mới
+        }
+      }
+
+      if (currentOrderCode) {
+        await addCartItemsToOrderCode(currentOrderCode);
+        sessionStorage.setItem('pendingOrderCode', String(currentOrderCode));
+        if (Number.isFinite(currentOrderId) && currentOrderId > 0) {
+          sessionStorage.setItem('pendingOrderId', String(currentOrderId));
+        }
+        setCart([]);
+        alert('Đã thêm món vào đơn hiện tại thành công. Nhân viên sẽ xác nhận đơn của bạn.');
+        return;
+      }
+
       const payload = {
         orderType: 'DineIn',
         tableIds: [tableId],
         numberOfGuests: 1,
         note: `QR order at table ${tableCode}`,
-        orderItems: cart.map((item) => ({
-          foodId: Number(item.id),
-          quantity: Number(item.quantity) || 1,
-          note: 'Khách đặt qua QR',
-        })),
+        orderItems: cart.map(toGuestOrderItemPayload),
       };
       const created = await createGuestOrder(payload);
-      const createdOrderId = extractOrderId(created);
+      const { orderId: createdOrderId, orderCode: createdOrderCode } = extractOrderMeta(created);
       if (!Number.isFinite(createdOrderId) || createdOrderId <= 0) {
         throw new Error('Tạo đơn thành công nhưng không lấy được orderId.');
       }
       sessionStorage.setItem('pendingOrderId', String(createdOrderId));
+      if (createdOrderCode) {
+        sessionStorage.setItem('pendingOrderCode', String(createdOrderCode));
+      }
       setCart([]);
       alert('Đã gửi gọi món thành công. Nhân viên sẽ xác nhận đơn của bạn.');
     } catch (err) {
@@ -317,19 +1003,33 @@ const GuesQRorder = () => {
         }}
       >
         <div style={{ fontSize: 32, fontWeight: 900, color: '#ff7a21', letterSpacing: 0.2 }}>
-          Lumiere Bistro
+          NHÀ HÀNG FPT
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <button style={{ border: 'none', background: 'transparent', color: '#ff7a21', fontWeight: 800, cursor: 'pointer', borderBottom: '2px solid #ff7a21', paddingBottom: 2 }}>
-            Food
-          </button>
-          <button style={{ border: 'none', background: 'transparent', color: '#4b5563', fontWeight: 700, cursor: 'pointer' }}>
-            Combo
-          </button>
-          <button style={{ border: 'none', background: 'transparent', color: '#4b5563', fontWeight: 700, cursor: 'pointer' }}>
-            Buffet
-          </button>
+          {MENU_TABS.map((tab) => {
+            const active = activeMenuType === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveMenuType(tab);
+                  setActiveCategory('all');
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: active ? '#ff7a21' : '#4b5563',
+                  fontWeight: active ? 800 : 700,
+                  cursor: 'pointer',
+                  borderBottom: active ? '2px solid #ff7a21' : '2px solid transparent',
+                  paddingBottom: 2,
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -344,19 +1044,23 @@ const GuesQRorder = () => {
       <div className="menu-page-container" style={{display: 'flex', gap: 32, paddingTop: 24}}>
         {/* Cột trái: Danh sách món ăn */}
         <div style={{flex: 2}}>
-          <h1 className="menu-title" style={{fontSize: 36, fontWeight: 800, marginBottom: 8}}>Món lẻ (Food)</h1>
+          <h1 className="menu-title" style={{fontSize: 36, fontWeight: 800, marginBottom: 8}}>
+            {activeMenuType === 'Food' ? 'Món lẻ (Food)' : activeMenuType === 'Combo' ? 'Combo' : 'Buffet'}
+          </h1>
           <p className="menu-desc" style={{color: '#6d7680', marginBottom: 24}}>Khám phá tinh hoa ẩm thực Pháp giữa lòng Sài Gòn</p>
-          <div className="menu-tabs-row" style={{marginBottom: 24}}>
-            {CATEGORY_CHIPS.map((cat) => (
-              <button
-                key={cat.key}
-                className={`menu-tab-btn ${activeCategory === cat.key ? 'active' : ''}`}
-                onClick={() => setActiveCategory(cat.key)}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+          {activeMenuType === 'Food' && (
+            <div className="menu-tabs-row" style={{marginBottom: 24}}>
+              {CATEGORY_CHIPS.map((cat) => (
+                <button
+                  key={cat.key}
+                  className={`menu-tab-btn ${activeCategory === cat.key ? 'active' : ''}`}
+                  onClick={() => setActiveCategory(cat.key)}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div style={{marginBottom: 24, position: 'relative', maxWidth: 320}}>
             <input
               className="menu-search-input"
@@ -369,44 +1073,177 @@ const GuesQRorder = () => {
           </div>
           {foodsError && <p style={{ color: '#cf1322', marginBottom: 16 }}>⚠ {foodsError}</p>}
           {loadingFoods && <p style={{ color: '#6d7680', marginBottom: 16 }}>Đang tải món ăn...</p>}
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24}}>
-            {filteredFoods.map((food) => (
-              <div key={food.id} className="menu-card" style={{background: '#fff', borderRadius: 16, boxShadow: '0 4px 15px rgba(0,0,0,0.05)', padding: 16, position: 'relative'}}>
+          {!loadingFoods && !foodsError && filteredFoods.length === 0 && (
+            <p style={{ color: '#6d7680', marginBottom: 16 }}>Hiện chưa có món trong mục {activeMenuType}.</p>
+          )}
+          {activeMenuType === 'Buffet' && ((showOrderBuffetFoods && selectedBuffetFoodsForView.length > 0) || (selectedBuffetId > 0 && selectedBuffetMenu)) ? (
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#374151' }}>MÓN TRONG GÓI BUFFET ĐÃ CHỌN</h3>
+                <p style={{ margin: '6px 0 0', color: '#6b7280', fontWeight: 700 }}>
+                  Gói đã chọn: {selectedBuffetMenu?.name || '--'}
+                </p>
+              </div>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, minmax(320px, 1fr))', gap: 16}}>
+                {selectedBuffetFoodsForView.map((food) => (
+                  <div
+                    key={`buffet-food-${food.foodId}`}
+                    style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: '1px solid #ffd7b8', borderRadius: 14, background: '#fff', padding: '14px 16px'}}
+                  >
+                    <div>
+                      <div style={{fontWeight: 800, color: '#1f2937', marginBottom: 4}}>{food.name}</div>
+                      <div style={{color: '#6b7280', fontSize: 13}}>Đã gồm trong giá buffet</div>
+                    </div>
+                    <button
+                      onClick={() => addBuffetFoodToCart(food)}
+                      style={{width: 34, height: 34, borderRadius: 10, border: '1px solid #ffd2ae', background: '#fff7f1', color: '#FF7A21', fontWeight: 900, fontSize: 20, cursor: 'pointer', lineHeight: 1}}
+                    >
+                      +
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+          <div style={{display: 'grid', gridTemplateColumns: activeMenuType === 'Buffet' ? 'repeat(2, minmax(320px, 1fr))' : 'repeat(3, 1fr)', gap: 24}}>
+            {filteredFoods.map((food) => {
+              const isBuffetCard = activeMenuType === 'Buffet';
+              const draftAdult = Number(buffetDraftQty[food.cartKey]?.adult ?? 1);
+              const draftChild = Number(buffetDraftQty[food.cartKey]?.child ?? 0);
+              return (
+              <div key={food.cartKey || `${food.itemType || 'Food'}-${food.id}`} className="menu-card" style={{background: '#fff', borderRadius: 20, boxShadow: '0 10px 28px rgba(15,23,42,0.08)', padding: isBuffetCard ? 18 : 16, position: 'relative', border: isBuffetCard ? '1px solid #ffd7b8' : '1px solid #eef2f7', display: 'flex', flexDirection: 'column', height: '100%'}}>
                 {food.tag && <div style={{position: 'absolute', top: 12, left: 12, background: '#FF7A21', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 8px', zIndex: 2}}>{food.tag}</div>}
                 <img src={food.img} alt={food.name} style={{width: '100%', height: 160, objectFit: 'cover', borderRadius: 12, marginBottom: 12}} />
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
                   <span style={{fontWeight: 700, fontSize: 16}}>{food.name}</span>
-                  <span style={{color: '#FF7A21', fontWeight: 700}}>{formatCurrency(food.price)}</span>
+                  <span style={{color: '#FF7A21', fontWeight: 700}}>{formatCurrency(food.itemType === 'Buffet' ? (food.buffetPriceAdult || food.price) : food.price)}</span>
                 </div>
-                <div style={{color: '#666', fontSize: 13, marginBottom: 12}}>{food.desc}</div>
+                {activeMenuType === 'Buffet' ? (
+                  <div style={{color: '#333', fontSize: 13, marginBottom: 12}}>
+                    <div style={{ marginBottom: 8, fontWeight: 800, color: '#1f2937' }}>Thực đơn bao gồm:</div>
+                    {Array.isArray(food.buffetIncludes) && food.buffetIncludes.length > 0 ? (
+                      <div style={{ marginBottom: 10, background: '#fff7f1', borderRadius: 12, padding: '10px 12px', border: '1px dashed #ffd7b8' }}>
+                        {food.buffetIncludes.map((line) => (
+                          <div key={`${food.cartKey}-menu-${line}`} style={{ marginBottom: 4, color: '#374151', lineHeight: 1.35 }}>• {line}</div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ marginBottom: 10, color: '#666', background: '#f8fafc', borderRadius: 10, padding: '8px 10px' }}>{food.desc}</div>
+                    )}
+                    <div style={{ marginBottom: 6, fontWeight: 800, color: '#1f2937' }}>Bảng Giá Chi Tiết</div>
+                    <div style={{ marginBottom: 8, background: '#fff', borderRadius: 12, border: '1px solid #ffe8d4', padding: '10px 12px' }}>
+                      <div style={{ marginBottom: 2, color: '#4b5563', fontWeight: 700 }}>Suất Người Lớn</div>
+                      <div style={{ marginBottom: 2, color: '#6b7280' }}>Dành cho khách trên 1m3</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ color: '#ff7a21', fontWeight: 900, fontSize: 28 }}>{formatCurrency(food.buffetPriceAdult || food.price || 0)}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => updateBuffetDraftQty(food.cartKey, 'adult', -1)}
+                            style={{width: 24, height: 24, borderRadius: 8, border: '1px solid #ffd2ae', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}
+                          >
+                            -
+                          </button>
+                          <span style={{ minWidth: 14, textAlign: 'center', fontWeight: 800 }}>{draftAdult}</span>
+                          <button
+                            onClick={() => updateBuffetDraftQty(food.cartKey, 'adult', 1)}
+                            style={{width: 24, height: 24, borderRadius: 8, border: '1px solid #ffd2ae', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #ffe8d4', padding: '10px 12px' }}>
+                      <div style={{ marginBottom: 2, color: '#4b5563', fontWeight: 700 }}>Suất Trẻ Em</div>
+                      <div style={{ marginBottom: 2, color: '#6b7280' }}>Khách hàng từ 1m - 1m3</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ color: '#ff7a21', fontWeight: 900, fontSize: 28 }}>{formatCurrency(food.buffetPriceChild || 0)}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => updateBuffetDraftQty(food.cartKey, 'child', -1)}
+                            style={{width: 24, height: 24, borderRadius: 8, border: '1px solid #ffd2ae', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}
+                          >
+                            -
+                          </button>
+                          <span style={{ minWidth: 14, textAlign: 'center', fontWeight: 800 }}>{draftChild}</span>
+                          <button
+                            onClick={() => updateBuffetDraftQty(food.cartKey, 'child', 1)}
+                            style={{width: 24, height: 24, borderRadius: 8, border: '1px solid #ffd2ae', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{color: '#666', fontSize: 13, marginBottom: 12}}>{food.desc}</div>
+                )}
                 <button
+                  disabled={
+                    activeMenuType === 'Buffet' &&
+                    Number(food.buffetId || 0) > 0 &&
+                    selectedBuffetId > 0 &&
+                    selectedBuffetId !== Number(food.buffetId || 0)
+                  }
+                  title={
+                    activeMenuType === 'Buffet' &&
+                    Number(food.buffetId || 0) > 0 &&
+                    selectedBuffetId > 0 &&
+                    selectedBuffetId !== Number(food.buffetId || 0)
+                      ? 'Đơn đã có loại buffet khác, không thể thêm.'
+                      : ''
+                  }
                   onClick={() => addToCart(food)}
-                  style={{width: '100%', background: '#FF7A21', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginTop: 8}}
+                  style={{width: '100%', background: '#FF7A21', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 0', fontWeight: 800, fontSize: 15, letterSpacing: 0.2, cursor: 'pointer', marginTop: 'auto', opacity: (activeMenuType === 'Buffet' && Number(food.buffetId || 0) > 0 && selectedBuffetId > 0 && selectedBuffetId !== Number(food.buffetId || 0)) ? 0.6 : 1}}
                 >
-                  + Thêm vào giỏ
+                  {activeMenuType === 'Buffet' ? 'THÊM VÀO GIỎ' : '+ Thêm vào giỏ'}
                 </button>
               </div>
-            ))}
+            )})}
           </div>
+          )}
         </div>
         {/* Cột phải: Sidebar giỏ hàng */}
         <div style={{flex: 1, background: '#fff', borderRadius: 16, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', padding: 24, minWidth: 340, maxWidth: 380, height: 'fit-content'}}>
           <div style={{fontWeight: 800, fontSize: 20, marginBottom: 8}}>Đơn hàng của bạn</div>
-          <div style={{color: '#888', fontSize: 13, marginBottom: 18}}>{tableLabel} • Lumiere Bistro</div>
+          <div style={{color: '#888', fontSize: 13, marginBottom: 18}}>{tableLabel} • NHÀ HÀNG FPT</div>
           <div style={{marginBottom: 18}}>
             {cart.length === 0 && <p style={{ color: '#94a3b8' }}>Chưa có món trong giỏ</p>}
             {cart.map((item) => (
-              <div key={item.id} style={{display: 'flex', alignItems: 'center', marginBottom: 12}}>
+              <div key={item.cartKey || item.id} style={{display: 'flex', alignItems: 'center', marginBottom: 12}}>
                 <img src={item.img} alt={item.name} style={{width: 48, height: 48, borderRadius: 8, marginRight: 12}} />
                 <div style={{flex: 1}}>
                   <div style={{fontWeight: 700, fontSize: 15}}>{item.name}</div>
                   <div style={{color: '#FF7A21', fontWeight: 700, fontSize: 13}}>{formatCurrency(item.price)}</div>
+                  {item.itemType === 'Buffet' && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span>Suất Người Lớn (trên 1m3): {formatCurrency(item.price)}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button onClick={() => updateQty(item.cartKey || String(item.id), -1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>-</button>
+                          <span style={{ minWidth: 10, textAlign: 'center', fontWeight: 700 }}>{Number(item.quantity || 0)}</span>
+                          <button onClick={() => updateQty(item.cartKey || String(item.id), 1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>+</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
+                        <span>Suất Trẻ Em (1m - 1m3): {formatCurrency(Number(item.childrenPrice || 0))}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button onClick={() => updateBuffetChildQty(item.cartKey || String(item.id), -1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>-</button>
+                        <span style={{ minWidth: 10, textAlign: 'center', fontWeight: 700 }}>{Number(item.quantityBufferChildent || 0)}</span>
+                        <button onClick={() => updateBuffetChildQty(item.cartKey || String(item.id), 1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>+</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
-                  <button onClick={() => updateQty(item.id, -1)} style={{width: 24, height: 24, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 16, cursor: 'pointer'}}>-</button>
-                  <span style={{fontWeight: 700, fontSize: 15}}>{item.quantity}</span>
-                  <button onClick={() => updateQty(item.id, 1)} style={{width: 24, height: 24, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 16, cursor: 'pointer'}}>+</button>
-                </div>
+                {item.itemType !== 'Buffet' && (
+                  <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                    <button onClick={() => updateQty(item.cartKey || String(item.id), -1)} style={{width: 24, height: 24, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 16, cursor: 'pointer'}}>-</button>
+                    <span style={{fontWeight: 700, fontSize: 15}}>{item.quantity}</span>
+                    <button onClick={() => updateQty(item.cartKey || String(item.id), 1)} style={{width: 24, height: 24, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 16, cursor: 'pointer'}}>+</button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -427,14 +1264,14 @@ const GuesQRorder = () => {
               disabled={isPlacingOrder}
               style={{flex: 1, background: '#fff', color: '#FF7A21', border: '2px solid #FF7A21', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isPlacingOrder ? 0.8 : 1}}
             >
-              <span style={{fontSize: 20}}>🛎️</span> {isPlacingOrder ? 'ĐANG GỬI...' : 'GỌI NHÂN VIÊN'}
+              {isPlacingOrder ? 'ĐANG GỬI...' : 'XÁC NHẬN THÊM MÓN'}
             </button>
             <button
               onClick={handlePayment}
               disabled={isRedirectingPayment || isPlacingOrder}
               style={{flex: 1, background: '#FF7A21', color: '#fff', border: 'none', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isRedirectingPayment ? 0.8 : 1}}
             >
-              <span style={{fontSize: 20}}>🧾</span> {isRedirectingPayment ? 'ĐANG CHUYỂN...' : 'THANH TOÁN'}
+              <CreditCard size={18} /> {isRedirectingPayment ? 'ĐANG XỬ LÝ THANH TOÁN...' : 'Thanh toán'}
             </button>
           </div>
         </div>

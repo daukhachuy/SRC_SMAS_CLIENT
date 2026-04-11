@@ -142,3 +142,31 @@ export const createGuestOrder = async (payload) => {
     throw error;
   }
 };
+
+// Lấy menu theo phiên bàn hiện tại (QR session)
+// GET /api/order/session/menu?type=&categoryId=&keyword=
+export const getOrderSessionMenu = async ({ type, categoryId, keyword } = {}) => {
+  const params = {};
+
+  if (type != null && String(type).trim()) {
+    params.type = String(type).trim();
+  }
+
+  if (categoryId != null && Number.isFinite(Number(categoryId))) {
+    params.categoryId = Number(categoryId);
+  }
+
+  if (keyword != null && String(keyword).trim()) {
+    params.keyword = String(keyword).trim();
+  }
+
+  const response = await instance.get('/order/session/menu', { params });
+  return response.data;
+};
+
+// Lấy đơn hiện tại của phiên bàn
+// GET /api/order/session/current
+export const getCurrentOrderSession = async () => {
+  const response = await instance.get('/order/session/current');
+  return response.data;
+};
