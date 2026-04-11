@@ -3,7 +3,7 @@ import { Bell, ShoppingBag, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import NotificationDropdown from './NotificationDropdown';
-import { getAllNotifications, getUnreadNotifications } from '../api/notificationApi';
+import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../api/notificationApi';
 import '../styles/Header.css';
 
 const MENU_ITEMS = [
@@ -15,14 +15,9 @@ const MENU_ITEMS = [
 
 const normalizeRole = (role) => String(role || '').trim().toLowerCase();
 
-const asArray = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
-  if (Array.isArray(payload?.$values)) return payload.$values;
-  if (Array.isArray(payload?.items)) return payload.items;
-  if (Array.isArray(payload?.notifications)) return payload.notifications;
-  return [];
+const getNotificationId = (item, idx = 0) => {
+  const id = item?.id ?? item?.notificationId ?? item?.notificationID ?? item?.Id ?? item?.NotificationId;
+  return id != null ? String(id) : `fallback-${idx}`;
 };
 
 const timeAgoVi = (value) => {
@@ -102,20 +97,35 @@ const Header = () => {
           getUnreadNotifications(),
         ]);
 
-        const allRows = asArray(allPayload?.data ?? allPayload);
-        const unreadRows = asArray(unreadPayload?.data ?? unreadPayload);
+        const allRows = normalizeNotificationList(allPayload);
+        const unreadRows = normalizeNotificationList(unreadPayload);
         const unreadIds = new Set(
           unreadRows
-            .map((item) => item?.id || item?.notificationId)
+            .map((item, idx) => getNotificationId(item, idx))
             .filter(Boolean)
         );
 
+        const hasExplicitReadFlag = allRows.some(
+          (item) => item?.isRead != null || item?.read != null || item?.isSeen != null
+        );
+        const hasAnyReadInAll = allRows.some((item) =>
+          Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false)
+        );
+        const unreadSourceLooksBroken =
+          allRows.length > 0 &&
+          unreadIds.size === allRows.length &&
+          hasExplicitReadFlag &&
+          hasAnyReadInAll;
+
         const mapped = allRows.map((item, idx) => {
           const mappedItem = mapNotificationItem(item, idx);
-          if (unreadIds.size > 0) {
-            return { ...mappedItem, isRead: !unreadIds.has(mappedItem.id) };
-          }
-          return mappedItem;
+          const rowId = getNotificationId(item, idx);
+          const isMarkedUnreadByEndpoint = !unreadSourceLooksBroken && unreadIds.has(rowId);
+          return {
+            ...mappedItem,
+            id: rowId,
+            isRead: isMarkedUnreadByEndpoint ? false : mappedItem.isRead,
+          };
         });
 
         if (mounted) {

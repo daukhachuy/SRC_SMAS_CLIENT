@@ -21,13 +21,29 @@ const KitchenLayout = () => {
   });
 
   const asArray = (payload) => {
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.data)) return payload.data;
-    if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
-    if (Array.isArray(payload?.$values)) return payload.$values;
-    if (Array.isArray(payload?.items)) return payload.items;
-    if (Array.isArray(payload?.notifications)) return payload.notifications;
+    let source = payload;
+    if (typeof source === 'string') {
+      try {
+        source = JSON.parse(source);
+      } catch {
+        return [];
+      }
+    }
+
+    if (Array.isArray(source)) return source;
+    if (Array.isArray(source?.data)) return source.data;
+    if (Array.isArray(source?.data?.$values)) return source.data.$values;
+    if (Array.isArray(source?.$values)) return source.$values;
+    if (Array.isArray(source?.items)) return source.items;
+    if (Array.isArray(source?.notifications)) return source.notifications;
+    if (source?.notificationId != null || source?.id != null) return [source];
+    if (source?.data && (source.data.notificationId != null || source.data.id != null)) return [source.data];
     return [];
+  };
+
+  const getNotificationId = (item, idx = 0) => {
+    const id = item?.id ?? item?.notificationId ?? item?.notificationID ?? item?.Id ?? item?.NotificationId;
+    return id != null ? String(id) : `fallback-${idx}`;
   };
 
   // Load user info và ưu tiên dữ liệu thật từ Profile API
@@ -108,9 +124,36 @@ const KitchenLayout = () => {
 
     const loadNotifications = async () => {
       try {
-        const res = await notificationAPI.getAll();
-        const rows = asArray(res?.data);
-        const mapped = rows.map((item, idx) => mapNotificationToUI(item, idx));
+        const [allRes, unreadRes] = await Promise.all([
+          notificationAPI.getAll(),
+          notificationAPI.getUnread(),
+        ]);
+        const allRows = asArray(allRes?.data);
+        const unreadRows = asArray(unreadRes?.data);
+        const unreadIdSet = new Set(unreadRows.map((item, idx) => getNotificationId(item, idx)));
+
+        const hasExplicitReadFlag = allRows.some(
+          (item) => item?.isRead != null || item?.read != null || item?.isSeen != null
+        );
+        const hasAnyReadInAll = allRows.some((item) =>
+          Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false)
+        );
+        const unreadSourceLooksBroken =
+          allRows.length > 0 &&
+          unreadIdSet.size === allRows.length &&
+          hasExplicitReadFlag &&
+          hasAnyReadInAll;
+
+        const mapped = allRows.map((item, idx) => {
+          const rowId = getNotificationId(item, idx);
+          const base = mapNotificationToUI(item, idx);
+          const isMarkedUnreadByEndpoint = !unreadSourceLooksBroken && unreadIdSet.has(rowId);
+          return {
+            ...base,
+            id: base.id ?? rowId,
+            isRead: isMarkedUnreadByEndpoint ? false : base.isRead,
+          };
+        });
         if (mounted) {
           setNotifications(mapped);
         }

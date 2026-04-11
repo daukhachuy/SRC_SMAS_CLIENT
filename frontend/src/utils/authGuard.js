@@ -75,7 +75,9 @@ export function hasRole(requiredRole) {
 
   try {
     const user = JSON.parse(userStr);
-    return user.role === requiredRole;
+    const userRole = String(user.role || '').trim().toLowerCase();
+    const normalizedRequired = String(requiredRole).trim().toLowerCase();
+    return userRole === normalizedRequired;
   } catch (error) {
     console.error('❌ Error parsing user:', error);
     return false;
@@ -95,7 +97,9 @@ export function hasAnyRole(roles) {
 
   try {
     const user = JSON.parse(userStr);
-    return roles.includes(user.role);
+    const userRole = String(user.role || '').trim().toLowerCase();
+    const normalizedRoles = roles.map(r => String(r).trim().toLowerCase());
+    return normalizedRoles.includes(userRole);
   } catch (error) {
     console.error('❌ Error parsing user:', error);
     return false;

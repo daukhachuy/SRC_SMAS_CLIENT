@@ -1,228 +1,611 @@
-import React, { useState, useRef } from 'react';
-import { Plus, Search, Pencil, Trash2, X, UploadCloud } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  Plus, Search, Pencil, Trash2, X, UploadCloud, AlertCircle,
+  CheckCircle, RefreshCw, Sparkles, Store,
+} from 'lucide-react';
+import {
+  getFoodCategories,
+  normalizeFoodCategoryPayload,
+  createFood,
+  updateFood,
+  deleteFood,
+  toggleFoodStatus,
+  getCategoryLists,
+  resolveFoodImageUrl
+} from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
 
-const CATEGORY_FILTERS = ['Khai vị', 'Món chính', 'Đồ uống', 'Tráng miệng', 'Đặc sản'];
-const DISH_CATEGORIES = ['Khai vị', 'Món chính', 'Tráng miệng', 'Đồ uống', 'Đặc sản'];
-const UNITS = ['Dĩa', 'Phần', 'Ly', 'Tô', 'Cái', 'Kg'];
+const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+const UNITS = ['Dĩa', 'Phần', 'Ly', 'Tô', 'Cái', 'Kg', 'Chai', 'Bình', 'Nắm'];
 
 const defaultDishForm = () => ({
   name: '',
-  image: null,
+  imageFile: null,
   imagePreview: null,
+  image: '',         // URL ảnh cũ khi edit (nếu không đổi ảnh)
   description: '',
   price: '',
   unit: 'Dĩa',
-  categories: [],
+  categoryId: null,
+  categories: [],     // tên danh mục (string) — hiển thị trên UI
   notes: '',
   status: true,
   promotionalPrice: '',
 });
 
-const MOCK_DISHES = [
-  {
-    id: 1,
-    name: 'Salad Cá Hồi Sốt Mè',
-    description: 'Salad tươi với cá hồi Na Uy và sốt mè thơm ngon.',
-    category: 'Khai vị',
-    categories: ['Khai vị'],
-    price: 125000,
-    priceDisplay: '125,000₫',
-    promotionalPrice: 0,
-    unit: 'Dĩa',
-    image: 'https://picsum.photos/seed/salad/80/80',
-    status: true,
-    notes: '',
-  },
-  {
-    id: 2,
-    name: 'Bít Tết Bò Mỹ Ribeye',
-    description: 'Thịt bò Mỹ Ribeye nướng kèm khoai tây chiên và sốt tiêu đen đặc biệt.',
-    category: 'Món chính',
-    categories: ['Món chính'],
-    price: 450000,
-    priceDisplay: '450,000₫',
-    promotionalPrice: 0,
-    unit: 'Dĩa',
-    image: 'https://picsum.photos/seed/steak/80/80',
-    status: true,
-    notes: '',
-  },
-  {
-    id: 3,
-    name: 'Phở Bò Kobe Đặc Biệt',
-    description: 'Phở bò truyền thống với thịt bò Kobe cao cấp.',
-    category: 'Món chính',
-    categories: ['Món chính'],
-    price: 280000,
-    priceDisplay: '280,000₫',
-    promotionalPrice: 0,
-    unit: 'Tô',
-    image: 'https://picsum.photos/seed/pho/80/80',
-    status: false,
-    notes: '',
-  },
-  {
-    id: 4,
-    name: 'Cà Phê Muối Đặc Sản',
-    description: 'Cà phê pha máy kèm kem muối đặc sản Đà Nẵng.',
-    category: 'Đồ uống',
-    categories: ['Đồ uống'],
-    price: 55000,
-    priceDisplay: '55,000₫',
-    promotionalPrice: 0,
-    unit: 'Ly',
-    image: 'https://picsum.photos/seed/coffee/80/80',
-    status: true,
-    notes: '',
-  },
-];
-
-const formatPrice = (n) => {
+function formatPrice(n) {
   if (n === '' || n == null) return '';
   const num = typeof n === 'number' ? n : parseInt(String(n).replace(/\D/g, ''), 10);
   if (isNaN(num)) return '';
   return num.toLocaleString('vi-VN');
-};
+}
 
+/** Chuẩn hóa 1 dòng từ GET /api/food (Swagger: foodId, isAvailable, promotionalPrice, image path, ...) */
+function normalizeFood(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const cats = [];
+  if (raw.categoryName) cats.push(String(raw.categoryName));
+  if (raw.category && typeof raw.category === 'object' && raw.category.name) {
+    cats.push(String(raw.category.name));
+  }
+  if (typeof raw.category === 'string' && raw.category.trim()) cats.push(raw.category.trim());
+  if (raw.categories) {
+    if (typeof raw.categories === 'string') cats.push(raw.categories);
+    else if (Array.isArray(raw.categories)) {
+      raw.categories.forEach((x) => {
+        if (typeof x === 'string' && x) cats.push(x);
+        else if (x && typeof x === 'object' && x.name) cats.push(String(x.name));
+      });
+    }
+  }
+  const uniqueCats = [...new Set(cats.filter(Boolean))];
+
+  const price = Number(raw.price) || 0;
+  const promo = Number(raw.promotionalPrice);
+  const hasPromo = Number.isFinite(promo) && promo > 0 && promo < price;
+
+  // Swagger: isAvailable — ưu tiên hơn field status cũ
+  let active = true;
+  if (raw.isAvailable !== undefined && raw.isAvailable !== null) {
+    active = raw.isAvailable === true || raw.isAvailable === 1 || raw.isAvailable === 'true';
+  } else {
+    active = raw.status !== false && raw.status !== 0;
+  }
+
+  return {
+    id: raw.foodId ?? raw.id ?? null,
+    foodId: raw.foodId ?? raw.id ?? null,
+    name: raw.name ?? '',
+    description: raw.description ?? '',
+    category: uniqueCats[0] ?? '—',
+    categories: uniqueCats,
+    price,
+    priceDisplay: hasPromo
+      ? `${formatPrice(promo)}đ`
+      : `${formatPrice(price)}đ`,
+    priceListDisplay: hasPromo ? `${formatPrice(price)}đ` : null,
+    unit: raw.unit ?? 'Dĩa',
+    image: raw.image ?? '',
+    imageUrl: resolveFoodImageUrl(raw.image),
+    status: active,
+    isAvailable: raw.isAvailable,
+    isDirectSale: raw.isDirectSale === true,
+    isFeatured: raw.isFeatured === true,
+    preparationTime: raw.preparationTime != null ? Number(raw.preparationTime) : null,
+    notes: raw.notes ?? raw.note ?? '',
+    promotionalPrice: Number.isFinite(promo) ? promo : 0,
+    /** Chuỗi hiển thị cột phân loại: "A, B, C" */
+    categoriesLabel: uniqueCats.length ? uniqueCats.join(', ') : '—',
+  };
+}
+
+
+/** Lấy categoryId từ categoryName (dựa vào categories đã load) */
+function categoryLabel(c) {
+  return (c?.name ?? c?.categoryName ?? c?.title ?? '').trim();
+}
+
+function findCategoryIdByName(name, categories) {
+  const n = String(name).toLowerCase().trim();
+  const found = categories.find((c) => categoryLabel(c).toLowerCase() === n);
+  return found ? found.categoryId ?? found.id : null;
+}
+
+/** Lấy categoryName từ categoryId */
 const AdminMenuFood = () => {
-  const [dishes, setDishes] = useState(MOCK_DISHES);
+  /* ── State dữ liệu ── */
+  const [foods, setFoods] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [toastMsg, setToastMsg] = useState('');
+  const [toastType, setToastType] = useState('success'); // 'success' | 'error'
+
+  /* ── Filter / Search ── */
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+
+  /* ── Pagination ── */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  const pageSizeOptions = [5, 10, 20];
+
+  /* ── Modal thêm ── */
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingDish, setEditingDish] = useState(null);
   const [form, setForm] = useState(defaultDishForm());
+  const [formLoading, setFormLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
   const addFileRef = useRef(null);
+
+  /* ── Modal sửa ── */
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingFood, setEditingFood] = useState(null);
+  const [formE, setFormE] = useState(defaultDishForm());
+  const [formELoading, setFormELoading] = useState(false);
+  const [formEErrors, setFormEErrors] = useState({});
   const editFileRef = useRef(null);
 
-  const filtered = dishes.filter((d) => {
-    const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !categoryFilter || (d.categories && d.categories.includes(categoryFilter)) || d.category === categoryFilter;
-    return matchSearch && matchCat;
-  });
+  /* ── Modal xóa ── */
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingFood, setDeletingFood] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
+  /* ── Toggle status đang xử lý ── */
+  const [toggleBusyId, setToggleBusyId] = useState(null);
+
+  /* ── Load dữ liệu ── */
+  const loadData = useCallback(async (options = {}) => {
+    if (!options.silent) {
+      setLoading(true);
+      setApiError('');
+    }
+    try {
+      // GET /api/food/category — danh sách món (Swagger: mảng món + categories lồng nhau)
+      const payload = await getFoodCategories();
+      const flatList = normalizeFoodCategoryPayload(payload);
+      const normFoods = (Array.isArray(flatList) ? flatList : [])
+        .map(normalizeFood)
+        .filter(Boolean);
+      setFoods(normFoods);
+
+      // Danh mục: tùy chọn, không chặn danh sách món nếu lỗi
+      try {
+        const catList = await getCategoryLists();
+        const rawCats = Array.isArray(catList)
+          ? catList
+          : catList?.$values || catList?.items || catList?.data || [];
+        setCategories(rawCats);
+      } catch (catErr) {
+        console.warn('[AdminMenuFood] getCategoryLists:', catErr?.message || catErr);
+        setCategories([]);
+      }
+    } catch (e) {
+      const msg =
+        (typeof e?.message === 'string' && e.message) ||
+        e?.response?.data?.message ||
+        e?.error?.response?.data?.message ||
+        e?.error?.message ||
+        'Không tải được danh sách món ăn (GET /api/food/category).';
+      setApiError(msg);
+      setFoods([]);
+    } finally {
+      if (!options.silent) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  /* ── Toast auto-clear ── */
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(''), 3500);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
+
+  /* ── Filtered list ── */
+  const filtered = useMemo(() => {
+    const list = foods.filter((d) => {
+      const matchSearch = !search || (d.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchCat = !categoryFilter || d.categories.includes(categoryFilter) || d.category === categoryFilter;
+      return matchSearch && matchCat;
+    });
+    return list;
+  }, [foods, search, categoryFilter]);
+
+  /* ── Paginated slice ── */
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
+  /* Reset page when filter changes */
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter]);
+
+  /* ── Helpers form ── */
+  const setFormErrorsFn = (setter) => (errors) => setter(typeof errors === 'function' ? errors({}) : errors);
+  const updateForm = (setter) => (field, value) => setter((prev) => ({ ...prev, [field]: value }));
+  const availableCategoryNames = useMemo(
+    () => [...new Set(categories.map(categoryLabel).filter(Boolean))],
+    [categories]
+  );
+
+  const validateForm = (f) => {
+    const e = {};
+    if (!(f.name || '').trim()) e.name = 'Tên món ăn bắt buộc.';
+    if (!f.price || isNaN(Number(String(f.price).replace(/\D/g, '')))) e.price = 'Giá bán bắt buộc và phải là số.';
+    if (availableCategoryNames.length > 0 && !f.categories.length) {
+      e.categories = 'Phải chọn ít nhất 1 danh mục.';
+    }
+    return e;
+  };
+
+  /* ── Image handling ── */
+  const handleImageFile = (e, setter) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+      setter((prev) => ({ ...prev, imageFile: null, imagePreview: null }));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setter((prev) => ({ ...prev, imageFile: null, imagePreview: null }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setter((prev) => ({ ...prev, imageFile: file, imagePreview: reader.result }));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (setter) => {
+    setter((prev) => ({ ...prev, imageFile: null, imagePreview: null, image: '' }));
+  };
+
+  /* ── Category toggle ── */
+  const handleCategoryToggle = (catName, setter) => {
+    setter((prev) => {
+      const next = prev.categories.includes(catName)
+        ? prev.categories.filter((c) => c !== catName)
+        : [...prev.categories, catName];
+      const catId = findCategoryIdByName(next[0], categories);
+      return { ...prev, categories: next, categoryId: catId };
+    });
+  };
+
+  /* ── OPEN MODALS ── */
   const openAddModal = () => {
-    setForm(defaultDishForm());
+    setForm({ ...defaultDishForm(), categories: [], categoryId: null });
+    setFormErrors({});
     setAddModalOpen(true);
   };
 
-  const closeAddModal = () => {
-    setAddModalOpen(false);
-    addFileRef.current = null;
-  };
-
   const openEditModal = (row) => {
-    setEditingDish(row);
-    setForm({
+    setEditingFood(row);
+    const initForm = {
       name: row.name || '',
-      image: null,
-      imagePreview: row.image || null,
+      imageFile: null,
+      imagePreview: row.imageUrl && row.imageUrl !== FIXED_PRODUCT_IMAGE ? row.imageUrl : null,
+      image: row.image || '',
       description: row.description || '',
-      price: row.price != null ? String(row.price) : '',
+      price: String(row.price || ''),
       unit: row.unit || 'Dĩa',
-      categories: row.categories ? [...row.categories] : (row.category ? [row.category] : []),
+      categoryId: null,
+      categories: [...(row.categories || [])],
       notes: row.notes || '',
       status: row.status !== false,
       promotionalPrice: row.promotionalPrice != null ? String(row.promotionalPrice) : '0',
-    });
+    };
+    setFormE(initForm);
+    setFormEErrors({});
     setEditModalOpen(true);
   };
 
-  const closeEditModal = () => {
-    setEditModalOpen(false);
-    setEditingDish(null);
-    editFileRef.current = null;
+  const openDeleteModal = (row) => {
+    setDeletingFood(row);
+    setDeleteModalOpen(true);
   };
 
-  const updateForm = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  /* ── SAVE NEW ── */
+  const handleSaveNew = async () => {
+    const errs = validateForm(form);
+    if (Object.keys(errs).length) { setFormErrors(errs); return; }
+    setFormLoading(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        price: Number(String(form.price).replace(/\D/g, '')) || 0,
+        unit: form.unit,
+        categoryId: form.categoryId,
+        status: form.status,
+        image: '',
+        imageFile: form.imageFile,
+        notes: form.notes.trim(),
+      };
+      await createFood(payload);
+      setToastMsg('Thêm món ăn thành công!');
+      setToastType('success');
+      setAddModalOpen(false);
+      await loadData({ silent: true });
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Thêm món ăn thất bại.';
+      setFormErrors({ _api: msg });
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleCategoryToggle = (cat) => {
-    setForm((prev) => {
-      const next = prev.categories.includes(cat)
-        ? prev.categories.filter((c) => c !== cat)
-        : [...prev.categories, cat];
-      return { ...prev, categories: next };
-    });
+  /* ── SAVE EDIT ── */
+  const handleSaveEdit = async () => {
+    if (!editingFood) return;
+    const errs = validateForm(formE);
+    if (Object.keys(errs).length) { setFormEErrors(errs); return; }
+    setFormELoading(true);
+    try {
+      const payload = {
+        name: formE.name.trim(),
+        description: formE.description.trim(),
+        price: Number(String(formE.price).replace(/\D/g, '')) || 0,
+        unit: formE.unit,
+        categoryId: formE.categoryId,
+        status: formE.status,
+        image: formE.image || '',
+        imageFile: formE.imageFile,
+        notes: formE.notes.trim(),
+      };
+      await updateFood(editingFood.id, payload);
+      setToastMsg('Cập nhật món ăn thành công!');
+      setToastType('success');
+      setEditModalOpen(false);
+      await loadData({ silent: true });
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Cập nhật món ăn thất bại.';
+      setFormEErrors({ _api: msg });
+    } finally {
+      setFormELoading(false);
+    }
   };
 
-  const handleAddImage = (e, isEdit = false) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!/^image\/(jpeg|jpg|png)$/i.test(file.type)) return;
-    if (file.size > 5 * 1024 * 1024) return; // 5MB
-    const reader = new FileReader();
-    reader.onload = () => {
-      setForm((prev) => ({ ...prev, image: file, imagePreview: reader.result }));
-    };
-    reader.readAsDataURL(file);
-    if (isEdit && editFileRef.current) editFileRef.current.value = '';
-    if (!isEdit && addFileRef.current) addFileRef.current.value = '';
+  /* ── DELETE ── */
+  const handleConfirmDelete = async () => {
+    if (!deletingFood) return;
+    setDeleteLoading(true);
+    try {
+      await deleteFood(deletingFood.id);
+      setToastMsg('Xóa món ăn thành công!');
+      setToastType('success');
+      setDeleteModalOpen(false);
+      setDeletingFood(null);
+      await loadData({ silent: true });
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Xóa món ăn thất bại.';
+      setToastMsg(msg);
+      setToastType('error');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
-  const handleSaveNew = () => {
-    const name = (form.name || '').trim();
-    const priceNum = parseInt(String(form.price).replace(/\D/g, ''), 10);
-    if (!name) return;
-    if (!form.categories.length) return;
-    const newDish = {
-      id: Math.max(0, ...dishes.map((d) => d.id)) + 1,
-      name,
-      description: (form.description || '').trim(),
-      category: form.categories[0],
-      categories: form.categories,
-      price: isNaN(priceNum) ? 0 : priceNum,
-      priceDisplay: formatPrice(priceNum) + '₫',
-      promotionalPrice: 0,
-      unit: form.unit,
-      image: form.imagePreview || '',
-      status: true,
-      notes: (form.notes || '').trim(),
-    };
-    setDishes((prev) => [...prev, newDish]);
-    closeAddModal();
+  /* ── TOGGLE STATUS ── */
+  const handleToggleStatus = async (row) => {
+    setToggleBusyId(row.id);
+    try {
+      await toggleFoodStatus(row.id, !row.status);
+      setToastMsg(`Đã ${!row.status ? 'bật' : 'tắt'} kinh doanh món "${row.name}".`);
+      setToastType('success');
+      await loadData({ silent: true });
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Không cập nhật được trạng thái.';
+      setToastMsg(msg);
+      setToastType('error');
+    } finally {
+      setToggleBusyId(null);
+    }
   };
 
-  const handleSaveEdit = () => {
-    if (!editingDish) return;
-    const name = (form.name || '').trim();
-    const priceNum = parseInt(String(form.price).replace(/\D/g, ''), 10);
-    const promoNum = parseInt(String(form.promotionalPrice || '0').replace(/\D/g, ''), 10);
-    if (!name) return;
-    if (!form.categories.length) return;
-    setDishes((prev) =>
-      prev.map((d) =>
-        d.id === editingDish.id
-          ? {
-              ...d,
-              name,
-              description: (form.description || '').trim(),
-              category: form.categories[0],
-              categories: form.categories,
-              price: isNaN(priceNum) ? d.price : priceNum,
-              priceDisplay: formatPrice(priceNum) + '₫',
-              promotionalPrice: isNaN(promoNum) ? 0 : promoNum,
-              unit: form.unit,
-              image: form.imagePreview || d.image,
-              status: form.status,
-              notes: (form.notes || '').trim(),
-            }
-          : d
-      )
-    );
-    closeEditModal();
-  };
+  /* ── Category filter buttons ── */
+  const filterCats = useMemo(
+    () => [
+      ...new Set([
+        ...categories.map(categoryLabel).filter(Boolean),
+        ...foods.flatMap((f) => f.categories || [])
+      ])
+    ],
+    [categories, foods]
+  );
 
-  const toggleStatus = (row) => {
-    setDishes((prev) =>
-      prev.map((d) => (d.id === row.id ? { ...d, status: !d.status } : d))
+  /* ── Render helpers ── */
+  const renderFormModal = (
+    isEdit,
+    open,
+    onClose,
+    formState,
+    setFormState,
+    formErrorsState,
+    onSave,
+    loading,
+    fileRef
+  ) => {
+    if (!open) return null;
+    return (
+      <div className="dish-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+        <div className="dish-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="dish-modal-head">
+            <h2 className="dish-modal-title">{isEdit ? 'Chỉnh sửa món ăn' : 'Thêm món ăn mới'}</h2>
+            <button type="button" className="dish-modal-close" onClick={onClose} aria-label="Đóng">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="dish-modal-form">
+            {formErrorsState._api && (
+              <div className="dish-api-error">
+                <AlertCircle size={16} />
+                <span>{formErrorsState._api}</span>
+              </div>
+            )}
+            <div className="dish-form-grid">
+              {/* LEFT: Tên, Ảnh, Mô tả */}
+              <div className="dish-form-left">
+                <div className="dish-form-group">
+                  <label htmlFor={`${isEdit ? 'edit' : 'add'}-name`}>
+                    Tên món ăn <span className="dish-required">*</span>
+                  </label>
+                  <input
+                    id={`${isEdit ? 'edit' : 'add'}-name`}
+                    type="text"
+                    placeholder="Ví dụ: Salad Cá Hồi Sốt Mè"
+                    value={formState.name}
+                    onChange={(e) => setFormState((p) => ({ ...p, name: e.target.value }))}
+                    className={formErrorsState.name ? 'input-error' : ''}
+                  />
+                  {formErrorsState.name && <span className="dish-field-error">{formErrorsState.name}</span>}
+                </div>
+                <div className="dish-form-group">
+                  <label>Hình ảnh món ăn</label>
+                  <label className="dish-upload-zone">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="dish-upload-input"
+                      onChange={(e) => handleImageFile(e, setFormState)}
+                    />
+                    {formState.imagePreview ? (
+                      <div className="dish-upload-preview">
+                        <img src={formState.imagePreview} alt="Preview" />
+                        <button
+                          type="button"
+                          className="dish-upload-remove"
+                          onClick={(e) => { e.preventDefault(); handleRemoveImage(setFormState); }}
+                          aria-label="Xóa ảnh"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="dish-upload-placeholder">
+                        <UploadCloud size={40} style={{ color: '#FF6C1F' }} />
+                        <span>Kéo thả hoặc nhấn để tải lên</span>
+                        <span className="dish-upload-hint">PNG, JPG, WEBP tối đa 5MB</span>
+                      </div>
+                    )}
+                  </label>
+                </div>
+                <div className="dish-form-group">
+                  <label htmlFor={`${isEdit ? 'edit' : 'add'}-desc`}>Miêu tả</label>
+                  <textarea
+                    id={`${isEdit ? 'edit' : 'add'}-desc`}
+                    placeholder="Mô tả ngắn gọn về hương vị, thành phần..."
+                    value={formState.description}
+                    onChange={(e) => setFormState((p) => ({ ...p, description: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* RIGHT: Giá, ĐVT, Danh mục, Ghi chú */}
+              <div className="dish-form-right">
+                <div className="dish-form-group">
+                  <label htmlFor={`${isEdit ? 'edit' : 'add'}-price`}>
+                    Giá bán (VNĐ) <span className="dish-required">*</span>
+                  </label>
+                  <div className="dish-price-wrap">
+                    <input
+                      id={`${isEdit ? 'edit' : 'add'}-price`}
+                      type="text"
+                      value={formState.price}
+                      onChange={(e) => setFormState((p) => ({ ...p, price: e.target.value }))}
+                      placeholder="0"
+                      className={formErrorsState.price ? 'input-error' : ''}
+                    />
+                    <span className="dish-currency">đ</span>
+                  </div>
+                  {formErrorsState.price && <span className="dish-field-error">{formErrorsState.price}</span>}
+                </div>
+                <div className="dish-form-group">
+                  <label htmlFor={`${isEdit ? 'edit' : 'add'}-unit`}>Đơn vị tính</label>
+                  <select
+                    id={`${isEdit ? 'edit' : 'add'}-unit`}
+                    value={formState.unit}
+                    onChange={(e) => setFormState((p) => ({ ...p, unit: e.target.value }))}
+                  >
+                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div className="dish-form-group">
+                  <label>Danh mục <span className="dish-required">*</span></label>
+                  <div className="dish-categories-grid">
+                    {filterCats.filter(Boolean).map((cat) => (
+                      <label key={cat} className="dish-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={formState.categories.includes(cat)}
+                          onChange={() => handleCategoryToggle(cat, setFormState)}
+                        />
+                        <span>{cat}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {formErrorsState.categories && <span className="dish-field-error">{formErrorsState.categories}</span>}
+                </div>
+                {isEdit && (
+                  <div className="dish-form-group dish-toggle-wrap">
+                    <label className="dish-toggle-label">
+                      {formState.status ? 'Đang kinh doanh' : 'Ngừng kinh doanh'}
+                    </label>
+                    <button
+                      type="button"
+                      className={`menu-toggle ${formState.status ? 'active' : ''}`}
+                      onClick={() => setFormState((p) => ({ ...p, status: !p.status }))}
+                      aria-label="Trạng thái"
+                    >
+                      <span className="menu-toggle-thumb" />
+                    </button>
+                  </div>
+                )}
+                <div className="dish-form-group">
+                  <label htmlFor={`${isEdit ? 'edit' : 'add'}-notes`}>Ghi chú</label>
+                  <textarea
+                    id={`${isEdit ? 'edit' : 'add'}-notes`}
+                    placeholder="Ghi chú nội bộ cho bếp hoặc phục vụ..."
+                    value={formState.notes}
+                    onChange={(e) => setFormState((p) => ({ ...p, notes: e.target.value }))}
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="dish-modal-actions">
+              <button type="button" className="dish-btn-cancel" onClick={onClose} disabled={loading}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="dish-btn-primary"
+                onClick={onSave}
+                disabled={loading}
+              >
+                {loading ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Lưu món ăn'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
   return (
     <div className="menu-management-section">
+      {/* ── Toolbar ── */}
       <div className="menu-section-toolbar">
         <div className="menu-search-wrap">
           <Search size={18} />
@@ -235,7 +618,14 @@ const AdminMenuFood = () => {
           />
         </div>
         <div className="menu-filters">
-          {CATEGORY_FILTERS.map((cat) => (
+          <button
+            type="button"
+            className={`menu-filter-btn ${categoryFilter === '' ? 'active' : ''}`}
+            onClick={() => setCategoryFilter('')}
+          >
+            Tất cả
+          </button>
+          {filterCats.filter(Boolean).map((cat) => (
             <button
               key={cat}
               type="button"
@@ -252,40 +642,120 @@ const AdminMenuFood = () => {
         </button>
       </div>
 
+      {/* ── Toast ── */}
+      {toastMsg && (
+        <div className={`kds-toast-msg ${toastType === 'error' ? 'kds-toast-msg--error' : ''}`} role="status">
+          {toastType === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* ── API Error banner ── */}
+      {apiError && (
+        <div className="kds-api-error" role="alert">
+          <AlertCircle size={20} />
+          <span>{apiError}</span>
+          <button type="button" className="menu-retry-btn" onClick={() => loadData()}>
+            <RefreshCw size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Bảng món ăn (GET /api/food/category) ── */}
       <div className="menu-table-card">
+        {loading ? (
+          <div className="menu-loading-wrap">
+            <RefreshCw size={32} className="spin" />
+            <span>Đang tải danh sách món ăn...</span>
+          </div>
+        ) : (
+          <>
+            <div className="menu-table-scroll">
         <table className="menu-table">
           <thead>
             <tr>
-              <th>HÌNH ẢNH</th>
-              <th>TÊN MÓN</th>
-              <th>DANH MỤC</th>
-              <th>GIÁ BÁN</th>
-              <th>TRẠNG THÁI</th>
-              <th>THAO TÁC</th>
+                  <th style={{ width: 72 }}>HÌNH ẢNH</th>
+                  <th style={{ minWidth: 160 }}>TÊN MÓN</th>
+                  <th style={{ width: 120 }}>GIÁ</th>
+                  <th style={{ minWidth: 180 }}>PHÂN LOẠI</th>
+                  <th style={{ minWidth: 200 }}>MÔ TẢ</th>
+                  <th style={{ width: 140 }}>TRẠNG THÁI</th>
+                  <th style={{ width: 104 }}>THAO TÁC</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row) => (
-              <tr key={row.id}>
+                {filtered.length === 0 ? (
+                  <tr>
+                      <td colSpan={7} className="menu-empty-row">
+                      {search || categoryFilter
+                        ? 'Không có món ăn phù hợp với bộ lọc.'
+                        : 'Chưa có món ăn nào. Nhấn "Thêm món mới" để bắt đầu.'}
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((row) => (
+                    <tr key={row.id} className={!row.status ? 'row-inactive' : ''}>
                 <td>
                   <div className="menu-table-img">
-                    {row.image ? <img src={row.image} alt={row.name} /> : <span>—</span>}
+                          {row.imageUrl && row.imageUrl !== FIXED_PRODUCT_IMAGE ? (
+                            <img src={row.imageUrl} alt={row.name} onError={(e) => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <div className="menu-table-img-placeholder">
+                              <span>{row.name?.[0]?.toUpperCase() ?? '?'}</span>
+                            </div>
+                          )}
                   </div>
                 </td>
-                <td className="menu-cell-name">{row.name}</td>
-                <td>
-                  <span className="menu-category-tag">{row.category || (row.categories && row.categories[0]) || '—'}</span>
+                      <td className="menu-cell-name">
+                        <span className="menu-dish-name">{row.name}</span>
+                        {(row.isFeatured || row.isDirectSale) && (
+                          <div className="menu-food-tag-row">
+                            {row.isFeatured && (
+                              <span className="menu-food-tag-pill menu-food-tag-pill--featured" title="Món nổi bật">
+                                <Sparkles size={12} aria-hidden />
+                                Nổi bật
+                              </span>
+                            )}
+                            {row.isDirectSale && (
+                              <span className="menu-food-tag-pill menu-food-tag-pill--direct" title="Bán lẻ / trực tiếp">
+                                <Store size={12} aria-hidden />
+                                Bán lẻ
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="menu-cell-price">
+                        <span className="menu-price-main">{row.priceDisplay}</span>
+                        {row.priceListDisplay && (
+                          <span className="menu-price-old">{row.priceListDisplay}</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="menu-categories-text" title={row.categoriesLabel}>
+                          {row.categoriesLabel}
+                        </span>
                 </td>
-                <td className="menu-cell-price">{row.priceDisplay}</td>
-                <td>
+                      <td>
+                        <div className="menu-status-stack">
+                          <span
+                            className={`menu-stock-badge ${row.status ? 'menu-stock-badge--in' : 'menu-stock-badge--out'}`}
+                          >
+                            {row.status ? 'Còn hàng' : 'Hết hàng'}
+                          </span>
                   <button
                     type="button"
                     className={`menu-toggle ${row.status ? 'active' : ''}`}
-                    aria-label="Toggle"
-                    onClick={() => toggleStatus(row)}
+                            aria-label={row.status ? 'Chuyển sang hết hàng' : 'Chuyển sang còn hàng'}
+                            disabled={toggleBusyId === row.id}
+                            onClick={() => handleToggleStatus(row)}
                   >
                     <span className="menu-toggle-thumb" />
                   </button>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="menu-desc-text">{row.description || '—'}</span>
                 </td>
                 <td>
                   <div className="menu-actions-cell">
@@ -301,285 +771,151 @@ const AdminMenuFood = () => {
                       type="button"
                       className="menu-icon-btn menu-icon-btn-danger"
                       aria-label="Xóa"
+                            onClick={() => openDeleteModal(row)}
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
                 </td>
               </tr>
-            ))}
+                  ))
+                )}
           </tbody>
         </table>
+            </div>
+
         <div className="menu-pagination">
-          <span>Hiển thị 1-{filtered.length} trên {dishes.length} món ăn</span>
+          <div className="menu-pagination-info">
+            <span>
+              Hiển thị {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, totalItems)} của {totalItems} món ăn
+            </span>
+            <div className="menu-page-size-wrap">
+              <label htmlFor="page-size-select">Hiển thị:</label>
+              <select
+                id="page-size-select"
+                className="menu-page-size-select"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {pageSizeOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <span>/ trang</span>
+            </div>
+          </div>
           <div className="menu-pagination-btns">
-            <button type="button" className="menu-page-btn" disabled>‹</button>
-            <button type="button" className="menu-page-btn active">1</button>
-            <button type="button" className="menu-page-btn">›</button>
+            <button
+              type="button"
+              className="menu-page-btn"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+            >
+              ‹
+            </button>
+
+            {(() => {
+              const pages = [];
+              const maxVisible = 5;
+              let startPage = Math.max(1, safePage - Math.floor(maxVisible / 2));
+              let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+              if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+              }
+              for (let i = startPage; i <= endPage; i++) {
+                pages.push(
+                  <button
+                    key={i}
+                    type="button"
+                    className={`menu-page-btn ${i === safePage ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(i)}
+                  >
+                    {i}
+                  </button>
+                );
+              }
+              return pages;
+            })()}
+
+            <button
+              type="button"
+              className="menu-page-btn"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+            >
+              ›
+            </button>
           </div>
         </div>
+          </>
+        )}
       </div>
 
-      {/* Modal Thêm món ăn mới */}
-      {addModalOpen && (
-        <div
-          className="dish-modal-overlay"
-          onClick={closeAddModal}
-          onKeyDown={(e) => e.key === 'Escape' && closeAddModal()}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="dish-add-title"
-        >
-          <div className="dish-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="dish-modal-head">
-              <h2 id="dish-add-title" className="dish-modal-title">Thêm món ăn mới</h2>
-              <button type="button" className="dish-modal-close" onClick={closeAddModal} aria-label="Đóng">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="dish-modal-form">
-              <div className="dish-form-grid">
-                <div className="dish-form-left">
-                  <div className="dish-form-group">
-                    <label htmlFor="add-name">Tên món ăn <span className="dish-required">*</span></label>
-                    <input
-                      id="add-name"
-                      type="text"
-                      placeholder="Ví dụ: Salad Cá Hồi Sốt Mè"
-                      value={form.name}
-                      onChange={(e) => updateForm('name', e.target.value)}
-                    />
-                  </div>
-                  <div className="dish-form-group">
-                    <label>Hình ảnh món ăn</label>
-                    <label className="dish-upload-zone">
-                      <input
-                        ref={addFileRef}
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png"
-                        className="dish-upload-input"
-                        onChange={(e) => handleAddImage(e, false)}
-                      />
-                      {form.imagePreview ? (
-                        <div className="dish-upload-preview">
-                          <img src={form.imagePreview} alt="Preview" />
-                        </div>
-                      ) : (
-                        <div className="dish-upload-placeholder">
-                          <UploadCloud size={40} style={{ color: '#FF6C1F' }} />
-                          <span>Kéo thả hoặc nhấn để tải lên</span>
-                          <span className="dish-upload-hint">PNG, JPG tối đa 5MB</span>
-                        </div>
-                      )}
-                    </label>
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="add-desc">Miêu tả</label>
-                    <textarea
-                      id="add-desc"
-                      placeholder="Mô tả ngắn gọn về hương vị, thành phần..."
-                      value={form.description}
-                      onChange={(e) => updateForm('description', e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <div className="dish-form-right">
-                  <div className="dish-form-group">
-                    <label htmlFor="add-price">Giá bán <span className="dish-required">*</span></label>
-                    <div className="dish-price-wrap">
-                      <input
-                        id="add-price"
-                        type="text"
-                        value={form.price}
-                        onChange={(e) => updateForm('price', e.target.value)}
-                        placeholder="0"
-                      />
-                      <span className="dish-currency">đ</span>
-                    </div>
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="add-unit">Đơn vị tính</label>
-                    <select
-                      id="add-unit"
-                      value={form.unit}
-                      onChange={(e) => updateForm('unit', e.target.value)}
-                    >
-                      {UNITS.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="dish-form-group">
-                    <label>Chọn Danh mục (Chọn ít nhất 1) <span className="dish-required">*</span></label>
-                    <div className="dish-categories-grid">
-                      {DISH_CATEGORIES.map((cat) => (
-                        <label key={cat} className="dish-checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={form.categories.includes(cat)}
-                            onChange={() => handleCategoryToggle(cat)}
-                          />
-                          <span>{cat}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="add-notes">Ghi chú</label>
-                    <textarea
-                      id="add-notes"
-                      placeholder="Ghi chú nội bộ cho bếp hoặc phục vụ..."
-                      value={form.notes}
-                      onChange={(e) => updateForm('notes', e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="dish-modal-actions">
-                <button type="button" className="dish-btn-cancel" onClick={closeAddModal}>Hủy</button>
-                <button type="button" className="dish-btn-primary" onClick={handleSaveNew}>Lưu món ăn</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ── Modal Thêm ── */}
+      {renderFormModal(
+        false,
+        addModalOpen,
+        () => { setAddModalOpen(false); },
+        form,
+        setForm,
+        formErrors,
+        handleSaveNew,
+        formLoading,
+        addFileRef
       )}
 
-      {/* Modal Chỉnh sửa thông tin món ăn */}
-      {editModalOpen && editingDish && (
-        <div
-          className="dish-modal-overlay"
-          onClick={closeEditModal}
-          onKeyDown={(e) => e.key === 'Escape' && closeEditModal()}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="dish-edit-title"
-        >
-          <div className="dish-modal dish-modal-edit" onClick={(e) => e.stopPropagation()}>
-            <div className="dish-modal-head">
-              <h2 id="dish-edit-title" className="dish-modal-title">Chỉnh sửa thông tin món ăn</h2>
-              <button type="button" className="dish-modal-close" onClick={closeEditModal} aria-label="Đóng">
-                <X size={20} />
-              </button>
+      {/* ── Modal Sửa ── */}
+      {renderFormModal(
+        true,
+        editModalOpen,
+        () => { setEditModalOpen(false); },
+        formE,
+        setFormE,
+        formEErrors,
+        handleSaveEdit,
+        formELoading,
+        editFileRef
+      )}
+
+      {/* ── Modal Xác nhận Xóa ── */}
+      {deleteModalOpen && deletingFood && (
+        <div className="kds-modal-overlay" onClick={() => !deleteLoading && setDeleteModalOpen(false)}>
+          <div className="kds-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="kds-modal-header">
+              <div className="modal-icon warning">
+                <AlertCircle size={28} />
+              </div>
+              <div>
+                <h3 className="kds-modal-title">
+                  Xác nhận xóa món: <span className="highlight">{deletingFood.name}</span>
+                </h3>
+                <p className="kds-modal-subtitle">Thao tác này không thể hoàn tác.</p>
+              </div>
             </div>
-            <div className="dish-modal-form">
-              <div className="dish-form-grid">
-                <div className="dish-form-left">
-                  <div className="dish-form-group">
-                    <label>Hình ảnh món ăn</label>
-                    <label className="dish-upload-zone">
-                      <input
-                        ref={editFileRef}
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png"
-                        className="dish-upload-input"
-                        onChange={(e) => handleAddImage(e, true)}
-                      />
-                      {form.imagePreview ? (
-                        <div className="dish-upload-preview">
-                          <img src={form.imagePreview} alt="Preview" />
-                        </div>
-                      ) : (
-                        <div className="dish-upload-placeholder">
-                          <UploadCloud size={40} style={{ color: '#9ca3af' }} />
-                          <span>Kéo thả hoặc nhấn để thay đổi ảnh</span>
-                        </div>
-                      )}
-                    </label>
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="edit-name">Tên món ăn <span className="dish-required">*</span></label>
-                    <input
-                      id="edit-name"
-                      type="text"
-                      value={form.name}
-                      onChange={(e) => updateForm('name', e.target.value)}
-                    />
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="edit-desc">Miêu tả</label>
-                    <textarea
-                      id="edit-desc"
-                      value={form.description}
-                      onChange={(e) => updateForm('description', e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <div className="dish-form-right">
-                  <div className="dish-form-group">
-                    <label htmlFor="edit-price">Giá bán (VNĐ) <span className="dish-required">*</span></label>
-                    <input
-                      id="edit-price"
-                      type="text"
-                      value={form.price}
-                      onChange={(e) => updateForm('price', e.target.value)}
-                    />
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="edit-promo">Giá khuyến mãi</label>
-                    <input
-                      id="edit-promo"
-                      type="text"
-                      value={form.promotionalPrice}
-                      onChange={(e) => updateForm('promotionalPrice', e.target.value)}
-                    />
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="edit-unit">Đơn vị tính</label>
-                    <select
-                      id="edit-unit"
-                      value={form.unit}
-                      onChange={(e) => updateForm('unit', e.target.value)}
-                    >
-                      {UNITS.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="dish-form-group dish-toggle-wrap">
-                    <label className="dish-toggle-label">Trạng thái (Còn món)</label>
+            <div className="kds-modal-content">
+              <p>Bạn có chắc chắn muốn xóa món <strong>{deletingFood.name}</strong> khỏi danh sách?</p>
+          </div>
+            <div className="kds-modal-footer">
+              <button
+                type="button"
+                className="kds-btn secondary"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleteLoading}
+              >
+                Quay lại
+              </button>
                     <button
                       type="button"
-                      className={`menu-toggle ${form.status ? 'active' : ''}`}
-                      onClick={() => updateForm('status', !form.status)}
-                      aria-label="Trạng thái"
-                    >
-                      <span className="menu-toggle-thumb" />
+                className="kds-btn danger"
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading}
+              >
+                <Trash2 size={18} />
+                {deleteLoading ? 'Đang xóa...' : 'Xác nhận xóa'}
                     </button>
-                  </div>
-                  <div className="dish-form-group">
-                    <label>Chọn danh mục <span className="dish-required">*</span></label>
-                    <div className="dish-categories-grid">
-                      {DISH_CATEGORIES.map((cat) => (
-                        <label key={cat} className="dish-checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={form.categories.includes(cat)}
-                            onChange={() => handleCategoryToggle(cat)}
-                          />
-                          <span>{cat}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="dish-form-group">
-                    <label htmlFor="edit-notes">Ghi chú</label>
-                    <textarea
-                      id="edit-notes"
-                      placeholder="Ghi chú cho bếp..."
-                      value={form.notes}
-                      onChange={(e) => updateForm('notes', e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="dish-modal-actions">
-                <button type="button" className="dish-btn-cancel" onClick={closeEditModal}>Hủy</button>
-                <button type="button" className="dish-btn-primary" onClick={handleSaveEdit}>Lưu thay đổi</button>
-              </div>
             </div>
           </div>
         </div>

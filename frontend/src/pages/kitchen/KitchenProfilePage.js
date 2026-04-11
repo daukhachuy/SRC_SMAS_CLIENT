@@ -186,8 +186,9 @@ const KitchenProfilePage = () => {
         if (status === 401 || status === 403) {
           setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
           setTimeout(() => {
+            localStorage.removeItem('authToken');
             localStorage.removeItem('token');
-            window.location.href = '/login';
+            window.location.href = '/auth';
           }, 2000);
           return;
         }
@@ -250,8 +251,9 @@ const KitchenProfilePage = () => {
       if (status === 401 || status === 403) {
         setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
         setTimeout(() => {
+          localStorage.removeItem('authToken');
           localStorage.removeItem('token');
-          window.location.href = '/login';
+          window.location.href = '/auth';
         }, 2000);
         return;
       }
@@ -316,8 +318,9 @@ const KitchenProfilePage = () => {
       if (status === 401 || status === 403) {
         setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
         setTimeout(() => {
+          localStorage.removeItem('authToken');
           localStorage.removeItem('token');
-          window.location.href = '/login';
+          window.location.href = '/auth';
         }, 2000);
         return;
       }

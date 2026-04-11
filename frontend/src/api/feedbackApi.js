@@ -9,8 +9,19 @@ function normalizeFeedbackList(data) {
   return [];
 }
 
+/**
+ * POST /api/feedback/create-or-update — Bearer
+ * Body: { orderCode, rating, comment, feedbackType }
+ */
+export async function createOrUpdateFeedback(payload) {
+  const { data } = await instance.post('/feedback/create-or-update', payload);
+  return data;
+}
+
 /** GET /api/feedback/lists — Bearer; 404 + MSG_016 = danh sách rỗng */
 export const feedbackAPI = {
+  createOrUpdate: createOrUpdateFeedback,
+
   getFeedbackLists: async () => {
     try {
       const { data } = await instance.get('/feedback/lists');
