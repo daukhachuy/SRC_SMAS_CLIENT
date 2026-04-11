@@ -1,39 +1,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
-import '../../styles/ManagerPages.css';
 import {
-  Calendar,
-  Search,
-  Plus,
-  Users,
-  CheckCircle,
   AlertCircle,
-  FileText,
-  Eye,
+  Calendar,
+  Check,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Clock3,
+  Eye,
+  FileText,
+  Info,
+  Plus,
+  Search,
+  Trash2,
+  Users,
   Utensils,
   X,
-  Edit,
-  Trash2,
-  Info,
-  Check,
   XCircle,
-  Clock3,
 } from 'lucide-react';
 import {
-  reservationAPI,
   eventBookingAPI,
-  mapReservationToUI,
   mapEventToUI,
+  mapReservationToUI,
+  reservationAPI,
+  reviewBookEvent,
 } from '../../api/managerApi';
+import '../../styles/ManagerPages.css';
 import '../../styles/ManagerReservationsPage.css';
 
 const ManagerReservationsPage = () => {
   const { base } = useRoleSectionBasePath();
-  const [eventStatusFilter, setEventStatusFilter] = useState('all');
   const navigate = useNavigate();
+  const [eventStatusFilter, setEventStatusFilter] = useState('all');
+  // Modal state cho xác nhận duyệt sự kiện
+  const [reviewModal, setReviewModal] = useState({ open: false, eventId: null, loading: false, error: '', decision: 'Approved', note: '' });
   const [activeTab, setActiveTab] = useState('regular');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -53,6 +55,44 @@ const ManagerReservationsPage = () => {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [processingCode, setProcessingCode] = useState('');
+
+  // Hàm mở modal xác nhận duyệt sự kiện
+  const openReviewModal = (eventId) => {
+    setReviewModal({ open: true, eventId, loading: false, error: '', decision: 'Approved', note: '' });
+  };
+
+  // Hàm gọi API xác nhận duyệt sự kiện
+  const handleReviewEvent = async (decision) => {
+    const resolvedDecision = decision === 'Rejected' ? 'Rejected' : 'Approved';
+    setReviewModal((prev) => ({ ...prev, loading: true, error: '', decision: resolvedDecision }));
+    try {
+      await reviewBookEvent(reviewModal.eventId, {
+        decision: resolvedDecision,
+        note: reviewModal.note,
+      });
+      setReviewModal({ open: false, eventId: null, loading: false, error: '', decision: 'Approved', note: '' });
+      setUiNotice(resolvedDecision === 'Approved' ? 'Xác nhận sự kiện thành công!' : 'Đã hủy sự kiện thành công!');
+      loadEventsData();
+    } catch (err) {
+      setReviewModal((prev) => ({ ...prev, loading: false, error: err?.response?.data?.message || err?.message || 'Lỗi xác nhận sự kiện' }));
+    }
+  };
+
+  const openContractSigningPage = (event, detailId) => {
+    if (!detailId) return;
+    const bookingCode = String(event?.bookingCode || event?.raw?.bookingCode || event?.raw?.eventCode || '').trim();
+    const bookingQuery = bookingCode ? `?bookingCode=${encodeURIComponent(bookingCode)}` : '';
+    navigate(`${base}/reservations/${detailId}/contract${bookingQuery}`);
+  };
+
+  const openCreateContractPage = (event, detailId) => {
+    if (!detailId) return;
+    const bookingCode = String(event?.bookingCode || event?.raw?.bookingCode || event?.raw?.eventCode || '').trim();
+    const query = new URLSearchParams();
+    if (bookingCode) query.set('bookingCode', bookingCode);
+    query.set('create', '1');
+    navigate(`${base}/reservations/${detailId}/contract?${query.toString()}`);
+  };
 
   useEffect(() => {
     if (!uiNotice) return;
@@ -389,6 +429,23 @@ const ManagerReservationsPage = () => {
       },
     };
     return configs[status] || configs.pending;
+  };
+
+  const hasCreatedContract = (event) => {
+    const raw = event?.raw || {};
+    const contractStatus = String(raw?.contractStatus || '').trim().toLowerCase();
+    if (['draft', 'sent', 'signed', 'deposited', 'deposit', 'completed', 'active'].includes(contractStatus)) {
+      return true;
+    }
+    return Boolean(
+      raw?.contractId
+      || raw?.contractCode
+      || raw?.termsAndConditions
+      || raw?.signedAt
+      || raw?.depositAmount
+      || raw?.depositPercent
+      || raw?.contract
+    );
   };
 
   const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|không/i.test(uiNotice);
@@ -734,6 +791,8 @@ const ManagerReservationsPage = () => {
                   const eventCode = event.bookingCode || event.raw?.bookingCode || event.raw?.eventCode || 'N/A';
                   const detailId = event.bookEventId || event.raw?.bookEventId || event.id || event.eventId;
                   const canOpenDetailByStatus = event.status === 'unsigned';
+                  const createdContract = hasCreatedContract(event);
+                  const shouldShowCreateContract = event.statusText === 'Đã duyệt' && !createdContract;
                   return (
                     <tr key={event.id || event.bookingCode || event.eventId} className={event.urgent ? 'urgent-row' : ''}>
                       <td>
@@ -783,15 +842,84 @@ const ManagerReservationsPage = () => {
                             <Eye size={14} />
                             Chi tiết
                           </button>
-                          <button
-                            className="btn-contract"
-                            onClick={() => detailId && navigate(`${base}/reservations/${detailId}/contract`)}
-                            type="button"
-                            disabled={!detailId}
-                          >
-                            <FileText size={14} />
-                            Hợp đồng
-                          </button>
+                          {event.statusText === 'Chờ duyệt' ? (
+                            <button
+                              className="btn-contract"
+                              onClick={() => detailId && openReviewModal(detailId)}
+                              type="button"
+                              disabled={!detailId}
+                            >
+                              <FileText size={14} />
+                              Xác nhận
+                            </button>
+                          ) : (
+                            <button
+                              className="btn-contract"
+                              onClick={() => (
+                                shouldShowCreateContract
+                                  ? openCreateContractPage(event, detailId)
+                                  : openContractSigningPage(event, detailId)
+                              )}
+                              type="button"
+                              disabled={!detailId}
+                            >
+                              <FileText size={14} />
+                              {shouldShowCreateContract ? 'Tạo hợp đồng' : 'Hợp đồng'}
+                            </button>
+                          )}
+                                    {/* Modal xác nhận duyệt sự kiện */}
+                                    {reviewModal.open && (
+                                      <div className="cancel-modal-overlay" onClick={() => setReviewModal({ ...reviewModal, open: false })}>
+                                        <div className="cancel-modal" onClick={e => e.stopPropagation()}>
+                                          <div className="cancel-modal-header">
+                                            <div className="cancel-modal-title-wrap">
+                                              <div className="cancel-icon-wrap">
+                                                <FileText size={18} />
+                                              </div>
+                                              <h3 className="cancel-modal-title">Xác nhận duyệt sự kiện</h3>
+                                            </div>
+                                            <button className="cancel-close-btn" onClick={() => setReviewModal({ ...reviewModal, open: false })} type="button">
+                                              <X size={18} />
+                                            </button>
+                                          </div>
+                                          <div className="cancel-modal-body">
+                                            <p className="cancel-modal-text">
+                                              Bạn muốn duyệt hay hủy sự kiện này?
+                                            </p>
+
+                                            <div className="cancel-warning-box">
+                                              <AlertCircle size={18} />
+                                              <p>
+                                                Chọn <strong>Xác nhận</strong> để duyệt sự kiện, hoặc <strong>Hủy sự kiện</strong> để từ chối.
+                                                Thao tác sẽ được ghi nhận và cập nhật trạng thái ngay.
+                                              </p>
+                                            </div>
+
+                                            <label className="cancel-label" htmlFor="review-note">
+                                              Ghi chú <span style={{ opacity: 0.7 }}>(tuỳ chọn)</span>
+                                            </label>
+                                            <textarea
+                                              id="review-note"
+                                              className="cancel-textarea"
+                                              placeholder="Nhập ghi chú (nếu có)..."
+                                              rows={4}
+                                              value={reviewModal.note}
+                                              onChange={e => setReviewModal(prev => ({ ...prev, note: e.target.value }))}
+                                            />
+                                            {reviewModal.error && <div style={{ color: 'red', marginTop: 8 }}>{reviewModal.error}</div>}
+                                          </div>
+                                          <div className="cancel-modal-footer">
+                                            <button className="btn-cancel-secondary" onClick={() => setReviewModal({ ...reviewModal, open: false })} type="button">Đóng</button>
+                                            <button className="btn-cancel-danger" onClick={() => handleReviewEvent('Rejected')} type="button" disabled={reviewModal.loading}>
+                                              {reviewModal.loading && reviewModal.decision === 'Rejected' ? 'Đang hủy...' : 'Hủy sự kiện'}
+                                            </button>
+                                            <button className="btn-contract" onClick={() => handleReviewEvent('Approved')} type="button" disabled={reviewModal.loading}>
+                                              {reviewModal.loading && reviewModal.decision === 'Approved' ? 'Đang xác nhận...' : 'Xác nhận'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                         </div>
                       </td>
                     </tr>

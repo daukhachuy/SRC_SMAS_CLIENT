@@ -88,7 +88,8 @@ const Services = () => {
   const [newDishForm, setNewDishForm] = useState({
     type: 'Menu',
     name: '',
-    quantity: 1,
+    menuQuantity: 1,
+    comboQuantity: 1,
     notes: '',
     price: 0,
     categoryLabel: 'Món chính'
@@ -150,19 +151,6 @@ const Services = () => {
 
         setApiComboOptions(mappedCombos);
         setApiMenuOptions(mappedFoods);
-
-        // Auto-fill default menu items if API returns data and no manual selection yet
-        if (mappedFoods.length > 0 && menuDishes.length <= 1) {
-          const defaultDishes = mappedFoods.slice(0, 3).map((item, idx) => ({
-            id: item.foodId || item.id || idx + 1,
-            foodId: item.foodId || item.id || 0,
-            ...item,
-            quantity: 10,
-            notes: '',
-            subtotal: item.price * 10
-          }));
-          setMenuDishes(defaultDishes);
-        }
       } catch (err) {
         console.warn('[Services] Failed to load menu/combo from API:', err);
       } finally {
@@ -509,10 +497,10 @@ const Services = () => {
       setEventStepError('time');
       return;
     }
-    // 4) Số khách
-    const guests = parseInt(eventForm.numGuests, 10);
-    if (!guests || guests < 1) {
-      setEventStepError('Vui lòng nhập số lượng khách (≥1).');
+    // 4) Số khách trong 1 bàn
+    const guestsPerTable = parseInt(eventForm.numGuests, 10);
+    if (!guestsPerTable || guestsPerTable < 1) {
+      setEventStepError('Vui lòng nhập số khách trong 1 bàn (≥1).');
       return;
     }
     // 5) Số bàn
@@ -575,13 +563,14 @@ const Services = () => {
     }
 
     const numTables = Math.max(1, parseInt(eventForm.numTables, 10) || 1);
-    const numGuests = Math.max(1, parseInt(eventForm.numGuests, 10) || 10);
+    const guestsPerTable = Math.max(1, parseInt(eventForm.numGuests, 10) || 10);
+    const expectedGuests = numTables * guestsPerTable;
     if (numTables < 1) {
       setEventError('Số lượng bàn phải lớn hơn 0.');
       return;
     }
-    if (numGuests < 1) {
-      setEventError('Số lượng khách phải lớn hơn 0.');
+    if (guestsPerTable < 1) {
+      setEventError('Số khách trong 1 bàn phải lớn hơn 0.');
       return;
     }
 
@@ -613,7 +602,7 @@ const Services = () => {
         .filter(f => f.foodId > 0);
 
       const payload = {
-        numberOfGuests: numGuests,
+        numberOfGuests: expectedGuests,
         reservationDate: formatReservationDate(selectedDate),
         reservationTime,
         note: eventForm.note || '',
@@ -656,6 +645,14 @@ const Services = () => {
       currency: 'VND'
     }).format(value);
   };
+
+  const guestsPerTableInput = Number.parseInt(eventForm.numGuests, 10);
+  const tablesInput = Number.parseInt(eventForm.numTables, 10);
+  const expectedGuestCount =
+    Number.isFinite(guestsPerTableInput) && guestsPerTableInput > 0 &&
+    Number.isFinite(tablesInput) && tablesInput > 0
+      ? guestsPerTableInput * tablesInput
+      : 0;
 
   // FAQ Data
   const faqItems = [
@@ -1019,7 +1016,7 @@ const Services = () => {
                           <div className="event-field-block">
                             <label className="event-field-label">
                               <Users size={14} className="icon-orange" />
-                              Số khách <span className="required-asterisk">*</span>
+                              Số khách / bàn <span className="required-asterisk">*</span>
                             </label>
                             <input
                               type="number"
@@ -1030,7 +1027,7 @@ const Services = () => {
                                 setEventForm({ ...eventForm, numGuests: e.target.value });
                                 setEventStepError('');
                               }}
-                              placeholder="50"
+                              placeholder="10"
                             />
                           </div>
                           <div className="event-field-block">
@@ -1049,6 +1046,15 @@ const Services = () => {
                               }}
                               placeholder="5"
                             />
+                          </div>
+                        </div>
+                        <div className="event-expected-guests-box">
+                          <label className="event-field-label">
+                            <Users size={14} className="icon-orange" />
+                            Số khách dự kiến
+                          </label>
+                          <div className="event-expected-guests-value">
+                            {expectedGuestCount.toLocaleString('vi-VN')} khách
                           </div>
                         </div>
                         {(eventStepError === 'guests' || eventStepError === 'tables') && (
@@ -1414,9 +1420,9 @@ const Services = () => {
                             {menuOptions.filter(o => o.type === 'Menu').map(o => <option key={o.name} value={o.name}>{o.name}</option>)}
                           </select>
                           <div className="event-qty-selector">
-                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: Math.max(1, newDishForm.quantity - 1) })}>−</button>
-                            <span>{newDishForm.quantity}</span>
-                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: newDishForm.quantity + 1 })}>+</button>
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, menuQuantity: Math.max(1, newDishForm.menuQuantity - 1) })}>−</button>
+                            <span>{newDishForm.menuQuantity}</span>
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, menuQuantity: newDishForm.menuQuantity + 1 })}>+</button>
                           </div>
                         </div>
                       </div>
@@ -1434,9 +1440,9 @@ const Services = () => {
                             {menuOptions.filter(o => o.type === 'Combo').map(o => <option key={o.name} value={o.name}>{o.name}</option>)}
                           </select>
                           <div className="event-qty-selector">
-                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: Math.max(1, newDishForm.quantity - 1) })}>−</button>
-                            <span>{newDishForm.quantity}</span>
-                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, quantity: newDishForm.quantity + 1 })}>+</button>
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, comboQuantity: Math.max(1, newDishForm.comboQuantity - 1) })}>−</button>
+                            <span>{newDishForm.comboQuantity}</span>
+                            <button type="button" onClick={() => setNewDishForm({ ...newDishForm, comboQuantity: newDishForm.comboQuantity + 1 })}>+</button>
                           </div>
                         </div>
                       </div>
@@ -1453,19 +1459,22 @@ const Services = () => {
                           const price = opt ? opt.price : newDishForm.price;
                           const categoryLabel = opt ? opt.categoryLabel : (newDishForm.categoryLabel || 'Món chính');
                           const foodId = opt?.foodId ?? opt?.id ?? opt?.comboId ?? 0;
+                          const selectedQuantity = newDishForm.type === 'Combo'
+                            ? Math.max(1, Number(newDishForm.comboQuantity) || 1)
+                            : Math.max(1, Number(newDishForm.menuQuantity) || 1);
                           const newDish = {
                             id: foodId || (menuDishes.length ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1),
                             foodId: foodId || (opt ? 0 : (menuDishes.length ? Math.max(...menuDishes.map(d => d.id)) + 1 : 1)),
                             type: newDishForm.type,
                             name: newDishForm.name,
-                            quantity: newDishForm.quantity,
+                            quantity: selectedQuantity,
                             price,
                             notes: newDishForm.notes,
-                            subtotal: newDishForm.quantity * price,
+                            subtotal: selectedQuantity * price,
                             categoryLabel
                           };
                           setMenuDishes([...menuDishes, newDish]);
-                          setNewDishForm({ type: 'Menu', name: '', quantity: 1, notes: '', price: 0, categoryLabel: 'Món chính' });
+                          setNewDishForm({ type: 'Menu', name: '', menuQuantity: 1, comboQuantity: 1, notes: '', price: 0, categoryLabel: 'Món chính' });
                         }}
                       >
                         Thêm vào danh sách

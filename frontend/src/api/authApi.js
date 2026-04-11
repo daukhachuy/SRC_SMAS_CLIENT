@@ -197,6 +197,7 @@ export function logout() {
   googleLogout();
   localStorage.removeItem('authToken');
   localStorage.removeItem('accessToken');
+  localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('rememberMe');
   localStorage.removeItem('savedEmail');
