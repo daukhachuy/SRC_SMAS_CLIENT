@@ -11,6 +11,9 @@ import { getComboLists, getFoodByFilter } from '../api/foodApi';
 import { isAuthenticated } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
 import AuthRequiredModal from '../components/AuthRequiredModal';
+import AddDishModal from '../components/AddDishModal';
+import FoodListModal from '../components/FoodListModal';
+import ComboListModal from '../components/ComboListModal';
 
 /** Tháng lịch hiển thị T2–CN: trả về mảng (null ô trống | Date). month: 0–11 */
 function getMonthDays(year, month) {
@@ -98,6 +101,12 @@ const Services = () => {
   const eventSubmitRef = useRef(false); // chống double-submit (React StrictMode)
   const [eventError, setEventError] = useState('');
   const [eventSuccess, setEventSuccess] = useState('');
+
+  // ===== STATE CHO 3 MODAL THÊM MÓN =====
+  const [showAddDishModal, setShowAddDishModal] = useState(false);  // Modal A: THÊM MÓN
+  const [showFoodListModal, setShowFoodListModal] = useState(false);  // Modal B: DANH SÁCH MÓN ĂN
+  const [showComboListModal, setShowComboListModal] = useState(false); // Modal C: DANH SÁCH GÓI COMBO
+  const [addDishNotes, setAddDishNotes] = useState(''); // Ghi chú trong modal THÊM MÓN
 
   // API-loaded menu & combo options
   const [apiMenuOptions, setApiMenuOptions] = useState([]);
@@ -188,6 +197,7 @@ const Services = () => {
             id: e.eventId ?? e.id,
             title: e.title || '',
             description: e.description || '',
+            isActive: e.isActive,
             image: e.image
               ? (e.image.startsWith('http') ? e.image : imageBase + (e.image.startsWith('/') ? e.image : `/${e.image}`))
               : 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=400',
@@ -457,8 +467,101 @@ const Services = () => {
     ] : [])
   ];
 
-  // Event Types - từ API /api/events (đồng bộ với backend)
-  const eventTypes = EVENT_TYPES_LIST.map(ev => ({ id: ev.id, name: ev.name }));
+  // ===== XỬ LÝ 3 MODAL THÊM MÓN =====
+  
+  // Tính tổng tiền từ danh sách món đã chọn
+  const addDishTotalPrice = menuDishes.reduce((sum, dish) => sum + dish.subtotal, 0);
+
+  // Mở Modal A (THÊM MÓN)
+  const handleOpenAddDishModal = () => {
+    setShowAddDishModal(true);
+  };
+
+  // Mở Modal B (DANH SÁCH MÓN ĂN) từ Modal A
+  const handleOpenFoodList = () => {
+    setShowAddDishModal(false);
+    setShowFoodListModal(true);
+  };
+
+  // Mở Modal C (DANH SÁCH GÓI COMBO) từ Modal A
+  const handleOpenComboList = () => {
+    setShowAddDishModal(false);
+    setShowComboListModal(true);
+  };
+
+  // Quay lại Modal A từ Modal B hoặc Modal C
+  const handleBackToAddDish = () => {
+    setShowFoodListModal(false);
+    setShowComboListModal(false);
+    setShowAddDishModal(true);
+  };
+
+  // Đóng tất cả Modal
+  const handleCloseAllModals = () => {
+    setShowAddDishModal(false);
+    setShowFoodListModal(false);
+    setShowComboListModal(false);
+    setAddDishNotes('');
+  };
+
+  // Thêm món vào danh sách (từ Modal B hoặc Modal C)
+  const handleAddDishFromModal = (newDish) => {
+    // Kiểm tra xem món đã tồn tại chưa
+    const existingIndex = menuDishes.findIndex(d => (d.foodId || d.id) === (newDish.foodId || newDish.id));
+    
+    if (existingIndex >= 0) {
+      // Tăng số lượng nếu đã tồn tại
+      const updated = [...menuDishes];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        quantity: updated[existingIndex].quantity + 1,
+        subtotal: (updated[existingIndex].quantity + 1) * updated[existingIndex].price
+      };
+      setMenuDishes(updated);
+    } else {
+      // Thêm món mới
+      setMenuDishes([...menuDishes, newDish]);
+    }
+  };
+
+  // Xóa món khỏi danh sách (từ Modal B hoặc Modal C)
+  const handleRemoveDishFromModal = (dishId) => {
+    setMenuDishes(menuDishes.filter(d => (d.foodId || d.id) !== dishId));
+  };
+
+  // Cập nhật số lượng món (từ Modal A)
+  const handleUpdateDishQuantity = (dishId, newQuantity) => {
+    const updated = menuDishes.map(d => {
+      if ((d.foodId || d.id) === dishId) {
+        return {
+          ...d,
+          quantity: newQuantity,
+          subtotal: newQuantity * d.price
+        };
+      }
+      return d;
+    });
+    setMenuDishes(updated);
+  };
+
+  // Xóa món (từ Modal A)
+  const handleRemoveDish = (dishId) => {
+    setMenuDishes(menuDishes.filter(d => (d.foodId || d.id) !== dishId));
+  };
+
+  // Xác nhận đơn hàng từ Modal A
+  const handleConfirmDishOrder = () => {
+    handleCloseAllModals();
+    // TODO: Xử lý logic xác nhận đơn hàng ở đây nếu cần
+  };
+
+  // Event Types - từ GET /api/events, chỉ lấy isActive === true
+  const eventTypes = showcaseEventsFromApi
+    .filter((e) => e.isActive !== false)
+    .map((e) => ({
+      id: e.id ?? e.eventId,
+      name: e.title || '',
+    }));
 
   // Time slots cho event (không cần đặt trước)
   const eventTimeSlots = [
@@ -470,17 +573,22 @@ const Services = () => {
   ];
 
   // Dịch vụ sự kiện: ưu tiên từ API GET /api/services, không có thì dùng fallback
+  // Cả API lẫn fallback đều lọc isAvailable !== false
   const fallbackEventServices = [
-    { id: 1, name: 'MC Tố Châu', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200', description: 'MC tổ chức có chuyên môn cao, dẫn dắt sự kiện chuyên nghiệp', price: 100000 },
-    { id: 2, name: 'MC Minh Hạ', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200', description: 'MC nổi tiếng với phong cách dẫn dắt hài hước và cuốn hút', price: 100000 },
-    { id: 3, name: 'Backdrop Tiêu Chuẩn', image: 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200', description: 'Backdrop trang trí cơ bản với các mẫu tiêu chuẩn', price: 2000000 },
-    { id: 4, name: 'Backdrop VIP', image: 'https://images.unsplash.com/photo-1537904904737-13fc2b3560a1?auto=format&fit=crop&q=80&w=200', description: 'Backdrop cao cấp với thiết kế riêng, trang trí sang trọng', price: 5000000 },
-    { id: 5, name: 'Âm thanh & Âm nhạc', image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống âm thanh chuyên nghiệp, DJ live để làm nóng không khí', price: 3000000 },
-    { id: 6, name: 'Chụp Ảnh & Video', image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&q=80&w=200', description: 'Chụp ảnh và quay phim chuyên nghiệp suốt sự kiện', price: 2500000 },
-    { id: 7, name: 'Lighting LED', image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống đèn LED hiện đại tạo không khí sôi động', price: 2000000 },
-    { id: 8, name: 'Hoa trang trí', image: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?auto=format&fit=crop&q=80&w=200', description: 'Hoa tươi và trang trí hoa cao cấp cho sự kiện', price: 1500000 },
+    { id: 1, name: 'MC Tố Châu', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200', description: 'MC tổ chức có chuyên môn cao, dẫn dắt sự kiện chuyên nghiệp', price: 100000, isAvailable: true },
+    { id: 2, name: 'MC Minh Hạ', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200', description: 'MC nổi tiếng với phong cách dẫn dắt hài hước và cuốn hút', price: 100000, isAvailable: true },
+    { id: 3, name: 'Backdrop Tiêu Chuẩn', image: 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200', description: 'Backdrop trang trí cơ bản với các mẫu tiêu chuẩn', price: 2000000, isAvailable: true },
+    { id: 4, name: 'Backdrop VIP', image: 'https://images.unsplash.com/photo-1537904904737-13fc2b3560a1?auto=format&fit=crop&q=80&w=200', description: 'Backdrop cao cấp với thiết kế riêng, trang trí sang trọng', price: 5000000, isAvailable: true },
+    { id: 5, name: 'Âm thanh & Âm nhạc', image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống âm thanh chuyên nghiệp, DJ live để làm nóng không khí', price: 3000000, isAvailable: true },
+    { id: 6, name: 'Chụp Ảnh & Video', image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&q=80&w=200', description: 'Chụp ảnh và quay phim chuyên nghiệp suốt sự kiện', price: 2500000, isAvailable: true },
+    { id: 7, name: 'Lighting LED', image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống đèn LED hiện đại tạo không khí sôi động', price: 2000000, isAvailable: true },
+    { id: 8, name: 'Hoa trang trí', image: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?auto=format&fit=crop&q=80&w=200', description: 'Hoa tươi và trang trí hoa cao cấp cho sự kiện', price: 1500000, isAvailable: true },
   ];
-  const eventServices = eventServicesFromApi.length > 0 ? eventServicesFromApi : fallbackEventServices;
+
+  // Ghép: API đã lọc isAvailable ở load time, fallback cũng đã có isAvailable = true
+  // Dùng .filter ở đây để đảm bảo an toàn nếu sau này backend trả thêm
+  const eventServices = (eventServicesFromApi.length > 0 ? eventServicesFromApi : fallbackEventServices)
+    .filter((s) => s.isAvailable !== false);
 
   // Validate Step 1 trước khi chuyển bước
   const handleNextStep = () => {
@@ -916,22 +1024,28 @@ const Services = () => {
                             <Star size={14} className="icon-orange" />
                             Loại sự kiện <span className="required-asterisk">*</span>
                           </label>
-                          <div className="event-type-chips">
-                            {eventTypes.map(ev => (
-                              <button
-                                key={ev.id}
-                                type="button"
-                                className={`event-type-chip ${selectedEventId === ev.id ? 'active' : ''}`}
-                                onClick={() => {
-                                  setSelectedEventId(ev.id);
-                                  setSelectedEvent(ev.name);
-                                  setEventStepError('');
-                                }}
-                              >
-                                {ev.name}
-                              </button>
-                            ))}
-                          </div>
+                          {isLoadingShowcaseEvents ? (
+                            <p className="event-field-loading">Đang tải loại sự kiện...</p>
+                          ) : eventTypes.length === 0 ? (
+                            <p className="event-field-empty">Hiện chưa có loại sự kiện nào.</p>
+                          ) : (
+                            <div className="event-type-chips">
+                              {eventTypes.map((ev) => (
+                                <button
+                                  key={ev.id}
+                                  type="button"
+                                  className={`event-type-chip ${selectedEventId === ev.id ? 'active' : ''}`}
+                                  onClick={() => {
+                                    setSelectedEventId(ev.id);
+                                    setSelectedEvent(ev.name);
+                                    setEventStepError('');
+                                  }}
+                                >
+                                  {ev.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                           {eventStepError === 'eventId' && (
                             <p className="event-field-error">Vui lòng chọn loại sự kiện.</p>
                           )}
@@ -1278,7 +1392,7 @@ const Services = () => {
                           <div className="event-menu-summary-row"><span>Phí dịch vụ (5%):</span><span>{formatCurrency(serviceFee)}</span></div>
                           <div className="event-menu-summary-row event-menu-summary-total"><span>TỔNG CỘNG:</span><span>{formatCurrency(total)}</span></div>
                           <div className="event-menu-summary-actions">
-                            <button type="button" className="event-btn-edit-menu" onClick={() => setIsEditingMenu(true)}><Utensils size={18} /> Chỉnh sửa thực đơn</button>
+                            <button type="button" className="event-btn-edit-menu" onClick={handleOpenAddDishModal}><Utensils size={18} /> Chỉnh sửa thực đơn</button>
                             <button type="button" className="event-btn-book-now" onClick={() => setEventStep(4)}><Check size={18} /> ĐẶT LỊCH NGAY</button>
                           </div>
                         </div>
@@ -1671,6 +1785,45 @@ const Services = () => {
       <AuthRequiredModal
         isOpen={showAuthRequired}
         onClose={() => setShowAuthRequired(false)}
+      />
+
+      {/* ===== 3 MODAL THÊM MÓN ===== */}
+
+      {/* Modal A: THÊM MÓN */}
+      <AddDishModal
+        isOpen={showAddDishModal}
+        onClose={handleCloseAllModals}
+        onOpenFoodList={handleOpenFoodList}
+        onOpenComboList={handleOpenComboList}
+        selectedDishes={menuDishes}
+        onUpdateQuantity={handleUpdateDishQuantity}
+        onRemoveDish={handleRemoveDish}
+        notes={addDishNotes}
+        onNotesChange={setAddDishNotes}
+        totalPrice={addDishTotalPrice}
+        onConfirm={handleConfirmDishOrder}
+      />
+
+      {/* Modal B: DANH SÁCH MÓN ĂN */}
+      <FoodListModal
+        isOpen={showFoodListModal}
+        onClose={() => setShowFoodListModal(false)}
+        onBack={handleBackToAddDish}
+        menuItems={menuOptions}
+        selectedDishes={menuDishes}
+        onAddDish={handleAddDishFromModal}
+        onRemoveDish={handleRemoveDishFromModal}
+      />
+
+      {/* Modal C: DANH SÁCH GÓI COMBO */}
+      <ComboListModal
+        isOpen={showComboListModal}
+        onClose={() => setShowComboListModal(false)}
+        onBack={handleBackToAddDish}
+        comboItems={apiComboOptions}
+        selectedDishes={menuDishes}
+        onAddDish={handleAddDishFromModal}
+        onRemoveDish={handleRemoveDishFromModal}
       />
 
       <Footer />

@@ -29,7 +29,13 @@ const defaultDishForm = () => ({
   categoryId: null,
   categories: [],     // tên danh mục (string) — hiển thị trên UI
   notes: '',
+  note: '',
   status: true,
+  isAvailable: true,
+  isDirectSale: false,
+  isFeatured: false,
+  preparationTime: '',
+  calories: '',
   promotionalPrice: '',
 });
 
@@ -301,7 +307,13 @@ const AdminMenuFood = () => {
       categoryId: null,
       categories: [...(row.categories || [])],
       notes: row.notes || '',
+      note: row.note || '',
       status: row.status !== false,
+      isAvailable: row.isAvailable !== false,
+      isDirectSale: row.isDirectSale === true,
+      isFeatured: row.isFeatured === true,
+      preparationTime: row.preparationTime != null ? String(row.preparationTime) : '',
+      calories: row.calories != null ? String(row.calories) : '',
       promotionalPrice: row.promotionalPrice != null ? String(row.promotionalPrice) : '0',
     };
     setFormE(initForm);
@@ -320,16 +332,23 @@ const AdminMenuFood = () => {
     if (Object.keys(errs).length) { setFormErrors(errs); return; }
     setFormLoading(true);
     try {
+      const cleanPrice = Number(String(form.price).replace(/[.,]/g, '')) || 0;
+      const cleanPrepTime = form.preparationTime !== '' ? Number(String(form.preparationTime).replace(/\D/g, '')) : 0;
+      const cleanCalories = form.calories !== '' ? Number(String(form.calories).replace(/\D/g, '')) : 0;
+
       const payload = {
         name: form.name.trim(),
-        description: form.description.trim(),
-        price: Number(String(form.price).replace(/\D/g, '')) || 0,
-        unit: form.unit,
-        categoryId: form.categoryId,
-        status: form.status,
-        image: '',
+        description: form.description ? form.description.trim() : '',
+        image: form.image || '',
+        price: cleanPrice,
+        unit: form.unit || 'Dĩa',
+        note: form.note ? form.note.trim() : '',
+        isAvailable: Boolean(form.isAvailable),
+        isDirectSale: Boolean(form.isDirectSale),
+        isFeatured: Boolean(form.isFeatured),
+        preparationTime: cleanPrepTime,
+        calories: cleanCalories,
         imageFile: form.imageFile,
-        notes: form.notes.trim(),
       };
       await createFood(payload);
       setToastMsg('Thêm món ăn thành công!');
@@ -351,16 +370,23 @@ const AdminMenuFood = () => {
     if (Object.keys(errs).length) { setFormEErrors(errs); return; }
     setFormELoading(true);
     try {
+      const cleanPrice = Number(String(formE.price).replace(/[.,]/g, '')) || 0;
+      const cleanPrepTime = formE.preparationTime !== '' ? Number(String(formE.preparationTime).replace(/\D/g, '')) : 0;
+      const cleanCalories = formE.calories !== '' ? Number(String(formE.calories).replace(/\D/g, '')) : 0;
+
       const payload = {
         name: formE.name.trim(),
-        description: formE.description.trim(),
-        price: Number(String(formE.price).replace(/\D/g, '')) || 0,
-        unit: formE.unit,
-        categoryId: formE.categoryId,
-        status: formE.status,
+        description: formE.description ? formE.description.trim() : '',
         image: formE.image || '',
+        price: cleanPrice,
+        unit: formE.unit || 'Dĩa',
+        note: formE.note ? formE.note.trim() : '',
+        isAvailable: Boolean(formE.isAvailable),
+        isDirectSale: Boolean(formE.isDirectSale),
+        isFeatured: Boolean(formE.isFeatured),
+        preparationTime: cleanPrepTime,
+        calories: cleanCalories,
         imageFile: formE.imageFile,
-        notes: formE.notes.trim(),
       };
       await updateFood(editingFood.id, payload);
       setToastMsg('Cập nhật món ăn thành công!');
