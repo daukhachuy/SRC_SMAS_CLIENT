@@ -37,6 +37,83 @@ const toDateTime = (rawDate) => {
   };
 };
 
+/** API .NET thường trả PascalCase; một số DTO lồng customer / partyB khác tên trường. */
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+
+function nestedCustomerLike(contract) {
+  if (!contract || typeof contract !== 'object') return {};
+  return (
+    contract.customer ||
+    contract.Customer ||
+    contract.partyB ||
+    contract.PartyB ||
+    contract.reservation?.customer ||
+    contract.Reservation?.Customer ||
+    contract.booking?.customer ||
+    contract.Booking?.Customer ||
+    {}
+  );
+}
+
+function pickCustomerFromContract(contract) {
+  const c = nestedCustomerLike(contract);
+  const name = firstNonEmpty(
+    contract.customerName,
+    contract.CustomerName,
+    contract.guestName,
+    contract.GuestName,
+    c.fullName,
+    c.FullName,
+    c.name,
+    c.Name,
+    c.fullname,
+    c.Fullname
+  );
+  const phone = firstNonEmpty(
+    contract.customerPhone,
+    contract.CustomerPhone,
+    contract.phone,
+    contract.Phone,
+    c.phone,
+    c.Phone,
+    c.phoneNumber,
+    c.PhoneNumber,
+    c.mobile,
+    c.Mobile
+  );
+  const email = firstNonEmpty(
+    contract.customerEmail,
+    contract.CustomerEmail,
+    contract.email,
+    contract.Email,
+    c.email,
+    c.Email
+  );
+  return {
+    customerName: name || 'Khách hàng',
+    customerPhone: phone || '---',
+    customerEmail: email || '---',
+  };
+}
+
+function pickEventNameFromContract(contract) {
+  return (
+    firstNonEmpty(
+      contract.eventTitle,
+      contract.EventTitle,
+      contract.eventName,
+      contract.EventName,
+      contract.title,
+      contract.Title
+    ) || 'Sự kiện'
+  );
+}
+
 const statusLabel = {
   draft: 'Nháp',
   sent: 'Đã gửi ký / Chờ khách ký',
@@ -75,31 +152,59 @@ const ContractCustomerSignPage = () => {
           throw new Error('Dữ liệu hợp đồng không hợp lệ.');
         }
 
-        const rawStatus = String(contract?.status || 'draft').toLowerCase();
-        const signedAt = contract?.signedAt || null;
-        const dt = toDateTime(contract?.eventDate || contract?.reservationDate || signedAt);
-        const terms = contract?.termsAndConditions
-          ? String(contract.termsAndConditions)
+        const rawStatus = String(
+          contract?.status ?? contract?.Status ?? 'draft'
+        ).toLowerCase();
+        const signedAt = contract?.signedAt ?? contract?.SignedAt ?? null;
+        const dt = toDateTime(
+          contract?.eventDate ||
+            contract?.EventDate ||
+            contract?.reservationDate ||
+            contract?.ReservationDate ||
+            signedAt
+        );
+        const termsRaw =
+          contract?.termsAndConditions ?? contract?.TermsAndConditions ?? '';
+        const terms = termsRaw
+          ? String(termsRaw)
             .split(/\r?\n|\.|;/)
             .map((x) => x.trim())
             .filter(Boolean)
           : [];
 
+        const cust = pickCustomerFromContract(contract);
+        const code =
+          firstNonEmpty(contract.contractCode, contract.ContractCode) || '--';
+        const cid =
+          firstNonEmpty(contract.contractId, contract.ContractId) || '--';
+
         setData({
-          contractId: contract?.contractId || '--',
-          contractCode: contract?.contractCode || '--',
+          contractId: cid,
+          contractCode: code,
           status: rawStatus,
           statusText: statusLabel[rawStatus] || contract?.status || 'Nháp',
-          customerName: contract?.customerName || contract?.customer?.fullName || 'Khách hàng',
-          customerPhone: contract?.customerPhone || contract?.customer?.phone || '---',
-          customerEmail: contract?.customerEmail || contract?.customer?.email || '---',
-          eventName: contract?.eventTitle || contract?.eventName || 'Sự kiện',
+          customerName: cust.customerName,
+          customerPhone: cust.customerPhone,
+          customerEmail: cust.customerEmail,
+          eventName: pickEventNameFromContract(contract),
           eventDate: dt.date,
           eventTime: dt.time,
-          numberOfGuests: toNum(contract?.numberOfGuests, 0),
+          numberOfGuests: toNum(
+            contract?.numberOfGuests ?? contract?.NumberOfGuests,
+            0
+          ),
           terms,
-          totalAmount: toNum(contract?.totalAmount || contract?.amount, 0),
-          depositAmount: toNum(contract?.depositAmount, 0),
+          totalAmount: toNum(
+            contract?.totalAmount ??
+              contract?.TotalAmount ??
+              contract?.amount ??
+              contract?.Amount,
+            0
+          ),
+          depositAmount: toNum(
+            contract?.depositAmount ?? contract?.DepositAmount,
+            0
+          ),
           signedAt,
         });
       } catch (err) {

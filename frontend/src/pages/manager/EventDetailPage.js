@@ -195,7 +195,7 @@ const EventDetailPage = () => {
 
         setEventData({
           id: pickField(detail, ['bookEventId', 'bookingCode', 'id'], eventId),
-          bookingCode: pickField(detail, ['bookingCode'], ''),
+          bookingCode: pickField(detail, ['bookingCode', 'bookEventCode', 'eventCode', 'code'], ''),
           title: pickField(detail, ['eventTitle', 'eventName', 'title'], pickField(eventInfo, ['title', 'eventTitle'], `Sự kiện ${pickField(detail, ['bookingCode'], '')}`)),
           venue: pickField(detail, ['venue', 'hallName', 'location'], 'Chưa cập nhật'),
           date: dt.date,

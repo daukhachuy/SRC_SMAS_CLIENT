@@ -9,8 +9,11 @@ import {
   updateCombo,
   deleteCombo,
   patchComboStatus,
+  getComboById,
   resolveFoodImageUrl,
   getComboCreatedBy,
+  getFoodCategories,
+  normalizeFoodCategoryPayload,
 } from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
 
@@ -29,6 +32,8 @@ const defaultComboForm = () => ({
   imagePreview: null,
   image: '',
 });
+
+const defaultSelectedFoods = () => ({}); // { [foodId]: quantity }
 
 function formatPriceVnd(num) {
   const n = Number(num) || 0;
@@ -132,6 +137,11 @@ const AdminMenuCombo = () => {
   const [formErrors, setFormErrors] = useState({});
   const [editComboId, setEditComboId] = useState(null);
 
+  const [comboStep, setComboStep] = useState(1); // 1: Thông tin, 2: Chọn món
+  const [selectedFoods, setSelectedFoods] = useState(defaultSelectedFoods); // { [foodId]: quantity }
+  const [availableFoods, setAvailableFoods] = useState([]);
+  const [foodsLoading, setFoodsLoading] = useState(false);
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingCombo, setDeletingCombo] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -191,11 +201,16 @@ const AdminMenuCombo = () => {
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage, pageSize]);
 
-  const validateForm = (f) => {
+  const validateForm = (f, step) => {
     const e = {};
-    if (!(f.name || '').trim()) e.name = 'Tên combo bắt buộc.';
-    const p = Number(String(f.price).replace(/\D/g, ''));
-    if (!f.price || Number.isNaN(p) || p < 0) e.price = 'Giá hợp lệ bắt buộc.';
+    if (step === 1) {
+      if (!(f.name || '').trim()) e.name = 'Tên combo bắt buộc.';
+      const p = Number(String(f.price).replace(/\D/g, ''));
+      if (!f.price || Number.isNaN(p) || p <= 0) e.price = 'Giá hợp lệ bắt buộc.';
+    } else if (step === 2) {
+      const hasFood = Object.values(selectedFoods).some((qty) => qty > 0);
+      if (!hasFood) e.foods = 'Vui lòng chọn ít nhất 1 món ăn cho combo.';
+    }
     return e;
   };
 
@@ -203,26 +218,48 @@ const AdminMenuCombo = () => {
     setEditComboId(null);
     setCreateComboForm(defaultComboForm());
     setFormErrors({});
+    setComboStep(1);
+    setSelectedFoods(defaultSelectedFoods());
+    setAvailableFoods([]);
     setCreateComboOpen(true);
   };
 
-  const openEditCombo = (row) => {
+  const openEditCombo = async (row) => {
     setEditComboId(row.id);
     setFormErrors({});
-    setCreateComboForm({
-      name: row.name || '',
-      description: row.description || '',
-      price: String(row.price ?? ''),
-      discountPercent: row.discountPercent ?? 0,
-      startDate: row.startDate || '',
-      expiryDate: row.expiryDate || '',
-      maxUsage: row.maxUsage != null && row.maxUsage < 2147483647 ? String(row.maxUsage) : '',
-      isAvailable: row.status !== false,
-      imageFile: null,
-      imagePreview: row.imageUrl || null,
-      image: row.image || '',
-    });
+    setComboStep(1);
+    setSelectedFoods(defaultSelectedFoods());
+    setAvailableFoods([]);
     setCreateComboOpen(true);
+    setFoodsLoading(true);
+    try {
+      const combo = await getComboById(row.id);
+      setCreateComboForm({
+        name: combo.name || '',
+        description: combo.description || '',
+        price: String(combo.price ?? ''),
+        discountPercent: combo.discountPercent ?? 0,
+        startDate: formatComboDateField(combo.startDate) || '',
+        expiryDate: formatComboDateField(combo.expiryDate) || '',
+        maxUsage: combo.maxUsage != null && combo.maxUsage < 2147483647 ? String(combo.maxUsage) : '',
+        isAvailable: combo.isAvailable !== false,
+        imageFile: null,
+        imagePreview: combo.imageUrl || combo.image || null,
+        image: combo.image || '',
+      });
+      if (Array.isArray(combo.foods) && combo.foods.length > 0) {
+        const mapped = {};
+        combo.foods.forEach((f) => {
+          const fid = f.foodId ?? f.id ?? 0;
+          mapped[fid] = f.quantity || 0;
+        });
+        setSelectedFoods(mapped);
+      }
+    } catch (e) {
+      console.error('Không tải được chi tiết combo:', e);
+    } finally {
+      setFoodsLoading(false);
+    }
   };
 
   const closeComboModal = () => {
@@ -230,6 +267,21 @@ const AdminMenuCombo = () => {
     setCreateComboForm(defaultComboForm());
     setEditComboId(null);
     setFormErrors({});
+    setComboStep(1);
+    setSelectedFoods(defaultSelectedFoods());
+  };
+
+  const loadAvailableFoods = async () => {
+    setFoodsLoading(true);
+    try {
+      const data = await getFoodCategories();
+      const foods = normalizeFoodCategoryPayload(data);
+      setAvailableFoods(foods);
+    } catch (e) {
+      console.error('Không tải được danh sách món:', e);
+    } finally {
+      setFoodsLoading(false);
+    }
   };
 
   const formatComboDateField = (v) => {
@@ -263,15 +315,44 @@ const AdminMenuCombo = () => {
   };
 
   const submitCombo = async () => {
-    const errs = validateForm(createComboForm);
+    if (comboStep === 1) {
+      const errs = validateForm(createComboForm, 1);
+      if (Object.keys(errs).length) {
+        setFormErrors(errs);
+        return;
+      }
+      // Chuyển sang bước 2
+      setFormErrors({});
+      setComboStep(2);
+      // Load foods nếu chưa load
+      if (availableFoods.length === 0) {
+        await loadAvailableFoods();
+      }
+      return;
+    }
+
+    // Bước 2: validate và submit
+    const errs = validateForm(createComboForm, 2);
     if (Object.keys(errs).length) {
       setFormErrors(errs);
       return;
     }
+
     setFormLoading(true);
     setFormErrors({});
     try {
       const payload = buildPayloadFromForm();
+      // Build foods array
+      const foodsArray = Object.entries(selectedFoods)
+        .filter(([, qty]) => qty > 0)
+        .map(([foodId, quantity]) => ({
+          foodId: parseInt(foodId, 10),
+          quantity: parseInt(quantity, 10),
+        }));
+      payload.foods = foodsArray;
+
+      console.log('📤 Combo payload:', JSON.stringify(payload, null, 2));
+
       if (editComboId) {
         await updateCombo(editComboId, payload);
         setToastMsg('Cập nhật combo thành công!');
@@ -514,156 +595,245 @@ const AdminMenuCombo = () => {
                 <X size={20} />
               </button>
             </div>
+
+            {/* Stepper */}
+            <div className="combo-stepper">
+              <div className={`combo-step ${comboStep >= 1 ? 'active' : ''} ${comboStep > 1 ? 'done' : ''}`}>
+                <div className="combo-step-num">{comboStep > 1 ? '✓' : '1'}</div>
+                <span>Thông tin Combo</span>
+              </div>
+              <div className="combo-step-line" />
+              <div className={`combo-step ${comboStep >= 2 ? 'active' : ''}`}>
+                <div className="combo-step-num">2</div>
+                <span>Chọn Món Ăn</span>
+              </div>
+            </div>
+
             <form
-                className="combo-create-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitCombo();
-                }}
-              >
-                {formErrors._api && (
-                  <div className="dish-api-error" style={{ marginBottom: '1rem' }}>
-                    <AlertCircle size={16} />
-                    <span>{formErrors._api}</span>
-                  </div>
-                )}
-                <div className="combo-form-group">
-                  <label>
-                    Tên Combo <span className="combo-required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={createComboForm.name}
-                    onChange={(e) => setCreateComboForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Ví dụ: Combo Gia Đình 4 Người"
-                    className={formErrors.name ? 'input-error' : ''}
-                  />
-                  {formErrors.name && <span className="dish-field-error">{formErrors.name}</span>}
+              className="combo-create-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitCombo();
+              }}
+            >
+              {formErrors._api && (
+                <div className="dish-api-error" style={{ marginBottom: '1rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{formErrors._api}</span>
                 </div>
-                <div className="combo-form-group">
-                  <label>Mô tả chi tiết</label>
-                  <textarea
-                    value={createComboForm.description}
-                    onChange={(e) => setCreateComboForm((f) => ({ ...f, description: e.target.value }))}
-                    placeholder="Mô tả combo..."
-                    rows={3}
-                  />
-                </div>
-                <div className="combo-form-group">
-                  <label>
-                    Giá bán (VNĐ) <span className="combo-required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={createComboForm.price}
-                    onChange={(e) => setCreateComboForm((f) => ({ ...f, price: e.target.value }))}
-                    placeholder="0"
-                    className={formErrors.price ? 'input-error' : ''}
-                  />
-                  {formErrors.price && <span className="dish-field-error">{formErrors.price}</span>}
-                </div>
-                <div className="combo-form-group">
-                  <label>Giảm giá (%)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={createComboForm.discountPercent}
-                    onChange={(e) =>
-                      setCreateComboForm((f) => ({
-                        ...f,
-                        discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
-                      }))
-                    }
-                  />
-                </div>
-                <div className="combo-form-group">
-                  <label>Ngày bắt đầu</label>
-                  <div className="combo-date-wrap">
+              )}
+
+              {/* BƯỚC 1: Thông tin Combo */}
+              {comboStep === 1 && (
+                <>
+                  <div className="combo-form-group">
+                    <label>
+                      Tên Combo <span className="combo-required">*</span>
+                    </label>
                     <input
-                      type="date"
-                      value={createComboForm.startDate}
-                      onChange={(e) => setCreateComboForm((f) => ({ ...f, startDate: e.target.value }))}
-                      className="combo-date-input"
+                      type="text"
+                      value={createComboForm.name}
+                      onChange={(e) => setCreateComboForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Ví dụ: Combo Gia Đình 4 Người"
+                      className={formErrors.name ? 'input-error' : ''}
                     />
-                    <Calendar size={18} className="combo-date-icon" />
+                    {formErrors.name && <span className="dish-field-error">{formErrors.name}</span>}
                   </div>
-                </div>
-                <div className="combo-form-group">
-                  <label>Ngày hết hạn</label>
-                  <div className="combo-date-wrap">
-                    <input
-                      type="date"
-                      value={createComboForm.expiryDate}
-                      onChange={(e) => setCreateComboForm((f) => ({ ...f, expiryDate: e.target.value }))}
-                      className="combo-date-input"
+                  <div className="combo-form-group">
+                    <label>Mô tả chi tiết</label>
+                    <textarea
+                      value={createComboForm.description}
+                      onChange={(e) => setCreateComboForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="Mô tả combo..."
+                      rows={3}
                     />
-                    <Calendar size={18} className="combo-date-icon" />
                   </div>
-                </div>
-                <div className="combo-form-group">
-                  <label>Giới hạn lượt dùng (để trống = không giới hạn)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={createComboForm.maxUsage}
-                    onChange={(e) => setCreateComboForm((f) => ({ ...f, maxUsage: e.target.value }))}
-                    placeholder="Không giới hạn"
-                  />
-                </div>
-                <div className="combo-form-group dish-toggle-wrap">
-                  <label className="dish-toggle-label">Đang mở bán</label>
-                  <button
-                    type="button"
-                    className={`menu-toggle ${createComboForm.isAvailable ? 'active' : ''}`}
-                    onClick={() =>
-                      setCreateComboForm((f) => ({ ...f, isAvailable: !f.isAvailable }))
-                    }
-                    aria-label="Trạng thái bán"
-                  >
-                    <span className="menu-toggle-thumb" />
-                  </button>
-                </div>
-                <div className="combo-form-group">
-                  <label>Hình ảnh Combo</label>
-                  <label className="combo-upload-zone">
+                  <div className="combo-form-group">
+                    <label>
+                      Giá bán (VNĐ) <span className="combo-required">*</span>
+                    </label>
                     <input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      className="combo-upload-input"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setCreateComboForm((prev) => ({
-                            ...prev,
-                            imageFile: file,
-                            imagePreview: URL.createObjectURL(file),
-                          }));
-                        }
-                      }}
+                      type="text"
+                      inputMode="numeric"
+                      value={createComboForm.price}
+                      onChange={(e) => setCreateComboForm((f) => ({ ...f, price: e.target.value }))}
+                      placeholder="0"
+                      className={formErrors.price ? 'input-error' : ''}
                     />
-                    {createComboForm.imagePreview ? (
-                      <div className="combo-upload-preview">
-                        <img src={createComboForm.imagePreview} alt="Preview" />
+                    {formErrors.price && <span className="dish-field-error">{formErrors.price}</span>}
+                  </div>
+                  <div className="combo-form-group">
+                    <label>Giảm giá (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={createComboForm.discountPercent}
+                      onChange={(e) =>
+                        setCreateComboForm((f) => ({
+                          ...f,
+                          discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="combo-form-row">
+                    <div className="combo-form-group">
+                      <label>Ngày bắt đầu</label>
+                      <div className="combo-date-wrap">
+                        <input
+                          type="date"
+                          value={createComboForm.startDate}
+                          onChange={(e) => setCreateComboForm((f) => ({ ...f, startDate: e.target.value }))}
+                          className="combo-date-input"
+                        />
+                        <Calendar size={18} className="combo-date-icon" />
                       </div>
-                    ) : (
-                      <div className="combo-upload-placeholder">
-                        <Plus size={32} />
-                        <span>Tải ảnh lên</span>
+                    </div>
+                    <div className="combo-form-group">
+                      <label>Ngày hết hạn</label>
+                      <div className="combo-date-wrap">
+                        <input
+                          type="date"
+                          value={createComboForm.expiryDate}
+                          onChange={(e) => setCreateComboForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                          className="combo-date-input"
+                        />
+                        <Calendar size={18} className="combo-date-icon" />
                       </div>
-                    )}
-                  </label>
+                    </div>
+                  </div>
+                  <div className="combo-form-group">
+                    <label>Hình ảnh Combo</label>
+                    <label className="combo-upload-zone">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        className="combo-upload-input"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setCreateComboForm((prev) => ({
+                              ...prev,
+                              imageFile: file,
+                              imagePreview: URL.createObjectURL(file),
+                            }));
+                          }
+                        }}
+                      />
+                      {createComboForm.imagePreview ? (
+                        <div className="combo-upload-preview">
+                          <img src={createComboForm.imagePreview} alt="Preview" />
+                        </div>
+                      ) : (
+                        <div className="combo-upload-placeholder">
+                          <Plus size={32} />
+                          <span>Tải ảnh lên</span>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* BƯỚC 2: Chọn Món Ăn */}
+              {comboStep === 2 && (
+                <div className="combo-step2-content">
+                  <p className="combo-step2-desc">Chọn món ăn và nhập số lượng cho Combo:</p>
+                  {formErrors.foods && (
+                    <div className="dish-api-error" style={{ marginBottom: '1rem' }}>
+                      <AlertCircle size={16} />
+                      <span>{formErrors.foods}</span>
+                    </div>
+                  )}
+                  {foodsLoading ? (
+                    <div className="combo-foods-loading">
+                      <RefreshCw size={24} className="spin" />
+                      <span>Đang tải danh sách món...</span>
+                    </div>
+                  ) : availableFoods.length === 0 ? (
+                    <div className="combo-foods-empty">Không có món ăn nào.</div>
+                  ) : (
+                    <div className="combo-foods-grid">
+                      {availableFoods.map((food) => {
+                        const foodId = food.foodId ?? food.id;
+                        const qty = selectedFoods[foodId] || 0;
+                        return (
+                          <div key={foodId} className={`combo-food-item ${qty > 0 ? 'selected' : ''}`}>
+                            <div className="combo-food-img">
+                              <img
+                                src={resolveFoodImageUrl(food.image)}
+                                alt={food.name}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            </div>
+                            <div className="combo-food-info">
+                              <span className="combo-food-name">{food.name}</span>
+                              <span className="combo-food-price">{formatPriceVnd(food.price || food.promotionalPrice)}</span>
+                            </div>
+                            <div className="combo-food-qty">
+                              <button
+                                type="button"
+                                className="combo-qty-btn"
+                                onClick={() => setSelectedFoods((prev) => ({
+                                  ...prev,
+                                  [foodId]: Math.max(0, (prev[foodId] || 0) - 1),
+                                }))}
+                              >
+                                −
+                              </button>
+                              <span className="combo-qty-value">{qty}</span>
+                              <button
+                                type="button"
+                                className="combo-qty-btn"
+                                onClick={() => setSelectedFoods((prev) => ({
+                                  ...prev,
+                                  [foodId]: (prev[foodId] || 0) + 1,
+                                }))}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {Object.values(selectedFoods).some((q) => q > 0) && (
+                    <div className="combo-selected-summary">
+                      <strong>Đã chọn:</strong>{' '}
+                      {Object.entries(selectedFoods)
+                        .filter(([, qty]) => qty > 0)
+                        .map(([id, qty]) => {
+                          const food = availableFoods.find((f) => (f.foodId ?? f.id) === parseInt(id, 10));
+                          return `${food?.name || id} × ${qty}`;
+                        })
+                        .join(', ')}
+                    </div>
+                  )}
                 </div>
-                <div className="combo-create-actions">
+              )}
+
+              <div className="combo-create-actions">
+                {comboStep === 1 ? (
                   <button type="button" className="combo-btn-cancel" onClick={closeComboModal} disabled={formLoading}>
                     Hủy bỏ
                   </button>
-                  <button type="submit" className="menu-btn-primary" disabled={formLoading}>
-                    {formLoading ? 'Đang lưu...' : editComboId ? 'Lưu thay đổi' : 'Tạo combo'}
+                ) : (
+                  <button
+                    type="button"
+                    className="combo-btn-cancel"
+                    onClick={() => setComboStep(1)}
+                    disabled={formLoading}
+                  >
+                    Quay lại
                   </button>
-                </div>
-              </form>
+                )}
+                <button type="submit" className="menu-btn-primary" disabled={formLoading}>
+                  {formLoading ? 'Đang lưu...' : comboStep === 1 ? 'Tiếp theo →' : editComboId ? 'Lưu thay đổi' : 'Xác nhận tạo'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

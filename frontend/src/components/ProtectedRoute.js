@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import AuthRequiredModal from './AuthRequiredModal';
+import { extractUserFromToken } from '../utils/jwtHelper';
 
-const normalizeRole = (role) => String(role || '').trim().toLowerCase();
+const normalizeRole = (role) => {
+  const normalized = String(role || '').trim().toLowerCase();
+  if (normalized.startsWith('role_')) return normalized.replace('role_', '');
+  return normalized;
+};
+
+const getStoredAuthToken = () =>
+  localStorage.getItem('authToken') || localStorage.getItem('accessToken');
 
 const getRoleHomePath = (role) => {
   const normalizedRole = normalizeRole(role);
@@ -27,8 +35,8 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   useEffect(() => {
     // Kiểm tra token
-    const token = localStorage.getItem('authToken');
-    const userStr = localStorage.getItem('user');
+    const token = getStoredAuthToken();
+    let userStr = localStorage.getItem('user');
     
     if (!token) {
       console.warn('⚠️ [ProtectedRoute] No token found - Showing auth required modal');
@@ -40,6 +48,14 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
     // Kiểm tra role nếu route yêu cầu
     if (requiredRole) {
+      if (!userStr && token) {
+        const userFromToken = extractUserFromToken(token);
+        if (userFromToken) {
+          localStorage.setItem('user', JSON.stringify(userFromToken));
+          userStr = JSON.stringify(userFromToken);
+        }
+      }
+
       if (!userStr) {
         console.warn('⚠️ [ProtectedRoute] Missing user info while role is required');
         setIsAuthorized(false);
@@ -49,10 +65,10 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
       try {
         const user = JSON.parse(userStr);
-        const userRole = String(user.role || '').toLowerCase();
+        const userRole = normalizeRole(user.role);
         const requiredRoles = Array.isArray(requiredRole)
-          ? requiredRole.map((role) => String(role).toLowerCase())
-          : [String(requiredRole).toLowerCase()];
+          ? requiredRole.map((role) => normalizeRole(role))
+          : [normalizeRole(requiredRole)];
 
         if (!requiredRoles.includes(userRole)) {
           console.warn(`⚠️ [ProtectedRoute] User role "${user.role}" does not match required role(s): ${requiredRoles.join(', ')}`);
@@ -99,7 +115,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   // Nếu không được phép
   if (!isAuthorized) {
-    const token = localStorage.getItem('authToken');
+    const token = getStoredAuthToken();
     
     // Không có token → hiển thị modal yêu cầu đăng nhập
     if (!token) {

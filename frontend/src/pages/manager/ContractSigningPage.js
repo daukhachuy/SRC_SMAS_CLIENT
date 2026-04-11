@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
-import { contractAPI, eventBookingAPI } from '../../api/managerApi';
+import { contractAPI, createBookEventContract, eventBookingAPI } from '../../api/managerApi';
 import { 
   ArrowLeft, FileText, ShieldCheck, Building2, User,
   CheckCircle, Download, Edit3
 } from 'lucide-react';
 import '../../styles/ContractSigningPage.css';
+
+const DEFAULT_CREATE_TERMS = [
+  'Bên B thanh toán đặt cọc theo tỷ lệ đã thỏa thuận trong vòng 24 giờ kể từ khi nhận hợp đồng.',
+  'Mọi thay đổi về số lượng khách phải được thông báo trước tối thiểu 48 giờ.',
+  'Hai bên phối hợp xác nhận lại danh mục món ăn/dịch vụ trước ngày tổ chức 03 ngày.',
+  'Chi phí phát sinh ngoài phạm vi hợp đồng sẽ được xác nhận bằng phụ lục hoặc biên bản bổ sung.',
+].join('\n');
 
 const createInitialContractData = () => ({
   contractNumericId: null,
@@ -50,13 +57,31 @@ const ContractSigningPage = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const [searchParams] = useSearchParams();
+  const isCreateMode = ['1', 'true', 'yes'].includes(String(searchParams.get('create') || '').toLowerCase());
   const [isSignaturePadOpen, setIsSignaturePadOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [isPendingCreate, setIsPendingCreate] = useState(false);
+  const [creatingContract, setCreatingContract] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    depositPercent: 30,
+    termsAndConditions: DEFAULT_CREATE_TERMS,
+    note: '',
+  });
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
   const [sendingDepositRequest, setSendingDepositRequest] = useState(false);
 
   const [contractData, setContractData] = useState(createInitialContractData);
+
+  /** Chỉ gửi yêu cầu cọc khi đã gửi khách ký (sent/signed) và Bên B đã ký xong; ẩn khi đã cọc / hủy. */
+  const canShowDepositRequestButton = (() => {
+    const st = String(contractData.status || '').toLowerCase();
+    if (!contractData.partyB.signed) return false;
+    if (['deposited', 'deposit', 'completed', 'cancelled', 'canceled'].includes(st)) {
+      return false;
+    }
+    return ['sent', 'signed'].includes(st);
+  })();
 
   const statusLabel = {
     pending: 'Chờ duyệt / Chờ xử lý',
@@ -89,28 +114,50 @@ const ContractSigningPage = () => {
     };
   };
 
+  const resolveBookingCode = (detail, fallback = '') => {
+    const direct =
+      detail?.bookingCode ||
+      detail?.bookEventCode ||
+      detail?.eventCode ||
+      detail?.code ||
+      detail?.eventInfo?.bookingCode ||
+      detail?.eventInfo?.bookEventCode ||
+      detail?.eventInfo?.eventCode ||
+      detail?.eventInfo?.code ||
+      '';
+    return String(direct || fallback || '').trim();
+  };
+
   useEffect(() => {
     const loadContract = async () => {
       setLoading(true);
       setLoadError('');
       try {
-        let bookingCode = searchParams.get('bookingCode');
+        let bookingCode = String(searchParams.get('bookingCode') || '').trim();
         let detail = null;
 
         if (eventId) {
           const detailRes = await eventBookingAPI.getDetailById(eventId);
           const detailPayload = detailRes?.data?.data?.data ?? detailRes?.data?.data ?? detailRes?.data;
           detail = Array.isArray(detailPayload) ? detailPayload[0] : detailPayload;
-          bookingCode = detail?.bookingCode || '';
+          bookingCode = resolveBookingCode(detail, bookingCode);
         }
 
         if (!bookingCode) {
           throw new Error('Không tìm thấy bookingCode để tải hợp đồng.');
         }
 
-        const contractRes = await contractAPI.getByBookingCode(bookingCode);
-        const payload = contractRes?.data?.data ?? contractRes?.data;
-        const contract = Array.isArray(payload) ? payload[0] : payload;
+        let contract = null;
+        try {
+          const contractRes = await contractAPI.getByBookingCode(bookingCode);
+          const payload = contractRes?.data?.data ?? contractRes?.data;
+          contract = Array.isArray(payload) ? payload[0] : payload;
+        } catch (contractErr) {
+          const status = contractErr?.response?.status;
+          if (!(isCreateMode && status === 404)) {
+            throw contractErr;
+          }
+        }
         const customer = detail?.customer || {};
         const eventInfo = detail?.eventInfo || {};
         const confirmedBy = detail?.confirmedBy || {};
@@ -133,7 +180,7 @@ const ContractSigningPage = () => {
         const tables = toNum(eventInfo?.numberOfTables ?? eventInfo?.tableCount, guests);
         const guestsPerTable = tables > 0 ? Math.max(1, Math.round(guests / tables)) : 10;
 
-        const terms = contract?.termsAndConditions || detail?.contract?.termsAndConditions || '';
+        const terms = contract?.termsAndConditions || detail?.contract?.termsAndConditions || DEFAULT_CREATE_TERMS;
         const cancellation = terms
           ? String(terms)
             .split(/\r?\n|\.|;/)
@@ -181,16 +228,19 @@ const ContractSigningPage = () => {
           },
           cancellation,
         });
+        setIsPendingCreate(!contract);
       } catch (err) {
         console.error('Lỗi tải hợp đồng theo bookingCode:', err);
-        setLoadError(err?.response?.data?.detail || err?.message || 'Không tải được hợp đồng.');
+        const errorCode = err?.response?.status ? ` (HTTP ${err.response.status})` : '';
+        const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Không tải được hợp đồng.';
+        setLoadError(`${detail}${errorCode}`);
       } finally {
         setLoading(false);
       }
     };
 
     loadContract();
-  }, [eventId, searchParams]);
+  }, [eventId, searchParams, isCreateMode]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
@@ -241,6 +291,10 @@ const ContractSigningPage = () => {
 
   const handleSendDepositRequest = () => {
     const doSend = async () => {
+      if (!canShowDepositRequestButton) {
+        alert('Chỉ gửi yêu cầu đặt cọc sau khi đã gửi khách ký và khách đã ký xong.');
+        return;
+      }
       if (!contractData.contractNumericId) {
         alert('Không tìm thấy contractId để gửi yêu cầu đặt cọc.');
         return;
@@ -275,11 +329,9 @@ const ContractSigningPage = () => {
             `Tran trong.`
           );
 
-          // Ưu tiên mở Gmail compose trực tiếp (không phụ thuộc app mail cục bộ).
           const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customerEmail)}&su=${subject}&body=${body}`;
           const opened = window.open(gmailComposeUrl, '_blank', 'noopener,noreferrer');
 
-          // Fallback cho môi trường chặn popup.
           if (!opened) {
             window.open(`mailto:${customerEmail}?subject=${subject}&body=${body}`, '_self');
           }
@@ -295,6 +347,26 @@ const ContractSigningPage = () => {
     };
 
     doSend();
+  };
+
+  const handleCreateContract = async () => {
+    if (!eventId) return;
+    setCreatingContract(true);
+    try {
+      await createBookEventContract(Number(eventId), {
+        depositPercent: Number(createForm.depositPercent) || 0,
+        termsAndConditions: createForm.termsAndConditions,
+        note: createForm.note,
+      });
+      const params = new URLSearchParams(searchParams);
+      params.delete('create');
+      navigate(`${base}/reservations/${eventId}/contract?${params.toString()}`, { replace: true });
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Tạo hợp đồng thất bại.';
+      alert(msg);
+    } finally {
+      setCreatingContract(false);
+    }
   };
 
   if (loading) {
@@ -317,13 +389,13 @@ const ContractSigningPage = () => {
           Lịch đặt bàn
         </span>
         <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">Ký hợp đồng điện tử</span>
+        <span className="breadcrumb-current">{isPendingCreate ? 'Tạo hợp đồng sự kiện' : 'Ký hợp đồng điện tử'}</span>
       </nav>
 
       {/* Top Header Bar */}
       <div className="contract-header-bar">
         <div className="header-info">
-          <h1 className="contract-title">KÝ HỢP ĐỒNG SỰ KIỆN</h1>
+          <h1 className="contract-title">{isPendingCreate ? 'TẠO HỢP ĐỒNG SỰ KIỆN' : 'KÝ HỢP ĐỒNG SỰ KIỆN'}</h1>
           <div className="contract-badges">
             <span className="badge badge-primary">
               Mã: {contractData.contractId}
@@ -344,13 +416,15 @@ const ContractSigningPage = () => {
             <ArrowLeft size={18} />
             Quay lại
           </button>
-          <button 
-            className="btn-download-pdf"
-            onClick={handleDownloadPDF}
-          >
-            <Download size={18} />
-            Tải bản nháp PDF
-          </button>
+          {!isPendingCreate && (
+            <button 
+              className="btn-download-pdf"
+              onClick={handleDownloadPDF}
+            >
+              <Download size={18} />
+              Tải bản nháp PDF
+            </button>
+          )}
         </div>
       </div>
 
@@ -480,47 +554,114 @@ const ContractSigningPage = () => {
           <section className="contract-section">
             <h4 className="section-title">
               <span className="section-number">3</span>
-              Chi phí & Đặt cọc
+              Điều khoản hợp đồng & Đặt cọc
             </h4>
-            <div className="payment-grid">
-              <div className="payment-box">
-                <div className="payment-total">
-                  <span className="payment-label">Tổng chi phí:</span>
-                  <span className="payment-amount">{formatCurrency(contractData.payment.total)}</span>
+            {isPendingCreate ? (
+              <div style={{ display: 'grid', gap: 14 }}>
+                <label style={{ fontWeight: 600 }}>
+                  Điều khoản hợp đồng
+                  <textarea
+                    rows={6}
+                    value={createForm.termsAndConditions}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, termsAndConditions: e.target.value }))}
+                    style={{ width: '100%', marginTop: 6, padding: '10px 12px', borderRadius: 10, border: '1px solid #d8dee9' }}
+                  />
+                </label>
+                <label style={{ fontWeight: 600 }}>
+                  Tỉ lệ đặt cọc (%)
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={createForm.depositPercent}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, depositPercent: Number(e.target.value) }))}
+                    style={{ width: '100%', marginTop: 6, padding: '10px 12px', borderRadius: 10, border: '1px solid #d8dee9' }}
+                  />
+                </label>
+                <label style={{ fontWeight: 600 }}>
+                  Ghi chú
+                  <textarea
+                    rows={3}
+                    value={createForm.note}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, note: e.target.value }))}
+                    style={{ width: '100%', marginTop: 6, padding: '10px 12px', borderRadius: 10, border: '1px solid #d8dee9' }}
+                  />
+                </label>
+
+                <div className="payment-box" style={{ marginTop: 6 }}>
+                  <div className="payment-total">
+                    <span className="payment-label">Tổng chi phí:</span>
+                    <span className="payment-amount">{formatCurrency(contractData.payment.total)}</span>
+                  </div>
+                  <div className="payment-deposit">
+                    <span className="deposit-label">Tiền đặt cọc ({createForm.depositPercent}%):</span>
+                    <span className="deposit-amount">
+                      {formatCurrency(Math.round((contractData.payment.total || 0) * (Number(createForm.depositPercent) || 0) / 100))}
+                    </span>
+                  </div>
                 </div>
-                <div className="payment-deposit">
-                  <span className="deposit-label">
-                    Tiền đặt cọc ({contractData.payment.depositPercent}%):
-                  </span>
-                  <span className="deposit-amount">{formatCurrency(contractData.payment.deposit)}</span>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  <button className="btn-back" onClick={() => navigate(-1)} type="button">
+                    <ArrowLeft size={18} />
+                    Quay lại
+                  </button>
+                  <button className="btn-download-pdf" onClick={handleCreateContract} type="button" disabled={creatingContract}>
+                    <Edit3 size={18} />
+                    {creatingContract ? 'Đang tạo hợp đồng...' : 'Tạo hợp đồng'}
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div className="payment-grid">
+                <div className="payment-box">
+                  <div className="payment-total">
+                    <span className="payment-label">Tổng chi phí:</span>
+                    <span className="payment-amount">{formatCurrency(contractData.payment.total)}</span>
+                  </div>
+                  <div className="payment-deposit">
+                    <span className="deposit-label">
+                      Tiền đặt cọc ({contractData.payment.depositPercent}%):
+                    </span>
+                    <span className="deposit-amount">{formatCurrency(contractData.payment.deposit)}</span>
+                  </div>
+                </div>
 
-              <div className="cancellation-policy">
-                <p className="policy-title">Quy định hủy bỏ:</p>
-                {contractData.cancellation.length === 0 && (
-                  <p className="policy-item">• Chưa có điều khoản hủy bỏ.</p>
-                )}
-                {contractData.cancellation.map((policy, index) => (
-                  <p key={index} className="policy-item">• {policy}</p>
-                ))}
+                <div className="cancellation-policy">
+                  <p className="policy-title">Quy định hủy bỏ:</p>
+                  {contractData.cancellation.length === 0 && (
+                    <p className="policy-item">• Chưa có điều khoản hủy bỏ.</p>
+                  )}
+                  {contractData.cancellation.map((policy, index) => (
+                    <p key={index} className="policy-item">• {policy}</p>
+                  ))}
 
-                <button
-                  className="btn-request-deposit"
-                  onClick={handleSendDepositRequest}
-                  type="button"
-                  disabled={sendingDepositRequest || !contractData.contractNumericId}
-                >
-                  {sendingDepositRequest ? 'ĐANG GỬI...' : 'GỬI YÊU CẦU ĐẶT CỌC'}
-                </button>
+                  {canShowDepositRequestButton ? (
+                    <button
+                      className="btn-request-deposit"
+                      onClick={handleSendDepositRequest}
+                      type="button"
+                      disabled={sendingDepositRequest || !contractData.contractNumericId}
+                    >
+                      {sendingDepositRequest ? 'ĐANG GỬI...' : 'GỬI YÊU CẦU ĐẶT CỌC'}
+                    </button>
+                  ) : (
+                    <p className="policy-item" style={{ marginTop: 12, color: '#64748b', fontSize: 13 }}>
+                      {contractData.partyB.signed
+                        ? 'Gửi yêu cầu đặt cọc sẽ khả dụng khi hợp đồng ở trạng thái đã gửi ký / đã ký.'
+                        : 'Vui lòng gửi khách hàng ký và chờ khách ký xong trước khi gửi yêu cầu đặt cọc.'}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           {/* Section 4: Signatures */}
-          <section className="contract-section signature-section">
-            <h4 className="signature-header">Khu vực chữ ký số</h4>
-            <div className="signatures-grid">
+          {!isPendingCreate && (
+            <section className="contract-section signature-section">
+              <h4 className="signature-header">Khu vực chữ ký số</h4>
+              <div className="signatures-grid">
               {/* Party A Signature */}
               <div className="signature-box">
                 <p className="signature-title">Bên A (Nhà hàng)</p>
@@ -560,29 +701,32 @@ const ContractSigningPage = () => {
                   {contractData.partyB.signed ? contractData.partyB.name : 'Chưa ký'}
                 </p>
               </div>
-            </div>
-          </section>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Action Footer */}
-        <div className="contract-footer">
-          <button
-            className="btn-send-customer-sign"
-            onClick={handleSendToCustomerSign}
-            type="button"
-            disabled={sendingToCustomer || !contractData.contractNumericId}
-          >
-            <FileText size={20} />
-            {sendingToCustomer ? 'ĐANG GỬI...' : 'GỬI KHÁCH HÀNG KÝ'}
-          </button>
-          <button 
-            className="btn-sign-contract"
-            onClick={handleSignContract}
-          >
-            <Edit3 size={20} />
-            XÁC NHẬN KÝ KẾT
-          </button>
-        </div>
+        {!isPendingCreate && (
+          <div className="contract-footer">
+            <button
+              className="btn-send-customer-sign"
+              onClick={handleSendToCustomerSign}
+              type="button"
+              disabled={sendingToCustomer || !contractData.contractNumericId}
+            >
+              <FileText size={20} />
+              {sendingToCustomer ? 'ĐANG GỬI...' : 'GỬI KHÁCH HÀNG KÝ'}
+            </button>
+            <button 
+              className="btn-sign-contract"
+              onClick={handleSignContract}
+            >
+              <Edit3 size={20} />
+              XÁC NHẬN KÝ KẾT
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Legal Notice */}

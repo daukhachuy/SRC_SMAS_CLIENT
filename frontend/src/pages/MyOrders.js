@@ -305,41 +305,14 @@ const MyOrders = () => {
   const getEventBookingCode = (ev) =>
     String(ev?.bookingCode || ev?.eventBookingCode || ev?.raw?.bookingCode || '').trim();
 
-  const getEventCheckoutUrl = (ev) => {
-    const contractId = Number(
-      ev?.contractId
-      || ev?.contract?.contractId
-      || ev?.raw?.contractId
-      || ev?.raw?.contract?.contractId
-      || 0
-    );
-
-    const list = [
-      ev,
-      ev?.contract,
-      ev?.payment,
-      ev?.paymentInfo,
-      ev?.raw,
-      ev?.raw?.contract,
-      ev?.raw?.payment,
-      ev?.raw?.paymentInfo,
-    ].filter(Boolean);
-
-    for (const item of list) {
-      const candidateId = Number(item?.contractId || item?.id || 0);
-      const url =
-        item?.checkoutUrl
-        || item?.CheckoutUrl
-        || item?.paymentUrl
-        || item?.PaymentUrl
-        || item?.depositUrl
-        || item?.depositCheckoutUrl
-        || '';
-      if (url && (!contractId || !candidateId || contractId === candidateId)) {
-        return url;
-      }
+  /** Lấy checkoutUrl từ body JSON (có thể lồng data). */
+  const pickDepositCheckoutUrl = (payload) => {
+    if (!payload || typeof payload !== 'object') return '';
+    const direct = payload.checkoutUrl || payload.CheckoutUrl;
+    if (direct) return String(direct).trim();
+    if (payload.data && typeof payload.data === 'object') {
+      return pickDepositCheckoutUrl(payload.data);
     }
-
     return '';
   };
 
@@ -352,61 +325,42 @@ const MyOrders = () => {
     try {
       setPayingEventId(eventBookingId || ev?.id || null);
 
-      let checkoutUrl = getEventCheckoutUrl(ev);
       let resolvedContractId = eventContractId;
-      let resolvedCustomerId = eventCustomerId;
+      const resolvedCustomerId = eventCustomerId;
 
-      // Fallback customer-safe: lấy theo bookingCode để tìm checkoutUrl vừa được manager gửi.
-      if (!checkoutUrl && eventBookingCode) {
+      if (resolvedContractId == null && eventBookingCode) {
         try {
           const contractResp = await myOrderAPI.getContractByBookingCode(eventBookingCode);
           const contractPayload = contractResp?.data ?? contractResp ?? {};
           const contract = Array.isArray(contractPayload) ? contractPayload[0] : contractPayload;
-
-          const contractIdFromApi = toNumOrNull(
+          resolvedContractId = toNumOrNull(
             contract?.contractId
             || contract?.id
             || contract?.contract?.contractId
           );
-
-          const paymentItems = Array.isArray(contract?.payment?.payments)
-            ? contract.payment.payments
-            : Array.isArray(contract?.payments)
-              ? contract.payments
-              : [];
-
-          const firstPaymentWithUrl = paymentItems.find((p) => (
-            p?.checkoutUrl || p?.paymentUrl || p?.url || p?.payUrl
-          ));
-
-          const urlFromContract =
-            contract?.checkoutUrl
-            || contract?.payment?.checkoutUrl
-            || contract?.deposit?.checkoutUrl
-            || firstPaymentWithUrl?.checkoutUrl
-            || firstPaymentWithUrl?.paymentUrl
-            || firstPaymentWithUrl?.url
-            || firstPaymentWithUrl?.payUrl
-            || '';
-
-          if (contractIdFromApi != null) {
-            resolvedContractId = contractIdFromApi;
-          }
-
-          if (!eventContractId || !contractIdFromApi || eventContractId === contractIdFromApi) {
-            if (urlFromContract) checkoutUrl = urlFromContract;
-          }
         } catch (_) {
-          // Endpoint có thể không cho customer hoặc chưa có dữ liệu link.
+          // GET contract theo bookingCode có thể không khả dụng cho customer.
         }
       }
 
-      if (!checkoutUrl) {
-        alert('Đơn này chưa có link thanh toán đặt cọc. Vui lòng đợi quản lý gửi yêu cầu thanh toán.');
+      if (resolvedContractId == null) {
+        alert('Không tìm thấy hợp đồng để thanh toán đặt cọc. Vui lòng liên hệ nhà hàng.');
         return;
       }
 
-      // Đồng bộ lại state card hiện tại để lần bấm sau mở trực tiếp, không cần tính lại.
+      const depositBody = await myOrderAPI.createContractDeposit(resolvedContractId);
+      const checkoutUrl = pickDepositCheckoutUrl(depositBody);
+
+      if (!checkoutUrl) {
+        const msg =
+          depositBody?.message
+          || depositBody?.Message
+          || depositBody?.data?.message
+          || 'Không nhận được link thanh toán từ máy chủ.';
+        alert(msg);
+        return;
+      }
+
       setEventsData((prev) => prev.map((item) => {
         const itemBookEventId = getEventBookingId(item);
         const itemContractId = getEventContractId(item);
@@ -421,9 +375,19 @@ const MyOrders = () => {
         };
       }));
 
-      window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+      const payTab = window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+      if (!payTab) {
+        alert('Trình duyệt đã chặn cửa sổ mới. Vui lòng cho phép popup hoặc thử lại.');
+      }
     } catch (err) {
-      alert(err?.response?.data?.message || 'Không lấy được link thanh toán. Vui lòng thử lại.');
+      const d = err?.response?.data;
+      const msg =
+        d?.message
+        || d?.detail
+        || d?.title
+        || err?.message
+        || 'Không tạo được link thanh toán. Vui lòng thử lại.';
+      alert(msg);
     } finally {
       setPayingEventId(null);
     }
@@ -479,7 +443,7 @@ const MyOrders = () => {
               onClick={() => handlePayEventDeposit(ev)}
               disabled={payingEventId === eventBookingId}
             >
-              {payingEventId === eventBookingId ? 'ĐANG MỞ LINK...' : 'THANH TOÁN ĐẶT CỌC'}
+              {payingEventId === eventBookingId ? 'ĐANG MỞ...' : 'THANH TOÁN ĐẶT CỌC'}
             </button>
           </div>
         </div>
