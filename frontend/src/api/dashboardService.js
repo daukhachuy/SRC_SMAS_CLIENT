@@ -1,9 +1,9 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 const API_URL = 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api';
 
 const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

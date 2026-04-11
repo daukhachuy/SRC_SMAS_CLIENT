@@ -107,11 +107,6 @@ const AuthPage = () => {
     try {
       const response = await login(trimmedEmail, trimmedPassword);
 
-      // Lưu token
-      if (response?.token) {
-        localStorage.setItem('accessToken', response.token);
-      }
-
       if (rememberMe) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('savedEmail', trimmedEmail);
@@ -170,10 +165,6 @@ const AuthPage = () => {
       const googleToken = credentialResponse.credential;
 
       const response = await googleLogin(googleToken);
-
-      if (response?.token) {
-        localStorage.setItem('accessToken', response.token);
-      }
 
       if (rememberMe) {
         localStorage.setItem('rememberMe', 'true');

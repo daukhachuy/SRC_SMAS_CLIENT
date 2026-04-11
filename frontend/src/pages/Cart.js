@@ -200,7 +200,7 @@ const Cart = () => {
     setIsOrdering(true);
 
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
       
       // BƯỚC 1: TẠO ĐƠN HÀNG (POST /api/order/create/delivery)
       const formattedItems = cartItems.map(item => {

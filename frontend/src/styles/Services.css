@@ -561,6 +561,12 @@
   right: 0;
 }
 
+.carousel-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .carousel-content {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -607,6 +613,20 @@
 }
 
 /* --- ADD-ON SERVICES CAROUSEL --- */
+.services-addon-loading,
+.services-addon-empty {
+  text-align: center;
+  color: var(--text-gray);
+  padding: 32px 16px 48px;
+  font-size: 15px;
+}
+
+.addon-carousel-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .addon-carousel-container {
   display: flex;
   align-items: center;

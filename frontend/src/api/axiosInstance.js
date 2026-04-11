@@ -82,13 +82,11 @@ instance.interceptors.response.use(
       const hadAuthToken = !!(localStorage.getItem('authToken') || localStorage.getItem('accessToken'));
 
       if (isTableSessionRoute) {
-        // 401 ở endpoint session bàn: coi như phiên bàn hết hạn.
         localStorage.removeItem('tableAccessToken');
         localStorage.removeItem('tableRefreshToken');
         localStorage.removeItem('tableSessionId');
         console.warn('⚠️ Table session unauthorized/expired.');
       } else if (!isGuestQrPath) {
-        // 401 ở khu vực cần đăng nhập: clear auth và redirect.
         localStorage.removeItem('authToken');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
@@ -97,7 +95,6 @@ instance.interceptors.response.use(
           window.location.href = '/auth';
         }
       } else {
-        // Guest QR gọi endpoint cần quyền cao hơn (ví dụ payment/create-link).
         console.warn('⚠️ Unauthorized on guest QR endpoint (likely insufficient scope).');
       }
     }

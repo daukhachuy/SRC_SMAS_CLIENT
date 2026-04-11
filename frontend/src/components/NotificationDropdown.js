@@ -12,6 +12,7 @@ import '../styles/NotificationDropdown.css';
 
 const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifications, onNotificationsChange }) => {
   const dropdownRef = useRef(null);
+  const [showAll, setShowAll] = useState(false);
 
   const getVisualByNotification = (notification) => {
     if (notification?.icon && notification?.iconBg) {
@@ -26,63 +27,9 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
     if (raw.includes('success')) return { Icon: Check, iconBg: 'bg-blue' };
     return { Icon: Info, iconBg: 'bg-blue' };
   };
-  
-  // Sample notifications data
-  const defaultNotifications = [
-    {
-      id: 1,
-      type: 'order',
-      title: 'Đơn hàng mới #DH123',
-      message: 'Một đơn hàng mới vừa được tạo từ Table B12 đang chờ bạn xác nhận.',
-      time: '5 phút trước',
-      isRead: false,
-      icon: ShoppingCart,
-      iconBg: 'bg-orange',
-    },
-    {
-      id: 2,
-      type: 'booking',
-      title: 'Yêu cầu đặt bàn mới',
-      message: 'Khách hàng Anh Minh vừa gửi yêu cầu đặt bàn 6 người vào lúc 19:00 tối nay.',
-      time: '15 phút trước',
-      isRead: false,
-      icon: Calendar,
-      iconBg: 'bg-orange',
-    },
-    {
-      id: 3,
-      type: 'system',
-      title: 'Cập nhật hệ thống thành công',
-      message: 'Phiên bản v2.4.0 đã được triển khai với các tính năng tối ưu hóa kho hàng.',
-      time: '2 giờ trước',
-      isRead: true,
-      icon: Info,
-      iconBg: 'bg-blue',
-    },
-    {
-      id: 4,
-      type: 'promotion',
-      title: 'Chiến dịch Marketing tháng 6',
-      message: 'Chương trình khuyến mãi tháng 6 đã sẵn sàng để áp dụng cho khách VIP.',
-      time: '5 giờ trước',
-      isRead: true,
-      icon: Star,
-      iconBg: 'bg-yellow',
-    },
-    {
-      id: 5,
-      type: 'warning',
-      title: 'Cảnh báo tồn kho',
-      message: 'Nguyên liệu "Cá hồi Na Uy" đang ở mức dưới hạn mức tối thiểu.',
-      time: '1 ngày trước',
-      isRead: true,
-      icon: AlertTriangle,
-      iconBg: 'bg-red',
-    },
-  ];
 
   const [notifications, setNotifications] = useState(
-    externalNotifications || defaultNotifications
+    Array.isArray(externalNotifications) ? externalNotifications : []
   );
 
   useEffect(() => {
@@ -90,6 +37,12 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
       setNotifications(externalNotifications);
     }
   }, [externalNotifications]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowAll(false);
+    }
+  }, [isOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -139,6 +92,9 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const visibleNotifications = showAll
+    ? notifications
+    : notifications.filter((n) => !n.isRead);
 
   if (!isOpen) return null;
 
@@ -167,15 +123,19 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
 
         {/* Notification List */}
         <div className="notification-list">
-          {notifications.length === 0 && (
+          {visibleNotifications.length === 0 && (
             <div className="notification-item" style={{ justifyContent: 'center' }}>
               <div className="notification-content">
-                <p className="notification-item-title">Chưa có thông báo</p>
-                <p className="notification-message">Hệ thống chưa có thông báo mới.</p>
+                <p className="notification-item-title">
+                  {showAll ? 'Chưa có thông báo' : 'Không có thông báo chưa đọc'}
+                </p>
+                <p className="notification-message">
+                  {showAll ? 'Hệ thống chưa có thông báo mới.' : 'Bạn đã đọc tất cả thông báo.'}
+                </p>
               </div>
             </div>
           )}
-          {notifications.map((notification) => {
+          {visibleNotifications.map((notification) => {
             const { Icon, iconBg } = getVisualByNotification(notification);
             return (
               <div
@@ -201,9 +161,14 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
 
         {/* Footer */}
         <div className="notification-footer">
-          <button className="view-all-notifications-btn">
-            Xem tất cả thông báo
-          </button>
+          {!showAll && (
+            <button
+              className="view-all-notifications-btn"
+              onClick={() => setShowAll(true)}
+            >
+              Xem tất cả thông báo
+            </button>
+          )}
         </div>
       </div>
     </>

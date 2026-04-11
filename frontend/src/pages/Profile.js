@@ -567,67 +567,6 @@ const Profile = () => {
         </div>
       </section>
 
-      {/* 3. Lịch sử đặt sự kiện */}
-      <section className="Profile-Section">
-        <h2 className="Profile-Section-Title">
-          <i className="fa-solid fa-calendar-check Profile-Section-Icon"></i>
-          Lịch sử đặt sự kiện
-        </h2>
-        {eventOrdersLoading ? (
-          <p className="Profile-Loading">Đang tải lịch sử đặt sự kiện...</p>
-        ) : eventOrdersError ? (
-          <p className="Profile-Error">{eventOrdersError}</p>
-        ) : eventOrders.length === 0 ? (
-          <p className="Profile-Empty">Bạn chưa có đơn đặt sự kiện nào.</p>
-        ) : (
-          <div className="Profile-EventOrders">
-            {eventOrders.map(event => (
-              <div key={event.id} className="Profile-EventCard">
-                <div className="Profile-EventCard-Header">
-                  <div className="Profile-EventCard-Left">
-                    <span className="Profile-EventCard-Code">{event.code}</span>
-                    <span className={`Profile-EventCard-Status ${event.statusCls}`}>{event.status}</span>
-                  </div>
-                  <span className="Profile-EventCard-Type">{event.eventType}</span>
-                </div>
-                <div className="Profile-EventCard-Body">
-                  <div className="Profile-EventCard-Info">
-                    <p><i className="fa-solid fa-user"></i> {event.guestName}</p>
-                    <p><i className="fa-solid fa-phone"></i> {typeof event.phone === 'string' ? event.phone : (event.phone?.toString?.() || '---')}</p>
-                    <p><i className="fa-solid fa-calendar-day"></i> {event.dateStr} lúc {event.timeStr}</p>
-                    <p><i className="fa-solid fa-users"></i> {event.numberOfGuests} khách &nbsp;|&nbsp; <i className="fa-solid fa-chair"></i> {event.numberOfTables} bàn</p>
-                  </div>
-                  {event.services.length > 0 && (
-                    <div className="Profile-EventCard-Services">
-                      <strong>Dịch vụ:</strong>
-                      <ul>
-                        {event.services.map((s, i) => (
-                          <li key={i}>{s.serviceName ?? s.name ?? `Dịch vụ #${s.serviceId}`} — {formatCurrency(s.price ?? 0)}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {event.menuItems.length > 0 && (
-                    <div className="Profile-EventCard-Foods">
-                      <strong>Thực đơn:</strong>
-                      <ul>
-                        {event.menuItems.map((f, i) => (
-                          <li key={i}>{f.foodName ?? f.name ?? `Món #${f.foodId}`} x{f.quantity}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-                <div className="Profile-EventCard-Footer">
-                  <span className="Profile-EventCard-Total">
-                    Tổng cộng: <strong>{formatCurrency(event.totalAmount)}</strong>
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
       {/* 4. Đổi mật khẩu */}
       <section className="Profile-Section">

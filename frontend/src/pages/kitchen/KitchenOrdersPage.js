@@ -74,6 +74,36 @@ function calcWaitMinutes(orderCreatedAt) {
   return Math.max(0, Math.floor(diff));
 }
 
+/** Chuẩn hóa status từ API → 'pending' | 'preparing' | 'ready' */
+function normalizeStatus(raw) {
+  if (raw == null || raw === '') return 'pending';
+  const s = String(raw).toLowerCase().trim();
+  if (s === 'preparing' || s === 'cooking') return 'preparing';
+  if (s === 'ready' || s === 'completed' || s === 'done') return 'ready';
+  return 'pending';
+}
+
+/** Trạng thái gốc từ từng dòng món (backend .NET hay camelCase). */
+function rawItemStatus(pi) {
+  if (!pi || typeof pi !== 'object') return '';
+  return (
+    pi.status ??
+    pi.Status ??
+    pi.itemStatus ??
+    pi.ItemStatus ??
+    pi.orderItemStatus ??
+    pi.OrderItemStatus ??
+    ''
+  );
+}
+
+/** Để gộp 2 nguồn: preparing thắng pending khi trùng orderItemId */
+function statusRank(s) {
+  if (s === 'preparing' || s === 'cooking') return 1;
+  if (s === 'ready') return 2;
+  return 0;
+}
+
 /** Map GET /api/order-items/pending → UI model */
 function mapPendingOrderToUI(raw) {
   const waitMinutes = calcWaitMinutes(raw.orderCreatedAt);
@@ -95,7 +125,7 @@ function mapPendingOrderToUI(raw) {
     name: pi.itemName,
     quantity: pi.quantity,
     note: pi.note,
-    status: 'pending',
+    status: normalizeStatus(rawItemStatus(pi)),
     openingTime: pi.openingTime
   }));
 
@@ -133,7 +163,7 @@ function mapInProgressOrderToUI(raw) {
     name: pi.itemName,
     quantity: pi.quantity,
     note: pi.note,
-    status: pi.status || 'preparing',
+    status: normalizeStatus(rawItemStatus(pi)),
     openingTime: pi.openingTime
   }));
 
@@ -213,19 +243,36 @@ const KitchenOrdersPage = () => {
     return () => clearTimeout(timer);
   }, [toastMsg]);
 
-  /** Gộp đơn pending (chờ nấu) và in-progress (đang nấu / sẵn sàng) theo orderId */
+  /** Gộp đơn pending + in-progress, lọc bỏ items đã ready. in-progress trước; trùng orderItemId giữ bản có status “xa” hơn (preparing > pending). */
   const allOrders = useMemo(() => {
+    const mergeItemLists = (a, b) => {
+      const byId = new Map();
+      for (const it of a) {
+        byId.set(String(it.orderItemId), it);
+      }
+      for (const it of b) {
+        const id = String(it.orderItemId);
+        const prev = byId.get(id);
+        if (!prev) {
+          byId.set(id, it);
+          continue;
+        }
+        if (statusRank(it.status) > statusRank(prev.status)) {
+          byId.set(id, it);
+        }
+      }
+      return Array.from(byId.values()).filter((it) => it.status !== 'ready');
+    };
+
     const map = new Map();
-    [...orders, ...inProgressOrders].forEach((o) => {
+    [...inProgressOrders, ...orders].forEach((o) => {
+      const rawItems = (o.items || []).filter((it) => it.status !== 'ready');
+      if (rawItems.length === 0) return;
       if (!map.has(o.orderId)) {
-        map.set(o.orderId, { ...o, items: [...(o.items || [])] });
+        map.set(o.orderId, { ...o, items: rawItems });
       } else {
         const existing = map.get(o.orderId);
-        (o.items || []).forEach((it) => {
-          if (!existing.items.find((e) => e.orderItemId === it.orderItemId)) {
-            existing.items.push(it);
-          }
-        });
+        existing.items = mergeItemLists(existing.items, rawItems);
       }
     });
     return Array.from(map.values()).sort((a, b) => a.waitTime - b.waitTime);
@@ -239,7 +286,7 @@ const KitchenOrdersPage = () => {
       if (o.status === 'overdue') overdueOrders += 1;
       (o.items || []).forEach((i) => {
         if (i.status === 'pending') pendingDishes += 1;
-        if (i.status === 'preparing' || i.status === 'cooking') cookingDishes += 1;
+        if (i.status === 'preparing') cookingDishes += 1;
       });
     });
     return { overdueOrders, pendingDishes, cookingDishes };
@@ -255,8 +302,12 @@ const KitchenOrdersPage = () => {
    */
   const aggregatedItems = useMemo(() => {
     const map = new Map();
-    orders.forEach((order) => {
+    // Duyệt cả pending (orders) và preparing (inProgressOrders)
+    allOrders.forEach((order) => {
       (order.items || []).forEach((item) => {
+        // Bỏ qua ready — đã xong, không hiện trên bếp
+        if (item.status === 'ready') return;
+
         const key = item.foodId ?? item.name ?? `__${item.id}`;
         if (!map.has(key)) {
           map.set(key, {
@@ -331,7 +382,28 @@ const KitchenOrdersPage = () => {
       setShowCancelModal(false);
       setCancelReason('');
       setSelectedItem(null);
-      await loadOrders({ silent: true });
+      // Optimistic: loại bỏ món khỏi cả orders và inProgressOrders
+      setOrders((prev) =>
+        prev
+          .map((order) => ({
+            ...order,
+            items: (order.items || []).filter(
+              (it) => String(it.orderItemId) !== String(oid) && it.id !== oid
+            )
+          }))
+          .filter((order) => (order.items || []).length > 0)
+      );
+      setInProgressOrders((prev) =>
+        prev
+          .map((order) => ({
+            ...order,
+            items: (order.items || []).filter(
+              (it) => String(it.orderItemId) !== String(oid) && it.id !== oid
+            )
+          }))
+          .filter((order) => (order.items || []).length > 0)
+      );
+      setToastMsg('Đã hủy món.');
     } catch (e) {
       const msg =
         e?.response?.data?.message || e?.message || 'Hủy món thất bại.';
@@ -341,21 +413,13 @@ const KitchenOrdersPage = () => {
     }
   };
 
-  /** PATCH preparing thành công: giữ món trên UI, chỉ đổi trạng thái (không gọi lại GET pending — tránh món biến mất) */
+  /** PATCH preparing — sau đó tải lại để khớp server (tránh F5 hiện pending trong khi DB đã preparing). */
   const handleItemPreparing = async (orderItemId) => {
     setItemBusyId(orderItemId);
     setError('');
     try {
       await patchOrderItemPreparing(orderItemId);
-      // Update the item in inProgressOrders (it just moved from pending → preparing)
-      setOrders((prev) =>
-        prev.map((order) => ({
-          ...order,
-          items: (order.items || []).filter(
-            (it) => it.orderItemId !== orderItemId && it.id !== orderItemId
-          )
-        })).filter((order) => (order.items || []).length > 0)
-      );
+      await loadOrders({ silent: true });
       setToastMsg('Đang nấu món này.');
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Không cập nhật trạng thái chế biến.');
@@ -369,23 +433,7 @@ const KitchenOrdersPage = () => {
     setError('');
     try {
       await patchOrderItemReady(orderItemId);
-      setInProgressOrders((prev) =>
-        prev
-          .map((order) => ({
-            ...order,
-            items: (order.items || []).map((it) =>
-              it.orderItemId === orderItemId || it.id === orderItemId
-                ? { ...it, status: 'ready' }
-                : it
-            )
-          }))
-          .map((order) => ({
-            ...order,
-            items: (order.items || []).filter((it) => it.status !== 'ready')
-          }))
-          .filter((order) => (order.items || []).length > 0)
-      );
-      // Toast-like notification (inline, no external lib)
+      await loadOrders({ silent: true });
       setToastMsg('Món đã sẵn sàng — chờ người chạy bàn.');
     } catch (e) {
       const msg = e?.response?.data?.message || e?.message || 'Không đánh dấu đã xong món.';
@@ -401,18 +449,9 @@ const KitchenOrdersPage = () => {
     setError('');
     try {
       await patchOrderAllPreparing(orderId);
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.orderId === orderId
-            ? {
-                ...order,
-                items: (order.items || []).map((it) =>
-                  it.status === 'pending' ? { ...it, status: 'preparing' } : it
-                )
-              }
-            : order
-        )
-      );
+      // Đồng bộ từ server: tránh F5 / danh sách pending+in-progress lệch nhau
+      await loadOrders({ silent: true });
+      setToastMsg('Bắt đầu nấu tất cả món.');
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Không bắt đầu tất cả món.');
     } finally {
@@ -427,6 +466,7 @@ const KitchenOrdersPage = () => {
     try {
       await patchOrderAllReady(orderId);
       await loadOrders({ silent: true });
+      setToastMsg('Hoàn thành đơn — chờ người chạy bàn.');
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Không hoàn thành tất cả món.');
     } finally {
@@ -493,6 +533,42 @@ const KitchenOrdersPage = () => {
       await loadOrders({ silent: true });
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Không bắt đầu nhóm món.');
+    } finally {
+      setOrderBusyId(null);
+    }
+  };
+
+  /** Xóa / hủy tất cả món trong group → gọi cancel cho mỗi order rồi load lại */
+  const handleGroupCancelAll = async (group) => {
+    const uniqueOrderIds = [...new Set(group.orderIds)];
+    setOrderBusyId(group.key);
+    setError('');
+    try {
+      // Thu thập orderItemId từ allOrders cho món thuộc group này
+      const toCancel = [];
+      allOrders.forEach((order) => {
+        if (!uniqueOrderIds.includes(order.orderId ?? order.id)) return;
+        (order.items || []).forEach((item) => {
+          const key = item.foodId ?? item.name ?? `__${item.id}`;
+          if (key === group.key && item.status !== 'ready') {
+            toCancel.push(item.orderItemId ?? item.id);
+          }
+        });
+      });
+      // Xác nhận trước khi hủy nhiều món
+      if (toCancel.length === 0) return;
+      const ok = window.confirm(
+        `Hủy ${toCancel.length} món "${group.name}" khỏi các đơn liên quan?`
+      );
+      if (!ok) {
+        setOrderBusyId(null);
+        return;
+      }
+      await Promise.all(toCancel.map((id) => postOrderItemCancel(id, 'Hủy từ bếp')));
+      await loadOrders({ silent: true });
+      setToastMsg(`Đã hủy ${toCancel.length} món.`);
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || 'Hủy nhóm món thất bại.');
     } finally {
       setOrderBusyId(null);
     }
@@ -660,22 +736,35 @@ const KitchenOrdersPage = () => {
                             </td>
                             <td className="kds-item-td kds-item-td-actions">
                               <div className="kds-item-action-btns">
-                                <button
-                                  type="button"
-                                  className="kds-item-pill-btn kds-item-pill-btn--complete"
-                                  disabled={orderBusyId === group.key}
-                                  onClick={() => handleGroupCompleteAll(group)}
-                                >
-                                  {orderBusyId === group.key ? '...' : 'HOÀN THÀNH'}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="kds-item-pill-btn kds-item-pill-btn--start"
-                                  disabled={orderBusyId === group.key || group.pendingQty === 0}
-                                  onClick={() => handleGroupStartAll(group)}
-                                >
-                                  {orderBusyId === group.key ? '...' : 'BẮT ĐẦU'}
-                                </button>
+                                {rowStatus === 'pending' ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="kds-item-pill-btn kds-item-pill-btn--start"
+                                      disabled={orderBusyId === group.key || group.pendingQty === 0}
+                                      onClick={() => handleGroupStartAll(group)}
+                                    >
+                                      {orderBusyId === group.key ? '...' : 'BẮT ĐẦU'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="kds-item-pill-btn kds-item-pill-btn--cancel"
+                                      disabled={orderBusyId === group.key}
+                                      onClick={() => handleGroupCancelAll(group)}
+                                    >
+                                      {orderBusyId === group.key ? '...' : 'HỦY'}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="kds-item-pill-btn kds-item-pill-btn--complete"
+                                    disabled={orderBusyId === group.key}
+                                    onClick={() => handleGroupCompleteAll(group)}
+                                  >
+                                    {orderBusyId === group.key ? '...' : 'HOÀN THÀNH'}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

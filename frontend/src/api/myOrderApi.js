@@ -101,7 +101,78 @@ const MAP_ORDER_TYPE = {
   eventBooking: 'EventBooking',
 };
 
+/**
+ * Trích mảng đơn từ body phản hồi (Swagger thường: { msgCode, message, data: Order[] }).
+ * Hỗ trợ PascalCase, $values (EF), lồng nhau.
+ */
+function extractOrderArrayFromHistoryBody(body) {
+  if (!body || typeof body !== 'object') return [];
+  if (Array.isArray(body)) return body;
+
+  const nested = body.data ?? body.Data ?? body.result ?? body.Result;
+  if (Array.isArray(nested)) return nested;
+  if (nested && typeof nested === 'object') {
+    if (Array.isArray(nested.$values)) return nested.$values;
+    if (Array.isArray(nested.items)) return nested.items;
+    if (Array.isArray(nested.Items)) return nested.Items;
+    if (Array.isArray(nested.orders)) return nested.orders;
+    if (Array.isArray(nested.Orders)) return nested.Orders;
+  }
+
+  if (Array.isArray(body.$values)) return body.$values;
+  if (Array.isArray(body.items)) return body.items;
+  if (Array.isArray(body.Items)) return body.Items;
+  return [];
+}
+
+/**
+ * GET /api/order/history/my — lịch sử đơn của user đăng nhập (Bearer token)
+ * Response Swagger: { msgCode, message, data: Order[] }
+ */
+export async function getMyOrderHistory() {
+  const res = await instance.get('/order/history/my');
+  console.log('[getMyOrderHistory] raw response.data:', res.data);
+  console.log('[getMyOrderHistory] typeof:', typeof res.data);
+  if (res.data && typeof res.data === 'object') {
+    console.log('[getMyOrderHistory] keys:', Object.keys(res.data));
+  }
+  return extractOrderArrayFromHistoryBody(res.data);
+}
+
+function unwrapResponseData(body) {
+  if (body && typeof body === 'object' && body.data !== undefined && body.data !== null) return body.data;
+  return body;
+}
+
+/**
+ * GET /api/order/{orderCode} — chi tiết một đơn (Bearer)
+ */
+export async function getOrderByOrderCode(orderCode) {
+  if (!orderCode) return null;
+  const code = encodeURIComponent(String(orderCode).trim());
+  const res = await instance.get(`/order/${code}`);
+  return unwrapResponseData(res.data);
+}
+
+/**
+ * GET /api/order/{orderCode}/items — dòng món trong đơn
+ */
+export async function getOrderItemsByOrderCode(orderCode) {
+  if (!orderCode) return [];
+  const code = encodeURIComponent(String(orderCode).trim());
+  const res = await instance.get(`/order/${code}/items`);
+  const d = unwrapResponseData(res.data);
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.$values)) return d.$values;
+  return [];
+}
+
 export const myOrderAPI = {
+  /** Alias GET /order/history/my — dùng cho trang Lịch sử đơn (khách đăng nhập) */
+  getMyOrderHistory,
+  getOrderByOrderCode,
+  getOrderItemsByOrderCode,
+
   getOrders: async (orderType = 'All', statusList = ['Pending', 'Confirmed', 'Processing', 'Completed', 'Cancelled']) => {
     // Swagger: POST /api/order/filter — orderType là required query param
     // pattern: ^(DineIn|TakeAway|Delivery|EventBooking)$
@@ -121,10 +192,14 @@ export const myOrderAPI = {
       }
     }
 
-    // Filter theo orderType cụ thể
-    const statusParams = statusList.filter(Boolean).map(s => `status=${s}`).join('&');
+    // POST /api/order/filter?orderType=...&status=...&status=... (Swagger: nhiều status lặp query)
+    const statuses = statusList.filter(Boolean);
+    const statusParams = statuses.map((s) => `status=${encodeURIComponent(s)}`).join('&');
     try {
-      const res = await instance.post(`/order/filter?orderType=${normalizedType}&${statusParams}`);
+      const res = await instance.post(
+        `/order/filter?orderType=${encodeURIComponent(normalizedType)}&${statusParams}`,
+        null
+      );
       const data = res.data;
       if (Array.isArray(data)) return data;
       if (data?.$values) return data.$values;
@@ -140,7 +215,34 @@ export const myOrderAPI = {
     }
   },
 
-  getReservations: async () => {
+  /**
+   * POST /api/order/filter — tìm một đơn theo orderCode khi cần đủ mọi trạng thái
+   * (Pending, Confirmed, Completed, Cancelled/Canceled…). GET /order/{code} có thể không trả đơn hủy/chưa xong.
+   */
+  getOrderByCodeViaFilter: async (orderCode, orderType = 'Delivery') => {
+    const statuses = [
+      'Pending',
+      'Confirmed',
+      'Processing',
+      'Completed',
+      'Cancelled',
+      'Canceled',
+    ];
+    const list = await myOrderAPI.getOrders(orderType, statuses);
+    const c = String(orderCode ?? '').trim();
+    if (!c || !Array.isArray(list)) return null;
+    return (
+      list.find((o) => String(o.orderCode) === c) ||
+      list.find((o) => String(o.orderId) === c) ||
+      null
+    );
+  },
+
+  /**
+   * GET /api/reservation/my — đặt chỗ của user (Bearer). Swagger: userId query optional.
+   * Response: mảng object có status dạng số (1–4) hoặc chuỗi ("Pending", "Cancelled", …).
+   */
+  getReservations: async (status = null) => {
     const userStr = localStorage.getItem('user');
     let userId = null;
     if (userStr) {
@@ -149,9 +251,20 @@ export const myOrderAPI = {
         userId = user.userId ?? user.id ?? null;
       } catch (_) {}
     }
-    if (!userId) return [];
+    const params = {};
+    if (userId != null && userId !== '') params.userId = userId;
+    if (status != null && status !== '' && String(status).toLowerCase() !== 'all') {
+      const s = String(status).trim();
+      const num = Number(s);
+      // Backend thường nhận status là int 1–4; đồng thời hỗ trợ tên enum nếu cần
+      if (!Number.isNaN(num) && num >= 1 && num <= 4) {
+        params.status = num;
+      } else {
+        params.status = s;
+      }
+    }
     try {
-      const response = await instance.get(`/reservation/my`, { params: { userId } });
+      const response = await instance.get(`/reservation/my`, { params });
       const data = response.data;
       if (Array.isArray(data)) return data;
       if (data?.$values) return data.$values;
@@ -224,3 +337,8 @@ export const myOrderAPI = {
     }
   },
 };
+
+/** Alias: tìm đơn qua POST /order/filter (đủ trạng thái). */
+export async function getOrderByCodeViaFilter(orderCode, orderType = 'Delivery') {
+  return myOrderAPI.getOrderByCodeViaFilter(orderCode, orderType);
+}

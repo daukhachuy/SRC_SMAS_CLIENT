@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import axios from 'axios';
 
 const ProfileUpdate = () => {
@@ -24,7 +24,7 @@ const ProfileUpdate = () => {
       console.log("Link ảnh Cloudinary:", imageUrl);
 
       // 2. Gửi URL về Backend C#
-      const token = localStorage.getItem("token"); 
+      const token = localStorage.getItem("authToken") || localStorage.getItem("token"); 
       await axios.put(
         "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/User/profile",
         {
