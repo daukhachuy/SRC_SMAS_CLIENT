@@ -1,6 +1,32 @@
 import instance from './axiosInstance';
 import { extractUserFromToken } from '../utils/jwtHelper';
 
+// Cloudinary config (cùng pattern dùng trong ManagerProfilePage)
+const CLOUD_NAME = 'dmzuier4p';
+const UPLOAD_PRESET = 'ml_default';
+const CLOUD_FOLDER = 'smas';
+
+const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+
+/**
+ * Upload ảnh lên Cloudinary, trả về secure_url
+ * @param {File} file
+ * @returns {Promise<string>} secure_url
+ */
+export async function uploadImageToCloudinary(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('folder', CLOUD_FOLDER);
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  );
+  if (!res.ok) throw new Error('Cloudinary upload failed');
+  const json = await res.json();
+  return json.secure_url;
+}
+
 export function getComboCreatedBy() {
   const token =
     localStorage.getItem('authToken') ||
@@ -16,8 +42,6 @@ export function getComboCreatedBy() {
     return 0;
   }
 }
-
-const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
 /**
  * Ghép URL ảnh món (Swagger: image có thể là path tương đối "/foods/xxx.jpg")
@@ -147,46 +171,47 @@ export function normalizeComboListResponse(data) {
 }
 
 /**
- * POST /api/combo — tạo combo (Swagger: JSON hoặc multipart nếu có ảnh)
+ * POST /api/combo — tạo combo (Swagger: JSON đúng schema)
+ * Payload: { name, description, price, discountPercent, image, startDate, expiryDate, maxUsage, foods }
  */
 export async function createCombo(payload) {
   try {
+    // Upload ảnh lên Cloudinary nếu có file
+    let imageUrl = payload.image ?? '';
+    if (payload.imageFile instanceof File) {
+      console.log('[createCombo] Đang upload ảnh lên Cloudinary...');
+      imageUrl = await uploadImageToCloudinary(payload.imageFile);
+      console.log('[createCombo] Ảnh đã upload:', imageUrl);
+    }
+
     const createdBy = payload.createdBy ?? getComboCreatedBy();
     const maxUsage =
       payload.maxUsage === '' || payload.maxUsage == null
         ? 2147483647
         : Math.max(0, Number(payload.maxUsage) || 0);
+
+    // Build foods array nếu có
+    const foodsArray = Array.isArray(payload.foods)
+      ? payload.foods.map((f) => ({
+          foodId: Number(f.foodId) || 0,
+          quantity: Number(f.quantity) || 0,
+        }))
+      : [];
+
     const base = {
-      name: payload.name ?? '',
-      description: payload.description ?? '',
-      price: Number(payload.price) || 0,
+      name: String(payload.name ?? ''),
+      description: String(payload.description ?? ''),
+      price: Number(payload.price) || 0.01,
       discountPercent: Math.min(100, Math.max(0, Number(payload.discountPercent) || 0)),
-      image: payload.image ?? '',
+      image: imageUrl,
       startDate: payload.startDate || '2000-01-01',
       expiryDate: payload.expiryDate || '2099-12-31',
       maxUsage,
-      isAvailable: payload.isAvailable !== false,
       createdBy: Number(createdBy) || 0,
+      foods: foodsArray,
     };
 
-    if (payload.imageFile instanceof File) {
-      const fd = new FormData();
-      fd.append('name', base.name);
-      fd.append('description', base.description);
-      fd.append('price', String(base.price));
-      fd.append('discountPercent', String(base.discountPercent));
-      fd.append('startDate', base.startDate);
-      fd.append('expiryDate', base.expiryDate);
-      fd.append('maxUsage', String(base.maxUsage));
-      fd.append('isAvailable', String(base.isAvailable));
-      fd.append('createdBy', String(base.createdBy));
-      fd.append('image', payload.imageFile);
-      const resp = await instance.post('/combo', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return resp.data;
-    }
-
+    console.log('[foodApi] createCombo payload:', JSON.stringify(base, null, 2));
     const resp = await instance.post('/combo', base);
     return resp.data;
   } catch (err) {
@@ -200,43 +225,62 @@ export async function createCombo(payload) {
  */
 export async function updateCombo(id, payload) {
   try {
+    // Upload ảnh lên Cloudinary nếu có file mới
+    let imageUrl = payload.image ?? '';
+    if (payload.imageFile instanceof File) {
+      console.log('[updateCombo] Đang upload ảnh lên Cloudinary...');
+      imageUrl = await uploadImageToCloudinary(payload.imageFile);
+      console.log('[updateCombo] Ảnh đã upload:', imageUrl);
+    }
+
     const maxUsage =
       payload.maxUsage === '' || payload.maxUsage == null
         ? 2147483647
         : Math.max(0, Number(payload.maxUsage) || 0);
+
+    // Build foods array nếu có
+    const foodsArray = Array.isArray(payload.foods)
+      ? payload.foods.map((f) => ({
+          foodId: Number(f.foodId) || 0,
+          quantity: Number(f.quantity) || 0,
+        }))
+      : [];
+
     const base = {
-      name: payload.name ?? '',
-      description: payload.description ?? '',
-      price: Number(payload.price) || 0,
+      name: String(payload.name ?? ''),
+      description: String(payload.description ?? ''),
+      price: Number(payload.price) || 0.01,
       discountPercent: Math.min(100, Math.max(0, Number(payload.discountPercent) || 0)),
-      image: payload.image ?? '',
+      image: imageUrl,
       startDate: payload.startDate || '2000-01-01',
       expiryDate: payload.expiryDate || '2099-12-31',
       maxUsage,
-      isAvailable: payload.isAvailable !== false,
+      foods: foodsArray,
     };
 
-    if (payload.imageFile instanceof File) {
-      const fd = new FormData();
-      fd.append('name', base.name);
-      fd.append('description', base.description);
-      fd.append('price', String(base.price));
-      fd.append('discountPercent', String(base.discountPercent));
-      fd.append('startDate', base.startDate);
-      fd.append('expiryDate', base.expiryDate);
-      fd.append('maxUsage', String(base.maxUsage));
-      fd.append('isAvailable', String(base.isAvailable));
-      fd.append('image', payload.imageFile);
-      const resp = await instance.put(`/combo/${id}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return resp.data;
-    }
-
+    console.log('[foodApi] updateCombo payload:', JSON.stringify(base, null, 2));
     const resp = await instance.put(`/combo/${id}`, base);
     return resp.data;
   } catch (err) {
     console.error('[foodApi] updateCombo error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * GET /api/combo?id={id} — lấy chi tiết 1 combo (bao gồm foods)
+ */
+export async function getComboById(id) {
+  try {
+    const resp = await instance.get('/combo', { params: { id: Number(id) } });
+    const data = resp.data;
+    // API trả về object rỗng nếu không tìm thấy
+    if (!data || Object.keys(data).length === 0) {
+      throw new Error('Không tìm thấy combo');
+    }
+    return data;
+  } catch (err) {
+    console.error('[foodApi] getComboById error:', err.response?.data || err.message);
     throw err;
   }
 }
@@ -308,35 +352,39 @@ export async function getAllFoods(foodId) {
  */
 export async function createFood(payload) {
   try {
-    let data;
-    const headers = {};
-
-    // Nếu có file ảnh → dùng FormData
+    // Upload ảnh lên Cloudinary nếu có file
+    let imageUrl = payload.image ?? '';
     if (payload.imageFile instanceof File) {
-      data = new FormData();
-      data.append('name', payload.name ?? '');
-      data.append('description', payload.description ?? '');
-      data.append('price', payload.price ?? 0);
-      data.append('categoryId', payload.categoryId ?? '');
-      data.append('unit', payload.unit ?? '');
-      data.append('status', payload.status ?? true);
-      data.append('image', payload.imageFile);
-      data.append('notes', payload.notes ?? '');
-      headers['Content-Type'] = 'multipart/form-data';
-    } else {
-      data = {
-        name: payload.name,
-        description: payload.description ?? '',
-        price: Number(payload.price) || 0,
-        categoryId: payload.categoryId ?? null,
-        unit: payload.unit ?? '',
-        status: payload.status !== false,
-        image: payload.image ?? '',
-        notes: payload.notes ?? ''
-      };
+      console.log('[createFood] Đang upload ảnh lên Cloudinary...');
+      imageUrl = await uploadImageToCloudinary(payload.imageFile);
+      console.log('[createFood] Ảnh đã upload:', imageUrl);
     }
 
-    const resp = await instance.post('/food', data, { headers });
+    // Chuẩn bị dữ liệu sạch
+    const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
+    const cleanPrepTime = payload.preparationTime != null ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0 : 0;
+    const cleanCalories = payload.calories != null ? Number(String(payload.calories).replace(/\D/g, '')) || 0 : 0;
+
+    // Backend Swagger chỉ chấp nhận application/json
+    const jsonData = {
+      name: payload.name ?? '',
+      description: payload.description ?? '',
+      image: imageUrl,
+      price: cleanPrice,
+      unit: payload.unit ?? '',
+      isAvailable: payload.isAvailable !== false,
+      isDirectSale: Boolean(payload.isDirectSale),
+      isFeatured: Boolean(payload.isFeatured),
+      preparationTime: cleanPrepTime,
+      calories: cleanCalories,
+      note: payload.note ?? '',
+    };
+    const config = { headers: { 'Content-Type': 'application/json' } };
+    const data = JSON.stringify(jsonData);
+
+    console.log('[createFood] Payload gửi đi:', jsonData);
+
+    const resp = await instance.post('/food', data, config);
     return resp.data;
   } catch (err) {
     console.error('[foodApi] createFood error:', err.response?.data || err.message);
@@ -349,34 +397,39 @@ export async function createFood(payload) {
  */
 export async function updateFood(id, payload) {
   try {
-    let data;
-    const headers = {};
-
+    // Upload ảnh lên Cloudinary nếu có file mới
+    let imageUrl = payload.image ?? '';
     if (payload.imageFile instanceof File) {
-      data = new FormData();
-      data.append('name', payload.name ?? '');
-      data.append('description', payload.description ?? '');
-      data.append('price', payload.price ?? 0);
-      data.append('categoryId', payload.categoryId ?? '');
-      data.append('unit', payload.unit ?? '');
-      data.append('status', payload.status ?? true);
-      data.append('image', payload.imageFile);
-      data.append('notes', payload.notes ?? '');
-      headers['Content-Type'] = 'multipart/form-data';
-    } else {
-      data = {
-        name: payload.name,
-        description: payload.description ?? '',
-        price: Number(payload.price) || 0,
-        categoryId: payload.categoryId ?? null,
-        unit: payload.unit ?? '',
-        status: payload.status !== false,
-        image: payload.image ?? '',
-        notes: payload.notes ?? ''
-      };
+      console.log('[updateFood] Đang upload ảnh lên Cloudinary...');
+      imageUrl = await uploadImageToCloudinary(payload.imageFile);
+      console.log('[updateFood] Ảnh đã upload:', imageUrl);
     }
 
-    const resp = await instance.put(`/food/${id}`, data, { headers });
+    // Chuẩn bị dữ liệu sạch
+    const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
+    const cleanPrepTime = payload.preparationTime != null ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0 : 0;
+    const cleanCalories = payload.calories != null ? Number(String(payload.calories).replace(/\D/g, '')) || 0 : 0;
+
+    // Backend Swagger chỉ chấp nhận application/json
+    const jsonData = {
+      name: payload.name ?? '',
+      description: payload.description ?? '',
+      image: imageUrl,
+      price: cleanPrice,
+      unit: payload.unit ?? '',
+      isAvailable: payload.isAvailable !== false,
+      isDirectSale: Boolean(payload.isDirectSale),
+      isFeatured: Boolean(payload.isFeatured),
+      preparationTime: cleanPrepTime,
+      calories: cleanCalories,
+      note: payload.note ?? '',
+    };
+    const config = { headers: { 'Content-Type': 'application/json' } };
+    const data = JSON.stringify(jsonData);
+
+    console.log('[updateFood] Payload gửi đi:', jsonData);
+
+    const resp = await instance.put(`/food/${id}`, data, config);
     return resp.data;
   } catch (err) {
     console.error('[foodApi] updateFood error:', err.response?.data || err.message);
@@ -522,5 +575,129 @@ export async function updateBuffetStatus(buffetId) {
       msgCode: typeof data === 'object' ? data?.msgCode : undefined,
       error
     };
+  }
+}
+
+/* =============================================
+   BUFFET API - CRUD + QUẢN LÝ MÓN TRONG BUFFET
+   ============================================= */
+
+/**
+ * POST /api/Buffer — tạo gói Buffet mới
+ * Payload: { name, description, image, mainPrice, childrenPrice, sidePrice, isAvailable, foods }
+ */
+export async function createBuffet(payload) {
+  try {
+    // Upload ảnh lên Cloudinary nếu có file
+    let imageUrl = payload.image ?? '';
+    if (payload.imageFile instanceof File) {
+      console.log('[createBuffet] Đang upload ảnh lên Cloudinary...');
+      imageUrl = await uploadImageToCloudinary(payload.imageFile);
+      console.log('[createBuffet] Ảnh đã upload:', imageUrl);
+    }
+
+    const createdBy = payload.createdBy ?? getComboCreatedBy();
+    const foodsArray = Array.isArray(payload.foods)
+      ? payload.foods.map((f) => ({
+          foodId: Number(f.foodId) || 0,
+          quantity: Number(f.quantity) || 0,
+          isUnlimited: Boolean(f.isUnlimited),
+        }))
+      : [];
+
+    const base = {
+      name: String(payload.name ?? ''),
+      description: String(payload.description ?? ''),
+      image: imageUrl,
+      mainPrice: Number(payload.mainPrice) || 0,
+      childrenPrice: Number(payload.childrenPrice) || 0,
+      sidePrice: Number(payload.sidePrice) || 0,
+      isAvailable: Boolean(payload.isAvailable),
+      createdBy: Number(createdBy) || 0,
+      foods: foodsArray,
+    };
+
+    console.log('[foodApi] createBuffet payload:', JSON.stringify(base, null, 2));
+    const resp = await instance.post('/Buffer', base);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] createBuffet error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * PUT /api/Buffer/{id} — cập nhật gói Buffet
+ */
+export async function updateBuffet(id, payload) {
+  try {
+    // Upload ảnh lên Cloudinary nếu có file mới
+    let imageUrl = payload.image ?? '';
+    if (payload.imageFile instanceof File) {
+      console.log('[updateBuffet] Đang upload ảnh lên Cloudinary...');
+      imageUrl = await uploadImageToCloudinary(payload.imageFile);
+      console.log('[updateBuffet] Ảnh đã upload:', imageUrl);
+    }
+
+    const foodsArray = Array.isArray(payload.foods)
+      ? payload.foods.map((f) => ({
+          foodId: Number(f.foodId) || 0,
+          quantity: Number(f.quantity) || 0,
+          isUnlimited: Boolean(f.isUnlimited),
+        }))
+      : [];
+
+    const base = {
+      name: String(payload.name ?? ''),
+      description: String(payload.description ?? ''),
+      image: imageUrl,
+      mainPrice: Number(payload.mainPrice) || 0,
+      childrenPrice: Number(payload.childrenPrice) || 0,
+      sidePrice: Number(payload.sidePrice) || 0,
+      isAvailable: Boolean(payload.isAvailable),
+      foods: foodsArray,
+    };
+
+    console.log('[foodApi] updateBuffet payload:', JSON.stringify(base, null, 2));
+    const resp = await instance.put(`/Buffer/${id}`, base);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] updateBuffet error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * DELETE /api/Buffer/{buffetId}/foods/{foodId} — xóa MỘT MÓN ăn khỏi gói Buffet
+ * Lưu ý: KHÔNG xóa Buffet, chỉ gỡ món ra khỏi danh sách
+ */
+export async function removeFoodFromBuffet(buffetId, foodId) {
+  try {
+    console.log(`[foodApi] removeFoodFromBuffet: buffetId=${buffetId}, foodId=${foodId}`);
+    const resp = await instance.delete(`/Buffer/${buffetId}/foods/${foodId}`);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] removeFoodFromBuffet error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * POST /api/Buffer/{id}/foods — thêm món vào gói Buffet
+ * Payload: { foodId, quantity, isUnlimited }
+ */
+export async function addFoodToBuffet(buffetId, foodPayload) {
+  try {
+    const body = {
+      foodId: Number(foodPayload.foodId) || 0,
+      quantity: Number(foodPayload.quantity) || 0,
+      isUnlimited: Boolean(foodPayload.isUnlimited),
+    };
+    console.log(`[foodApi] addFoodToBuffet: buffetId=${buffetId}`, body);
+    const resp = await instance.post(`/Buffer/${buffetId}/foods`, body);
+    return resp.data;
+  } catch (err) {
+    console.error('[foodApi] addFoodToBuffet error:', err.response?.data || err.message);
+    throw err;
   }
 }

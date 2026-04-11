@@ -13,27 +13,22 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smas-afbhfnduadas
 const instance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
 });
 
 // Request Interceptor - Thêm token vào tất cả requests
 instance.interceptors.request.use(
   (config) => {
+    // Đảm bảo headers mặc định
+    config.headers = config.headers || {};
+    config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
+    config.headers['Accept'] = config.headers['Accept'] || 'application/json';
+
     const token =
       localStorage.getItem('authToken') ||
       localStorage.getItem('accessToken') ||
       localStorage.getItem('tableAccessToken');
-    // Log chi tiết token và API URL để debug
-    console.log('[DEBUG] API BASE URL:', API_BASE_URL);
-    console.log('[DEBUG] Token FE gửi lên:', token);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url} → Bearer ${token.slice(0, 20)}...`);
-    } else {
-      console.warn(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url} → NO TOKEN`);
     }
     return config;
   },
@@ -62,7 +57,6 @@ instance.interceptors.response.use(
       localStorage.removeItem('authToken');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
-      // Chỉ redirect khi trước đó có token (phiên hết hạn), tránh đá người dùng guest khỏi trang public
       if (hadToken && !window.location.pathname.includes('/auth')) {
         window.location.href = '/auth';
       }
@@ -86,7 +80,6 @@ instance.interceptors.response.use(
     // Network error
     if (!error.response) {
       console.error('❌ Network error - Backend unreachable at:', API_BASE_URL);
-      // Có thể implement offline mode ở đây
     }
 
     return Promise.reject(error);
