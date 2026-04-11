@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Ph
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
 import { eventBookingAPI, serviceAPI, EVENT_TYPES_LIST } from '../api/managerApi';
+import { eventsAPI } from '../api/eventsApi';
 import { getComboLists, getFoodByFilter } from '../api/foodApi';
 import { isAuthenticated } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
@@ -106,6 +107,10 @@ const Services = () => {
   const [eventServicesFromApi, setEventServicesFromApi] = useState([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
 
+  // GET /api/events — carousel "ĐẦY ĐỦ CÁC SỰ KIỆN" (title, description, image)
+  const [showcaseEventsFromApi, setShowcaseEventsFromApi] = useState([]);
+  const [isLoadingShowcaseEvents, setIsLoadingShowcaseEvents] = useState(false);
+
   useEffect(() => {
     // Services page is now public - anyone can view
   }, []);
@@ -168,25 +173,73 @@ const Services = () => {
     loadMenuData();
   }, []);
 
+  useEffect(() => {
+    setAddOnCarouselIndex((i) => {
+      const max = Math.max(0, eventServicesFromApi.length - 3);
+      return Math.min(i, max);
+    });
+  }, [eventServicesFromApi.length]);
+
+  useEffect(() => {
+    setServiceCarouselIndex((i) => {
+      const max = Math.max(0, showcaseEventsFromApi.length - 4);
+      return Math.min(i, max);
+    });
+  }, [showcaseEventsFromApi.length]);
+
+  useEffect(() => {
+    const loadShowcaseEvents = async () => {
+      setIsLoadingShowcaseEvents(true);
+      try {
+        const list = await eventsAPI.getEvents();
+        const apiUrl = process.env.REACT_APP_API_URL || 'https://localhost:5001/api';
+        const imageBase = apiUrl.replace(/\/api\/?$/, '') || window.location.origin;
+        const mapped = (Array.isArray(list) ? list : [])
+          .filter((e) => e.isActive !== false)
+          .map((e) => ({
+            id: e.eventId ?? e.id,
+            title: e.title || '',
+            description: e.description || '',
+            image: e.image
+              ? (e.image.startsWith('http') ? e.image : imageBase + (e.image.startsWith('/') ? e.image : `/${e.image}`))
+              : 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=400',
+          }));
+        setShowcaseEventsFromApi(mapped);
+      } catch (err) {
+        console.warn('[Services] Failed to load events for showcase:', err);
+        setShowcaseEventsFromApi([]);
+      } finally {
+        setIsLoadingShowcaseEvents(false);
+      }
+    };
+    loadShowcaseEvents();
+  }, []);
+
   // Load danh sách dịch vụ từ GET /api/services (Bước 2: Sự kiện & Dịch vụ)
   useEffect(() => {
     const loadServices = async () => {
       setIsLoadingServices(true);
       try {
         const res = await serviceAPI.getServices();
-        const list = Array.isArray(res?.data) ? res.data : res?.data?.$values ?? [];
+        const body = res?.data ?? {};
+        const list = Array.isArray(body.data)
+          ? body.data
+          : Array.isArray(body)
+            ? body
+            : [];
         const apiUrl = process.env.REACT_APP_API_URL || 'https://localhost:5001/api';
         const imageBase = apiUrl.replace(/\/api\/?$/, '') || window.location.origin;
         const mapped = list
-          .filter(s => s.isAvailable !== false)
-          .map(s => ({
-            id: s.serviceId,
+          .filter((s) => s.isAvailable !== false)
+          .map((s) => ({
+            id: s.serviceId ?? s.id,
+            title: s.title || '',
             name: s.title || '',
             price: s.servicePrice ?? 0,
             description: s.description || '',
             unit: s.unit || '',
             image: s.image
-              ? (s.image.startsWith('http') ? s.image : imageBase + (s.image.startsWith('/') ? s.image : '/' + s.image))
+              ? (s.image.startsWith('http') ? s.image : imageBase + (s.image.startsWith('/') ? s.image : `/${s.image}`))
               : 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200',
           }));
         setEventServicesFromApi(mapped);
@@ -638,39 +691,6 @@ const Services = () => {
     }
   ];
 
-  // Service Items for Carousel
-  const serviceItems = [
-    { id: 1, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1551632786-de41ec6a05ae?auto=format&fit=crop&q=80&w=400', desc: 'Lợi chủ tự ăn tại chỗ' },
-    { id: 2, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1504674900861-b72b27e84530?auto=format&fit=crop&q=80&w=400', desc: 'Nơi lành lẽ, không khí sạch sẽ' },
-    { id: 3, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&q=80&w=400', desc: 'Lợi chủ tự ăn tại chỗ' },
-    { id: 4, name: 'Tiệc sinh nhật', image: 'https://images.unsplash.com/photo-1552566239-4a8c54ef0eaa?auto=format&fit=crop&q=80&w=400', desc: 'Lợi chủ tự ăn tại chỗ' }
-  ];
-
-  // Add-on Services
-  const addOnServices = [
-    { 
-      id: 1, 
-      name: 'Bánh Sinh Nhật', 
-      image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&q=80&w=400', 
-      description: 'Cá mú được tẩm bột tỏi hành và chiên trong ngập đầu ăn sẽ tạo cảm giác như ở trên mây',
-      price: '250.000 vnđ' 
-    },
-    { 
-      id: 2, 
-      name: 'MC', 
-      image: 'https://images.unsplash.com/photo-1511379938547-c1f69b13d835?auto=format&fit=crop&q=80&w=400', 
-      description: 'Cá mú được tẩm bột tỏi hành và chiên trong ngập đầu ăn sẽ tạo cảm giác như ở trên mây',
-      price: '250.000 vnđ' 
-    },
-    { 
-      id: 3, 
-      name: 'Cá mú đủ', 
-      image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=crop&q=80&w=400', 
-      description: 'Cá mú được tẩm bột tỏi hành và chiên trong ngập đầu ăn sẽ tạo cảm giác như ở trên mây',
-      price: '250.000 vnđ' 
-    }
-  ];
-
   // Online delivery options
   const deliveryOptions = [
     { id: 1, title: 'Giao nhanh', subtitle: '30 phút', image: '/images/ShipFast.png' },
@@ -736,17 +756,10 @@ const Services = () => {
                         <span
                           key={idx}
                           onClick={() => isSelectable && setSelectedDate(date)}
-                          className={`calendar-day-block ${!isSelectable ? 'day-disabled' : ''} ${isSelected ? 'day-active' : ''} ${isSelectable ? 'day-selectable' : ''}`}
-                          style={{ cursor: isSelectable ? 'pointer' : 'not-allowed', opacity: isSelectable ? 1 : 0.5 }}
-                          className={`
-                            ${isToday ? 'today' : ''}
-                            ${isSelected ? 'day-active' : ''}
-                            ${!isSelectable ? 'day-disabled' : ''}
-                            ${isSelectable ? 'day-selectable' : ''}
-                          `}
+                          className={`calendar-day-block ${isToday ? 'today' : ''} ${isSelected ? 'day-active' : ''} ${!isSelectable ? 'day-disabled' : ''} ${isSelectable ? 'day-selectable' : ''}`}
                           style={{
                             cursor: isSelectable ? 'pointer' : 'not-allowed',
-                            opacity: isSelectable ? 1 : 0.35
+                            opacity: isSelectable ? 1 : 0.35,
                           }}
                         >
                           <div className="calendar-weekday">{weekday}</div>
@@ -1542,53 +1555,90 @@ const Services = () => {
           </div>
         </section>
 
-        {/* SECTION 3: SERVICE CAROUSEL */}
+        {/* SECTION 3: EVENTS CAROUSEL — GET /api/events (title, description, image) */}
         <section className="service-card-section">
           <h2 className="service-title-gold">ĐẦY ĐỦ CÁC SỰ KIỆN</h2>
-          <div className="carousel-container">
-            <button className="carousel-nav prev" onClick={() => setServiceCarouselIndex(Math.max(0, serviceCarouselIndex - 1))}>
-              <ChevronLeft size={24} />
-            </button>
-            <div className="carousel-content">
-              {serviceItems.slice(serviceCarouselIndex, serviceCarouselIndex + 4).map(item => (
-                <div key={item.id} className="carousel-item">
-                  <img src={item.image} alt={item.name} />
-                  <h4>{item.name}</h4>
-                  <p className="carousel-item-desc">{item.desc}</p>
-                </div>
-              ))}
+          {isLoadingShowcaseEvents ? (
+            <p className="services-addon-loading">Đang tải sự kiện...</p>
+          ) : showcaseEventsFromApi.length === 0 ? (
+            <p className="services-addon-empty">Hiện chưa có sự kiện để hiển thị.</p>
+          ) : (
+            <div className="carousel-container">
+              <button
+                type="button"
+                className="carousel-nav prev"
+                onClick={() => setServiceCarouselIndex(Math.max(0, serviceCarouselIndex - 1))}
+                disabled={serviceCarouselIndex <= 0}
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <div className="carousel-content">
+                {showcaseEventsFromApi.slice(serviceCarouselIndex, serviceCarouselIndex + 4).map((item) => (
+                  <div key={item.id} className="carousel-item">
+                    <img src={item.image} alt={item.title} />
+                    <h4>{item.title}</h4>
+                    <p className="carousel-item-desc">{item.description}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="carousel-nav next"
+                onClick={() =>
+                  setServiceCarouselIndex(
+                    Math.min(Math.max(0, showcaseEventsFromApi.length - 4), serviceCarouselIndex + 1)
+                  )
+                }
+                disabled={serviceCarouselIndex >= Math.max(0, showcaseEventsFromApi.length - 4)}
+              >
+                <ChevronRight size={24} />
+              </button>
             </div>
-            <button className="carousel-nav next" onClick={() => setServiceCarouselIndex(Math.min(serviceItems.length - 4, serviceCarouselIndex + 1))}>
-              <ChevronRight size={24} />
-            </button>
-          </div>
+          )}
         </section>
 
-        {/* SECTION 4: ADD-ON SERVICES */}
+        {/* SECTION 4: ADD-ON SERVICES — GET /api/services (title, description, image) */}
         <section className="service-card-section">
           <h2 className="service-title-gold">DỊCH VỤ KÈM THEO</h2>
-          <div className="addon-carousel-container">
-            <button className="addon-carousel-nav prev" onClick={() => setAddOnCarouselIndex(Math.max(0, addOnCarouselIndex - 1))}>
-              <ChevronLeft size={32} />
-            </button>
-            <div className="addon-carousel-content">
-              {addOnServices.slice(addOnCarouselIndex, addOnCarouselIndex + 3).map(item => (
-                <div key={item.id} className="addon-item-card">
-                  <div className="addon-item-image">
-                    <img src={item.image} alt={item.name} />
+          {isLoadingServices ? (
+            <p className="services-addon-loading">Đang tải dịch vụ...</p>
+          ) : eventServicesFromApi.length === 0 ? (
+            <p className="services-addon-empty">Hiện chưa có dịch vụ kèm theo.</p>
+          ) : (
+            <div className="addon-carousel-container">
+              <button
+                type="button"
+                className="addon-carousel-nav prev"
+                onClick={() => setAddOnCarouselIndex(Math.max(0, addOnCarouselIndex - 1))}
+                disabled={addOnCarouselIndex <= 0}
+              >
+                <ChevronLeft size={32} />
+              </button>
+              <div className="addon-carousel-content">
+                {eventServicesFromApi.slice(addOnCarouselIndex, addOnCarouselIndex + 3).map((item) => (
+                  <div key={item.id} className="addon-item-card">
+                    <div className="addon-item-image">
+                      <img src={item.image} alt={item.title || item.name || ''} />
+                    </div>
+                    <div className="addon-item-info">
+                      <h4 className="addon-item-name">{item.title || item.name}</h4>
+                      <p className="addon-item-description">{item.description}</p>
+                    </div>
                   </div>
-                  <div className="addon-item-info">
-                    <h4 className="addon-item-name">{item.name}</h4>
-                    <p className="addon-item-description">{item.description}</p>
-                    <p className="addon-item-price">{item.price}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <button
+                type="button"
+                className="addon-carousel-nav next"
+                onClick={() =>
+                  setAddOnCarouselIndex(Math.min(Math.max(0, eventServicesFromApi.length - 3), addOnCarouselIndex + 1))
+                }
+                disabled={addOnCarouselIndex >= Math.max(0, eventServicesFromApi.length - 3)}
+              >
+                <ChevronRight size={32} />
+              </button>
             </div>
-            <button className="addon-carousel-nav next" onClick={() => setAddOnCarouselIndex(Math.min(addOnServices.length - 3, addOnCarouselIndex + 1))}>
-              <ChevronRight size={32} />
-            </button>
-          </div>
+          )}
         </section>
 
         {/* SECTION 5: ONLINE DELIVERY */}

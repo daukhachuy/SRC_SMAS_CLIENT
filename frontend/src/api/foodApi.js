@@ -1,7 +1,7 @@
 import instance from './axiosInstance';
 import { extractUserFromToken } from '../utils/jwtHelper';
 
-function getComboCreatedBy() {
+export function getComboCreatedBy() {
   const token =
     localStorage.getItem('authToken') ||
     localStorage.getItem('accessToken');

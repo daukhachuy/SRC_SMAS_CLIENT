@@ -10,6 +10,7 @@ import {
   deleteCombo,
   patchComboStatus,
   resolveFoodImageUrl,
+  getComboCreatedBy,
 } from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
 
@@ -34,6 +35,54 @@ function formatPriceVnd(num) {
   return `${n.toLocaleString('vi-VN')}₫`;
 }
 
+function unwrapArray(value) {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.$values)) return value.$values;
+  return [];
+}
+
+/** Các khóa thường gặp từ GET /api/combo (nested món trong combo) */
+const COMBO_FOOD_ARRAY_KEYS = [
+  'comboFoods',
+  'ComboFoods',
+  'foods',
+  'Foods',
+  'foodItems',
+  'FoodItems',
+  'comboDetails',
+  'ComboDetails',
+  'comboItems',
+  'ComboItems',
+];
+
+function extractComboFoodArray(raw) {
+  if (!raw || typeof raw !== 'object') return [];
+  for (const key of COMBO_FOOD_ARRAY_KEYS) {
+    const arr = unwrapArray(raw[key]);
+    if (arr.length > 0) return arr;
+  }
+  return [];
+}
+
+function normalizeComboFoodLines(raw) {
+  const items = extractComboFoodArray(raw);
+  return items
+    .map((item) => {
+      const foodName =
+        item?.foodName ??
+        item?.FoodName ??
+        item?.name ??
+        item?.food?.foodName ??
+        item?.food?.name ??
+        item?.Food?.foodName ??
+        '';
+      const quantity =
+        Number(item?.quantity ?? item?.Quantity ?? item?.qty ?? item?.Qty ?? 0) || 0;
+      return { foodName: String(foodName).trim(), quantity };
+    })
+    .filter((row) => row.foodName || row.quantity > 0);
+}
+
 function normalizeComboRow(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const id = raw.comboId ?? raw.id ?? null;
@@ -43,6 +92,7 @@ function normalizeComboRow(raw) {
   if (raw.isAvailable !== undefined && raw.isAvailable !== null) {
     active = raw.isAvailable === true || raw.isAvailable === 1 || raw.isAvailable === 'true';
   }
+  const foodsLines = normalizeComboFoodLines(raw);
   return {
     id,
     comboId: id,
@@ -60,6 +110,7 @@ function normalizeComboRow(raw) {
     numberOfUsed: raw.numberOfUsed != null ? Number(raw.numberOfUsed) : 0,
     status: active,
     isAvailable: raw.isAvailable,
+    foodsLines,
   };
 }
 
@@ -76,7 +127,6 @@ const AdminMenuCombo = () => {
   const [pageSize] = useState(5);
 
   const [createComboOpen, setCreateComboOpen] = useState(false);
-  const [createComboStep, setCreateComboStep] = useState(1);
   const [createComboForm, setCreateComboForm] = useState(defaultComboForm);
   const [formLoading, setFormLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -151,7 +201,6 @@ const AdminMenuCombo = () => {
 
   const openAddCombo = () => {
     setEditComboId(null);
-    setCreateComboStep(1);
     setCreateComboForm(defaultComboForm());
     setFormErrors({});
     setCreateComboOpen(true);
@@ -159,7 +208,6 @@ const AdminMenuCombo = () => {
 
   const openEditCombo = (row) => {
     setEditComboId(row.id);
-    setCreateComboStep(1);
     setFormErrors({});
     setCreateComboForm({
       name: row.name || '',
@@ -179,30 +227,39 @@ const AdminMenuCombo = () => {
 
   const closeComboModal = () => {
     setCreateComboOpen(false);
-    setCreateComboStep(1);
     setCreateComboForm(defaultComboForm());
     setEditComboId(null);
     setFormErrors({});
   };
 
+  const formatComboDateField = (v) => {
+    if (v == null || v === '') return undefined;
+    return String(v).slice(0, 10);
+  };
+
+  /** Body khớp Swagger POST/PUT /api/combo (JSON); có file ảnh thì foodApi dùng multipart */
   const buildPayloadFromForm = () => {
     const priceNum = Number(String(createComboForm.price).replace(/\D/g, '')) || 0;
     const maxUsage =
       createComboForm.maxUsage === '' || createComboForm.maxUsage == null
         ? 2147483647
         : Math.max(0, parseInt(String(createComboForm.maxUsage).replace(/\D/g, ''), 10) || 0);
-    return {
+    const payload = {
       name: createComboForm.name.trim(),
-      description: createComboForm.description.trim(),
+      description: (createComboForm.description || '').trim(),
       price: priceNum,
-      discountPercent: Number(createComboForm.discountPercent) || 0,
-      startDate: createComboForm.startDate || undefined,
-      expiryDate: createComboForm.expiryDate || undefined,
+      discountPercent: Math.min(100, Math.max(0, Number(createComboForm.discountPercent) || 0)),
+      startDate: formatComboDateField(createComboForm.startDate),
+      expiryDate: formatComboDateField(createComboForm.expiryDate),
       maxUsage,
-      isAvailable: createComboForm.isAvailable,
-      image: createComboForm.image || '',
+      isAvailable: createComboForm.isAvailable !== false,
+      image: (createComboForm.image || '').trim(),
       imageFile: createComboForm.imageFile,
     };
+    if (!editComboId) {
+      payload.createdBy = Number(getComboCreatedBy()) || 0;
+    }
+    return payload;
   };
 
   const submitCombo = async () => {
@@ -331,8 +388,8 @@ const AdminMenuCombo = () => {
                     <th style={{ width: 72 }}>HÌNH ẢNH</th>
                     <th style={{ minWidth: 160 }}>TÊN COMBO</th>
                     <th style={{ minWidth: 200 }}>MÔ TẢ</th>
+                    <th style={{ minWidth: 200 }}>MÓN ĂN</th>
                     <th style={{ width: 120 }}>GIÁ</th>
-                    <th style={{ width: 80 }}>GIẢM %</th>
                     <th style={{ width: 110 }}>HẾT HẠN</th>
                     <th style={{ width: 120 }}>TRẠNG THÁI</th>
                     <th style={{ width: 104 }}>THAO TÁC</th>
@@ -364,8 +421,21 @@ const AdminMenuCombo = () => {
                           <div className="menu-cell-code">Mã: {row.code}</div>
                         </td>
                         <td className="menu-cell-desc">{row.description || '—'}</td>
+                        <td className="menu-cell-combo-foods">
+                          {row.foodsLines?.length ? (
+                            <ul className="combo-foods-list">
+                              {row.foodsLines.map((f, idx) => (
+                                <li key={`${row.id}-${idx}`}>
+                                  <span className="combo-food-name">{f.foodName || '—'}</span>
+                                  <span className="combo-food-qty"> × {f.quantity}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td className="menu-cell-price">{row.priceDisplay}</td>
-                        <td>{row.discountPercent ? `${row.discountPercent}%` : '—'}</td>
                         <td>{row.expiryDate || '—'}</td>
                         <td>
                           <button
@@ -444,29 +514,11 @@ const AdminMenuCombo = () => {
                 <X size={20} />
               </button>
             </div>
-            <div className="combo-create-steps">
-              <button
-                type="button"
-                className={`combo-step-tab ${createComboStep === 1 ? 'active' : ''}`}
-                onClick={() => setCreateComboStep(1)}
-              >
-                1 Thông tin cơ bản
-              </button>
-              <button
-                type="button"
-                className={`combo-step-tab ${createComboStep === 2 ? 'active' : ''}`}
-                onClick={() => setCreateComboStep(2)}
-              >
-                2 Chọn món ăn
-              </button>
-            </div>
-
-            {createComboStep === 1 && (
-              <form
+            <form
                 className="combo-create-form"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  setCreateComboStep(2);
+                  submitCombo();
                 }}
               >
                 {formErrors._api && (
@@ -608,27 +660,10 @@ const AdminMenuCombo = () => {
                     Hủy bỏ
                   </button>
                   <button type="submit" className="menu-btn-primary" disabled={formLoading}>
-                    Tiếp theo
+                    {formLoading ? 'Đang lưu...' : editComboId ? 'Lưu thay đổi' : 'Tạo combo'}
                   </button>
                 </div>
               </form>
-            )}
-
-            {createComboStep === 2 && (
-              <div className="combo-create-form">
-                <p className="combo-step2-placeholder">
-                  Chọn món trong combo có thể tích hợp sau (API chi tiết món-combo). Nhấn Hoàn tất để lưu thông tin bước 1.
-                </p>
-                <div className="combo-create-actions">
-                  <button type="button" className="combo-btn-cancel" onClick={() => setCreateComboStep(1)} disabled={formLoading}>
-                    Quay lại
-                  </button>
-                  <button type="button" className="menu-btn-primary" onClick={submitCombo} disabled={formLoading}>
-                    {formLoading ? 'Đang lưu...' : editComboId ? 'Lưu thay đổi' : 'Hoàn tất'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
