@@ -1,3 +1,9 @@
+// Xác nhận duyệt sự kiện (review)
+export const reviewBookEvent = (id, data) =>
+  instance.post(`/book-event/${id}/review`, data);
+// Tạo hợp đồng cho book-event
+export const createBookEventContract = (id, data) =>
+  instance.post(`/book-event/${id}/contract`, data);
 import instance from './axiosInstance'; 
 // Export lại các hàm cho các file khác import trực tiếp (đặt sau staffAPI)
 export const getWorkingStaffToday = (...args) => staffAPI.getWorkingToday(...args);
@@ -533,7 +539,7 @@ export async function getAllStaffSchedule() {
     const statusRaw = normalizeStatus(pick(item, ['contractStatus', 'status', 'bookingStatus'], 'pending'));
     const statusMap = {
       // BookEvent statuses
-      pending: { status: 'nosigned', statusText: 'Chờ duyệt / Chờ xử lý' },
+      pending: { status: 'nosigned', statusText: 'Chờ duyệt' },
       approved: { status: 'unsigned', statusText: 'Đã duyệt' },
       rejected: { status: 'rejected', statusText: 'Từ chối' },
       confirmed: { status: 'signed', statusText: 'Đã xác nhận' },
