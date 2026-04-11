@@ -1,0 +1,283 @@
+.combo-list-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.combo-list-modal {
+  background: #fff;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+/* Header */
+.combo-list-modal-header {
+  padding: 20px 24px;
+  background: #fff;
+  border-bottom: 1px solid #EEE;
+}
+
+.combo-list-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.combo-list-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1A1A1A;
+  letter-spacing: 0.5px;
+}
+
+.combo-list-modal-close {
+  background: #F5F5F5;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.combo-list-modal-close:hover {
+  background: #FF4D4D;
+  color: #fff;
+}
+
+/* Search */
+.combo-list-search {
+  position: relative;
+}
+
+.combo-list-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+}
+
+.combo-list-search input {
+  width: 100%;
+  padding: 12px 14px 12px 44px;
+  border: 1px solid #E0E0E0;
+  border-radius: 12px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.combo-list-search input:focus {
+  outline: none;
+  border-color: #FF7A21;
+}
+
+/* Body */
+.combo-list-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.combo-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Items List */
+.combo-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Combo Item */
+.combo-list-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 2px solid #F0F0F0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.combo-list-item:hover {
+  border-color: #FF9800;
+  box-shadow: 0 4px 16px rgba(255, 152, 0, 0.15);
+}
+
+.combo-list-item.selected {
+  border-color: #FF9800;
+  background: #FFF8F0;
+}
+
+.combo-list-item-image {
+  flex-shrink: 0;
+}
+
+.combo-list-item-placeholder {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.combo-list-item-placeholder span {
+  font-size: 32px;
+  font-weight: 800;
+  color: #FF9800;
+}
+
+.combo-list-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.combo-list-item-badge {
+  display: inline-block;
+  width: fit-content;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #FFF3E0;
+  color: #FF9800;
+}
+
+.combo-list-item-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.combo-list-item-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #888;
+}
+
+.combo-list-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.combo-list-item-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #FF9800;
+}
+
+.combo-list-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  background: #F5F5F5;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.combo-list-item-btn:hover {
+  background: #FF9800;
+  color: #fff;
+}
+
+.combo-list-item-btn.selected {
+  background: #4CAF50;
+  color: #fff;
+}
+
+/* Footer */
+.combo-list-modal-footer {
+  padding: 16px 24px;
+  background: #FAFAFA;
+  border-top: 1px solid #EEE;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.combo-list-back-btn {
+  background: none;
+  border: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.combo-list-back-btn:hover {
+  color: #333;
+}
+
+.combo-list-selected-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #666;
+}
+
+.combo-list-selected-info strong {
+  color: #FF9800;
+  font-weight: 700;
+}
+
+.combo-list-confirm-btn {
+  background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);
+  color: #fff;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(255, 152, 0, 0.3);
+}
+
+.combo-list-confirm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+}
