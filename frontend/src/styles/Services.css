@@ -2885,6 +2885,18 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
+.event-payment-columns.event-payment-single-column {
+  grid-template-columns: 1fr;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.event-payment-card.event-payment-summary-only {
+  border-radius: 16px !important;
+  border-right: none !important;
+}
+
 .event-payment-card {
   background: #ffffff;
   border-radius: 0;
@@ -3753,6 +3765,10 @@
 }
 
 /* Step 5 - Success */
+.event-success-step {
+  padding: 12px 0 48px;
+}
+
 .event-success-card {
   background: white;
   border-radius: 20px;
@@ -3762,6 +3778,47 @@
   margin: 40px auto;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
 }
+
+.event-success-card-premium {
+  position: relative;
+  max-width: 560px;
+  padding: 48px 36px 44px;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fffb 100%);
+  box-shadow:
+    0 4px 6px -1px rgba(34, 197, 94, 0.08),
+    0 20px 50px -12px rgba(15, 118, 110, 0.15);
+  overflow: hidden;
+}
+
+.event-success-glow {
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120%;
+  height: 55%;
+  background: radial-gradient(ellipse at center, rgba(34, 197, 94, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.event-success-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #047857;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 20px;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
 .event-success-icon {
   width: 80px;
   height: 80px;
@@ -3773,22 +3830,99 @@
   justify-content: center;
   margin: 0 auto 24px;
 }
+
+.event-success-icon-animated {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.45);
+  animation: event-success-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes event-success-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .event-success-card h2 {
   font-size: 28px;
   font-weight: 800;
   color: #1e293b;
   margin-bottom: 16px;
 }
+
+.event-success-card-premium h2 {
+  position: relative;
+  z-index: 1;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #0f172a, #334155);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 14px;
+}
+
+.event-success-lead {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  color: #475569;
+  line-height: 1.65;
+  margin-bottom: 24px;
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.event-success-hint {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  max-width: 420px;
+  margin: 0 auto 28px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.event-success-hint svg {
+  flex-shrink: 0;
+  color: #0d9488;
+  margin-top: 2px;
+}
+
 .event-success-card p {
   font-size: 16px;
   color: #64748b;
   line-height: 1.6;
   margin-bottom: 32px;
 }
+
 .event-success-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: center;
+}
+
+.event-success-btn-ghost {
+  background: transparent !important;
+  border: 1px solid #e2e8f0 !important;
 }
 .event-success-actions .event-btn-primary {
   background: linear-gradient(135deg, var(--primary-orange), var(--secondary-orange));

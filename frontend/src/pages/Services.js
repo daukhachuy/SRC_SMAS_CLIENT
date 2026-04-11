@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
-import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, Users, UtensilsCrossed, MapPin, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, CreditCard, Wallet, Bell, Tag, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, Users, UtensilsCrossed, MapPin, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, Bell, Star, Sparkles } from 'lucide-react';
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
 import { eventBookingAPI, serviceAPI, EVENT_TYPES_LIST } from '../api/managerApi';
@@ -85,8 +85,6 @@ const Services = () => {
   const [selectedServices, setSelectedServices] = useState([]);
   const [menuDishes, setMenuDishes] = useState([]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('payos');
-  const [discountCode, setDiscountCode] = useState('');
   const [showAllServicesModal, setShowAllServicesModal] = useState(false);
   const [newDishForm, setNewDishForm] = useState({
     type: 'Menu',
@@ -727,7 +725,9 @@ const Services = () => {
       console.log('[Event] Submitting book-event:', payload);
       const response = await eventBookingAPI.create(payload);
       console.log('[Event] Success:', response?.data);
-      setEventSuccess('Đặt sự kiện thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.');
+      setEventSuccess(
+        'Yêu cầu của bạn đã được ghi nhận. Đội ngũ nhà hàng sẽ liên hệ trong thời gian sớm nhất để xác nhận chi tiết, thực đơn và thanh toán (nếu có).'
+      );
       setEventStep(5);
     } catch (err) {
       console.error('[Event] Submit error:', err);
@@ -985,23 +985,32 @@ const Services = () => {
               <div className="event-progress-block">
                 <div className="event-progress-top">
                   <span className="event-step-caption">
-                    Bước {eventStep}: {
-                      eventStep === 1 ? 'Chọn Sự Kiện & Thông Tin' :
-                      eventStep === 2 ? 'Dịch Vụ Đi Kèm' :
-                      eventStep === 3 ? 'Lên Thực Đơn' :
-                      'Xác Nhận & Thanh Toán'
-                    }
+                    {eventStep === 5 ? (
+                      <>Hoàn tất — Cảm ơn bạn đã tin tưởng</>
+                    ) : (
+                      <>Bước {eventStep}: {
+                        eventStep === 1 ? 'Chọn Sự Kiện & Thông Tin' :
+                        eventStep === 2 ? 'Dịch Vụ Đi Kèm' :
+                        eventStep === 3 ? 'Lên Thực Đơn' :
+                        'Xác Nhận Đặt Sự Kiện'
+                      }</>
+                    )}
                   </span>
-                  <span className="event-percent">{Math.round((eventStep / 4) * 100)}% Hoàn thành</span>
+                  <span className="event-percent">
+                    {eventStep >= 5 ? 100 : Math.round((eventStep / 4) * 100)}% Hoàn thành
+                  </span>
                 </div>
                 <div className="event-progress-bar-bg">
-                  <div className="event-progress-bar-fill" style={{ width: `${(eventStep / 4) * 100}%` }} />
+                  <div
+                    className="event-progress-bar-fill"
+                    style={{ width: `${eventStep >= 5 ? 100 : (eventStep / 4) * 100}%` }}
+                  />
                 </div>
                 <div className="event-step-labels">
                   <span className={eventStep >= 1 ? 'active' : ''}>Chọn Sự Kiện</span>
                   <span className={eventStep >= 2 ? 'active' : ''}>Dịch Vụ</span>
                   <span className={eventStep >= 3 ? 'active' : ''}>Thực Đơn</span>
-                  <span className={eventStep >= 4 ? 'active' : ''}>Thanh Toán</span>
+                  <span className={eventStep >= 4 ? 'active' : ''}>Xác Nhận</span>
                 </div>
               </div>
 
@@ -1422,62 +1431,30 @@ const Services = () => {
                 </div>
               )}
 
-              {/* STEP 4: Thanh toán - một thẻ trắng lớn căn giữa như ảnh */}
+              {/* STEP 4: Xác nhận — chỉ tóm tắt chi phí */}
               {eventStep === 4 && (
                 <div className="event-form-step event-payment-step">
                   <div className="event-payment-outer-card">
-                    <div className="event-payment-columns">
-                    <div className="event-payment-card event-payment-summary">
-                      <h4 className="event-payment-card-title"><Tag size={18} className="icon-orange" /> Tóm tắt đơn hàng</h4>
-                      {(() => {
-                        const bookingFee = 2500000;
-                        const decorationFee = selectedServices.length > 0 ? calculateServiceTotal() : 1000000;
-                        const serviceFeePercent = 0.1;
-                        const subtotalBeforeFee = bookingFee + decorationFee;
-                        const serviceFeeAmount = Math.round(subtotalBeforeFee * serviceFeePercent);
-                        const totalPayment = subtotalBeforeFee + serviceFeeAmount;
-                        return (
-                          <>
-                            <div className="event-payment-line"><span>Dịch vụ đặt lịch</span><span>{formatCurrency(bookingFee)}</span></div>
-                            <div className="event-payment-line"><span>Phí trang trí</span><span>{formatCurrency(decorationFee)}</span></div>
-                            <div className="event-payment-line"><span>Phí phục vụ (10%)</span><span>{formatCurrency(serviceFeeAmount)}</span></div>
-                            <div className="event-payment-total-row"><span>Tổng cộng</span><span className="event-payment-total-amount">{formatCurrency(totalPayment)}</span></div>
-                            <div className="event-payment-discount">
-                              <label>Mã giảm giá</label>
-                              <div className="event-payment-discount-row">
-                                <input type="text" value={discountCode} onChange={(e) => setDiscountCode(e.target.value)} placeholder="Nhập mã khuyến mãi" />
-                                <button type="button" className="event-payment-apply-btn">Áp dụng</button>
-                              </div>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                    <div className="event-payment-card event-payment-methods">
-                      <h4 className="event-payment-card-title"><Tag size={18} className="icon-orange" /> Phương thức thanh toán</h4>
-                      <div className="event-payment-options">
-                        <label className={`event-payment-option ${paymentMethod === 'payos' ? 'selected' : ''}`} onClick={() => setPaymentMethod('payos')}>
-                          <input type="radio" name="paymentMethod" checked={paymentMethod === 'payos'} readOnly />
-                          <div className="event-payment-option-icon"><CreditCard size={22} /></div>
-                          <div className="event-payment-option-text">
-                            <strong>PayOS</strong>
-                            <span>Thanh toán nhanh qua cổng PayOS</span>
-                          </div>
-                        </label>
-                        <label className={`event-payment-option ${paymentMethod === 'cash' ? 'selected' : ''}`} onClick={() => setPaymentMethod('cash')}>
-                          <input type="radio" name="paymentMethod" checked={paymentMethod === 'cash'} readOnly />
-                          <div className="event-payment-option-icon"><Wallet size={22} /></div>
-                          <div className="event-payment-option-text">
-                            <strong>Tiền mặt</strong>
-                            <span>Thanh toán trực tiếp khi nhận dịch vụ</span>
-                          </div>
-                        </label>
+                    <div className="event-payment-columns event-payment-single-column">
+                      <div className="event-payment-card event-payment-summary event-payment-summary-only">
+                        <h4 className="event-payment-card-title"><List size={18} className="icon-orange" /> Tóm tắt đơn hàng</h4>
+                        {(() => {
+                          const bookingFee = 2500000;
+                          const decorationFee = selectedServices.length > 0 ? calculateServiceTotal() : 1000000;
+                          const serviceFeePercent = 0.1;
+                          const subtotalBeforeFee = bookingFee + decorationFee;
+                          const serviceFeeAmount = Math.round(subtotalBeforeFee * serviceFeePercent);
+                          const totalPayment = subtotalBeforeFee + serviceFeeAmount;
+                          return (
+                            <>
+                              <div className="event-payment-line"><span>Dịch vụ đặt lịch</span><span>{formatCurrency(bookingFee)}</span></div>
+                              <div className="event-payment-line"><span>Phí trang trí</span><span>{formatCurrency(decorationFee)}</span></div>
+                              <div className="event-payment-line"><span>Phí phục vụ (10%)</span><span>{formatCurrency(serviceFeeAmount)}</span></div>
+                              <div className="event-payment-total-row"><span>Tổng cộng</span><span className="event-payment-total-amount">{formatCurrency(totalPayment)}</span></div>
+                            </>
+                          );
+                        })()}
                       </div>
-                      <div className="event-payment-security">
-                        <ShieldCheck size={18} className="event-payment-security-icon" />
-                        <p>Thông tin thanh toán của bạn được mã hóa và bảo mật tuyệt đối theo tiêu chuẩn quốc tế. Chúng tôi không lưu trữ thông tin thẻ của bạn.</p>
-                      </div>
-                    </div>
                     </div>
 
                     <button
@@ -1486,26 +1463,39 @@ const Services = () => {
                       onClick={handleEventSubmit}
                       disabled={isEventSubmitting}
                     >
-                      {isEventSubmitting ? 'ĐANG XỬ LÝ...' : 'Xác nhận thanh toán →'}
+                      {isEventSubmitting ? 'ĐANG XỬ LÝ...' : 'Xác nhận đặt sự kiện'}
                     </button>
                     {eventError && <p className="booking-status booking-status-error" style={{ textAlign: 'center', marginTop: 8 }}>{eventError}</p>}
-                    {eventSuccess && <p className="booking-status booking-status-success" style={{ textAlign: 'center', marginTop: 8 }}>{eventSuccess}</p>}
                     <p className="event-payment-terms">Bằng cách nhấn nút, bạn đồng ý với <a href="#terms">Điều khoản dịch vụ</a> của chúng tôi.</p>
                     <button type="button" className="event-btn-back event-btn-back-payment-link" onClick={() => setEventStep(3)}>← Quay lại</button>
                   </div>
                 </div>
               )}
 
-              {/* STEP 5: Success */}
+              {/* STEP 5: Thông báo thành công */}
               {eventStep === 5 && (
-                <div className="event-form-step">
-                  <div className="event-success-card">
-                    <div className="event-success-icon"><Check size={48} strokeWidth={2.5} /></div>
-                    <h2>Đặt Sự Kiện Thành Công!</h2>
-                    <p>{eventSuccess || 'Cảm ơn bạn đã đặt sự kiện. Nhân viên của chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất để xác nhận chi tiết.'}</p>
+                <div className="event-form-step event-success-step">
+                  <div className="event-success-card event-success-card-premium">
+                    <div className="event-success-glow" aria-hidden />
+                    <div className="event-success-badge">
+                      <Sparkles size={20} strokeWidth={2.2} />
+                      <span>Thành công</span>
+                    </div>
+                    <div className="event-success-icon event-success-icon-animated">
+                      <Check size={44} strokeWidth={2.8} />
+                    </div>
+                    <h2>Đặt sự kiện thành công</h2>
+                    <p className="event-success-lead">
+                      {eventSuccess || 'Cảm ơn bạn đã đặt sự kiện. Nhân viên của chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất để xác nhận chi tiết.'}
+                    </p>
+                    <div className="event-success-hint">
+                      <ShieldCheck size={18} />
+                      <span>Thông tin đã được lưu an toàn. Bạn có thể xem trạng thái trong mục Đơn hàng / Sự kiện.</span>
+                    </div>
                     <div className="event-success-actions">
                       <button type="button" className="event-btn-primary" onClick={() => { setEventStep(1); setEventSuccess(''); }}>Đặt sự kiện mới</button>
-                      <button type="button" className="event-btn-secondary" onClick={() => navigate('/')}>Về trang chủ</button>
+                      <button type="button" className="event-btn-secondary" onClick={() => navigate('/my-orders')}>Xem đơn của tôi</button>
+                      <button type="button" className="event-btn-secondary event-success-btn-ghost" onClick={() => navigate('/')}>Về trang chủ</button>
                     </div>
                   </div>
                 </div>
