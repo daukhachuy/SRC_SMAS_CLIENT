@@ -6,7 +6,7 @@ const CLOUD_NAME = 'dmzuier4p';
 const UPLOAD_PRESET = 'ml_default';
 const CLOUD_FOLDER = 'smas';
 
-const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
+export const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
 /**
  * Upload ảnh lên Cloudinary, trả về secure_url
@@ -352,7 +352,6 @@ export async function getAllFoods(foodId) {
  */
 export async function createFood(payload) {
   try {
-    // Upload ảnh lên Cloudinary nếu có file
     let imageUrl = payload.image ?? '';
     if (payload.imageFile instanceof File) {
       console.log('[createFood] Đang upload ảnh lên Cloudinary...');
@@ -360,31 +359,24 @@ export async function createFood(payload) {
       console.log('[createFood] Ảnh đã upload:', imageUrl);
     }
 
-    // Chuẩn bị dữ liệu sạch
     const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
     const cleanPrepTime = payload.preparationTime != null ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0 : 0;
-    const cleanCalories = payload.calories != null ? Number(String(payload.calories).replace(/\D/g, '')) || 0 : 0;
 
-    // Backend Swagger chỉ chấp nhận application/json
     const jsonData = {
       name: payload.name ?? '',
       description: payload.description ?? '',
       image: imageUrl,
       price: cleanPrice,
-      unit: payload.unit ?? '',
       isAvailable: payload.isAvailable !== false,
-      isDirectSale: Boolean(payload.isDirectSale),
-      isFeatured: Boolean(payload.isFeatured),
+      inStockable: payload.inStockable !== false,
       preparationTime: cleanPrepTime,
-      calories: cleanCalories,
+      colors: payload.colors ?? [],
       note: payload.note ?? '',
+      categoryIds: payload.categoryIds ?? [],
     };
-    const config = { headers: { 'Content-Type': 'application/json' } };
-    const data = JSON.stringify(jsonData);
-
     console.log('[createFood] Payload gửi đi:', jsonData);
 
-    const resp = await instance.post('/food', data, config);
+    const resp = await instance.post('/food', jsonData);
     return resp.data;
   } catch (err) {
     console.error('[foodApi] createFood error:', err.response?.data || err.message);
@@ -397,7 +389,6 @@ export async function createFood(payload) {
  */
 export async function updateFood(id, payload) {
   try {
-    // Upload ảnh lên Cloudinary nếu có file mới
     let imageUrl = payload.image ?? '';
     if (payload.imageFile instanceof File) {
       console.log('[updateFood] Đang upload ảnh lên Cloudinary...');
@@ -405,31 +396,24 @@ export async function updateFood(id, payload) {
       console.log('[updateFood] Ảnh đã upload:', imageUrl);
     }
 
-    // Chuẩn bị dữ liệu sạch
     const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
     const cleanPrepTime = payload.preparationTime != null ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0 : 0;
-    const cleanCalories = payload.calories != null ? Number(String(payload.calories).replace(/\D/g, '')) || 0 : 0;
 
-    // Backend Swagger chỉ chấp nhận application/json
     const jsonData = {
       name: payload.name ?? '',
       description: payload.description ?? '',
       image: imageUrl,
       price: cleanPrice,
-      unit: payload.unit ?? '',
       isAvailable: payload.isAvailable !== false,
-      isDirectSale: Boolean(payload.isDirectSale),
-      isFeatured: Boolean(payload.isFeatured),
+      inStockable: payload.inStockable !== false,
       preparationTime: cleanPrepTime,
-      calories: cleanCalories,
+      colors: payload.colors ?? [],
       note: payload.note ?? '',
+      categoryIds: payload.categoryIds ?? [],
     };
-    const config = { headers: { 'Content-Type': 'application/json' } };
-    const data = JSON.stringify(jsonData);
-
     console.log('[updateFood] Payload gửi đi:', jsonData);
 
-    const resp = await instance.put(`/food/${id}`, data, config);
+    const resp = await instance.put(`/food/${id}`, jsonData);
     return resp.data;
   } catch (err) {
     console.error('[foodApi] updateFood error:', err.response?.data || err.message);
@@ -510,10 +494,7 @@ export async function getFoodByFilter(params) {
     const queryString = params instanceof URLSearchParams ? params.toString() : new URLSearchParams(params).toString();
     const response = await instance.get(`/food/filter?${queryString}`);
     const foodArray = Array.isArray(response.data) ? response.data : response.data?.$values || [];
-    return foodArray.map(item => ({
-      ...item,
-      image: FIXED_PRODUCT_IMAGE
-    }));
+    return foodArray;
   } catch (error) {
     console.error('❌ Failed to fetch foods with filter:', error.response?.data || error.message);
     throw error;

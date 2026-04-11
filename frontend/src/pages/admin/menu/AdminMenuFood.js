@@ -11,7 +11,6 @@ import {
   deleteFood,
   toggleFoodStatus,
   getCategoryLists,
-  resolveFoodImageUrl
 } from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
 
@@ -92,7 +91,7 @@ function normalizeFood(raw) {
     priceListDisplay: hasPromo ? `${formatPrice(price)}đ` : null,
     unit: raw.unit ?? 'Dĩa',
     image: raw.image ?? '',
-    imageUrl: resolveFoodImageUrl(raw.image),
+    imageUrl: raw.image,
     status: active,
     isAvailable: raw.isAvailable,
     isDirectSale: raw.isDirectSale === true,
@@ -334,21 +333,22 @@ const AdminMenuFood = () => {
     try {
       const cleanPrice = Number(String(form.price).replace(/[.,]/g, '')) || 0;
       const cleanPrepTime = form.preparationTime !== '' ? Number(String(form.preparationTime).replace(/\D/g, '')) : 0;
-      const cleanCalories = form.calories !== '' ? Number(String(form.calories).replace(/\D/g, '')) : 0;
+
+      const categoryIds = form.categories
+        .map(name => findCategoryIdByName(name, categories))
+        .filter(id => id != null);
 
       const payload = {
         name: form.name.trim(),
         description: form.description ? form.description.trim() : '',
         image: form.image || '',
         price: cleanPrice,
-        unit: form.unit || 'Dĩa',
-        note: form.note ? form.note.trim() : '',
         isAvailable: Boolean(form.isAvailable),
-        isDirectSale: Boolean(form.isDirectSale),
-        isFeatured: Boolean(form.isFeatured),
+        inStockable: true,
         preparationTime: cleanPrepTime,
-        calories: cleanCalories,
-        imageFile: form.imageFile,
+        note: form.note ? form.note.trim() : '',
+        colors: [],
+        categoryIds,
       };
       await createFood(payload);
       setToastMsg('Thêm món ăn thành công!');
@@ -372,20 +372,22 @@ const AdminMenuFood = () => {
     try {
       const cleanPrice = Number(String(formE.price).replace(/[.,]/g, '')) || 0;
       const cleanPrepTime = formE.preparationTime !== '' ? Number(String(formE.preparationTime).replace(/\D/g, '')) : 0;
-      const cleanCalories = formE.calories !== '' ? Number(String(formE.calories).replace(/\D/g, '')) : 0;
+
+      const categoryIds = formE.categories
+        .map(name => findCategoryIdByName(name, categories))
+        .filter(id => id != null);
 
       const payload = {
         name: formE.name.trim(),
         description: formE.description ? formE.description.trim() : '',
         image: formE.image || '',
         price: cleanPrice,
-        unit: formE.unit || 'Dĩa',
-        note: formE.note ? formE.note.trim() : '',
         isAvailable: Boolean(formE.isAvailable),
-        isDirectSale: Boolean(formE.isDirectSale),
-        isFeatured: Boolean(formE.isFeatured),
+        inStockable: true,
         preparationTime: cleanPrepTime,
-        calories: cleanCalories,
+        note: formE.note ? formE.note.trim() : '',
+        colors: [],
+        categoryIds,
         imageFile: formE.imageFile,
       };
       await updateFood(editingFood.id, payload);
@@ -704,8 +706,8 @@ const AdminMenuFood = () => {
                   <th style={{ minWidth: 160 }}>TÊN MÓN</th>
                   <th style={{ width: 120 }}>GIÁ</th>
                   <th style={{ minWidth: 180 }}>PHÂN LOẠI</th>
-                  <th style={{ minWidth: 200 }}>MÔ TẢ</th>
-                  <th style={{ width: 140 }}>TRẠNG THÁI</th>
+                  <th style={{ minWidth: 200 }}>TRẠNG THÁI</th>
+                  <th style={{ width: 140 }}>MÔ TẢ</th>
                   <th style={{ width: 104 }}>THAO TÁC</th>
             </tr>
           </thead>
@@ -723,8 +725,8 @@ const AdminMenuFood = () => {
                     <tr key={row.id} className={!row.status ? 'row-inactive' : ''}>
                 <td>
                   <div className="menu-table-img">
-                          {row.imageUrl && row.imageUrl !== FIXED_PRODUCT_IMAGE ? (
-                            <img src={row.imageUrl} alt={row.name} onError={(e) => { e.target.style.display = 'none'; }} />
+                          {row.image ? (
+                            <img src={row.image} alt={row.name} onError={(e) => { e.target.style.display = 'none'; }} />
                           ) : (
                             <div className="menu-table-img-placeholder">
                               <span>{row.name?.[0]?.toUpperCase() ?? '?'}</span>
@@ -792,14 +794,6 @@ const AdminMenuFood = () => {
                       onClick={() => openEditModal(row)}
                     >
                       <Pencil size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className="menu-icon-btn menu-icon-btn-danger"
-                      aria-label="Xóa"
-                            onClick={() => openDeleteModal(row)}
-                    >
-                      <Trash2 size={16} />
                     </button>
                   </div>
                 </td>

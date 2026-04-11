@@ -1,14 +1,13 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Home.css';
+import { FIXED_PRODUCT_IMAGE } from '../api/foodApi';
 import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Calendar, ShoppingCart } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 import { isAuthenticated } from '../api/authApi';
-
-const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
 // Pool ảnh món ăn đa dạng cho design
 const FOOD_IMAGES = [
@@ -72,7 +71,7 @@ const Home = () => {
           name: item.name,
           price: item.price,
           oldPrice: item.originalPrice || null,
-          img: item.image || FIXED_PRODUCT_IMAGE,
+          img: item.image,
           desc: item.description || 'Thưởng thức hương vị hải sản thượng hạng.',
           rating: item.rating || 4.8,
         }));

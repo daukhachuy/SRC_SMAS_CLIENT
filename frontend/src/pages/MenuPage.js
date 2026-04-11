@@ -23,12 +23,11 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 import { getAllCategories } from '../api/categoryApi';
-import { getFoodByFilter, resolveFoodImageUrl } from '../api/foodApi';
+import { getFoodByFilter, FIXED_PRODUCT_IMAGE } from '../api/foodApi';
 import { isAuthenticated } from '../api/authApi';
 
 const MenuPage = () => {
   const navigate = useNavigate();
-  const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -84,7 +83,7 @@ const MenuPage = () => {
           name: item.name,
           price: item.price,
           oldPrice: item.promotionalPrice,
-          image: resolveFoodImageUrl(item.image),
+          image: item.image,
           categoryName: item.categories?.[0]?.name || 'Món ăn',
           isAvailable: item.isAvailable !== false,
         }));
