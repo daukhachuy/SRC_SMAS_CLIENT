@@ -1,31 +1,6 @@
-  // Cloudinary config cho upload avatar
-  const cloudName = "dgjkqvbhm";
-  const uploadPreset = "unsigned_preset"; // Đặt đúng tên preset bạn đã tạo trên Cloudinary
-
-  // Hàm upload avatar lên Cloudinary
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-    try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.secure_url) {
-        setEditForm((prev) => ({ ...prev, avatarUrl: data.secure_url }));
-      }
-    } catch (err) {
-      alert('Lỗi upload ảnh đại diện!');
-    }
-  };
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   User,
-  Phone,
   Mail,
   MapPin,
   Wallet,
@@ -44,18 +19,6 @@ import {
 import '../../styles/WaiterPages.css';
 import { salaryRecordAPI, staffAPI } from '../../api/managerApi';
 import { staffApi } from '../../api/staffApi';
-
-function asArray(value) {
-  if (Array.isArray(value)) return value;
-  if (Array.isArray(value?.data)) return value.data;
-  if (Array.isArray(value?.items)) return value.items;
-  return [];
-}
-
-function unwrapResponse(response) {
-  if (!response) return [];
-  return asArray(response.data?.data ?? response.data ?? response);
-}
 
 function pick(obj, keys, fallback = null) {
   for (const key of keys) {
@@ -86,6 +49,27 @@ function normalizeMonthLabel(item, index) {
   return `T${index + 1}`;
 }
 
+/** GET /Staff/sum-workshift-thismonth | sum-timework-thismonth — body is JSON number */
+function parseStaffMonthSum(axiosRes) {
+  const d = axiosRes?.data;
+  if (typeof d === 'number') return d;
+  if (d != null && typeof d === 'object' && typeof d.data === 'number') return d.data;
+  const n = Number(d);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** GET /SalaryRecord/last-six-months — { averageSalary, months: [...] } */
+function unwrapLastSixMonths(axiosRes) {
+  const raw = axiosRes?.data;
+  if (!raw || typeof raw !== 'object') return { averageSalary: 0, months: [] };
+  const months = Array.isArray(raw.months) ? raw.months : [];
+  const avg = Number(raw.averageSalary ?? 0);
+  return {
+    averageSalary: Number.isFinite(avg) ? avg : 0,
+    months,
+  };
+}
+
 const WaiterProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -111,6 +95,8 @@ const WaiterProfilePage = () => {
   });
 
   const [salaryTrend, setSalaryTrend] = useState([]);
+  const [sixMonthAverageSalary, setSixMonthAverageSalary] = useState(0);
+  const [salaryDetailNote, setSalaryDetailNote] = useState('');
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -125,11 +111,35 @@ const WaiterProfilePage = () => {
     bankName: '',
   });
 
+  const cloudName = 'dgjkqvbhm';
+  const uploadPreset = 'unsigned_preset';
+
+  const handleAvatarUpload = useCallback(async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.secure_url) {
+        setEditForm((prev) => ({ ...prev, avatarUrl: data.secure_url }));
+      }
+    } catch (err) {
+      alert('Lỗi upload ảnh đại diện!');
+    }
+  }, []);
+
   const fetchProfilePageData = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
+      setSalaryDetailNote('');
       const [profileRes, monthDetailRes, sixMonthsRes, monthHoursRes, monthShiftsRes] = await Promise.allSettled([
         staffApi.getProfile(),
         salaryRecordAPI.getCurrentMonthDetail(),
@@ -166,14 +176,24 @@ const WaiterProfilePage = () => {
         });
       }
 
-      const detail = monthDetailRes.status === 'fulfilled'
-        ? monthDetailRes.value?.data?.data ?? monthDetailRes.value?.data ?? {}
-        : {};
+      let detail = {};
+      if (monthDetailRes.status === 'fulfilled') {
+        detail = monthDetailRes.value?.data?.data ?? monthDetailRes.value?.data ?? {};
+      } else {
+        const status = monthDetailRes.reason?.response?.status;
+        const msg = monthDetailRes.reason?.response?.data?.message;
+        if (status === 404 && msg) {
+          setSalaryDetailNote(String(msg));
+        } else if (msg) {
+          setSalaryDetailNote(String(msg));
+        }
+      }
+
       const totalHours = monthHoursRes.status === 'fulfilled'
-        ? Number(monthHoursRes.value?.data?.data ?? monthHoursRes.value?.data ?? 0)
+        ? parseStaffMonthSum(monthHoursRes.value)
         : 0;
       const completedShifts = monthShiftsRes.status === 'fulfilled'
-        ? Number(monthShiftsRes.value?.data?.data ?? monthShiftsRes.value?.data ?? 0)
+        ? parseStaffMonthSum(monthShiftsRes.value)
         : 0;
 
       const estimatedSalary = Number(
@@ -186,7 +206,11 @@ const WaiterProfilePage = () => {
         completedShifts: Number.isFinite(completedShifts) ? completedShifts : 0,
       });
 
-      const trendItemsRaw = sixMonthsRes.status === 'fulfilled' ? unwrapResponse(sixMonthsRes.value) : [];
+      const { averageSalary: avgSix, months: trendItemsRaw } = sixMonthsRes.status === 'fulfilled'
+        ? unwrapLastSixMonths(sixMonthsRes.value)
+        : { averageSalary: 0, months: [] };
+      setSixMonthAverageSalary(Number.isFinite(avgSix) ? avgSix : 0);
+
       const trend = trendItemsRaw.map((item, index) => {
         const salary = Number(pick(item, ['actualSalary', 'salary', 'totalSalary', 'income'], 0));
         return {
@@ -195,18 +219,7 @@ const WaiterProfilePage = () => {
         };
       });
 
-      if (trend.length > 0) {
-        setSalaryTrend(trend);
-      } else {
-        setSalaryTrend([
-          { month: 'T5', value: 12500000 },
-          { month: 'T6', value: 13200000 },
-          { month: 'T7', value: 14800000 },
-          { month: 'T8', value: 14100000 },
-          { month: 'T9', value: 15000000 },
-          { month: 'T10', value: 15500000 },
-        ]);
-      }
+      setSalaryTrend(trend);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'Không thể tải dữ liệu hồ sơ.');
     } finally {
@@ -219,8 +232,8 @@ const WaiterProfilePage = () => {
   }, [fetchProfilePageData]);
 
   const maxSalary = useMemo(() => {
-    const maxVal = Math.max(...salaryTrend.map((x) => x.value), 1);
-    return maxVal;
+    if (!salaryTrend.length) return 1;
+    return Math.max(...salaryTrend.map((x) => x.value), 1);
   }, [salaryTrend]);
 
   const handleSaveProfile = async (event) => {
@@ -307,21 +320,25 @@ const WaiterProfilePage = () => {
               <div className="icon orange"><Wallet size={18} /></div>
               <p>Lương dự tính (Tháng này)</p>
               <h4>{formatCurrency(salaryStats.estimatedSalary)}</h4>
-              <span className="trend up"><TrendingUp size={12} /> +5%</span>
+              {salaryDetailNote ? (
+                <span className="waiter-profile-stat-note">{salaryDetailNote}</span>
+              ) : (
+                <span className="trend muted"><TrendingUp size={12} /> Tháng hiện tại</span>
+              )}
             </article>
 
             <article className="waiter-profile-stat-card">
               <div className="icon blue"><Clock3 size={18} /></div>
-              <p>Tổng giờ làm</p>
+              <p>Tổng giờ làm (tháng này)</p>
               <h4>{salaryStats.totalHours} giờ</h4>
-              <span className="trend down">-2%</span>
+              <span className="trend muted">Theo ca đã đăng ký</span>
             </article>
 
             <article className="waiter-profile-stat-card">
               <div className="icon green"><CheckCircle2 size={18} /></div>
-              <p>Số ca hoàn thành</p>
+              <p>Số ca hoàn thành (tháng này)</p>
               <h4>{salaryStats.completedShifts} ca</h4>
-              <span className="trend up">+10%</span>
+              <span className="trend muted">Trong tháng hiện tại</span>
             </article>
           </section>
 
@@ -333,24 +350,38 @@ const WaiterProfilePage = () => {
               </h3>
               <div className="legend">
                 <span className="dot"></span>
-                <small>Lương thực nhận</small>
+                <small>
+                  Lương thực nhận
+                  {sixMonthAverageSalary > 0 && (
+                    <> · TB: {formatCurrency(sixMonthAverageSalary)}</>
+                  )}
+                </small>
               </div>
             </div>
 
-            <div className="waiter-salary-bars">
-              {salaryTrend.map((item, index) => {
-                const height = Math.max((item.value / maxSalary) * 100, 8);
-                const isCurrent = index === salaryTrend.length - 1;
-                return (
-                  <div key={`${item.month}-${index}`} className="waiter-salary-bar-col">
-                    <div className={`waiter-salary-bar ${isCurrent ? 'is-current' : ''}`} style={{ height: `${height}%` }}>
-                      <span>{(item.value / 1000000).toFixed(1)}M</span>
+            {salaryTrend.length === 0 ? (
+              <p className="waiter-profile-chart-empty">Chưa có dữ liệu lương 6 tháng gần nhất.</p>
+            ) : (
+              <div
+                className="waiter-salary-bars"
+                style={{
+                  gridTemplateColumns: `repeat(${salaryTrend.length}, minmax(0, 1fr))`,
+                }}
+              >
+                {salaryTrend.map((item, index) => {
+                  const height = Math.max((item.value / maxSalary) * 100, 8);
+                  const isCurrent = index === salaryTrend.length - 1;
+                  return (
+                    <div key={`${item.month}-${index}`} className="waiter-salary-bar-col">
+                      <div className={`waiter-salary-bar ${isCurrent ? 'is-current' : ''}`} style={{ height: `${height}%` }}>
+                        <span>{(item.value / 1000000).toFixed(1)}M</span>
+                      </div>
+                      <p className={isCurrent ? 'is-current' : ''}>{item.month}</p>
                     </div>
-                    <p className={isCurrent ? 'is-current' : ''}>{item.month}</p>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </>
       )}

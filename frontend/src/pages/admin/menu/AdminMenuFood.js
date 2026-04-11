@@ -210,8 +210,8 @@ const AdminMenuFood = () => {
     const list = foods.filter((d) => {
       const matchSearch = !search || (d.name || '').toLowerCase().includes(search.toLowerCase());
       const matchCat = !categoryFilter || d.categories.includes(categoryFilter) || d.category === categoryFilter;
-      return matchSearch && matchCat;
-    });
+    return matchSearch && matchCat;
+  });
     return list;
   }, [foods, search, categoryFilter]);
 

@@ -175,15 +175,12 @@
   background: #fff;
   border-radius: 1rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
-/* Cuộn dọc khi danh sách dài (GET /api/food/category) */
+/* Bảng hiển thị tự nhiên, không cuộn */
 .menu-table-scroll {
-  max-height: min(35vh, 420px);
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 .menu-table-scroll .menu-table thead th {
@@ -197,6 +194,7 @@
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  min-width: 0;
 }
 
 /* Header bảng: nền trắng, chữ xám (không dùng xanh) */
@@ -266,6 +264,34 @@
 .menu-cell-desc {
   color: #6b7280;
   max-width: 280px;
+}
+
+.menu-cell-combo-foods {
+  color: #374151;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  vertical-align: top;
+  max-width: 260px;
+}
+
+.combo-foods-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.combo-foods-list li {
+  margin-bottom: 0.2rem;
+}
+
+.combo-food-name {
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.combo-food-qty {
+  font-weight: 600;
+  color: #6b7280;
 }
 
 .menu-cell-price {
