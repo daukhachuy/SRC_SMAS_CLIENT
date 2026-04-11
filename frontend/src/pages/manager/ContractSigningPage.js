@@ -1,73 +1,196 @@
-import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
+import { contractAPI, eventBookingAPI } from '../../api/managerApi';
 import { 
   ArrowLeft, FileText, ShieldCheck, Building2, User,
   CheckCircle, Download, Edit3
 } from 'lucide-react';
 import '../../styles/ContractSigningPage.css';
 
+const createInitialContractData = () => ({
+  contractNumericId: null,
+  contractId: '--',
+  status: 'draft',
+  statusText: 'Nháp',
+  bookingCode: '',
+  partyA: {
+    name: 'Nhà hàng Gourmet Luxury',
+    address: 'Chưa cập nhật',
+    representative: 'Chưa cập nhật',
+    position: 'Quản lý',
+    signed: false,
+    signedDate: '--/--/----',
+  },
+  partyB: {
+    name: 'Chưa cập nhật',
+    phone: '---',
+    email: '---',
+    signed: false,
+    signedDate: null,
+  },
+  event: {
+    name: 'Chưa cập nhật',
+    date: '--/--/----',
+    time: '--:--',
+    tables: 0,
+    guestsPerTable: 10,
+  },
+  menu: [],
+  payment: {
+    total: 0,
+    depositPercent: 30,
+    deposit: 0,
+  },
+  cancellation: [],
+});
+
 const ContractSigningPage = () => {
   const { base, homePath } = useRoleSectionBasePath();
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const [searchParams] = useSearchParams();
   const [isSignaturePadOpen, setIsSignaturePadOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [sendingToCustomer, setSendingToCustomer] = useState(false);
+  const [sendingDepositRequest, setSendingDepositRequest] = useState(false);
 
-  // Contract data
-  const contractData = {
-    contractId: 'EVT-2023-0815',
-    status: 'pending_signature',
-    statusText: 'Chờ ký kết',
-    
-    // Party A (Restaurant)
-    partyA: {
-      name: 'Nhà hàng Gourmet Luxury',
-      address: '123 Đường Lê Lợi, Q.1, TP. HCM',
-      representative: 'Nguyễn Văn A',
-      position: 'Quản lý',
-      signed: true,
-      signedDate: '24/10/2023'
-    },
-    
-    // Party B (Customer)
-    partyB: {
-      name: 'Trần Thị B',
-      phone: '0901234567',
-      email: 'tran.thib@gmail.com',
-      signed: false,
-      signedDate: null
-    },
-    
-    // Event details
-    event: {
-      name: 'Tiệc Cưới Minh & Vy',
-      date: '22/12/2023',
-      time: '18:00',
-      tables: 50,
-      guestsPerTable: 10
-    },
-    
-    // Menu items
-    menu: [
-      { name: 'Súp Bào Ngư Vi Cá Hoàng Gia', category: 'Món khai vị' },
-      { name: 'Tôm Hùm Bỏ Lò Phô Mai Pháp', category: 'Món chính' },
-      { name: 'Bò Wagyu Nướng Đá Muối', category: 'Món chính' }
-    ],
-    
-    // Payment
-    payment: {
-      total: 500000000,
-      depositPercent: 30,
-      deposit: 150000000
-    },
-    
-    // Cancellation policy
-    cancellation: [
-      'Trước 30 ngày: Hoàn trả 100% tiền cọc.',
-      'Từ 15-30 ngày: Phạt 50% số tiền đặt cọc.',
-      'Dưới 15 ngày: Phạt 100% số tiền đặt cọc.'
-    ]
+  const [contractData, setContractData] = useState(createInitialContractData);
+
+  const statusLabel = {
+    pending: 'Chờ duyệt / Chờ xử lý',
+    approved: 'Đã duyệt',
+    rejected: 'Từ chối',
+    confirmed: 'Đã xác nhận',
+    active: 'Đang diễn ra',
+    completed: 'Đã hoàn thành',
+    draft: 'Nháp',
+    sent: 'Đã gửi ký / Chờ khách ký',
+    signed: 'Đã ký',
+    deposited: 'Đã đặt cọc',
+    cancelled: 'Đã hủy',
+    canceled: 'Đã hủy',
   };
+
+  const toNum = (value, fallback = 0) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const toDateTime = (dateStr, timeStr) => {
+    if (!dateStr) return { date: '--/--/----', time: '--:--' };
+    const raw = /^\d{4}-\d{2}-\d{2}$/.test(String(dateStr)) ? `${dateStr}T${timeStr || '00:00:00'}` : dateStr;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return { date: '--/--/----', time: '--:--' };
+    return {
+      date: d.toLocaleDateString('vi-VN'),
+      time: d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    };
+  };
+
+  useEffect(() => {
+    const loadContract = async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        let bookingCode = searchParams.get('bookingCode');
+        let detail = null;
+
+        if (eventId) {
+          const detailRes = await eventBookingAPI.getDetailById(eventId);
+          const detailPayload = detailRes?.data?.data?.data ?? detailRes?.data?.data ?? detailRes?.data;
+          detail = Array.isArray(detailPayload) ? detailPayload[0] : detailPayload;
+          bookingCode = detail?.bookingCode || '';
+        }
+
+        if (!bookingCode) {
+          throw new Error('Không tìm thấy bookingCode để tải hợp đồng.');
+        }
+
+        const contractRes = await contractAPI.getByBookingCode(bookingCode);
+        const payload = contractRes?.data?.data ?? contractRes?.data;
+        const contract = Array.isArray(payload) ? payload[0] : payload;
+        const customer = detail?.customer || {};
+        const eventInfo = detail?.eventInfo || {};
+        const confirmedBy = detail?.confirmedBy || {};
+        const detailPayment = detail?.payment || {};
+
+        const rawStatus = String(contract?.status || detail?.status || 'draft').toLowerCase();
+        const total = toNum(detailPayment?.totalAmount ?? contract?.totalAmount ?? contract?.amount, 0);
+        const deposit = toNum(detailPayment?.depositAmount ?? contract?.depositAmount, 0);
+        const depositPercent = total > 0 && deposit > 0 ? Math.round((deposit / total) * 100) : 30;
+        const dt = toDateTime(eventInfo?.reservationDate, eventInfo?.reservationTime);
+
+        const foods = Array.isArray(detail?.foods) ? detail.foods : [];
+        const services = Array.isArray(detail?.services) ? detail.services : [];
+        const mergedMenu = [
+          ...foods.map((x) => ({ name: x?.name || 'Món ăn', category: 'Món ăn' })),
+          ...services.map((x) => ({ name: x?.name || 'Dịch vụ', category: 'Dịch vụ' })),
+        ];
+
+        const guests = toNum(eventInfo?.numberOfGuests, 0);
+        const tables = toNum(eventInfo?.numberOfTables ?? eventInfo?.tableCount, guests);
+        const guestsPerTable = tables > 0 ? Math.max(1, Math.round(guests / tables)) : 10;
+
+        const terms = contract?.termsAndConditions || detail?.contract?.termsAndConditions || '';
+        const cancellation = terms
+          ? String(terms)
+            .split(/\r?\n|\.|;/)
+            .map((x) => x.trim())
+            .filter(Boolean)
+          : [];
+
+        const signedAt = contract?.signedAt || confirmedBy?.confirmedAt;
+        const signedDate = signedAt ? new Date(signedAt).toLocaleDateString('vi-VN') : '--/--/----';
+
+        setContractData({
+          ...createInitialContractData(),
+          contractNumericId: toNum(contract?.contractId, 0) || null,
+          bookingCode,
+          contractId: contract?.contractCode || contract?.contractId || '--',
+          status: rawStatus,
+          statusText: statusLabel[rawStatus] || contract?.status || detail?.status || 'Nháp',
+          partyA: {
+            name: 'Nhà hàng Gourmet Luxury',
+            address: 'Chưa cập nhật',
+            representative: confirmedBy?.fullName || 'Chưa cập nhật',
+            position: 'Quản lý',
+            signed: Boolean(signedAt),
+            signedDate,
+          },
+          partyB: {
+            name: customer?.fullName || 'Chưa cập nhật',
+            phone: customer?.phone || '---',
+            email: customer?.email || '---',
+            signed: Boolean(contract?.signedAt),
+            signedDate: contract?.signedAt ? new Date(contract.signedAt).toLocaleDateString('vi-VN') : null,
+          },
+          event: {
+            name: detail?.eventTitle || `Sự kiện ${bookingCode}`,
+            date: dt.date,
+            time: dt.time,
+            tables,
+            guestsPerTable,
+          },
+          menu: mergedMenu,
+          payment: {
+            total,
+            deposit,
+            depositPercent,
+          },
+          cancellation,
+        });
+      } catch (err) {
+        console.error('Lỗi tải hợp đồng theo bookingCode:', err);
+        setLoadError(err?.response?.data?.detail || err?.message || 'Không tải được hợp đồng.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContract();
+  }, [eventId, searchParams]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
@@ -81,6 +204,106 @@ const ContractSigningPage = () => {
   const handleDownloadPDF = () => {
     alert('Tính năng tải PDF đang được phát triển');
   };
+
+  const handleSendToCustomerSign = () => {
+    const doSend = async () => {
+      if (!contractData.contractNumericId) {
+        alert('Không tìm thấy contractId để gửi ký.');
+        return;
+      }
+
+      setSendingToCustomer(true);
+      try {
+        const res = await contractAPI.sendSign(contractData.contractNumericId);
+        const payload = res?.data?.data ?? res?.data ?? {};
+        const sentTo = payload?.sentTo ? ` (${payload.sentTo})` : '';
+        const deadline = payload?.deadline
+          ? `\nHạn ký: ${new Date(payload.deadline).toLocaleString('vi-VN')}`
+          : '';
+
+        setContractData(prev => ({
+          ...prev,
+          status: 'sent',
+          statusText: 'Đã gửi ký / Chờ khách ký',
+        }));
+
+        alert(`${payload?.message || 'Đã gửi khách hàng ký thành công'}${sentTo}${deadline}`);
+      } catch (err) {
+        const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Gửi khách hàng ký thất bại.';
+        alert(msg);
+      } finally {
+        setSendingToCustomer(false);
+      }
+    };
+
+    doSend();
+  };
+
+  const handleSendDepositRequest = () => {
+    const doSend = async () => {
+      if (!contractData.contractNumericId) {
+        alert('Không tìm thấy contractId để gửi yêu cầu đặt cọc.');
+        return;
+      }
+
+      setSendingDepositRequest(true);
+      try {
+        const res = await contractAPI.sendDepositRequest(contractData.contractNumericId);
+        const payload = res?.data?.data ?? res?.data ?? {};
+        const checkoutUrl = payload?.checkoutUrl || '';
+
+        if (!checkoutUrl) {
+          alert(payload?.message || 'Đã tạo yêu cầu đặt cọc nhưng không nhận được đường dẫn thanh toán.');
+          return;
+        }
+
+        if (navigator?.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(checkoutUrl);
+          } catch (_) {
+            // Ignore clipboard errors and continue with mail draft flow.
+          }
+        }
+
+        const customerEmail = contractData?.partyB?.email;
+        if (customerEmail && customerEmail !== '---') {
+          const subject = encodeURIComponent(`Yeu cau dat coc hop dong ${contractData.contractId}`);
+          const body = encodeURIComponent(
+            `Xin chao ${contractData.partyB.name || 'Quy khach'},\n\n` +
+            `Vui long thanh toan dat coc theo hop dong ${contractData.contractId}.\n` +
+            `Link thanh toan PayOS: ${checkoutUrl}\n\n` +
+            `Tran trong.`
+          );
+
+          // Ưu tiên mở Gmail compose trực tiếp (không phụ thuộc app mail cục bộ).
+          const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customerEmail)}&su=${subject}&body=${body}`;
+          const opened = window.open(gmailComposeUrl, '_blank', 'noopener,noreferrer');
+
+          // Fallback cho môi trường chặn popup.
+          if (!opened) {
+            window.open(`mailto:${customerEmail}?subject=${subject}&body=${body}`, '_self');
+          }
+        }
+
+        alert(`${payload?.message || 'Đã tạo link đặt cọc thành công.'}\nLink thanh toán đã được sao chép.`);
+      } catch (err) {
+        const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Gửi yêu cầu đặt cọc thất bại.';
+        alert(msg);
+      } finally {
+        setSendingDepositRequest(false);
+      }
+    };
+
+    doSend();
+  };
+
+  if (loading) {
+    return <div className="contract-signing-page" style={{ padding: 24 }}>Đang tải hợp đồng...</div>;
+  }
+
+  if (loadError) {
+    return <div className="contract-signing-page" style={{ padding: 24, color: '#b91c1c' }}>{loadError}</div>;
+  }
 
   return (
     <div className="contract-signing-page">
@@ -105,6 +328,9 @@ const ContractSigningPage = () => {
             <span className="badge badge-primary">
               Mã: {contractData.contractId}
             </span>
+            {contractData.bookingCode ? (
+              <span className="badge badge-primary">Booking: {contractData.bookingCode}</span>
+            ) : null}
             <span className="badge badge-warning">
               Trạng thái: {contractData.statusText}
             </span>
@@ -234,6 +460,11 @@ const ContractSigningPage = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {contractData.menu.length === 0 && (
+                    <tr>
+                      <td colSpan="2" className="menu-item-category">Chưa có dữ liệu món ăn/dịch vụ</td>
+                    </tr>
+                  )}
                   {contractData.menu.map((item, index) => (
                     <tr key={index}>
                       <td className="menu-item-name">{item.name}</td>
@@ -267,9 +498,21 @@ const ContractSigningPage = () => {
 
               <div className="cancellation-policy">
                 <p className="policy-title">Quy định hủy bỏ:</p>
+                {contractData.cancellation.length === 0 && (
+                  <p className="policy-item">• Chưa có điều khoản hủy bỏ.</p>
+                )}
                 {contractData.cancellation.map((policy, index) => (
                   <p key={index} className="policy-item">• {policy}</p>
                 ))}
+
+                <button
+                  className="btn-request-deposit"
+                  onClick={handleSendDepositRequest}
+                  type="button"
+                  disabled={sendingDepositRequest || !contractData.contractNumericId}
+                >
+                  {sendingDepositRequest ? 'ĐANG GỬI...' : 'GỬI YÊU CẦU ĐẶT CỌC'}
+                </button>
               </div>
             </div>
           </section>
@@ -281,14 +524,14 @@ const ContractSigningPage = () => {
               {/* Party A Signature */}
               <div className="signature-box">
                 <p className="signature-title">Bên A (Nhà hàng)</p>
-                <div className="signature-area signed">
+                <div className={`signature-area ${contractData.partyA.signed ? 'signed' : 'unsigned'}`}>
                   <div className="signature-content">
                     {contractData.partyA.representative}
                   </div>
                   <div className="signature-timestamp">
                     Digital Signed: {contractData.partyA.signedDate}
                   </div>
-                  <CheckCircle className="signature-check" size={20} />
+                  {contractData.partyA.signed ? <CheckCircle className="signature-check" size={20} /> : null}
                 </div>
                 <p className="signatory-name">{contractData.partyA.representative}</p>
               </div>
@@ -297,13 +540,25 @@ const ContractSigningPage = () => {
               <div className="signature-box">
                 <p className="signature-title">Bên B (Khách hàng)</p>
                 <div 
-                  className="signature-area unsigned"
-                  onClick={handleSignContract}
+                  className={`signature-area ${contractData.partyB.signed ? 'signed' : 'unsigned'}`}
+                  onClick={!contractData.partyB.signed ? handleSignContract : undefined}
                 >
-                  <Edit3 className="signature-icon" size={24} />
-                  <p className="signature-prompt">Ký tên tại đây</p>
+                  {contractData.partyB.signed ? (
+                    <>
+                      <div className="signature-content">{contractData.partyB.name}</div>
+                      <div className="signature-timestamp">Digital Signed: {contractData.partyB.signedDate}</div>
+                      <CheckCircle className="signature-check" size={20} />
+                    </>
+                  ) : (
+                    <>
+                      <Edit3 className="signature-icon" size={24} />
+                      <p className="signature-prompt">Ký tên tại đây</p>
+                    </>
+                  )}
                 </div>
-                <p className="signatory-name unsigned-text">Chưa ký</p>
+                <p className={`signatory-name ${contractData.partyB.signed ? '' : 'unsigned-text'}`}>
+                  {contractData.partyB.signed ? contractData.partyB.name : 'Chưa ký'}
+                </p>
               </div>
             </div>
           </section>
@@ -311,6 +566,15 @@ const ContractSigningPage = () => {
 
         {/* Action Footer */}
         <div className="contract-footer">
+          <button
+            className="btn-send-customer-sign"
+            onClick={handleSendToCustomerSign}
+            type="button"
+            disabled={sendingToCustomer || !contractData.contractNumericId}
+          >
+            <FileText size={20} />
+            {sendingToCustomer ? 'ĐANG GỬI...' : 'GỬI KHÁCH HÀNG KÝ'}
+          </button>
           <button 
             className="btn-sign-contract"
             onClick={handleSignContract}

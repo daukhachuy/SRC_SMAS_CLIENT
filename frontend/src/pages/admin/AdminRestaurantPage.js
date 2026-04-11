@@ -536,12 +536,6 @@ const AdminRestaurantPage = () => {
     }
   }, [tab, loadBlogs]);
 
-  useEffect(() => {
-    if (tab === 'reviews') {
-      loadFeedback();
-    }
-  }, [tab, loadFeedback]);
-
   /* ── Services ── */
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
@@ -711,31 +705,27 @@ const AdminRestaurantPage = () => {
     }
   };
 
-  /** PUT /api/services/{id} — chỉ đổi isAvailable (body đầy đủ ServiceUpdateDto) */
+  /** PATCH /api/services/{id}/status?isAvailable= — chỉ đổi isAvailable (Swagger) */
   const toggleServiceAvailable = async (row) => {
     const sid = Number(row?.id);
     if (!Number.isFinite(sid) || sid <= 0) return;
     if (serviceToggleBusyId != null) return;
-    const raw = row.raw || {};
-    const nextAvailable = !row.active;
-    const p = Number(raw.servicePrice ?? raw.price);
-    const title = (raw.title || row.name || '').trim();
-    if (!title) {
-      window.alert('Thiếu tên dịch vụ, không thể cập nhật.');
-      return;
-    }
+    const next = !row.active;
+
+    // Optimistic update
+    setServices((prev) =>
+      prev.map((r) => (r.id === sid ? { ...r, active: next } : r))
+    );
     setServiceToggleBusyId(sid);
+
     try {
-      await serviceAPI.update(sid, {
-        title,
-        servicePrice: Number.isFinite(p) ? p : 0,
-        description: (raw.description || '').trim(),
-        unit: (raw.unit || '').trim(),
-        image: (raw.image || raw.imageUrl || '').toString().trim(),
-        isAvailable: nextAvailable,
-      });
-      await loadServices();
+      await serviceAPI.toggleStatus(sid, next);
+      console.info(`[AdminRestaurant] Toggle service OK — id:${sid} → isAvailable:${next}`);
     } catch (err) {
+      // Revert optimistic update
+      setServices((prev) =>
+        prev.map((r) => (r.id === sid ? { ...r, active: !next } : r))
+      );
       const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái dịch vụ.';
       window.alert(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
     } finally {
@@ -799,6 +789,12 @@ const AdminRestaurantPage = () => {
       loadEvents();
     }
   }, [tab, loadEvents]);
+
+  useEffect(() => {
+    if (tab === 'reviews') {
+      loadFeedback();
+    }
+  }, [tab, loadFeedback]);
 
   const closeEventModal = () => {
     setEventModalOpen(false);
@@ -951,7 +947,7 @@ const AdminRestaurantPage = () => {
     }
   };
 
-  /** PATCH /api/events/{id}/status — EventStatusPatchDto { isActive } */
+  /** PATCH /api/events/{id}/status?isActive= — true = Mở, false = Tắt */
   const toggleEventActive = async (row) => {
     const eid = Number(row?.id);
     if (!Number.isFinite(eid) || eid <= 0) return;
@@ -1466,14 +1462,14 @@ const AdminRestaurantPage = () => {
         <button type="button" className={`rest-tab ${tab === 'blog' ? 'active' : ''}`} onClick={() => setTab('blog')}>
           Blog
         </button>
-        <button type="button" className={`rest-tab ${tab === 'reviews' ? 'active' : ''}`} onClick={() => setTab('reviews')}>
-          Đánh giá
-        </button>
         <button type="button" className={`rest-tab ${tab === 'services' ? 'active' : ''}`} onClick={() => setTab('services')}>
           Phục vụ
         </button>
         <button type="button" className={`rest-tab ${tab === 'events' ? 'active' : ''}`} onClick={() => setTab('events')}>
           Sự kiện
+        </button>
+        <button type="button" className={`rest-tab ${tab === 'reviews' ? 'active' : ''}`} onClick={() => setTab('reviews')}>
+          Đánh giá
         </button>
       </div>
 
@@ -1996,12 +1992,12 @@ const AdminRestaurantPage = () => {
                             onClick={() => toggleEventActive(row)}
                             disabled={!!eventDeletingId || eventToggleBusyId === row.id}
                             aria-busy={eventToggleBusyId === row.id}
-                            aria-label={row.active ? 'Tắt sự kiện' : 'Bật sự kiện'}
+                            aria-label={row.active ? 'Tắt sự kiện (isActive=false)' : 'Mở sự kiện (isActive=true)'}
                           >
                             <span className="rest-toggle-slider" />
                           </button>
                           <span className={`rest-status-text ${row.active ? 'rest-status-on' : 'rest-status-off'}`}>
-                            {row.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}
+                            {row.active ? 'Mở' : 'Tắt'}
                           </span>
                         </div>
                       </td>

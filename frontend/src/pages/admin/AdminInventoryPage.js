@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Package, Layers, Plus, Pencil, X, Loader2 } from 'lucide-react';
 import '../../styles/AdminInventory.css';
 import {
@@ -51,6 +51,14 @@ const AdminInventoryPage = () => {
   const [dateRange, setDateRange] = useState('01/10/2023 - 31/10/2023');
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryTab, setCategoryTab] = useState('danh-muc'); // 'danh-muc' | 'lo-hang'
+
+  /* ── Pagination ── */
+  const [stockPage, setStockPage] = useState(1);
+  const [stockPageSize] = useState(5);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize] = useState(5);
+  const [categoryPage, setCategoryPage] = useState(1);
+  const [categoryPageSize] = useState(5);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importSubmitting, setImportSubmitting] = useState(false);
@@ -117,18 +125,29 @@ const AdminInventoryPage = () => {
 
       // Transform logs to history format
       // API: /api/inventory/logs returns array of InventorylogResponseDTO
+      // Fields: inventoryLogId, ingredientName, unitOfMeasurement, batchCode,
+      //         action ("Import" | "EXPORT"), oldQuantity, newQuantity, timestamp, fullname
       const rawLogs = Array.isArray(logs) ? logs : (logs?.$values || []);
       const transformedHistory = rawLogs.map(item => {
+        const isImport = item.action === 'Import' || item.action === 'import';
         const diff = (item.newQuantity ?? 0) - (item.oldQuantity ?? 0);
         return {
-          time: item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '',
+          time: item.timestamp
+            ? new Date(item.timestamp).toLocaleString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '',
           batchId: item.batchCode || '',
           material: item.ingredientName || '',
-          type: item.action === 'Import' ? 'import' : 'export',
-          qty: item.action === 'Import' ? Math.abs(diff) : -Math.abs(diff),
+          type: isImport ? 'import' : 'export',
+          qty: isImport ? Math.abs(diff) : -Math.abs(diff),
           unit: item.unitOfMeasurement || 'Kg',
-          reason: item.note || '',
-          performer: 'Staff'
+          reason: item.details || item.note || '',
+          performer: item.fullname?.trim() || 'Staff',
         };
       });
       setHistoryData(transformedHistory);
@@ -147,6 +166,24 @@ const AdminInventoryPage = () => {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  /* Reset page when filter changes */
+  useEffect(() => {
+    setStockPage(1);
+  }, [searchStock]);
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [searchStock, typeFilter]);
+  useEffect(() => {
+    setCategoryPage(1);
+  }, [searchCategory, statusFilter]);
+
+  /* Reset tab → page 1 */
+  useEffect(() => {
+    setStockPage(1);
+    setHistoryPage(1);
+    setCategoryPage(1);
+  }, [mainTab]);
 
   const openImportModal = async () => {
     setShowImportModal(true);
@@ -245,6 +282,86 @@ const AdminInventoryPage = () => {
     return matchSearch && matchStatus;
   });
 
+  /* ── Stock filtered & paginated ── */
+  const filteredStock = useMemo(() => {
+    return stockData.filter((r) =>
+      !searchStock || (r.name || '').toLowerCase().includes(searchStock.toLowerCase())
+    );
+  }, [stockData, searchStock]);
+
+  const stockTotal = Math.max(1, Math.ceil(filteredStock.length / stockPageSize));
+  const stockSafe = Math.min(Math.max(1, stockPage), stockTotal);
+  const stockPaginated = useMemo(
+    () => filteredStock.slice((stockSafe - 1) * stockPageSize, stockSafe * stockPageSize),
+    [filteredStock, stockSafe, stockPageSize]
+  );
+
+  /* ── History filtered & paginated ── */
+  const filteredHistory = useMemo(() => {
+    return historyData.filter((r) => {
+      const matchSearch = !searchStock || (r.material || '').toLowerCase().includes(searchStock.toLowerCase());
+      const matchType = typeFilter === 'all' || r.type === typeFilter;
+      return matchSearch && matchType;
+    });
+  }, [historyData, searchStock, typeFilter]);
+
+  const histTotal = Math.max(1, Math.ceil(filteredHistory.length / historyPageSize));
+  const histSafe = Math.min(Math.max(1, historyPage), histTotal);
+  const historyPaginated = useMemo(
+    () => filteredHistory.slice((histSafe - 1) * historyPageSize, histSafe * historyPageSize),
+    [filteredHistory, histSafe, historyPageSize]
+  );
+
+  /* ── Category paginated ── */
+  const catTotal = Math.max(1, Math.ceil(filteredCategory.length / categoryPageSize));
+  const catSafe = Math.min(Math.max(1, categoryPage), catTotal);
+  const categoryPaginated = useMemo(
+    () => filteredCategory.slice((catSafe - 1) * categoryPageSize, catSafe * categoryPageSize),
+    [filteredCategory, catSafe, categoryPageSize]
+  );
+
+  /* Pagination button helper */
+  const renderPagination = (total, safe, setFn, label) => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, safe - Math.floor(maxVisible / 2));
+    let end = Math.min(total, start + maxVisible - 1);
+    if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+    for (let i = start; i <= end; i++) {
+      pages.push(
+        <button
+          key={i}
+          type="button"
+          className={`inv-page-btn ${i === safe ? 'active' : ''}`}
+          onClick={() => setFn(i)}
+        >
+          {i}
+        </button>
+      );
+    }
+    return (
+      <>
+        <button
+          type="button"
+          className="inv-page-btn"
+          disabled={safe <= 1}
+          onClick={() => setFn((p) => Math.max(1, p - 1))}
+        >
+          ‹
+        </button>
+        {pages}
+        <button
+          type="button"
+          className="inv-page-btn"
+          disabled={safe >= total}
+          onClick={() => setFn((p) => Math.min(total, p + 1))}
+        >
+          ›
+        </button>
+      </>
+    );
+  };
+
   return (
     <div className="admin-inventory">
       <header className="inv-header">
@@ -335,7 +452,7 @@ const AdminInventoryPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {stockData.map((row) => (
+                  {stockPaginated.map((row) => (
                     <tr key={row.batchId}>
                       <td>{row.batchId}</td>
                       <td>{row.name}</td>
@@ -353,15 +470,11 @@ const AdminInventoryPage = () => {
               </table>
             </div>
             <div className="inv-pagination">
-              <span>Hiển thị {stockData.length} trong tổng số {stockData.length * 10 || 56} nguyên liệu</span>
+              <span>
+                Hiển thị {(stockSafe - 1) * stockPageSize + 1}–{Math.min(stockSafe * stockPageSize, filteredStock.length)} / {filteredStock.length} nguyên liệu
+              </span>
               <div className="inv-pagination-btns">
-                <button type="button" className="inv-page-btn">&lt;</button>
-                <button type="button" className="inv-page-btn active">1</button>
-                <button type="button" className="inv-page-btn">2</button>
-                <button type="button" className="inv-page-btn">3</button>
-                <button type="button" className="inv-page-btn">...</button>
-                <button type="button" className="inv-page-btn">6</button>
-                <button type="button" className="inv-page-btn">&gt;</button>
+                {renderPagination(stockTotal, stockSafe, setStockPage)}
               </div>
             </div>
           </section>
@@ -394,7 +507,7 @@ const AdminInventoryPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {historyData.map((row, idx) => (
+                  {historyPaginated.map((row, idx) => (
                     <tr key={idx}>
                       <td>{row.time}</td>
                       <td>{row.batchId}</td>
@@ -415,15 +528,11 @@ const AdminInventoryPage = () => {
               </table>
             </div>
             <div className="inv-pagination">
-              <span>Hiển thị {historyData.length} trong tổng số {historyData.length * 10 || 128} bản ghi</span>
+              <span>
+                Hiển thị {(histSafe - 1) * historyPageSize + 1}–{Math.min(histSafe * historyPageSize, filteredHistory.length)} / {filteredHistory.length} bản ghi
+              </span>
               <div className="inv-pagination-btns">
-                <button type="button" className="inv-page-btn">&lt;</button>
-                <button type="button" className="inv-page-btn active">1</button>
-                <button type="button" className="inv-page-btn">2</button>
-                <button type="button" className="inv-page-btn">3</button>
-                <button type="button" className="inv-page-btn">...</button>
-                <button type="button" className="inv-page-btn">12</button>
-                <button type="button" className="inv-page-btn">&gt;</button>
+                {renderPagination(histTotal, histSafe, setHistoryPage)}
               </div>
             </div>
           </section>
@@ -464,7 +573,7 @@ const AdminInventoryPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCategory.map((row) => (
+                    {categoryPaginated.map((row) => (
                       <tr key={row.id}>
                         <td className="inv-name">{row.name}</td>
                         <td>{row.unit}</td>
@@ -491,13 +600,11 @@ const AdminInventoryPage = () => {
                 </table>
               </div>
               <div className="inv-pagination">
-                <span>Hiển thị 1 đến {filteredCategory.length} trên {ingredients.length} kết quả</span>
+                <span>
+                  Hiển thị {(catSafe - 1) * categoryPageSize + 1}–{Math.min(catSafe * categoryPageSize, filteredCategory.length)} / {filteredCategory.length} kết quả
+                </span>
                 <div className="inv-pagination-btns">
-                  <button type="button" className="inv-page-btn">Trước</button>
-                  <button type="button" className="inv-page-btn active">1</button>
-                  <button type="button" className="inv-page-btn">2</button>
-                  <button type="button" className="inv-page-btn">3</button>
-                  <button type="button" className="inv-page-btn">Sau</button>
+                  {renderPagination(catTotal, catSafe, setCategoryPage)}
                 </div>
               </div>
             </>

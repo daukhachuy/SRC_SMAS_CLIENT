@@ -196,6 +196,7 @@ export async function resetPassword(email, otp, newPassword) {
 export function logout() {
   googleLogout();
   localStorage.removeItem('authToken');
+  localStorage.removeItem('accessToken');
   localStorage.removeItem('user');
   localStorage.removeItem('rememberMe');
   localStorage.removeItem('savedEmail');

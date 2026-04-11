@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     apiLogout(); // Xóa từ localStorage
     localStorage.removeItem('authToken');
+    localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
   };
 
