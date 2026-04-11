@@ -73,6 +73,16 @@ const ContractSigningPage = () => {
 
   const [contractData, setContractData] = useState(createInitialContractData);
 
+  /** Chỉ gửi yêu cầu cọc khi đã gửi khách ký (sent/signed) và Bên B đã ký xong; ẩn khi đã cọc / hủy. */
+  const canShowDepositRequestButton = (() => {
+    const st = String(contractData.status || '').toLowerCase();
+    if (!contractData.partyB.signed) return false;
+    if (['deposited', 'deposit', 'completed', 'cancelled', 'canceled'].includes(st)) {
+      return false;
+    }
+    return ['sent', 'signed'].includes(st);
+  })();
+
   const statusLabel = {
     pending: 'Chờ duyệt / Chờ xử lý',
     approved: 'Đã duyệt',
@@ -281,6 +291,10 @@ const ContractSigningPage = () => {
 
   const handleSendDepositRequest = () => {
     const doSend = async () => {
+      if (!canShowDepositRequestButton) {
+        alert('Chỉ gửi yêu cầu đặt cọc sau khi đã gửi khách ký và khách đã ký xong.');
+        return;
+      }
       if (!contractData.contractNumericId) {
         alert('Không tìm thấy contractId để gửi yêu cầu đặt cọc.');
         return;
@@ -315,11 +329,9 @@ const ContractSigningPage = () => {
             `Tran trong.`
           );
 
-          // Ưu tiên mở Gmail compose trực tiếp (không phụ thuộc app mail cục bộ).
           const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customerEmail)}&su=${subject}&body=${body}`;
           const opened = window.open(gmailComposeUrl, '_blank', 'noopener,noreferrer');
 
-          // Fallback cho môi trường chặn popup.
           if (!opened) {
             window.open(`mailto:${customerEmail}?subject=${subject}&body=${body}`, '_self');
           }
@@ -624,14 +636,22 @@ const ContractSigningPage = () => {
                     <p key={index} className="policy-item">• {policy}</p>
                   ))}
 
-                  <button
-                    className="btn-request-deposit"
-                    onClick={handleSendDepositRequest}
-                    type="button"
-                    disabled={sendingDepositRequest || !contractData.contractNumericId}
-                  >
-                    {sendingDepositRequest ? 'ĐANG GỬI...' : 'GỬI YÊU CẦU ĐẶT CỌC'}
-                  </button>
+                  {canShowDepositRequestButton ? (
+                    <button
+                      className="btn-request-deposit"
+                      onClick={handleSendDepositRequest}
+                      type="button"
+                      disabled={sendingDepositRequest || !contractData.contractNumericId}
+                    >
+                      {sendingDepositRequest ? 'ĐANG GỬI...' : 'GỬI YÊU CẦU ĐẶT CỌC'}
+                    </button>
+                  ) : (
+                    <p className="policy-item" style={{ marginTop: 12, color: '#64748b', fontSize: 13 }}>
+                      {contractData.partyB.signed
+                        ? 'Gửi yêu cầu đặt cọc sẽ khả dụng khi hợp đồng ở trạng thái đã gửi ký / đã ký.'
+                        : 'Vui lòng gửi khách hàng ký và chờ khách ký xong trước khi gửi yêu cầu đặt cọc.'}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
