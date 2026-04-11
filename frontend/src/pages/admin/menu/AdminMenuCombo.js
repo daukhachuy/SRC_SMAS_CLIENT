@@ -539,14 +539,6 @@ const AdminMenuCombo = () => {
                             >
                               <Pencil size={16} />
                             </button>
-                            <button
-                              type="button"
-                              className="menu-icon-btn menu-icon-btn-danger"
-                              aria-label="Xóa"
-                              onClick={() => { setDeletingCombo(row); setDeleteModalOpen(true); }}
-                            >
-                              <Trash2 size={16} />
-                            </button>
                           </div>
                         </td>
                       </tr>
