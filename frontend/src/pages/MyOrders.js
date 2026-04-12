@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { myOrderAPI } from '../api/myOrderApi';
 import OrderDetailModal from './OrderDetailModal';
 import EventOrderDetailModal from './EventOrderDetailModal';
+import CustomerNoticeModal from '../components/CustomerNoticeModal';
 import '../styles/OrderHistory.css';
 
 /**
@@ -89,6 +90,7 @@ const MyOrders = () => {
   const [showModal, setShowModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [payingEventId, setPayingEventId] = useState(null);
+  const [customerNotice, setCustomerNotice] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [searchQuery, setSearchQuery] = useState('');
@@ -344,7 +346,13 @@ const MyOrders = () => {
       }
 
       if (resolvedContractId == null) {
-        alert('Không tìm thấy hợp đồng để thanh toán đặt cọc. Vui lòng liên hệ nhà hàng.');
+        setCustomerNotice({
+          kind: 'alert',
+          title: 'Chưa có hợp đồng thanh toán',
+          message:
+            'Không tìm thấy hợp đồng để thanh toán đặt cọc. Vui lòng liên hệ nhà hàng để được hỗ trợ.',
+          variant: 'warning',
+        });
         return;
       }
 
@@ -357,7 +365,12 @@ const MyOrders = () => {
           || depositBody?.Message
           || depositBody?.data?.message
           || 'Không nhận được link thanh toán từ máy chủ.';
-        alert(msg);
+        setCustomerNotice({
+          kind: 'alert',
+          title: 'Không mở được thanh toán',
+          message: msg,
+          variant: 'warning',
+        });
         return;
       }
 
@@ -377,7 +390,13 @@ const MyOrders = () => {
 
       const payTab = window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
       if (!payTab) {
-        alert('Trình duyệt đã chặn cửa sổ mới. Vui lòng cho phép popup hoặc thử lại.');
+        setCustomerNotice({
+          kind: 'alert',
+          title: 'Trình duyệt chặn cửa sổ mới',
+          message:
+            'Vui lòng cho phép mở popup cho trang này, hoặc thử lại sau khi bật quyền trong cài đặt trình duyệt.',
+          variant: 'info',
+        });
       }
     } catch (err) {
       const d = err?.response?.data;
@@ -387,7 +406,12 @@ const MyOrders = () => {
         || d?.title
         || err?.message
         || 'Không tạo được link thanh toán. Vui lòng thử lại.';
-      alert(msg);
+      setCustomerNotice({
+        kind: 'alert',
+        title: 'Thanh toán đặt cọc thất bại',
+        message: msg,
+        variant: 'warning',
+      });
     } finally {
       setPayingEventId(null);
     }
@@ -646,6 +670,11 @@ const MyOrders = () => {
           onClose={() => setShowEventModal(false)}
         />
       )}
+
+      <CustomerNoticeModal
+        config={customerNotice}
+        onRequestClose={() => setCustomerNotice(null)}
+      />
     </div>
   );
 };

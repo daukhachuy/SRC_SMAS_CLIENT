@@ -349,6 +349,7 @@ const AdminMenuFood = () => {
         note: form.note ? form.note.trim() : '',
         colors: [],
         categoryIds,
+        imageFile: form.imageFile,
       };
       await createFood(payload);
       setToastMsg('Thêm món ăn thành công!');

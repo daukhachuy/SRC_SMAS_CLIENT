@@ -261,6 +261,10 @@ const ManagerReservationsPage = () => {
     loadEventsData();
   }, [loadReservationData, loadEventsData]);
 
+  /** Chỉ cho hủy trước khi khách nhận bàn (đã xác nhận vẫn hủy được; seated/dining thì không). */
+  const canCancelRegularBooking = (booking) =>
+    booking && ['pending', 'confirmed'].includes(booking.status);
+
   const handleConfirmReservation = async (booking) => {
     if (!booking?.reservationCode) return;
     setProcessingCode(booking.reservationCode);
@@ -279,6 +283,10 @@ const ManagerReservationsPage = () => {
   };
 
   const openCancelModal = (booking) => {
+    if (!canCancelRegularBooking(booking)) {
+      setUiNotice('Đã nhận bàn hoặc đang dùng bữa — không thể hủy đặt bàn.');
+      return;
+    }
     setCancelTarget(booking);
     setCancelReason('');
   };
@@ -290,6 +298,11 @@ const ManagerReservationsPage = () => {
 
   const handleCancelReservation = async () => {
     if (!cancelTarget?.reservationCode || !cancelReason.trim()) return;
+    if (!canCancelRegularBooking(cancelTarget)) {
+      closeCancelModal();
+      setUiNotice('Không thể hủy đơn ở trạng thái này.');
+      return;
+    }
     setProcessingCode(cancelTarget.reservationCode);
     try {
       await reservationAPI.cancel(cancelTarget.reservationCode, cancelReason);
@@ -752,12 +765,18 @@ const ManagerReservationsPage = () => {
                               <button className="btn-icon-only" title="Chi tiết" type="button">
                                 <Info size={16} />
                               </button>
+                            ) : canCancelRegularBooking(booking) ? (
+                              <button className="btn-icon-only danger" title="Hủy đặt bàn" onClick={() => openCancelModal(booking)} type="button">
+                                <Trash2 size={16} />
+                              </button>
                             ) : (
-                              <>
-                                <button className="btn-icon-only danger" title="Hủy đặt bàn" onClick={() => openCancelModal(booking)} type="button">
-                                  <Trash2 size={16} />
-                                </button>
-                              </>
+                              <button
+                                className="btn-icon-only"
+                                title="Đã nhận bàn — không thể hủy"
+                                type="button"
+                              >
+                                <Info size={16} />
+                              </button>
                             )}
                           </div>
                         </td>

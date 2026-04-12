@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Ticket, Copy, BookOpen, Utensils, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Header from '../components/Header';
-import Footer from '../components/Footer'; 
+import Footer from '../components/Footer';
+import CustomerNoticeModal from '../components/CustomerNoticeModal';
 import '../styles/Promotion.css';
 
 const Promotion = () => {
@@ -16,6 +17,7 @@ const Promotion = () => {
     const [foodDiscounts, setFoodDiscounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [customerNotice, setCustomerNotice] = useState(null);
 
     const API_BASE = "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api";
 
@@ -57,7 +59,13 @@ const Promotion = () => {
 
     const copyToClipboard = (code) => {
         navigator.clipboard.writeText(code);
-        alert(`Đã sao chép mã: ${code}`);
+        setCustomerNotice({
+            kind: 'alert',
+            title: 'Đã sao chép mã',
+            message: `Mã ưu đãi "${code}" đã được lưu vào bộ nhớ tạm. Dán khi thanh toán để áp dụng.`,
+            variant: 'success',
+            confirmLabel: 'Đã hiểu',
+        });
     };
 
     // Tạo mảng nhân bản từ dữ liệu thật để chạy vô hạn
@@ -226,6 +234,10 @@ const Promotion = () => {
                 </section>
             </main>
             <Footer />
+            <CustomerNoticeModal
+                config={customerNotice}
+                onRequestClose={() => setCustomerNotice(null)}
+            />
         </div>
     );
 };

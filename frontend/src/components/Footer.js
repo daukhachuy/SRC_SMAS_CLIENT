@@ -17,7 +17,7 @@ const Footer = () => {
               <span className="logo-text">
                 <span className="text-white">Nhà Hàng</span>
                 {" "}
-                <span className="text-primary">FPT</span>
+                <span className="text-primary">SMAS</span>
               </span>
             </div>
             <p className="footer-text intro-text">

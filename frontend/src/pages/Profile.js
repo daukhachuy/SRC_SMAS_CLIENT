@@ -4,6 +4,7 @@ import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 import { getProfile, updateProfile } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { formatCurrency } from '../api/managerApi';
+import CustomerNoticeModal from '../components/CustomerNoticeModal';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBHDr0B4X2T13T1nVBQczGvKkS8VQZmwc";
 
@@ -98,6 +99,7 @@ const Profile = () => {
   const [dobInput, setDobInput] = useState('');
   const [fieldErrors, setFieldErrors] = useState({ phone: '', dob: '' });
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
+  const [customerNotice, setCustomerNotice] = useState(null);
   const [newAddress, setNewAddress] = useState({
     street: '',
     district: '',
@@ -130,12 +132,23 @@ const Profile = () => {
         },
         (err) => {
           console.error('Geolocation error:', err);
-          alert('Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền truy cập vị trí.');
+          setCustomerNotice({
+            kind: 'alert',
+            title: 'Không lấy được vị trí',
+            message:
+              'Vui lòng cho phép truy cập vị trí trong trình duyệt, hoặc chọn điểm trên bản đồ.',
+            variant: 'info',
+          });
         },
         { enableHighAccuracy: true }
       );
     } else {
-      alert('Trình duyệt không hỗ trợ định vị.');
+      setCustomerNotice({
+        kind: 'alert',
+        title: 'Trình duyệt không hỗ trợ',
+        message: 'Trình duyệt của bạn không hỗ trợ định vị. Bạn vẫn có thể chọn vị trí trên bản đồ.',
+        variant: 'info',
+      });
     }
   };
 
@@ -765,6 +778,11 @@ const Profile = () => {
           </div>
         </div>
       )}
+
+      <CustomerNoticeModal
+        config={customerNotice}
+        onRequestClose={() => setCustomerNotice(null)}
+      />
     </div>
   );
 };
