@@ -269,7 +269,7 @@ const Header = () => {
 
           <div className="hd-brand-text">
             <span className="hd-brand-sub">NHÀ HÀNG</span>
-            <span className="hd-brand-main">FPT</span>
+            <span className="hd-brand-main">SMAS</span>
           </div>
         </div>
 

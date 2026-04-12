@@ -1494,8 +1494,10 @@ const Services = () => {
                     </div>
                     <div className="event-success-actions">
                       <button type="button" className="event-btn-primary" onClick={() => { setEventStep(1); setEventSuccess(''); }}>Đặt sự kiện mới</button>
-                      <button type="button" className="event-btn-secondary" onClick={() => navigate('/my-orders')}>Xem đơn của tôi</button>
-                      <button type="button" className="event-btn-secondary event-success-btn-ghost" onClick={() => navigate('/')}>Về trang chủ</button>
+                      <div className="event-success-actions-row">
+                        <button type="button" className="event-btn-secondary" onClick={() => navigate('/my-orders')}>Xem đơn của tôi</button>
+                        <button type="button" className="event-btn-secondary event-success-btn-ghost" onClick={() => navigate('/')}>Về trang chủ</button>
+                      </div>
                     </div>
                   </div>
                 </div>

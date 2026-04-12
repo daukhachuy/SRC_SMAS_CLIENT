@@ -233,6 +233,28 @@
   line-height: 1.5;
 }
 
+.order-paid-notice {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(22, 163, 74, 0.09);
+  border: 1px solid rgba(22, 163, 74, 0.28);
+  border-radius: 10px;
+  align-items: flex-start;
+}
+
+.order-icon--paid {
+  color: #15803d;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.order-paid-notice__text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #14532d;
+  line-height: 1.45;
+}
+
 .btn-order-detail {
   width: 100%;
   background: transparent;
@@ -2873,6 +2895,55 @@
 .dish-action.serve {
   color: #fff;
   background: #16a34a;
+}
+
+.waiter-dish-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.waiter-cancel-item-quick-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.waiter-quick-reason-chip {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.waiter-quick-reason-chip:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.dish-status-cancelled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.dish-status-cancelled::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
 }
 
 .total-summary.soft {

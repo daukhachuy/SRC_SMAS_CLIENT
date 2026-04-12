@@ -319,6 +319,21 @@ export async function fetchWarehouseTransactions() {
   return normalizeWarehouseTransactions(j);
 }
 
+/** GET /api/admin/dashboard/menu-analysis — phân tích món lẻ / menu */
+export function fetchAdminMenuAnalysis() {
+  return authGet('/admin/dashboard/menu-analysis');
+}
+
+/** GET /api/admin/dashboard/combo-analysis — phân tích & gợi ý combo */
+export function fetchAdminComboAnalysis() {
+  return authGet('/admin/dashboard/combo-analysis');
+}
+
+/** GET /api/admin/dashboard/feedback-analysis — phân tích đánh giá khách hàng */
+export function fetchAdminFeedbackAnalysis() {
+  return authGet('/admin/dashboard/feedback-analysis');
+}
+
 /**
  * @param {{ month?: number; year?: number; chartMonths?: number }} [opts]
  * chartMonths → query `months` của GET /admin/dashboard/revenue-chart
