@@ -13,7 +13,8 @@ import {
   X,
   UserCircle,
   Pencil,
-  User
+  User,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/AdminLayout.css';
@@ -26,7 +27,8 @@ const navItems = [
   { to: '/admin/menu', label: 'Thực đơn', icon: UtensilsCrossed },
   { to: '/admin/inventory', label: 'Kho hàng', icon: Boxes },
   { to: '/admin/accounts', label: 'Quản lý Tài khoản', icon: UserCircle },
-  { to: '/admin/restaurant', label: 'Nhà hàng', icon: Home }
+  { to: '/admin/restaurant', label: 'Nhà hàng', icon: Home },
+  { to: '/admin/ai-insights', label: 'AI phân tích', icon: Sparkles }
 ];
 
 const AdminLayout = () => {

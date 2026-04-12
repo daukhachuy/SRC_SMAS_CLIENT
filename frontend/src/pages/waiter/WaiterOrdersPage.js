@@ -25,6 +25,7 @@ import { orderAPI } from '../../api/managerApi';
 import { createGuestOrder, createOrderByReservation, createOrderByContact, addItemsToOrder, lookupOrder, getFoodsBufferByOrderCode } from '../../api/orderApi';
 import { getFoodByFilter, getBuffetLists, getComboLists } from '../../api/foodApi';
 import { patchOrderItemServed } from '../../api/orderItemApi';
+import { apiCancelItem } from '../../api/kitchenOrderApi';
 import { createPaymentLink, payOrderCash } from '../../api/paymentService';
 import { getWaiterTables } from '../../api/waiterApiTable';
 import { initTableSession } from '../../api/tableSessionApi';
@@ -54,6 +55,8 @@ const getDishStatus = (status) => {
       return { cls: 'dish-status-served', label: 'Đã phục vụ' };
     case 'preparing':
       return { cls: 'dish-status-preparing', label: 'Đang làm' };
+    case 'cancelled':
+      return { cls: 'dish-status-cancelled', label: 'Đã hủy món' };
     case 'pending':
     default:
       return { cls: 'dish-status-pending', label: 'Chờ xử lý' };
@@ -114,6 +117,7 @@ const mapOrderStatus = (status) => {
 
 const mapDishStatus = (status) => {
   const s = normalizeStatus(status);
+  if (['cancelled', 'canceled', 'void', 'voided'].includes(s)) return 'cancelled';
   if (s === 'ready' || s === 'completed') return 'ready';
   if (s === 'served' || s === 'delivered') return 'served';
   if (s === 'preparing' || s === 'processing' || s === 'cooking') return 'preparing';
@@ -123,8 +127,28 @@ const mapDishStatus = (status) => {
 const canStartDeliveryByItems = (order) => {
   const items = Array.isArray(order?.items) ? order.items : [];
   if (items.length === 0) return false;
-  return items.every((item) => ['ready', 'served', 'completed'].includes(String(item?.dishStatus || '').toLowerCase()));
+  return items.every((item) =>
+    ['ready', 'served', 'completed', 'cancelled'].includes(String(item?.dishStatus || '').toLowerCase())
+  );
 };
+
+/** ID dòng order-item cho API (một dòng UI có thể gộp nhiều orderItemId). */
+const resolveOrderItemNumericIds = (item) => {
+  const raw = [
+    ...(Array.isArray(item?.orderItemIds) ? item.orderItemIds : []),
+    item?.id,
+    item?.orderItemId,
+    item?.itemId,
+  ];
+  return Array.from(new Set(raw.map((x) => Number(x || 0)).filter((x) => Number.isFinite(x) && x > 0)));
+};
+
+const WAITER_CANCEL_ITEM_QUICK_REASONS = [
+  'Khách đổi món',
+  'Hết nguyên liệu / hết món',
+  'Khách hủy món',
+  'Nhập nhầm món',
+];
 
 const mapDeliveryWorkflowStatus = (status) => {
   const s = normalizeStatus(status);
@@ -143,21 +167,78 @@ const mapDeliveryWorkflowStatus = (status) => {
   return { status: 'pending', statusLabel: 'Chờ xử lý', actionLabel: 'CẬP NHẬT TRẠNG THÁI' };
 };
 
+const PAID_PAYMENT_STATUSES = new Set([
+  'paid',
+  'success',
+  'completed',
+  'done',
+  'settled',
+  'captured',
+  'authorized',
+  'succeeded',
+]);
+
+const isPaidPaymentStatusString = (raw) => {
+  const s = normalizeStatus(raw);
+  if (!s) return false;
+  if (PAID_PAYMENT_STATUSES.has(s)) return true;
+  if (s.includes('da thanh toan') || s.includes('đã thanh toán')) return true;
+  if (s.includes('thanh toan') && (s.includes('roi') || s.includes('rồi') || s.includes('xong'))) return true;
+  return false;
+};
+
 const isPaidOrder = (order) => {
+  if (!order || typeof order !== 'object') return false;
+  if (order.isPaid === true || order.IsPaid === true) return true;
+
+  const paymentObj = order.payment && typeof order.payment === 'object' ? order.payment : null;
+  if (paymentObj?.isPaid === true || paymentObj?.IsPaid === true) return true;
+
+  const statusFields = [
+    order.paymentStatus,
+    order.PaymentStatus,
+    order.paymentState,
+    order.financialStatus,
+    paymentObj?.status,
+    paymentObj?.paymentStatus,
+    paymentObj?.state,
+  ];
+  for (const f of statusFields) {
+    if (isPaidPaymentStatusString(f)) return true;
+  }
+
   const normalizedOrderStatus = normalizeStatus(order?.orderStatus || order?.status);
   if (['paid', 'completed', 'done', 'closed'].includes(normalizedOrderStatus)) return true;
+  if (normalizedOrderStatus.includes('thanh toan') && normalizedOrderStatus.includes('da')) return true;
 
-  const paidAmount = Number(order?.paidAmount ?? order?.payment?.paidAmount ?? 0);
-  const totalAmount = Number(order?.totalAmount ?? order?.payment?.totalAmount ?? 0);
+  if (order.prepaid === true || order.isPrepaid === true || order.Prepaid === true) return true;
+  if (order.paidBeforeDelivery === true || order.paidBeforeShip === true) return true;
+
+  const paidAmount = Number(
+    order?.paidAmount ?? paymentObj?.paidAmount ?? order?.amountPaid ?? 0
+  );
+  const totalAmount = Number(
+    order?.totalAmount ?? paymentObj?.totalAmount ?? order?.total ?? 0
+  );
   if (Number.isFinite(paidAmount) && Number.isFinite(totalAmount) && totalAmount > 0 && paidAmount >= totalAmount) {
     return true;
   }
 
-  const payments = Array.isArray(order?.payments) ? order.payments : [];
-  return payments.some((p) => {
-    const s = normalizeStatus(p?.status || p?.paymentStatus || p?.state);
-    return ['paid', 'success', 'completed', 'done'].includes(s);
-  });
+  const payments = Array.isArray(order?.payments)
+    ? order.payments
+    : Array.isArray(paymentObj?.payments)
+      ? paymentObj.payments
+      : [];
+  if (
+    payments.some((p) => {
+      const s = normalizeStatus(p?.status || p?.paymentStatus || p?.state);
+      return PAID_PAYMENT_STATUSES.has(s) || s.includes('da thanh toan') || s.includes('đã thanh toán');
+    })
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 const toCurrencyNumber = (value) => {
@@ -541,6 +622,9 @@ const mapApiOrderToWaiter = (order) => {
   const [activePaymentMethod, setActivePaymentMethod] = useState('cash');
   const [isPaying, setIsPaying] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [itemCancelIndex, setItemCancelIndex] = useState(null);
+  const [itemCancelReason, setItemCancelReason] = useState('');
+  const [isCancellingItem, setIsCancellingItem] = useState(false);
   const [uiNotice, setUiNotice] = useState('');
   const [tableQrValue, setTableQrValue] = useState('');
   const [tableQrCode, setTableQrCode] = useState('');
@@ -944,10 +1028,10 @@ const mapApiOrderToWaiter = (order) => {
   }, [uiNotice]);
 
   const calculateOrderSubtotal = (order) => {
-    const itemsSubtotal = (order?.items || []).reduce(
-      (sum, item) => sum + Number(item?.price || 0) * Number(item?.quantity || 0),
-      0
-    );
+    const itemsSubtotal = (order?.items || []).reduce((sum, item) => {
+      if (item?.dishStatus === 'cancelled') return sum;
+      return sum + Number(item?.price || 0) * Number(item?.quantity || 0);
+    }, 0);
 
     const backendSubtotalCandidates = [
       Number(order?.subTotal),
@@ -1105,6 +1189,8 @@ const mapApiOrderToWaiter = (order) => {
   };
 
   const openOrderDetail = async (order) => {
+    setItemCancelIndex(null);
+    setItemCancelReason('');
     setSelectedOrder(order);
     setOrderItemsState(order.items.map(item => ({ ...item }))); // clone để thao tác trạng thái
     setShowOrderDetailModal(true);
@@ -1175,7 +1261,7 @@ const mapApiOrderToWaiter = (order) => {
 
       setUiNotice(successMessage);
       closeCancelModal();
-      setShowOrderDetailModal(false);
+      closeOrderDetailModal();
       await fetchWaiterOrders();
     } catch (err) {
       const data = err?.response?.data;
@@ -1232,13 +1318,71 @@ const mapApiOrderToWaiter = (order) => {
   }, 0);
 
   const canProceedToPayment = orderItemsState.every(
-    (item) => item.dishStatus === 'served' || item.dishStatus === 'completed'
+    (item) =>
+      item.dishStatus === 'cancelled' ||
+      item.dishStatus === 'served' ||
+      item.dishStatus === 'completed'
   );
 
   const canOrderProceedToPayment = (order) =>
     (order?.items || []).every(
-      (item) => item.dishStatus === 'served' || item.dishStatus === 'completed'
+      (item) =>
+        item.dishStatus === 'cancelled' ||
+        item.dishStatus === 'served' ||
+        item.dishStatus === 'completed'
     );
+
+  const closeItemCancelModal = () => {
+    setItemCancelIndex(null);
+    setItemCancelReason('');
+  };
+
+  const closeOrderDetailModal = () => {
+    closeItemCancelModal();
+    setShowOrderDetailModal(false);
+  };
+
+  const handleConfirmCancelItem = async () => {
+    const reason = String(itemCancelReason || '').trim();
+    if (itemCancelIndex == null || reason === '') {
+      alert('Vui lòng chọn hoặc nhập lý do hủy món.');
+      return;
+    }
+    const item = orderItemsState[itemCancelIndex];
+    if (!item) {
+      closeItemCancelModal();
+      return;
+    }
+    const ids = resolveOrderItemNumericIds(item);
+    if (ids.length === 0) {
+      alert('Không tìm thấy mã dòng món (orderItemId) để hủy.');
+      return;
+    }
+    try {
+      setIsCancellingItem(true);
+      await Promise.all(ids.map((id) => apiCancelItem(id, reason)));
+      const patchCancelled = (arr) =>
+        (arr || []).map((it, i) =>
+          i === itemCancelIndex ? { ...it, dishStatus: 'cancelled' } : it
+        );
+      setOrderItemsState((prev) => patchCancelled(prev));
+      setSelectedOrder((prev) => (prev ? { ...prev, items: patchCancelled(prev.items || []) } : prev));
+      setUiNotice('Đã hủy món thành công.');
+      closeItemCancelModal();
+      await fetchWaiterOrders();
+    } catch (err) {
+      const data = err?.response?.data;
+      const msg =
+        data?.message ||
+        data?.title ||
+        (typeof data === 'string' ? data : '') ||
+        err?.message ||
+        'Không thể hủy món.';
+      alert(msg);
+    } finally {
+      setIsCancellingItem(false);
+    }
+  };
 
   const openOrderPaymentLink = (order) => {
     setSelectedOrder(order);
@@ -1314,7 +1458,7 @@ const mapApiOrderToWaiter = (order) => {
         });
         alert('Thanh toán tiền mặt thành công.');
         setShowPaymentModal(false);
-        setShowOrderDetailModal(false);
+        closeOrderDetailModal();
         await fetchWaiterOrders();
       } catch (err) {
         alert(err?.response?.data?.message || err?.message || 'Lỗi thanh toán tiền mặt.');
@@ -1506,6 +1650,29 @@ const mapApiOrderToWaiter = (order) => {
                 .includes(String(order?.deliveryWorkflowStatus || '').toLowerCase());
               const isChangingDelivery = changingDeliveryOrderCode === String(order.id || '');
               const deliveryActionClass = isDeliveryOrder ? getDeliveryActionClass(order.deliveryActionLabel) : '';
+              const deliveryActionUpper = String(order?.deliveryActionLabel || '').trim().toUpperCase();
+              const isCompleteDeliveryBtn = isDeliveryOrder && deliveryActionUpper === 'HOÀN THÀNH GIAO';
+              const deliveryPayBtnLabel = isDeliveryOrder
+                ? isChangingDelivery
+                  ? 'ĐANG CẬP NHẬT...'
+                  : order.isPaid && isCompleteDeliveryBtn
+                    ? 'HOÀN THÀNH GIAO · ĐÃ TT'
+                    : order.deliveryActionLabel
+                : 'Thanh toán';
+              const deliveryPayTitle = isDeliveryOrder
+                ? [
+                    order.isPaid && isCompleteDeliveryBtn
+                      ? 'Khách đã thanh toán trước (CK/online) — chỉ giao hàng, không thu tiền.'
+                      : '',
+                    isStartDeliveryAction && !canStartDelivery
+                      ? 'Bếp chưa làm xong món, chưa thể bắt đầu giao.'
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                : canPayThisOrder
+                  ? ''
+                  : 'Cần phục vụ xong tất cả món trước khi thanh toán';
               return (
                 <div
                   key={order.id}
@@ -1551,6 +1718,13 @@ const mapApiOrderToWaiter = (order) => {
                     <Utensils size={18} className="order-icon muted" />
                     <p className="order-items">{getOrderItemsSummary(order)}</p>
                   </div>
+
+                  {isDeliveryOrder && order.isPaid && (
+                    <div className="order-info-row order-paid-notice" title="Khách đã thanh toán trước khi giao hàng">
+                      <CheckCircle2 size={18} className="order-icon order-icon--paid" />
+                      <span className="order-paid-notice__text">Đã thanh toán — chỉ giao hàng, không thu tiền</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="order-card-actions">
@@ -1589,16 +1763,12 @@ const mapApiOrderToWaiter = (order) => {
                       setShowPaymentModal(true);
                     }}
                     aria-disabled={isDeliveryOrder ? (isDoneDelivery || isChangingDelivery) : !canPayThisOrder}
-                    title={isDeliveryOrder
-                      ? (isStartDeliveryAction && !canStartDelivery ? 'Bếp chưa làm xong món, chưa thể bắt đầu giao.' : '')
-                      : (canPayThisOrder ? '' : 'Cần phục vụ xong tất cả món trước khi thanh toán')}
+                    title={deliveryPayTitle || undefined}
                     style={(isDeliveryOrder ? (isDoneDelivery || isChangingDelivery || (isStartDeliveryAction && !canStartDelivery)) : !canPayThisOrder)
                       ? { opacity: 0.6, cursor: 'not-allowed' }
                       : undefined}
                   >
-                    {isDeliveryOrder
-                      ? (isChangingDelivery ? 'ĐANG CẬP NHẬT...' : order.deliveryActionLabel)
-                      : 'Thanh toán'}
+                    {isDeliveryOrder ? deliveryPayBtnLabel : 'Thanh toán'}
                   </button>
                 </div>
               </div>
@@ -2242,7 +2412,7 @@ const mapApiOrderToWaiter = (order) => {
       )}
 
       {showOrderDetailModal && selectedOrder && (
-        <div className="modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
+        <div className="modal-overlay" onClick={closeOrderDetailModal}>
           <div className="modal-container modal-detail" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-content">
@@ -2251,7 +2421,7 @@ const mapApiOrderToWaiter = (order) => {
                   {selectedOrder.statusLabel}
                 </span>
               </div>
-              <button className="modal-close-btn" onClick={() => setShowOrderDetailModal(false)}>
+              <button className="modal-close-btn" onClick={closeOrderDetailModal}>
                 <X size={20} />
               </button>
             </div>
@@ -2332,6 +2502,9 @@ const mapApiOrderToWaiter = (order) => {
                   <tbody>
                     {orderItemsState.map((item, idx) => {
                       const dishStatus = getDishStatus(item.dishStatus || 'pending');
+                      const itemRowIds = resolveOrderItemNumericIds(item);
+                      const canCancelThisItem =
+                        item.dishStatus === 'pending' && itemRowIds.length > 0;
                       return (
                         <tr key={item.name + idx}>
                           <td>
@@ -2344,11 +2517,25 @@ const mapApiOrderToWaiter = (order) => {
                           </td>
                           <td>{formatCurrency(item.price)}</td>
                           <td>
-                            {dishStatus.label === 'Sẵn sàng' && (
-                              <button
-                                className="dish-action serve"
-                                type="button"
-                                onClick={async () => {
+                            <div className="waiter-dish-actions">
+                              {canCancelThisItem && (
+                                <button
+                                  className="dish-action delete"
+                                  type="button"
+                                  title="Hủy món (bếp chưa nhận làm)"
+                                  onClick={() => {
+                                    setItemCancelIndex(idx);
+                                    setItemCancelReason('');
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                              {dishStatus.label === 'Sẵn sàng' && (
+                                <button
+                                  className="dish-action serve"
+                                  type="button"
+                                  onClick={async () => {
                                   // Gọi API PATCH để cập nhật trạng thái món ăn
                                   try {
                                     const ids = Array.from(
@@ -2382,6 +2569,7 @@ const mapApiOrderToWaiter = (order) => {
                             {dishStatus.label === 'Hoàn thành' && (
                               <span style={{color:'#4caf50'}}><CheckCircle2 size={14} /></span>
                             )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2415,7 +2603,7 @@ const mapApiOrderToWaiter = (order) => {
             </div>
 
             <div className="modal-footer split">
-              <button className="btn-cancel" onClick={() => setShowOrderDetailModal(false)}>
+              <button className="btn-cancel" onClick={closeOrderDetailModal}>
                 Đóng
               </button>
               <div className="detail-footer-actions">
@@ -2441,6 +2629,60 @@ const mapApiOrderToWaiter = (order) => {
                   <CreditCard size={18} /> Thanh toán
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {itemCancelIndex !== null && orderItemsState[itemCancelIndex] && (
+        <div className="modal-overlay" onClick={closeItemCancelModal}>
+          <div className="modal-container modal-small" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Hủy món</h3>
+              <button className="modal-close-btn" type="button" onClick={closeItemCancelModal}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: '0 0 12px', fontWeight: 700, color: '#1f2937' }}>
+                {orderItemsState[itemCancelIndex]?.name}
+              </p>
+              <div className="field-group">
+                <label>
+                  Lý do hủy <span className="required">*</span>
+                </label>
+                <div className="waiter-cancel-item-quick-reasons">
+                  {WAITER_CANCEL_ITEM_QUICK_REASONS.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      className="waiter-quick-reason-chip"
+                      onClick={() => setItemCancelReason(r)}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={4}
+                  placeholder="Chọn nhanh ở trên hoặc nhập lý do chi tiết..."
+                  value={itemCancelReason}
+                  onChange={(e) => setItemCancelReason(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-footer end">
+              <button className="btn-cancel" type="button" onClick={closeItemCancelModal}>
+                Quay lại
+              </button>
+              <button
+                className="btn-danger-solid"
+                type="button"
+                onClick={handleConfirmCancelItem}
+                disabled={!itemCancelReason.trim() || isCancellingItem}
+              >
+                <Trash2 size={16} /> {isCancellingItem ? 'Đang xử lý...' : 'Xác nhận hủy món'}
+              </button>
             </div>
           </div>
         </div>

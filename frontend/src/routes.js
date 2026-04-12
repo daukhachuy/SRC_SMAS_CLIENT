@@ -58,6 +58,7 @@ import AdminMenuManagement from './pages/admin/menu/AdminMenuManagement';
 import AdminInventoryPage from './pages/admin/AdminInventoryPage';
 import AdminRestaurantPage from './pages/admin/AdminRestaurantPage';
 import AdminStaffPage from './pages/admin/AdminStaffPage';
+import AdminAIInsightPage from './pages/admin/AdminAIInsightPage';
 
 // Import trang Promotion
 import Promotion from './pages/Promotion';
@@ -168,6 +169,7 @@ const AppRoutes = () => {
           <Route path="staff" element={<Navigate to="/admin/accounts" replace />} />
           <Route path="accounts" element={<AdminStaffPage />} />
           <Route path="restaurant" element={<AdminRestaurantPage />} />
+          <Route path="ai-insights" element={<AdminAIInsightPage />} />
         </Route>
 
         <Route path="/payment-result" element={<PaymentResult />} />

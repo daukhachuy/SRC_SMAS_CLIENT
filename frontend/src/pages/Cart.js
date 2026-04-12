@@ -6,6 +6,7 @@ import { getProfile } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { discountAPI } from '../api/discountApi';
 import { useNavigate } from 'react-router-dom';
+import CustomerNoticeModal from '../components/CustomerNoticeModal';
 import '../styles/Cart.css';
 
 const Cart = () => {
@@ -64,20 +65,36 @@ const Cart = () => {
   const [modalStep, setModalStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Tiền Mặt');
   const [paymentError, setPaymentError] = useState('');
+  const [customerNotice, setCustomerNotice] = useState(null);
 
   // --- LOGIC VALIDATE SỐ ĐIỆN THOẠI ---
   const handleGoToStep2 = () => {
     const phoneRegex = /^(0|84)(3|5|7|8|9)([0-9]{8})$/;
     if (!customerInfo.recipientPhone.trim()) {
-      alert("Vui lòng nhập số điện thoại!");
+      setCustomerNotice({
+        kind: 'alert',
+        title: 'Thiếu số điện thoại',
+        message: 'Vui lòng nhập số điện thoại để nhà hàng liên hệ giao hàng.',
+        variant: 'warning',
+      });
       return;
     }
     if (!phoneRegex.test(customerInfo.recipientPhone.trim())) {
-      alert("Số điện thoại không hợp lệ! Vui lòng kiểm tra lại.");
+      setCustomerNotice({
+        kind: 'alert',
+        title: 'Số điện thoại chưa hợp lệ',
+        message: 'Vui lòng nhập đúng định dạng số điện thoại Việt Nam (ví dụ 09xxxxxxxx).',
+        variant: 'warning',
+      });
       return;
     }
     if (!customerInfo.recipientName.trim() || !customerInfo.address.trim()) {
-      alert("Vui lòng điền đầy đủ Tên và Địa chỉ!");
+      setCustomerNotice({
+        kind: 'alert',
+        title: 'Thiếu thông tin giao hàng',
+        message: 'Vui lòng điền đầy đủ họ tên và địa chỉ nhận hàng.',
+        variant: 'warning',
+      });
       return;
     }
     setModalStep(2);
@@ -119,19 +136,28 @@ const Cart = () => {
   };
 
   const removeItem = (actualIndex) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa món này?")) {
-      const newCart = cartItems.filter((_, i) => i !== actualIndex);
-      updateCart(newCart);
-    }
+    setCustomerNotice({
+      kind: 'confirm',
+      title: 'Xóa món khỏi giỏ?',
+      message:
+        'Bạn có chắc chắn muốn xóa món này? Bạn luôn có thể thêm lại từ thực đơn.',
+      variant: 'danger',
+      confirmLabel: 'Xóa món',
+      cancelLabel: 'Giữ lại',
+      onConfirm: () => {
+        const newCart = cartItems.filter((_, i) => i !== actualIndex);
+        updateCart(newCart);
+      },
+    });
   };
 
   const totalPrice = cartItems.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
 
-  const getDepositInfo = (price) => {
-    if (price > 10000000) return { percent: 50, amount: price * 0.5 };
-    if (price > 3000000) return { percent: 10, amount: price * 0.1 };
-    return { percent: 0, amount: 0 };
-  };
+  const deliveryFeeRaw = process.env.REACT_APP_DELIVERY_FEE;
+  const deliveryFee =
+    deliveryFeeRaw === undefined || deliveryFeeRaw === ''
+      ? 25000
+      : Math.max(0, Number(deliveryFeeRaw) || 0);
 
   const handleCloseModal = () => {
     if (isOrdering) return; 
@@ -191,8 +217,7 @@ const Cart = () => {
   };
 
   const discountAmount = calculateDiscount();
-  const finalPrice = totalPrice - discountAmount;
-  const deposit = getDepositInfo(finalPrice);
+  const finalPrice = totalPrice - discountAmount + deliveryFee;
 
   // --- LOGIC ĐẶT HÀNG & THANH TOÁN (THEO QUY TRÌNH 3 BƯỚC) ---
   const handleFinalOrder = async () => {
@@ -231,8 +256,16 @@ const Cart = () => {
 
       // BƯỚC 2: TẠO LINK THANH TOÁN NẾU KHÔNG PHẢI TIỀN MẶT
       if (paymentMethod === 'Tiền Mặt') {
-        alert(orderRes.data.message || "Đặt hàng thành công!");
-        finishOrderSuccess();
+        setCustomerNotice({
+          kind: 'alert',
+          title: 'Đặt hàng thành công',
+          message:
+            orderRes.data.message ||
+            'Cảm ơn bạn! Đơn hàng đã được ghi nhận. Nhà hàng sẽ liên hệ sớm nhất có thể.',
+          variant: 'success',
+          confirmLabel: 'Xem đơn của tôi',
+          afterClose: finishOrderSuccess,
+        });
       } else {
         const payRes = await instance.post('/payment/create-link', {
           orderId: Number(orderId),
@@ -266,7 +299,12 @@ const Cart = () => {
         setPaymentError("Payment failed, please choose another payment method.");
         setModalStep(2); // Stay on order summary
       } else {
-        alert(errorMessage);
+        setCustomerNotice({
+          kind: 'alert',
+          title: 'Không thể hoàn tất đơn',
+          message: errorMessage,
+          variant: 'warning',
+        });
       }
     } finally {
       setIsOrdering(false);
@@ -388,13 +426,15 @@ const Cart = () => {
                   Giảm giá: <strong>-{discountAmount.toLocaleString()} đ</strong>
                 </div>
               )}
-              <div className="Sum-Item">Tiền cọc ({deposit.percent}%): <strong className="text-orange">{deposit.amount.toLocaleString()} đ</strong></div>
+              <div className="Sum-Item">
+                Phí vận chuyển:{' '}
+                <strong>{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()} đ` : 'Miễn phí'}</strong>
+              </div>
               <div className="Sum-Item" style={{ fontSize: '16px', fontWeight: 'bold' }}>
                 Tổng cộng: <strong className="text-orange">{finalPrice.toLocaleString()} đ</strong>
               </div>
             </div>
             <div className="Summary-Right">
-              <p className="Deposit-Policy">Chính sách cọc: 10% cho đơn trên 3tr, 50% cho đơn trên 10tr.</p>
               <button className="Btn-Order-Now" disabled={cartItems.length === 0} onClick={() => setShowInfoModal(true)}>Đặt ngay</button>
             </div>
           </div>
@@ -490,7 +530,10 @@ const Cart = () => {
                         </div>
                       )}
                       <div className="Bill-Row"><span>Tạm tính:</span> <span>{totalPrice.toLocaleString()}đ</span></div>
-                      <div className="Bill-Row"><span>Tiền cọc ({deposit.percent}%):</span> <span className="text-orange">{deposit.amount.toLocaleString()}đ</span></div>
+                      <div className="Bill-Row">
+                        <span>Phí vận chuyển</span>
+                        <span>{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()}đ` : 'Miễn phí'}</span>
+                      </div>
                       <div className="Bill-Total"><span>Tổng cộng:</span> <span>{finalPrice.toLocaleString()}đ</span></div>
                     </div>
                   </div>
@@ -557,6 +600,11 @@ const Cart = () => {
       )}
 
       <Footer />
+
+      <CustomerNoticeModal
+        config={customerNotice}
+        onRequestClose={() => setCustomerNotice(null)}
+      />
     </div>
   );
 };
