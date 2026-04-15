@@ -245,10 +245,11 @@ const Profile = () => {
             ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—';
           const statusRaw = (item.status ?? item.contractStatus ?? '').toLowerCase();
           const statusMap = {
-            pending:      { label: 'Chờ xác nhận',  cls: 'status-pending' },
-            confirmed:    { label: 'Đã xác nhận',    cls: 'status-confirmed' },
-            signed:       { label: 'Đã ký hợp đồng', cls: 'status-signed' },
-            deposit:      { label: 'Chờ đặt cọc',    cls: 'status-deposit' },
+            pending:      { label: 'Chờ duyệt',       cls: 'status-pending' },
+            approved:     { label: 'Đã duyệt',        cls: 'status-confirmed' },
+            rejected:     { label: 'Đã từ chối',      cls: 'status-cancelled' },
+            active:       { label: 'Đang hoạt động',  cls: 'status-signed' },
+            completed:    { label: 'Hoàn thành',      cls: 'status-signed' },
             cancelled:    { label: 'Đã hủy',          cls: 'status-cancelled' },
             cancel:       { label: 'Đã hủy',          cls: 'status-cancelled' },
           };

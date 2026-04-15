@@ -27,7 +27,7 @@ const AddDishModal = ({
         {/* Header */}
         <div className="add-dish-modal-header">
           <h3>THÊM MÓN</h3>
-          <button className="add-dish-modal-close" onClick={onClose}>
+          <button type="button" className="add-dish-modal-close" onClick={onClose}>
             <X size={24} />
           </button>
         </div>
@@ -36,14 +36,30 @@ const AddDishModal = ({
         <div className="add-dish-modal-body">
           {/* 2 Buttons lớn */}
           <div className="add-dish-choices">
-            <button className="add-dish-choice-btn" onClick={onOpenFoodList}>
+            <button
+              type="button"
+              className="add-dish-choice-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenFoodList();
+              }}
+            >
               <div className="add-dish-choice-icon">
                 <UtensilsCrossed size={32} />
               </div>
               <span className="add-dish-choice-text">Chọn món từ thực đơn</span>
             </button>
 
-            <button className="add-dish-choice-btn" onClick={onOpenComboList}>
+            <button
+              type="button"
+              className="add-dish-choice-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenComboList();
+              }}
+            >
               <div className="add-dish-choice-icon">
                 <Gift size={32} />
               </div>
@@ -119,7 +135,7 @@ const AddDishModal = ({
             <span>Tổng cộng tạm tính:</span>
             <strong>{formatCurrency(totalPrice)}</strong>
           </div>
-          <button className="add-dish-confirm-btn" onClick={onConfirm}>
+          <button type="button" className="add-dish-confirm-btn" onClick={onConfirm}>
             XÁC NHẬN ĐƠN HÀNG
           </button>
         </div>

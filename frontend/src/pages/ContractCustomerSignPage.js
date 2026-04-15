@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Edit3, FileText, ShieldCheck } from 'lucide-react';
 import { contractTokenAPI } from '../api/managerApi';
 import '../styles/ContractSigningPage.css';
@@ -123,7 +123,12 @@ const statusLabel = {
   canceled: 'Đã hủy',
 };
 
+const getStoredAuthToken = () =>
+  localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+
 const ContractCustomerSignPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
 
@@ -138,6 +143,18 @@ const ContractCustomerSignPage = () => {
       if (!token) {
         setError('Thiếu token ký hợp đồng.');
         setLoading(false);
+        return;
+      }
+
+      const authToken = getStoredAuthToken();
+      if (!authToken) {
+        navigate('/auth', {
+          replace: true,
+          state: {
+            authMessage: 'Vui lòng đăng nhập để ký hợp đồng.',
+            redirectTo: `${location.pathname}${location.search}`,
+          },
+        });
         return;
       }
 
@@ -215,7 +232,7 @@ const ContractCustomerSignPage = () => {
     };
 
     loadByToken();
-  }, [token]);
+  }, [location.pathname, location.search, navigate, token]);
 
   const canSign = useMemo(() => data.status !== 'signed' && !data.signedAt, [data.status, data.signedAt]);
 

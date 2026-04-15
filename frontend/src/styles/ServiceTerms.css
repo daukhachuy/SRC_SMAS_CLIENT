@@ -1,0 +1,196 @@
+.service-terms-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 420px at 50% -10%, rgba(255, 140, 62, 0.2), transparent 70%),
+    linear-gradient(180deg, #fff8f1 0%, #ffffff 28%, #ffffff 100%);
+}
+
+.service-terms-main {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 124px 0 72px;
+}
+
+.service-terms-hero {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.service-terms-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #9a5a20;
+  background: #fff1e5;
+  border: 1px solid #ffd1ab;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.service-terms-hero h1 {
+  margin: 14px 0 10px;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 900;
+  color: #1c1f2a;
+}
+
+.service-terms-hero p {
+  max-width: 760px;
+  margin: 0 auto;
+  color: #5f6678;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.service-terms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.service-terms-card {
+  background: #ffffff;
+  border: 1px solid #f1e4d9;
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 12px 30px rgba(34, 40, 70, 0.07);
+}
+
+.service-terms-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.service-terms-card-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #ff7a21;
+  background: rgba(255, 122, 33, 0.14);
+}
+
+.service-terms-card h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1b1f2a;
+}
+
+.service-terms-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.service-terms-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #4e5668;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.service-terms-card li svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: #ef8d49;
+}
+
+.service-terms-note {
+  margin-top: 24px;
+  border: 1px solid #f1e4d9;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fff7f0 100%);
+  padding: 24px;
+  text-align: center;
+}
+
+.service-terms-note h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1b1f2a;
+}
+
+.service-terms-note p {
+  margin: 0 auto;
+  max-width: 760px;
+  color: #5f6678;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.service-terms-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-terms-btn {
+  text-decoration: none;
+  border-radius: 12px;
+  padding: 11px 18px;
+  font-weight: 700;
+  transition: all 0.25s ease;
+}
+
+.service-terms-btn.ghost {
+  border: 1px solid #d9deea;
+  color: #374151;
+  background: #ffffff;
+}
+
+.service-terms-btn.ghost:hover {
+  border-color: #c2c8d8;
+  color: #111827;
+}
+
+.service-terms-btn.primary {
+  border: 1px solid #ff7a21;
+  background: linear-gradient(135deg, #ff7a21, #ff9b52);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(255, 122, 33, 0.25);
+}
+
+.service-terms-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(255, 122, 33, 0.3);
+}
+
+@media (max-width: 900px) {
+  .service-terms-main {
+    padding-top: 110px;
+  }
+
+  .service-terms-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .service-terms-main {
+    width: min(1100px, calc(100% - 20px));
+    padding-bottom: 56px;
+  }
+
+  .service-terms-card,
+  .service-terms-note {
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .service-terms-card h2 {
+    font-size: 16px;
+  }
+}

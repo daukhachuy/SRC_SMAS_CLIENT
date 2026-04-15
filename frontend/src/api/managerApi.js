@@ -546,7 +546,6 @@ export async function getAllStaffSchedule() {
       pending: { status: 'nosigned', statusText: 'Chờ duyệt' },
       approved: { status: 'unsigned', statusText: 'Đã duyệt' },
       rejected: { status: 'rejected', statusText: 'Từ chối' },
-      confirmed: { status: 'signed', statusText: 'Đã xác nhận' },
       active: { status: 'signed', statusText: 'Đang diễn ra' },
       cancelled: { status: 'cancelled', statusText: 'Đã hủy' },
       canceled: { status: 'cancelled', statusText: 'Đã hủy' },
