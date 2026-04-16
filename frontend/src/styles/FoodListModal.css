@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 10060;
   padding: 20px;
 }
 
@@ -178,6 +178,16 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  overflow: hidden;
+}
+
+.food-list-card-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
 }
 
 .food-list-card-placeholder {
@@ -191,6 +201,8 @@
   color: #fff;
   font-size: 22px;
   font-weight: 800;
+  position: relative;
+  z-index: 1;
 }
 
 .food-list-card-check {
@@ -205,6 +217,7 @@
   align-items: center;
   justify-content: center;
   color: #fff;
+  z-index: 2;
 }
 
 .food-list-card-content {

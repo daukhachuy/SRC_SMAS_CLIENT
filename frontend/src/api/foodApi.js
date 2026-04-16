@@ -493,8 +493,12 @@ export async function getFoodByFilter(params) {
   try {
     const queryString = params instanceof URLSearchParams ? params.toString() : new URLSearchParams(params).toString();
     const response = await instance.get(`/food/filter?${queryString}`);
-    const foodArray = Array.isArray(response.data) ? response.data : response.data?.$values || [];
-    return foodArray;
+    const d = response.data;
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.$values)) return d.$values;
+    if (Array.isArray(d?.items)) return d.items;
+    if (Array.isArray(d?.data)) return d.data;
+    return [];
   } catch (error) {
     console.error('❌ Failed to fetch foods with filter:', error.response?.data || error.message);
     throw error;

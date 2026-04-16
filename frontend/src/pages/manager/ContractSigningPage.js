@@ -83,6 +83,16 @@ const ContractSigningPage = () => {
     return ['sent', 'signed'].includes(st);
   })();
 
+  /** Khi khách đã ký hoặc hợp đồng đã kết thúc luồng ký thì ẩn cụm nút gửi ký/xác nhận ký. */
+  const canShowSigningActionButtons = (() => {
+    const st = String(contractData.status || '').toLowerCase();
+    if (contractData.partyB.signed) return false;
+    if (['signed', 'deposited', 'deposit', 'completed', 'cancelled', 'canceled'].includes(st)) {
+      return false;
+    }
+    return true;
+  })();
+
   const statusLabel = {
     pending: 'Chờ duyệt / Chờ xử lý',
     approved: 'Đã duyệt',
@@ -707,7 +717,7 @@ const ContractSigningPage = () => {
         </div>
 
         {/* Action Footer */}
-        {!isPendingCreate && (
+        {!isPendingCreate && canShowSigningActionButtons && (
           <div className="contract-footer">
             <button
               className="btn-send-customer-sign"

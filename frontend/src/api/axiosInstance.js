@@ -48,6 +48,7 @@ instance.interceptors.response.use(
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message;
     const requestUrl = String(error?.config?.url || '').toLowerCase();
+    const isContractSignRequest = requestUrl.includes('/contract/sign');
     
     console.error(`[API Error] Status: ${status}, Message: ${message}`);
 
@@ -58,7 +59,8 @@ instance.interceptors.response.use(
       localStorage.removeItem('authToken');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
-      if (hadToken && !window.location.pathname.includes('/auth')) {
+      const shouldRedirectToAuth = hadToken || isContractSignRequest;
+      if (shouldRedirectToAuth && !window.location.pathname.includes('/auth')) {
         window.location.href = '/auth';
       }
     }

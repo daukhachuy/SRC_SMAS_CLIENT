@@ -256,6 +256,18 @@
   color: #1976D2;
 }
 
+.Status-Label.Contract-None {
+  background: #EEF2F7;
+  color: #64748B;
+}
+
+.Contract-Status-Btn {
+  border: none;
+  text-transform: none;
+  cursor: default;
+  white-space: nowrap;
+}
+
 .Status-Label.Cancel {
   background: #FFEBEE;
   color: var(--Danger-Red);

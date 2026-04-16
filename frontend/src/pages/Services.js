@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
-import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, Users, UtensilsCrossed, MapPin, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, Bell, Star, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, Users, UtensilsCrossed, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, Bell, Star, Sparkles, AlertTriangle, CircleCheck } from 'lucide-react';
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
 import { eventBookingAPI, serviceAPI, EVENT_TYPES_LIST } from '../api/managerApi';
 import { eventsAPI } from '../api/eventsApi';
-import { getComboLists, getFoodByFilter } from '../api/foodApi';
+import { getComboLists, getFoodByFilter, getAllFoods } from '../api/foodApi';
+import { getAllCategories } from '../api/categoryApi';
+import { mapFoodDtoToMenuOption, reconcileMenuItemsWithApiCategories } from '../utils/menuFoodFromApi';
 import { isAuthenticated } from '../api/authApi';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 import AddDishModal from '../components/AddDishModal';
 import FoodListModal from '../components/FoodListModal';
@@ -29,8 +31,23 @@ function getMonthDays(year, month) {
   return cells;
 }
 
+
+const MENU_OPTIONS_FALLBACK = [
+  { type: 'Menu', id: -9001, foodId: -9001, name: 'Súp bào ngư vây cá', price: 500000, categoryLabel: 'Khai vị' },
+  { type: 'Menu', id: -9002, foodId: -9002, name: 'Cá điều hồng hấp', price: 150000, categoryLabel: 'Món chính' },
+  { type: 'Menu', id: -9003, foodId: -9003, name: 'Tôm sú hấp', price: 180000, categoryLabel: 'Món chính' },
+  { type: 'Menu', id: -9004, foodId: -9004, name: 'Mực nướng', price: 200000, categoryLabel: 'Món chính' },
+  { type: 'Menu', id: -9005, foodId: -9005, name: 'Chè tổ yến hạt sen', price: 300000, categoryLabel: 'Tráng miệng' }
+];
+const COMBO_OPTIONS_FALLBACK = [
+  { type: 'Combo', id: -9101, comboId: -9101, name: 'Combo FPT', price: 150000, categoryLabel: 'Món chính' },
+  { type: 'Combo', id: -9102, comboId: -9102, name: 'Combo VIP', price: 250000, categoryLabel: 'Món chính' },
+  { type: 'Combo', id: -9103, comboId: -9103, name: 'Combo Family', price: 350000, categoryLabel: 'Món chính' }
+];
+
 const Services = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showAuthRequired, setShowAuthRequired] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -64,7 +81,6 @@ const Services = () => {
     phone: '',
     numTables: '1',
     numGuests: '10',
-    location: '',
     note: ''
   });
   const [bookingForm, setBookingForm] = useState({
@@ -77,9 +93,11 @@ const Services = () => {
   });
   const [bookingError, setBookingError] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState('');
+  const [bookingErrorField, setBookingErrorField] = useState('');
   const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(''); // tên hiển thị
   const [selectedEventId, setSelectedEventId] = useState(0); // id gửi API (backend cần eventId)
+  const [selectedEventSession, setSelectedEventSession] = useState(''); // buổi: morning | evening
   const [selectedEventTime, setSelectedEventTime] = useState(''); // giờ tổ chức HH:mm
   const [eventStepError, setEventStepError] = useState(''); // lỗi validation step 1
   const [selectedServices, setSelectedServices] = useState([]);
@@ -96,9 +114,33 @@ const Services = () => {
     categoryLabel: 'Món chính'
   });
   const [isEventSubmitting, setIsEventSubmitting] = useState(false);
+  const [hasConfirmedTerms, setHasConfirmedTerms] = useState(false);
   const eventSubmitRef = useRef(false); // chống double-submit (React StrictMode)
   const [eventError, setEventError] = useState('');
   const [eventSuccess, setEventSuccess] = useState('');
+
+  const clampNumberInput = (value, min, max) => {
+    if (value === '') return '';
+    const numeric = Number.parseInt(value, 10);
+    if (!Number.isFinite(numeric)) return String(min);
+    if (numeric < min) return String(min);
+    if (numeric > max) return String(max);
+    return String(numeric);
+  };
+
+  const bookingAlertRef = useRef(null);
+  const bookingTimeGridRef = useRef(null);
+  const bookingFullNameRef = useRef(null);
+  const bookingPhoneRef = useRef(null);
+  const bookingGuestsRef = useRef(null);
+  const eventTypeChipsRef = useRef(null);
+  const eventTimeGridRef = useRef(null);
+  const eventGuestsRef = useRef(null);
+  const eventTablesRef = useRef(null);
+  const eventFullNameRef = useRef(null);
+  const eventPhoneRef = useRef(null);
+  const eventStepErrorAlertRef = useRef(null);
+  const eventErrorAlertRef = useRef(null);
 
   // ===== STATE CHO 3 MODAL THÊM MÓN =====
   const [showAddDishModal, setShowAddDishModal] = useState(false);  // Modal A: THÊM MÓN
@@ -109,6 +151,7 @@ const Services = () => {
   // API-loaded menu & combo options
   const [apiMenuOptions, setApiMenuOptions] = useState([]);
   const [apiComboOptions, setApiComboOptions] = useState([]);
+  const [menuCategoriesFromApi, setMenuCategoriesFromApi] = useState([]);
   const [isLoadingMenu, setIsLoadingMenu] = useState(false);
 
   // API-loaded event services (Bước 2: Sự kiện & Dịch vụ)
@@ -123,6 +166,25 @@ const Services = () => {
     // Services page is now public - anyone can view
   }, []);
 
+  // Danh mục thực đơn (cùng API với trang /menu) — tab lọc modal đồng bộ với category lists + categoryId
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getAllCategories();
+        let categoryData = [];
+        if (Array.isArray(res)) categoryData = res;
+        else if (Array.isArray(res?.$values)) categoryData = res.$values;
+        else if (Array.isArray(res?.data)) categoryData = res.data;
+        else if (Array.isArray(res?.data?.$values)) categoryData = res.data.$values;
+        if (!cancelled) setMenuCategoriesFromApi(categoryData);
+      } catch {
+        if (!cancelled) setMenuCategoriesFromApi([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Load menu items (food) and combos from API
   useEffect(() => {
     const loadMenuData = async () => {
@@ -134,9 +196,16 @@ const Services = () => {
         ]);
 
         const comboList = comboRes.status === 'fulfilled' ? (Array.isArray(comboRes.value) ? comboRes.value : comboRes.value?.$values || []) : [];
-        const foodList = foodRes.status === 'fulfilled' ? (Array.isArray(foodRes.value) ? foodRes.value : foodRes.value?.$values || []) : [];
-
-        const categoryMap = { 1: 'Khai vị', 2: 'Món chính', 3: 'Tráng miệng', 4: 'Đồ uống' };
+        let foodList = foodRes.status === 'fulfilled' ? foodRes.value : [];
+        if (!Array.isArray(foodList)) foodList = [];
+        if (foodList.length === 0) {
+          try {
+            foodList = await getAllFoods();
+            if (!Array.isArray(foodList)) foodList = [];
+          } catch (e) {
+            console.warn('[Services] getAllFoods fallback:', e?.message || e);
+          }
+        }
 
         const mappedCombos = comboList.map(c => ({
           type: 'Combo',
@@ -147,14 +216,7 @@ const Services = () => {
           categoryLabel: 'Món chính'
         }));
 
-        const mappedFoods = foodList.map(f => ({
-          type: 'Menu',
-          id: f.foodId ?? f.id ?? 0,
-          foodId: f.foodId ?? f.id ?? 0,
-          name: f.foodName || f.name || '',
-          price: f.price || 0,
-          categoryLabel: categoryMap[f.categoryId] || 'Món chính'
-        }));
+        const mappedFoods = foodList.map((f) => mapFoodDtoToMenuOption(f));
 
         setApiComboOptions(mappedCombos);
         setApiMenuOptions(mappedFoods);
@@ -387,34 +449,47 @@ const Services = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const scrollToTarget = (targetRef, shouldFocus = false) => {
+    const el = targetRef?.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (shouldFocus && typeof el.focus === 'function') {
+      window.setTimeout(() => {
+        el.focus({ preventScroll: true });
+      }, 180);
+    }
+  };
+
   const validateBookingForm = () => {
     if (!bookingForm.fullName.trim()) {
-      return 'Vui lòng nhập họ và tên.';
+      return { field: 'fullName', message: 'Vui lòng nhập họ và tên.' };
     }
 
     if (!bookingForm.phone.trim()) {
-      return 'Vui lòng nhập số điện thoại.';
+      return { field: 'phone', message: 'Vui lòng nhập số điện thoại.' };
     }
 
     if (!selectedTime) {
-      return 'Vui lòng chọn giờ đặt bàn.';
+      return { field: 'time', message: 'Vui lòng chọn giờ đặt bàn.' };
     }
 
     const guests = Number(bookingForm.numGuests);
     if (!guests || guests < 1 || guests > 29) {
-      return 'Số lượng khách hợp lệ từ 1 đến 29.';
+      return { field: 'numGuests', message: 'Số lượng khách hợp lệ từ 1 đến 29.' };
     }
 
-    return '';
+    return null;
   };
 
   const handleBookingSubmit = async () => {
     setBookingError('');
     setBookingSuccess('');
+    setBookingErrorField('');
 
     const validationError = validateBookingForm();
     if (validationError) {
-      setBookingError(validationError);
+      setBookingError(validationError.message);
+      setBookingErrorField(validationError.field);
       return;
     }
 
@@ -448,22 +523,78 @@ const Services = () => {
     }
   };
 
-  // Menu và Combo options (merge API data + fallbacks, categoryLabel dùng cho tag màu)
-  const menuOptions = [
-    ...apiMenuOptions,
-    ...apiComboOptions,
-    // Fallback items nếu API chưa có
-    ...(apiMenuOptions.length === 0 && apiComboOptions.length === 0 ? [
-      { type: 'Menu', name: 'Súp bào ngư vây cá', price: 500000, categoryLabel: 'Khai vị' },
-      { type: 'Menu', name: 'Cá điều hồng hấp', price: 150000, categoryLabel: 'Món chính' },
-      { type: 'Menu', name: 'Tôm sú hấp', price: 180000, categoryLabel: 'Món chính' },
-      { type: 'Menu', name: 'Mực nướng', price: 200000, categoryLabel: 'Món chính' },
-      { type: 'Menu', name: 'Chè tổ yến hạt sen', price: 300000, categoryLabel: 'Tráng miệng' },
-      { type: 'Combo', name: 'Combo FPT', price: 150000, categoryLabel: 'Món chính' },
-      { type: 'Combo', name: 'Combo VIP', price: 250000, categoryLabel: 'Món chính' },
-      { type: 'Combo', name: 'Combo Family', price: 350000, categoryLabel: 'Món chính' }
-    ] : [])
-  ];
+  useEffect(() => {
+    if (!bookingError) return;
+    const fieldToRef = {
+      fullName: bookingFullNameRef,
+      phone: bookingPhoneRef,
+      time: bookingTimeGridRef,
+      numGuests: bookingGuestsRef,
+    };
+    const targetRef = fieldToRef[bookingErrorField] || bookingAlertRef;
+    const shouldFocus = targetRef !== bookingTimeGridRef;
+    scrollToTarget(targetRef, shouldFocus);
+  }, [bookingError, bookingErrorField]);
+
+  useEffect(() => {
+    if (eventStep !== 1 || !eventStepError) return;
+    const lower = String(eventStepError).toLowerCase();
+    if (eventStepError === 'eventId') {
+      scrollToTarget(eventTypeChipsRef);
+      return;
+    }
+    if (eventStepError === 'time') {
+      scrollToTarget(eventTimeGridRef);
+      return;
+    }
+    if (eventStepError === 'fullName') {
+      scrollToTarget(eventFullNameRef, true);
+      return;
+    }
+    if (eventStepError === 'phone') {
+      scrollToTarget(eventPhoneRef, true);
+      return;
+    }
+    if (lower.includes('khách')) {
+      scrollToTarget(eventGuestsRef, true);
+      return;
+    }
+    if (lower.includes('số lượng bàn')) {
+      scrollToTarget(eventTablesRef, true);
+      return;
+    }
+    scrollToTarget(eventStepErrorAlertRef);
+  }, [eventStep, eventStepError]);
+
+  useEffect(() => {
+    if (eventStep === 4 && eventError) {
+      scrollToTarget(eventErrorAlertRef);
+    }
+  }, [eventError, eventStep]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('step') === '4') {
+      setBookingTab('event');
+      setEventStep(4);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (eventStep !== 4) setHasConfirmedTerms(false);
+  }, [eventStep]);
+
+  const menuOptions = useMemo(() => {
+    const raw = [
+      ...apiMenuOptions,
+      ...apiComboOptions,
+      ...(apiMenuOptions.length === 0 ? MENU_OPTIONS_FALLBACK : []),
+      ...(apiComboOptions.length === 0 ? COMBO_OPTIONS_FALLBACK : [])
+    ];
+    return reconcileMenuItemsWithApiCategories(raw, menuCategoriesFromApi);
+  }, [apiMenuOptions, apiComboOptions, menuCategoriesFromApi]);
+
+
 
   // ===== XỬ LÝ 3 MODAL THÊM MÓN =====
   
@@ -478,13 +609,13 @@ const Services = () => {
   // Mở Modal B (DANH SÁCH MÓN ĂN) từ Modal A
   const handleOpenFoodList = () => {
     setShowAddDishModal(false);
-    setShowFoodListModal(true);
+    setTimeout(() => setShowFoodListModal(true), 100);
   };
 
   // Mở Modal C (DANH SÁCH GÓI COMBO) từ Modal A
   const handleOpenComboList = () => {
     setShowAddDishModal(false);
-    setShowComboListModal(true);
+    setTimeout(() => setShowComboListModal(true), 100);
   };
 
   // Quay lại Modal A từ Modal B hoặc Modal C
@@ -558,17 +689,22 @@ const Services = () => {
     .filter((e) => e.isActive !== false)
     .map((e) => ({
       id: e.id ?? e.eventId,
-      name: e.title || '',
+      name: String(e.title || '').trim().toLowerCase() === 'hội nghị - hội thảo'
+        ? 'Tiệc kỷ niệm'
+        : (e.title || ''),
     }));
 
-  // Time slots cho event (không cần đặt trước)
-  const eventTimeSlots = [
-    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
-    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
-    '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
-    '20:00', '20:30', '21:00', '21:30', '22:00'
+  const eventSessionOptions = [
+    { id: 'morning', label: 'Sáng', icon: '🌅' },
+    { id: 'evening', label: 'Tối', icon: '🌙' },
   ];
+
+  const eventSessionTimeMap = {
+    morning: ['08:00', '09:00', '10:00', '11:00'],
+    evening: ['17:00', '18:00', '19:00', '20:00'],
+  };
+
+  const eventTimeSlots = eventSessionTimeMap[selectedEventSession] || [];
 
   // Dịch vụ sự kiện: ưu tiên từ API GET /api/services, không có thì dùng fallback
   // Cả API lẫn fallback đều lọc isAvailable !== false
@@ -597,30 +733,33 @@ const Services = () => {
       setEventStepError('eventId');
       return;
     }
-    // 2) Chọn ngày (luôn có default → không cần check trống, chỉ check quá khứ nếu muốn)
-    // 3) Chọn giờ
+    // 2) Chọn giờ
     if (!selectedEventTime) {
       setEventStepError('time');
       return;
     }
-    // 4) Số khách trong 1 bàn
+    // 3) Số khách trong 1 bàn
     const guestsPerTable = parseInt(eventForm.numGuests, 10);
-    if (!guestsPerTable || guestsPerTable < 1) {
-      setEventStepError('Vui lòng nhập số khách trong 1 bàn (≥1).');
+    if (!guestsPerTable || guestsPerTable < 4 || guestsPerTable > 10) {
+      setEventStepError('Số khách / bàn chỉ được từ 4 đến 10 khách.');
       return;
     }
-    // 5) Số bàn
+    // 4) Số bàn
     const tables = parseInt(eventForm.numTables, 10);
     if (!tables || tables < 1) {
       setEventStepError('Vui lòng nhập số lượng bàn (≥1).');
       return;
     }
-    // 6) Họ tên
+    if (tables > 30) {
+      setEventStepError('Số lượng bàn tối đa là 30.');
+      return;
+    }
+    // 5) Họ tên
     if (!eventForm.fullName || !eventForm.fullName.trim()) {
       setEventStepError('fullName');
       return;
     }
-    // 7) SĐT
+    // 6) SĐT
     if (!eventForm.phone || !eventForm.phone.trim()) {
       setEventStepError('phone');
       return;
@@ -659,7 +798,7 @@ const Services = () => {
     console.log('[handleEventSubmit] Authenticated ✅');
 
     if (!selectedDate) {
-      setEventError('Vui lòng chọn ngày tổ chức sự kiện');
+      setEventError('Vui lòng chọn ngày tổ chức sự kiện.');
       return;
     }
 
@@ -668,15 +807,19 @@ const Services = () => {
       return;
     }
 
-    const numTables = Math.max(1, parseInt(eventForm.numTables, 10) || 1);
-    const guestsPerTable = Math.max(1, parseInt(eventForm.numGuests, 10) || 10);
+    const numTables = parseInt(eventForm.numTables, 10);
+    const guestsPerTable = parseInt(eventForm.numGuests, 10);
     const expectedGuests = numTables * guestsPerTable;
-    if (numTables < 1) {
+    if (!numTables || numTables < 1) {
       setEventError('Số lượng bàn phải lớn hơn 0.');
       return;
     }
-    if (guestsPerTable < 1) {
-      setEventError('Số khách trong 1 bàn phải lớn hơn 0.');
+    if (numTables > 30) {
+      setEventError('Số lượng bàn tối đa là 30.');
+      return;
+    }
+    if (!guestsPerTable || guestsPerTable < 4 || guestsPerTable > 10) {
+      setEventError('Số khách / bàn chỉ được từ 4 đến 10 khách.');
       return;
     }
 
@@ -712,7 +855,7 @@ const Services = () => {
         reservationDate: formatReservationDate(selectedDate),
         reservationTime,
         note: eventForm.note || '',
-        area: eventForm.location || 'Trong nhà (Máy lạnh)',
+        area: 'Trong nhà (Máy lạnh)',
         eventId: selectedEventId,
         services: selectedServices.map(id => ({
           serviceId: id,
@@ -761,6 +904,11 @@ const Services = () => {
     Number.isFinite(tablesInput) && tablesInput > 0
       ? guestsPerTableInput * tablesInput
       : 0;
+  const tableCount = Number.isFinite(tablesInput) && tablesInput > 0 ? tablesInput : 0;
+  const menuPerTableAmount = menuDishes.reduce((sum, dish) => sum + (Number(dish.subtotal) || 0), 0);
+  const menuFeeAmount = menuPerTableAmount * tableCount;
+  const servicesFeeAmount = calculateServiceTotal();
+  const eventGrandTotal = menuFeeAmount + servicesFeeAmount;
 
   // FAQ Data
   const faqItems = [
@@ -874,7 +1022,7 @@ const Services = () => {
                     })}
                   </div>
                 </div>
-                <div className="time-grid">
+                <div className="time-grid" ref={bookingTimeGridRef}>
                   {getAvailableTimes(selectedDate).map((time) => {
                     const isSelectable = isTimeSelectable(time, selectedDate);
                     const isSelected = time === selectedTime;
@@ -904,6 +1052,8 @@ const Services = () => {
                     type="text" 
                     placeholder="" 
                     value={bookingForm.fullName}
+                    ref={bookingFullNameRef}
+                    className={bookingErrorField === 'fullName' ? 'input-invalid' : ''}
                     onChange={(e) => setBookingForm({...bookingForm, fullName: e.target.value})}
                   />
                 </div>
@@ -913,6 +1063,8 @@ const Services = () => {
                     type="text" 
                     placeholder="" 
                     value={bookingForm.phone}
+                    ref={bookingPhoneRef}
+                    className={bookingErrorField === 'phone' ? 'input-invalid' : ''}
                     onChange={(e) => setBookingForm({...bookingForm, phone: e.target.value})}
                   />
                 </div>
@@ -930,6 +1082,8 @@ const Services = () => {
                   <input 
                     type="number" 
                     value={bookingForm.numGuests}
+                    ref={bookingGuestsRef}
+                    className={bookingErrorField === 'numGuests' ? 'input-invalid' : ''}
                     onChange={(e) => setBookingForm({...bookingForm, numGuests: e.target.value})}
                     placeholder="" 
                   />
@@ -952,8 +1106,18 @@ const Services = () => {
                     onChange={(e) => setBookingForm({...bookingForm, note: e.target.value})}
                   ></textarea>
                 </div>
-                {bookingError && <p className="booking-status booking-status-error">{bookingError}</p>}
-                {bookingSuccess && <p className="booking-status booking-status-success">{bookingSuccess}</p>}
+                {bookingError && (
+                  <div className="form-alert form-alert-error" role="alert" aria-live="assertive" ref={bookingAlertRef}>
+                    <AlertTriangle size={18} />
+                    <span>{bookingError}</span>
+                  </div>
+                )}
+                {bookingSuccess && (
+                  <div className="form-alert form-alert-success" role="status" aria-live="polite">
+                    <CircleCheck size={18} />
+                    <span>{bookingSuccess}</span>
+                  </div>
+                )}
                 <button
                   className="primary-gold-btn"
                   onClick={handleBookingSubmit}
@@ -1038,7 +1202,7 @@ const Services = () => {
                           ) : eventTypes.length === 0 ? (
                             <p className="event-field-empty">Hiện chưa có loại sự kiện nào.</p>
                           ) : (
-                            <div className="event-type-chips">
+                            <div className={`event-type-chips ${eventStepError === 'eventId' ? 'field-invalid' : ''}`} ref={eventTypeChipsRef}>
                               {eventTypes.map((ev) => (
                                 <button
                                   key={ev.id}
@@ -1079,8 +1243,11 @@ const Services = () => {
                               {getMonthDays(selectedDate.getFullYear(), selectedDate.getMonth()).map((date, idx) => {
                                 if (!date) return <span key={`empty-${idx}`} style={{ display: 'block' }} />;
                                 const today = new Date();
-                                const isToday = date.toDateString() === today.toDateString();
-                                const isPast = date < today && date.toDateString() !== today.toDateString();
+                                today.setHours(0, 0, 0, 0);
+                                const cell = new Date(date);
+                                cell.setHours(0, 0, 0, 0);
+                                const isToday = date.toDateString() === new Date().toDateString();
+                                const isPast = cell < today;
                                 const isSelected = date.toDateString() === selectedDate.toDateString();
                                 return (
                                   <button
@@ -1105,20 +1272,34 @@ const Services = () => {
                             <Clock size={14} className="icon-orange" />
                             Giờ tổ chức <span className="required-asterisk">*</span>
                           </label>
-                          <div className="time-slots-grid">
-                            {eventTimeSlots.map(time => {
-                              const [h, m] = time.split(':').map(Number);
-                              const slotDate = new Date(selectedDate);
-                              slotDate.setHours(h, m, 0, 0);
-                              const now = new Date();
-                              const isPast = selectedDate.toDateString() === now.toDateString() && slotDate <= now;
+                          <div className="event-session-grid">
+                            {eventSessionOptions.map((session) => (
+                              <button
+                                key={session.id}
+                                type="button"
+                                className={`event-session-btn ${selectedEventSession === session.id ? 'active' : ''}`}
+                                onClick={() => {
+                                  setSelectedEventSession(session.id);
+                                  setSelectedEventTime('');
+                                  setEventStepError('');
+                                }}
+                              >
+                                <span className="event-session-icon">{session.icon}</span>
+                                <span>{session.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div className={`time-slots-grid ${eventStepError === 'time' ? 'field-invalid' : ''}`} ref={eventTimeGridRef}>
+                            {eventSessionOptions.length > 0 && eventTimeSlots.length === 0 ? (
+                              <p className="event-time-helper">Chọn buổi trước để hiển thị giờ phù hợp.</p>
+                            ) : null}
+                            {eventTimeSlots.map((time) => {
                               const isSelected = selectedEventTime === time;
                               return (
                                 <button
                                   key={time}
                                   type="button"
-                                  className={`time-slot-btn ${isSelected ? 'active' : ''} ${isPast ? 'disabled' : ''}`}
-                                  disabled={isPast}
+                                  className={`time-slot-btn ${isSelected ? 'active' : ''}`}
                                   onClick={() => {
                                     setSelectedEventTime(time);
                                     setEventStepError('');
@@ -1143,14 +1324,16 @@ const Services = () => {
                             </label>
                             <input
                               type="number"
-                              className="event-step1-input"
+                              className={`event-step1-input ${String(eventStepError).toLowerCase().includes('khách') ? 'input-invalid' : ''}`}
                               value={eventForm.numGuests}
-                              min="1"
+                              min="4"
+                              max="10"
+                              ref={eventGuestsRef}
                               onChange={(e) => {
-                                setEventForm({ ...eventForm, numGuests: e.target.value });
+                                setEventForm({ ...eventForm, numGuests: clampNumberInput(e.target.value, 4, 10) });
                                 setEventStepError('');
                               }}
-                              placeholder="10"
+                              placeholder="4 - 10"
                             />
                           </div>
                           <div className="event-field-block">
@@ -1160,14 +1343,16 @@ const Services = () => {
                             </label>
                             <input
                               type="number"
-                              className="event-step1-input"
+                              className={`event-step1-input ${String(eventStepError).toLowerCase().includes('số lượng bàn') ? 'input-invalid' : ''}`}
                               value={eventForm.numTables}
                               min="1"
+                              max="30"
+                              ref={eventTablesRef}
                               onChange={(e) => {
-                                setEventForm({ ...eventForm, numTables: e.target.value });
+                                setEventForm({ ...eventForm, numTables: clampNumberInput(e.target.value, 1, 30) });
                                 setEventStepError('');
                               }}
-                              placeholder="5"
+                              placeholder="1 - 30"
                             />
                           </div>
                         </div>
@@ -1199,8 +1384,9 @@ const Services = () => {
                           </label>
                           <input
                             type="text"
-                            className="event-step1-input"
+                            className={`event-step1-input ${eventStepError === 'fullName' ? 'input-invalid' : ''}`}
                             value={eventForm.fullName}
+                            ref={eventFullNameRef}
                             onChange={(e) => {
                               setEventForm({ ...eventForm, fullName: e.target.value });
                               setEventStepError('');
@@ -1219,9 +1405,10 @@ const Services = () => {
                           </label>
                           <input
                             type="text"
-                            className="event-step1-input"
+                            className={`event-step1-input ${eventStepError === 'phone' ? 'input-invalid' : ''}`}
                             value={eventForm.phone}
                             maxLength={11}
+                            ref={eventPhoneRef}
                             onChange={(e) => {
                               setEventForm({ ...eventForm, phone: e.target.value.replace(/\D/g, '') });
                               setEventStepError('');
@@ -1247,23 +1434,7 @@ const Services = () => {
                           />
                         </div>
 
-                        <div className="event-field-block">
-                          <label className="event-field-label">
-                            <MapPin size={14} className="icon-orange" />
-                            Khu vực tổ chức
-                          </label>
-                          <select
-                            className="event-step1-input"
-                            value={eventForm.location}
-                            onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
-                          >
-                            <option value="">Chọn khu vực</option>
-                            <option value="Trong nhà (Máy lạnh)">Trong nhà (Máy lạnh)</option>
-                            <option value="Ngoài trời (Sân vườn)">Ngoài trời (Sân vườn)</option>
-                          </select>
-                        </div>
-
-                        <div className="event-field-block">
+                                                <div className="event-field-block">
                           <label className="event-field-label">
                             <FileText size={14} className="icon-orange" />
                             Ghi chú thêm
@@ -1281,7 +1452,10 @@ const Services = () => {
 
                     {/* Lỗi tổng hợp */}
                     {eventStepError && !['eventId', 'time', 'fullName', 'phone', 'guests', 'tables'].includes(eventStepError) && (
-                      <p className="event-form-error-summary">{eventStepError}</p>
+                      <div className="form-alert form-alert-error event-form-error-summary" role="alert" aria-live="assertive" ref={eventStepErrorAlertRef}>
+                        <AlertTriangle size={18} />
+                        <span>{eventStepError}</span>
+                      </div>
                     )}
 
                     <div className="event-form-card-actions">
@@ -1355,7 +1529,7 @@ const Services = () => {
               {eventStep === 3 && (
                 <div className="event-form-step">
                   <div className="event-menu-detail-card">
-                    <h4 className="event-menu-detail-title">Chi tiết thực đơn đã chọn</h4>
+                    <h4 className="event-menu-detail-title">Chi tiết thực đơn đã chọn cho từng bàn</h4>
                     <p className="event-menu-detail-desc">Vui lòng kiểm tra kỹ danh sách món ăn và số lượng trước khi tiếp tục đặt lịch.</p>
                     <div className="event-menu-table-wrap">
                       <table className="event-menu-table">
@@ -1393,13 +1567,10 @@ const Services = () => {
                     </div>
                     {(() => {
                       const subtotal = menuDishes.reduce((s, d) => s + d.subtotal, 0);
-                      const serviceFee = Math.round(subtotal * 0.05);
-                      const total = subtotal + serviceFee;
                       return (
                         <div className="event-menu-summary">
                           <div className="event-menu-summary-row"><span>Tạm tính:</span><span>{formatCurrency(subtotal)}</span></div>
-                          <div className="event-menu-summary-row"><span>Phí dịch vụ (5%):</span><span>{formatCurrency(serviceFee)}</span></div>
-                          <div className="event-menu-summary-row event-menu-summary-total"><span>TỔNG CỘNG:</span><span>{formatCurrency(total)}</span></div>
+                          <div className="event-menu-summary-row event-menu-summary-total"><span>TỔNG CỘNG:</span><span>{formatCurrency(subtotal)}</span></div>
                           <div className="event-menu-summary-actions">
                             <button type="button" className="event-btn-edit-menu" onClick={handleOpenAddDishModal}><Utensils size={18} /> Chỉnh sửa thực đơn</button>
                             <button type="button" className="event-btn-book-now" onClick={() => setEventStep(4)}><Check size={18} /> ĐẶT LỊCH NGAY</button>
@@ -1435,38 +1606,71 @@ const Services = () => {
               {eventStep === 4 && (
                 <div className="event-form-step event-payment-step">
                   <div className="event-payment-outer-card">
-                    <div className="event-payment-columns event-payment-single-column">
-                      <div className="event-payment-card event-payment-summary event-payment-summary-only">
-                        <h4 className="event-payment-card-title"><List size={18} className="icon-orange" /> Tóm tắt đơn hàng</h4>
-                        {(() => {
-                          const bookingFee = 2500000;
-                          const decorationFee = selectedServices.length > 0 ? calculateServiceTotal() : 1000000;
-                          const serviceFeePercent = 0.1;
-                          const subtotalBeforeFee = bookingFee + decorationFee;
-                          const serviceFeeAmount = Math.round(subtotalBeforeFee * serviceFeePercent);
-                          const totalPayment = subtotalBeforeFee + serviceFeeAmount;
-                          return (
-                            <>
-                              <div className="event-payment-line"><span>Dịch vụ đặt lịch</span><span>{formatCurrency(bookingFee)}</span></div>
-                              <div className="event-payment-line"><span>Phí trang trí</span><span>{formatCurrency(decorationFee)}</span></div>
-                              <div className="event-payment-line"><span>Phí phục vụ (10%)</span><span>{formatCurrency(serviceFeeAmount)}</span></div>
-                              <div className="event-payment-total-row"><span>Tổng cộng</span><span className="event-payment-total-amount">{formatCurrency(totalPayment)}</span></div>
-                            </>
-                          );
-                        })()}
+                    <div className="event-payment-columns">
+                      <div className="event-payment-card event-payment-summary">
+                        <h4 className="event-payment-card-title"><List size={18} className="icon-orange" /> Phí món ăn</h4>
+                        <div className="event-payment-line">
+                          <span>Thực đơn 1 bàn</span>
+                          <span>{formatCurrency(menuPerTableAmount)}</span>
+                        </div>
+                        <div className="event-payment-line">
+                          <span>Số bàn đã đặt</span>
+                          <span>{tableCount}</span>
+                        </div>
+                        <div className="event-payment-total-row">
+                          <span>Thành tiền món ăn</span>
+                          <span className="event-payment-total-amount">{formatCurrency(menuFeeAmount)}</span>
+                        </div>
+                      </div>
+
+                      <div className="event-payment-card event-payment-methods">
+                        <h4 className="event-payment-card-title"><List size={18} className="icon-orange" /> Phí các dịch vụ</h4>
+                        <div className="event-payment-line">
+                          <span>Số dịch vụ đã chọn</span>
+                          <span>{selectedServices.length}</span>
+                        </div>
+                        <div className="event-payment-total-row">
+                          <span>Thành tiền dịch vụ</span>
+                          <span className="event-payment-total-amount">{formatCurrency(servicesFeeAmount)}</span>
+                        </div>
                       </div>
                     </div>
+                    <div className="event-payment-grand-total-row">
+                      <span>Tổng cộng</span>
+                      <span className="event-payment-total-amount">{formatCurrency(eventGrandTotal)}</span>
+                    </div>
 
+                    <p className="event-payment-terms">
+                      Vui lòng đọc và xác nhận <a href="/services/terms" target="_blank" rel="noreferrer">Điều khoản dịch vụ</a>{' '}
+                      trước khi đặt sự kiện.
+                    </p>
+                    <label className={`event-terms-checkbox ${hasConfirmedTerms ? 'checked' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={hasConfirmedTerms}
+                        onChange={(e) => setHasConfirmedTerms(e.target.checked)}
+                      />
+                      <span>Tôi đã đọc và đồng ý với Điều khoản dịch vụ</span>
+                    </label>
+                    {!hasConfirmedTerms && (
+                      <p className="event-payment-terms-hint">
+                        Cần tick vào ô xác nhận để tiếp tục.
+                      </p>
+                    )}
                     <button
                       type="button"
                       className="event-btn-confirm-payment"
                       onClick={handleEventSubmit}
-                      disabled={isEventSubmitting}
+                      disabled={isEventSubmitting || !hasConfirmedTerms}
                     >
                       {isEventSubmitting ? 'ĐANG XỬ LÝ...' : 'Xác nhận đặt sự kiện'}
                     </button>
-                    {eventError && <p className="booking-status booking-status-error" style={{ textAlign: 'center', marginTop: 8 }}>{eventError}</p>}
-                    <p className="event-payment-terms">Bằng cách nhấn nút, bạn đồng ý với <a href="#terms">Điều khoản dịch vụ</a> của chúng tôi.</p>
+                    {eventError && (
+                      <div className="form-alert form-alert-error" role="alert" aria-live="assertive" style={{ marginTop: 8 }} ref={eventErrorAlertRef}>
+                        <AlertTriangle size={18} />
+                        <span>{eventError}</span>
+                      </div>
+                    )}
                     <button type="button" className="event-btn-back event-btn-back-payment-link" onClick={() => setEventStep(3)}>← Quay lại</button>
                   </div>
                 </div>
@@ -1802,6 +2006,7 @@ const Services = () => {
         onClose={() => setShowFoodListModal(false)}
         onBack={handleBackToAddDish}
         menuItems={menuOptions}
+        menuCategories={menuCategoriesFromApi}
         selectedDishes={menuDishes}
         onAddDish={handleAddDishFromModal}
         onRemoveDish={handleRemoveDishFromModal}

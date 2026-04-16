@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import '../styles/AuthPage.css';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import RestaurantLogo from '../components/RestaurantLogo';
@@ -8,7 +8,12 @@ import { login, googleLogin } from '../api/authApi';
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const timeoutRef = useRef(null);
+  const pendingRedirect =
+    typeof location.state?.redirectTo === 'string' && location.state.redirectTo.startsWith('/')
+      ? location.state.redirectTo
+      : '';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +45,16 @@ const AuthPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const stateMessage = location.state?.authMessage;
+    const queryMessage = new URLSearchParams(location.search).get('message');
+    const authMessage = stateMessage || queryMessage;
+
+    if (authMessage) {
+      setError(authMessage);
+    }
+  }, [location.pathname, location.search, location.state]);
+
   // ==========================
   // ERROR PARSER
   // ==========================
@@ -64,6 +79,22 @@ const AuthPage = () => {
       return 'Lỗi kết nối. Vui lòng kiểm tra internet.';
 
     return 'Đăng nhập thất bại. Vui lòng thử lại.';
+  };
+
+  const getPostLoginPath = (role) => {
+    if (pendingRedirect) return pendingRedirect;
+
+    switch (role) {
+      case 'Manager':
+        return '/manager/dashboard';
+      case 'Waiter':
+        return '/waiter/orders';
+      case 'Kitchen':
+        return '/kitchen/orders';
+      case 'Customer':
+      default:
+        return '/profile';
+    }
   };
 
   // ==========================
@@ -117,25 +148,8 @@ const AuthPage = () => {
 
       setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
 
-      // Redirect dựa trên role
       const userRole = response?.user?.role;
-      let redirectPath = '/';
-
-      switch (userRole) {
-        case 'Manager':
-          redirectPath = '/manager/dashboard';
-          break;
-        case 'Waiter':
-          redirectPath = '/waiter/orders';
-          break;
-        case 'Kitchen':
-          redirectPath = '/kitchen/orders';
-          break;
-        case 'Customer':
-        default:
-          redirectPath = '/profile';
-          break;
-      }
+      const redirectPath = getPostLoginPath(userRole);
 
       console.log(`✅ Login success - Role: ${userRole} → Redirecting to: ${redirectPath}`);
 
@@ -176,25 +190,8 @@ const AuthPage = () => {
 
       setSuccess('Đăng nhập Google thành công!');
 
-      // Redirect dựa trên role
       const userRole = response?.user?.role;
-      let redirectPath = '/';
-
-      switch (userRole) {
-        case 'Manager':
-          redirectPath = '/manager/dashboard';
-          break;
-        case 'Waiter':
-          redirectPath = '/waiter/orders';
-          break;
-        case 'Kitchen':
-          redirectPath = '/kitchen/orders';
-          break;
-        case 'Customer':
-        default:
-          redirectPath = '/profile';
-          break;
-      }
+      const redirectPath = getPostLoginPath(userRole);
 
       console.log(`✅ Google Login success - Role: ${userRole} → Redirecting to: ${redirectPath}`);
 
