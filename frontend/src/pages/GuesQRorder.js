@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bell, User, ShoppingCart } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { getBuffetDetail, getBuffetLists, getComboLists, resolveFoodImageUrl } from '../api/foodApi';
+import { getAllCategories } from '../api/categoryApi';
 import {
   addItemToOrder,
   addItemsToOrder,
@@ -16,13 +17,7 @@ import '../styles/MenuPage.css';
 
 const MENU_TABS = ['Food', 'Combo', 'Buffet'];
 
-const CATEGORY_CHIPS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'appetizer', label: 'Khai vị' },
-  { key: 'main', label: 'Món chính' },
-  { key: 'drink', label: 'Đồ uống' },
-  { key: 'dessert', label: 'Tráng miệng' },
-];
+const CATEGORY_ALL_KEY = 'all';
 
 const stripVietnamese = (value) =>
   String(value || '')
@@ -180,10 +175,31 @@ const mapMenuItem = (item, idx, forcedType) => {
   const id = rawId || idx + 1;
   const foodName = item.foodName || item.comboName || item.buffetName || item.name || `Món ${id}`;
   const rawPrice = Number(item.price ?? item.unitPrice ?? item.amount ?? 0);
-  const categoryRaw = String(item.categoryName || item.foodCategoryName || item.category || '').trim();
+  const firstCategory = Array.isArray(item?.categories) ? item.categories[0] : null;
+  const categoryRaw = String(
+    item.categoryName ||
+    item.foodCategoryName ||
+    firstCategory?.name ||
+    item.category?.name ||
+    item.category ||
+    ''
+  ).trim();
+  const categoryId = Number(
+    item.categoryId ??
+    item.foodCategoryId ??
+    item.idCategory ??
+    firstCategory?.categoryId ??
+    firstCategory?.id ??
+    item.category?.categoryId ??
+    item.category?.id ??
+    0
+  );
   const categoryKey = categoryRaw
     ? normalizeCategoryKey(categoryRaw)
     : inferCategoryKeyFromName(foodName);
+  const categoryFilterKey = Number.isFinite(categoryId) && categoryId > 0
+    ? `id:${categoryId}`
+    : `key:${categoryKey}`;
 
   return {
     id,
@@ -200,8 +216,10 @@ const mapMenuItem = (item, idx, forcedType) => {
     buffetPriceChild: Number(item.priceOfChildren ?? item.childrenPrice ?? item.priceChild ?? item.childPrice ?? item.childAmount ?? 0),
     buffetIncludes: itemType === 'Buffet' ? extractBuffetIncludes(item) : [],
     buffetFoods: [],
+    categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : 0,
     category: categoryRaw || categoryLabelByKey[categoryKey] || 'Món chính',
     categoryKey,
+    categoryFilterKey,
     tag: item.isBestSeller || item.isChefChoice ? `CHEF'S CHOICE` : '',
   };
 };
@@ -366,7 +384,8 @@ const GuesQRorder = () => {
   const [foodsError, setFoodsError] = useState('');
   const [activeMenuType, setActiveMenuType] = useState('Food');
   const [searchText, setSearchText] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState(CATEGORY_ALL_KEY);
+  const [foodCategories, setFoodCategories] = useState([]);
   const [cart, setCart] = useState([]);
   const [buffetDraftQty, setBuffetDraftQty] = useState({});
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -390,6 +409,31 @@ const GuesQRorder = () => {
 
   const formatCurrency = (value) =>
     `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await getAllCategories();
+        const rows = Array.isArray(res)
+          ? res
+          : (Array.isArray(res?.$values)
+            ? res.$values
+            : (Array.isArray(res?.data)
+              ? res.data
+              : (Array.isArray(res?.data?.$values) ? res.data.$values : [])));
+        const mapped = rows
+          .map((x) => ({
+            id: Number(x?.categoryId ?? x?.id ?? 0),
+            name: String(x?.name || x?.categoryName || '').trim(),
+          }))
+          .filter((x) => Number.isFinite(x.id) && x.id > 0 && x.name);
+        setFoodCategories(mapped);
+      } catch {
+        setFoodCategories([]);
+      }
+    };
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     const loadFoods = async () => {
@@ -448,6 +492,23 @@ const GuesQRorder = () => {
             .map((item, idx) => mapMenuItem(item, idx, 'Buffet'));
         }
 
+        if (activeMenuType === 'Food' && mapped.length > 0 && foodCategories.length > 0) {
+          const categoryIdByName = new Map(
+            foodCategories.map((cat) => [stripVietnamese(cat.name), cat.id])
+          );
+          mapped = mapped.map((food) => {
+            if (food.itemType !== 'Food') return food;
+            if (Number(food.categoryId || 0) > 0) return food;
+            const matchedCategoryId = categoryIdByName.get(stripVietnamese(food.category));
+            if (!matchedCategoryId) return food;
+            return {
+              ...food,
+              categoryId: matchedCategoryId,
+              categoryFilterKey: `id:${matchedCategoryId}`,
+            };
+          });
+        }
+
         if (activeMenuType === 'Buffet' && mapped.length > 0) {
           mapped = await enrichBuffetIncludesWithDetail(mapped);
         }
@@ -472,7 +533,7 @@ const GuesQRorder = () => {
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [activeMenuType, searchText, tableToken]);
+  }, [activeMenuType, searchText, tableToken, foodCategories]);
 
   useEffect(() => {
     const loadCurrentOrder = async () => {
@@ -574,10 +635,36 @@ const GuesQRorder = () => {
     loadCurrentOrder();
   }, [tableToken, searchParams]);
 
+  const foodCategoryChips = useMemo(() => {
+    const foodsOnly = foods.filter((item) => item.itemType === 'Food');
+    const byId = new Map(foodCategories.map((cat) => [cat.id, cat.name]));
+    const chips = [{ key: CATEGORY_ALL_KEY, label: 'Tất cả' }];
+    const seen = new Set([CATEGORY_ALL_KEY]);
+
+    // Đồng bộ thứ tự danh mục như trang thực đơn customer.
+    foodCategories.forEach((cat) => {
+      const key = `id:${cat.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      chips.push({ key, label: cat.name });
+    });
+
+    // Fallback: món chưa có categoryId vẫn có thể hiển thị nhóm suy đoán.
+    foodsOnly.forEach((food) => {
+      if (Number(food.categoryId || 0) > 0) return;
+      const fallbackKey = String(food.categoryFilterKey || `key:${food.categoryKey || 'main'}`);
+      if (seen.has(fallbackKey)) return;
+      seen.add(fallbackKey);
+      chips.push({ key: fallbackKey, label: food.category || categoryLabelByKey[food.categoryKey] || 'Món chính' });
+    });
+
+    return chips;
+  }, [foods, foodCategories]);
+
   const filteredFoods = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
     return foods.filter((food) => {
-      const byCategory = activeMenuType !== 'Food' || activeCategory === 'all' || food.categoryKey === activeCategory;
+      const byCategory = activeMenuType !== 'Food' || activeCategory === CATEGORY_ALL_KEY || String(food.categoryFilterKey || '') === activeCategory;
       const bySearch =
         !keyword ||
         food.name.toLowerCase().includes(keyword) ||
@@ -944,6 +1031,32 @@ const GuesQRorder = () => {
   }, 0);
   const total = subtotal;
 
+  const getOrderedItemQuantity = (item) =>
+    Number(item?.quantity || 0) + Number(item?.quantityBufferChildent || 0);
+
+  const getOrderedItemLineAmount = (item) => {
+    const adultQty = Number(item?.quantity || 0);
+    const childQty = Number(item?.quantityBufferChildent || 0);
+    const adultPrice = Number(item?.price || 0);
+    const childPrice = Number(item?.childrenPrice || 0);
+    if (item?.itemType === 'Buffet') {
+      return adultQty * adultPrice + childQty * childPrice;
+    }
+    return getOrderedItemQuantity(item) * adultPrice;
+  };
+
+  const orderedItemsSummary = useMemo(() => {
+    return orderedItems.reduce(
+      (acc, item) => {
+        // Tổng số món = số dòng món (không cộng dồn theo quantity).
+        acc.totalQty += 1;
+        acc.totalAmount += getOrderedItemLineAmount(item);
+        return acc;
+      },
+      { totalQty: 0, totalAmount: 0 }
+    );
+  }, [orderedItems]);
+
   useEffect(() => {
     if (tableCode) {
       localStorage.setItem('tableCode', String(tableCode));
@@ -1057,7 +1170,7 @@ const GuesQRorder = () => {
                 key={tab}
                 onClick={() => {
                   setActiveMenuType(tab);
-                  setActiveCategory('all');
+                  setActiveCategory(CATEGORY_ALL_KEY);
                 }}
                 style={{
                   border: 'none',
@@ -1075,26 +1188,31 @@ const GuesQRorder = () => {
           })}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
             onClick={handleOpenOrderedItems}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '6px 10px',
+              gap: 8,
+              padding: '8px 14px',
               borderRadius: 999,
-              background: '#f3f4f6',
-              fontWeight: 800,
-              border: 'none',
+              background: '#fff7f1',
+              color: '#b45309',
+              fontWeight: 900,
+              border: '1px solid #ffd2ae',
               cursor: 'pointer',
+              boxShadow: '0 3px 10px rgba(255,122,33,0.16)',
             }}
+            title={`Đơn hàng của ${tableLabel}`}
           >
-            <ShoppingCart size={14} /> {tableLabel}
+            <ShoppingCart size={14} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 0.2 }}>
+              Bạn đang ở
+            </span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>{tableLabel}</span>
           </button>
-          <Bell size={18} color="#374151" />
-          <User size={18} color="#374151" />
         </div>
       </div>
 
@@ -1106,16 +1224,43 @@ const GuesQRorder = () => {
           </h1>
           <p className="menu-desc" style={{color: '#6d7680', marginBottom: 24}}>Khám phá tinh hoa ẩm thực Pháp giữa lòng Sài Gòn</p>
           {activeMenuType === 'Food' && (
-            <div className="menu-tabs-row" style={{marginBottom: 24}}>
-              {CATEGORY_CHIPS.map((cat) => (
-                <button
-                  key={cat.key}
-                  className={`menu-tab-btn ${activeCategory === cat.key ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(cat.key)}
-                >
-                  {cat.label}
-                </button>
-              ))}
+            <div style={{ marginBottom: 24 }}>
+              <div
+                style={{
+                  border: '1px solid #f1e4d7',
+                  background: 'linear-gradient(180deg, #fff 0%, #fff9f4 100%)',
+                  borderRadius: 14,
+                  padding: '12px 14px',
+                }}
+              >
+                <div style={{ fontWeight: 800, fontSize: 14, color: '#374151', marginBottom: 10 }}>
+                  Danh Mục Món Ăn
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {foodCategoryChips.map((cat) => (
+                  <button
+                    key={cat.key}
+                    onClick={() => setActiveCategory(cat.key)}
+                    style={{
+                      height: 34,
+                      padding: '0 16px',
+                      borderRadius: 999,
+                      border: activeCategory === cat.key ? 'none' : '1px solid #e5e7eb',
+                      background: activeCategory === cat.key ? '#ff8a2a' : '#f5f7fb',
+                      color: activeCategory === cat.key ? '#fff' : '#334155',
+                      fontSize: 12,
+                      fontWeight: 800,
+                      letterSpacing: 0.2,
+                      cursor: 'pointer',
+                      boxShadow: activeCategory === cat.key ? '0 6px 14px rgba(255,122,33,0.28)' : 'none',
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+                </div>
+              </div>
             </div>
           )}
           <div style={{marginBottom: 24, position: 'relative', maxWidth: 320}}>
@@ -1375,7 +1520,7 @@ const GuesQRorder = () => {
               <div>
                 <div style={{ fontWeight: 900, fontSize: 20, color: '#111827' }}>Món đã order</div>
                 <div style={{ color: '#6b7280', fontSize: 13 }}>
-                  {tableLabel}{currentOrderCode ? ` • Đơn ${currentOrderCode}` : ''}
+                  {tableLabel}
                 </div>
               </div>
               <button
@@ -1401,6 +1546,8 @@ const GuesQRorder = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {orderedItems.map((item) => {
                   const st = getDishStatusMeta(item.dishStatus);
+                  const lineQty = getOrderedItemQuantity(item);
+                  const lineAmount = getOrderedItemLineAmount(item);
                   return (
                     <div
                       key={`ordered-${item.cartKey || item.id}`}
@@ -1416,8 +1563,11 @@ const GuesQRorder = () => {
                     >
                       <div>
                         <div style={{ fontWeight: 700, color: '#111827' }}>{item.name}</div>
-                        <div style={{ color: '#6b7280', fontSize: 13 }}>
-                          Số lượng: {Number(item.quantity || 0) + Number(item.quantityBufferChildent || 0)}
+                        <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 2 }}>
+                          Số lượng: {lineQty}
+                        </div>
+                        <div style={{ color: '#f97316', fontSize: 13, fontWeight: 800 }}>
+                          Thành tiền: {formatCurrency(lineAmount)}
                         </div>
                       </div>
                       <span
@@ -1436,6 +1586,26 @@ const GuesQRorder = () => {
                     </div>
                   );
                 })}
+              </div>
+            ) : null}
+
+            {!orderedItemsLoading && !orderedItemsError && orderedItems.length > 0 ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  borderTop: '1px dashed #e5e7eb',
+                  paddingTop: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ color: '#374151', fontWeight: 700 }}>
+                  Tổng số món: {orderedItemsSummary.totalQty}
+                </div>
+                <div style={{ color: '#ea580c', fontWeight: 900, fontSize: 18 }}>
+                  Tổng tiền: {formatCurrency(orderedItemsSummary.totalAmount)}
+                </div>
               </div>
             ) : null}
           </div>

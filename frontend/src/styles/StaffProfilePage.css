@@ -99,3 +99,354 @@
 .staff-profile-stat-card {
 	background: #fff;
 }
+
+.staff-profile-bg {
+	min-height: 100vh;
+	background: #f8f3ee;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 28px 12px;
+}
+
+.staff-profile-card {
+	width: 100%;
+	max-width: 980px;
+	background: #fff;
+	border-radius: 22px;
+	box-shadow: 0 16px 40px rgba(26, 22, 18, 0.12);
+	border: 1px solid #f1e8e0;
+	overflow: hidden;
+}
+
+.staff-profile-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 24px 28px;
+	border-bottom: 1px solid #f3eae3;
+}
+
+.staff-profile-header-info {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	min-width: 0;
+}
+
+.staff-profile-avatar {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	overflow: hidden;
+	flex-shrink: 0;
+	border: 2px solid #ffe2cf;
+	background: #f4ede7;
+}
+
+.staff-profile-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.staff-profile-header-title {
+	font-size: 34px;
+	font-weight: 900;
+	color: #1f1a16;
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+}
+
+.staff-profile-header-title .highlight {
+	color: #ff6c1f;
+}
+
+.staff-profile-header-meta {
+	margin-top: 2px;
+	font-size: 16px;
+	font-weight: 800;
+	color: #2c2019;
+}
+
+.staff-profile-header-meta span {
+	color: #111827;
+}
+
+.staff-profile-close-btn {
+	width: 40px;
+	height: 40px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 999px;
+	background: transparent;
+	color: #5f4d40;
+	cursor: pointer;
+	transition: all 0.18s ease;
+}
+
+.staff-profile-close-btn:hover {
+	background: #f3ece5;
+	color: #25160d;
+}
+
+.staff-profile-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+	padding: 14px 18px;
+	background: #faf4ef;
+	border-bottom: 1px solid #f1e8e0;
+}
+
+.staff-profile-stat-card {
+	background: #fff;
+	border: 1px solid #f1e8e0;
+	border-radius: 10px;
+	padding: 12px 14px;
+}
+
+.staff-profile-stat-label {
+	font-size: 14px;
+	color: #7a6352;
+	margin-bottom: 6px;
+}
+
+.staff-profile-stat-main {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.staff-profile-stat-value {
+	font-size: 22px;
+	font-weight: 900;
+	color: #1f2937;
+}
+
+.staff-profile-stat-change {
+	font-size: 13px;
+	font-weight: 700;
+	color: #16a34a;
+}
+
+.staff-profile-stat-unit {
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.staff-profile-stat-absent {
+	color: #dc2626;
+}
+
+.staff-profile-table-section {
+	padding: 0 0 14px;
+}
+
+.staff-profile-table-header {
+	padding: 12px 16px 10px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.staff-profile-table-title {
+	font-size: 22px;
+	font-weight: 800;
+	color: #25160d;
+}
+
+.staff-profile-table-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #4b5563;
+}
+
+.staff-profile-table-filter select {
+	padding: 6px 10px;
+	border-radius: 8px;
+	border: 1px solid #dbcfc4;
+	background: #fff;
+	font-weight: 600;
+	color: #1f2937;
+	outline: none;
+}
+
+.staff-profile-table-filter select:focus {
+	border-color: #ff6c1f;
+	box-shadow: 0 0 0 2px rgba(255, 108, 31, 0.16);
+}
+
+.staff-profile-table-container {
+	margin: 0 12px;
+	border: 1px solid #e7dfd7;
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.staff-profile-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.staff-profile-table thead tr {
+	background: linear-gradient(180deg, #6f86e8 0%, #5771db 100%);
+}
+
+.staff-profile-table th {
+	padding: 10px 12px;
+	text-align: left;
+	font-size: 13px;
+	font-weight: 800;
+	color: #fff;
+}
+
+.staff-profile-table td {
+	padding: 10px 12px;
+	border-bottom: 1px solid #f3ece5;
+	font-size: 14px;
+	color: #1f2937;
+}
+
+.staff-profile-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+.staff-profile-table .center {
+	text-align: center;
+}
+
+.staff-profile-table .right {
+	text-align: right;
+}
+
+.staff-profile-status-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.staff-profile-status-on-time {
+	background: #dcfce7;
+	color: #166534;
+}
+
+.staff-profile-status-late {
+	background: #fef3c7;
+	color: #92400e;
+}
+
+.staff-profile-status-absent {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+.staff-profile-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 10px 12px;
+	background: #fcfaf8;
+	border-top: 1px solid #eee5dd;
+}
+
+.staff-profile-pagination-info {
+	font-size: 13px;
+	color: #6b7280;
+	font-weight: 600;
+}
+
+.staff-profile-pagination-controls {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.staff-profile-pagination-btn {
+	min-width: 32px;
+	height: 32px;
+	padding: 0 8px;
+	border-radius: 8px;
+	border: 1px solid #e5dacf;
+	background: #fff;
+	color: #374151;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.staff-profile-pagination-btn:hover:not(:disabled) {
+	border-color: #ff6c1f;
+	color: #ff6c1f;
+}
+
+.staff-profile-pagination-btn.active {
+	background: #ff6c1f;
+	border-color: #ff6c1f;
+	color: #fff;
+}
+
+.staff-profile-pagination-btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.staff-profile-footer {
+	display: flex;
+	justify-content: flex-end;
+	padding: 10px 14px 14px;
+}
+
+.staff-profile-export-btn {
+	height: 38px;
+	padding: 0 16px;
+	border-radius: 10px;
+	border: none;
+	background: #ff6c1f;
+	color: #fff;
+	font-size: 14px;
+	font-weight: 800;
+	cursor: pointer;
+	box-shadow: 0 8px 18px rgba(255, 108, 31, 0.25);
+}
+
+.staff-profile-export-btn:hover {
+	filter: brightness(0.96);
+}
+
+@media (max-width: 900px) {
+	.staff-profile-header-title {
+		font-size: 24px;
+	}
+
+	.staff-profile-header-meta {
+		font-size: 14px;
+	}
+
+	.staff-profile-stats {
+		grid-template-columns: 1fr;
+	}
+
+	.staff-profile-table-title {
+		font-size: 18px;
+	}
+
+	.staff-profile-table-container {
+		overflow-x: auto;
+	}
+
+	.staff-profile-table {
+		min-width: 680px;
+	}
+}

@@ -63,7 +63,7 @@
       phone: raw.phone || '',
       joinDate: raw.hireDate || raw.joinDate || '',
       rating: typeof raw.rating === 'number' ? raw.rating : 0,
-      workStaffId: raw.workStaffId,
+      workStaffId: raw.workStaffId ?? raw.idWorkStaff ?? raw.workId ?? null,
       isWorking: raw.isWorking,
       startTime: raw.startTime,
       location: raw.location || '',
@@ -162,6 +162,7 @@
       afternoon: [],
       evening: [],
     });
+    const [scheduleWorkStaffMap, setScheduleWorkStaffMap] = useState({});
 
     const [employees, setEmployees] = useState([]);
     const [workshifts, setWorkshifts] = useState([]);
@@ -224,6 +225,7 @@
         afternoon: Array.from({ length: weekDates.length }, () => []),
         evening: Array.from({ length: weekDates.length }, () => []),
       };
+      const workStaffMapByCell = {};
       const employeePool = [...baseEmployees];
       const employeeIds = new Set(employeePool.map((e) => e.id));
 
@@ -242,7 +244,7 @@
       scheduleItemsMap.forEach((raw) => {
         // key: userId|shiftId|workDay
         const key = `${raw.userId || raw.id}|${raw.shiftId}|${(raw.workDate || raw.workDay || '').slice(0,10)}`;
-        workStaffIdMap.set(key, raw.workStaffId);
+        workStaffIdMap.set(key, raw.workStaffId ?? raw.idWorkStaff ?? raw.workId ?? null);
       });
 
       (nextSevenData?.shifts || []).forEach((shift, shiftIdx) => {
@@ -270,6 +272,7 @@
             if (!byDay[shiftKey][dayIndex].includes(staff.userId)) {
               byDay[shiftKey][dayIndex].push(staff.userId);
             }
+            workStaffMapByCell[`${shiftKey}-${dayIndex}-${String(staff.userId)}`] = workStaffId ?? null;
           });
         });
       });
@@ -294,6 +297,7 @@
         if (!byDay[shiftKey][dayIndex].includes(staff.id)) {
           byDay[shiftKey][dayIndex].push(staff.id);
         }
+        workStaffMapByCell[`${shiftKey}-${dayIndex}-${String(staff.id)}`] = raw?.workStaffId ?? raw?.idWorkStaff ?? raw?.workId ?? null;
       });
 
       // DEBUG LOG: Kết quả mapping ca làm
@@ -301,12 +305,22 @@
       console.log('[DEBUG][fetchSchedule] employeePool:', employeePool);
 
       setScheduleData(byDay);
+      setScheduleWorkStaffMap(workStaffMapByCell);
 
       setEmployees((prev) => {
         // ...existing code...
         const map = new Map(prev.map((p) => [p.id, p]));
         employeePool.forEach((p) => {
-          if (p.id != null && !map.has(p.id)) map.set(p.id, p);
+          if (p.id == null) return;
+          const existing = map.get(p.id);
+          if (!existing) {
+            map.set(p.id, p);
+            return;
+          }
+          // Ưu tiên giữ workStaffId mới khi dữ liệu cũ chưa có.
+          if ((existing.workStaffId == null || existing.workStaffId === '') && p.workStaffId != null) {
+            map.set(p.id, { ...existing, workStaffId: p.workStaffId });
+          }
         });
         const arr = Array.from(map.values());
         console.log('[SET EMPLOYEES]', arr);
@@ -457,11 +471,23 @@
       return colors[color] || colors.blue;
     };
 
-    const renderEmployeeAvatar = (employeeId) => {
+    const findAnyWorkStaffIdByEmployee = (employeeId) => {
+      const idToken = `-${String(employeeId)}`;
+      for (const [key, value] of Object.entries(scheduleWorkStaffMap || {})) {
+        if (!key.endsWith(idToken)) continue;
+        if (value != null && value !== '') return value;
+      }
+      return null;
+    };
+
+    const renderEmployeeAvatar = (employeeId, shiftKey, dayIdx) => {
       // Log debug chi tiết khi render avatar
       console.log('[RENDER AVATAR]', { employeeId, employeeMap, employee: employeeMap.get(employeeId) });
       const employee = employeeMap.get(employeeId);
       if (!employee) return null;
+      const cellKey = `${shiftKey}-${dayIdx}-${String(employeeId)}`;
+      const workStaffIdFromCell = scheduleWorkStaffMap[cellKey];
+      const fallbackWorkStaffId = findAnyWorkStaffIdByEmployee(employeeId);
 
       return (
         <div
@@ -469,7 +495,10 @@
           className="staff-avatar"
           title={employee.name}
           onClick={() => {
-            setSelectedEmployee(employee);
+            setSelectedEmployee({
+              ...employee,
+              workStaffId: workStaffIdFromCell ?? employee.workStaffId ?? fallbackWorkStaffId ?? null,
+            });
             setShowDetailModal(true);
           }}
         >
@@ -659,7 +688,7 @@
                               if (selectedDepartment === 'service') return emp.role === 'Phục vụ';
                               return true;
                             })
-                            .map((empId) => renderEmployeeAvatar(empId))}
+                            .map((empId) => renderEmployeeAvatar(empId, 'morning', dayIdx))}
                           <button className="add-employee-btn" onClick={() => { setSelectedWorkDay(day.key); setShowAssignModal(true); }}>
                             <Plus size={16} />
                           </button>
@@ -684,7 +713,7 @@
                               if (selectedDepartment === 'service') return emp.role === 'Phục vụ';
                               return true;
                             })
-                            .map((empId) => renderEmployeeAvatar(empId))}
+                            .map((empId) => renderEmployeeAvatar(empId, 'afternoon', dayIdx))}
                           <button className="add-employee-btn" onClick={() => { setSelectedWorkDay(day.key); setShowAssignModal(true); }}>
                             <Plus size={16} />
                           </button>
@@ -709,7 +738,7 @@
                               if (selectedDepartment === 'service') return emp.role === 'Phục vụ';
                               return true;
                             })
-                            .map((empId) => renderEmployeeAvatar(empId))}
+                            .map((empId) => renderEmployeeAvatar(empId, 'evening', dayIdx))}
                           <button className="add-employee-btn" onClick={() => { setSelectedWorkDay(day.key); setShowAssignModal(true); }}>
                             <Plus size={16} />
                           </button>

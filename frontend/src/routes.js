@@ -40,6 +40,7 @@ import ManagerChatPage from './pages/manager/ManagerChatPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 import PaymentResult from './pages/PaymentResult';
+import PaymentCallbackPage from './pages/PaymentCallbackPage';
 import ContractCustomerSignPage from './pages/ContractCustomerSignPage';
 import WaiterLayout from './pages/waiter/WaiterLayout';
 import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
@@ -206,6 +207,8 @@ const AppRoutes = () => {
         </Route>
 
         <Route path="/payment-result" element={<PaymentResult />} />
+        <Route path="/payment/success" element={<PaymentCallbackPage />} />
+        <Route path="/payment/cancel" element={<PaymentCallbackPage />} />
         <Route
           path="/contract/sign"
           element={
