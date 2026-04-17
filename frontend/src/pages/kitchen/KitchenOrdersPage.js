@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   AlertCircle,
   CheckCircle,
@@ -29,6 +29,76 @@ import 'dayjs/locale/vi';
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
 dayjs.locale('vi');
+
+/**
+ * Component con: Hiển thị thời gian trôi qua theo giây (MM:SS)
+ * - Tự động cập nhật mỗi giây
+ * - Màu sắc theo thời gian: Xanh (<5p) | Cam (5-10p) | Đỏ (>10p)
+ * - Tránh re-render toàn bộ trang
+ * - Sử dụng múi giờ Việt Nam (UTC+7)
+ */
+const TimerDisplay = ({ createdAt }) => {
+  const [elapsed, setElapsed] = useState(0);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    // Parse thời gian tạo món về milliseconds (UTC)
+    const startMs = parseOrderCreatedAtMs(createdAt);
+    if (!startMs) {
+      setElapsed(0);
+      return;
+    }
+
+    // Chuyển start time sang múi giờ Việt Nam (UTC+7)
+    const startMsVn = startMs + 7 * 60 * 60 * 1000;
+
+    // Hàm tính thời gian đã trôi qua (giây) theo múi giờ Việt Nam
+    const calculateElapsed = () => {
+      const now = Date.now();
+      // Thêm offset 7 giờ để sang múi giờ Việt Nam
+      const nowVn = now + 7 * 60 * 60 * 1000;
+      return Math.max(0, Math.floor((nowVn - startMsVn) / 1000));
+    };
+
+    // Cập nhật ngay lập tức
+    setElapsed(calculateElapsed());
+
+    // Thiết lập interval 1 giây
+    intervalRef.current = setInterval(() => {
+      setElapsed(calculateElapsed());
+    }, 1000);
+
+    // Cleanup: xóa interval khi unmount hoặc createdAt thay đổi
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [createdAt]);
+
+  // Chuyển đổi giây sang MM:SS
+  const totalSeconds = elapsed;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  // Xác định màu sắc theo thời gian
+  const minutesElapsed = minutes + (seconds > 0 ? 1 : 0); // Làm tròn lên phút
+  let colorClass = 'timer-green'; // Xanh: < 5 phút
+  if (minutesElapsed >= 10) {
+    colorClass = 'timer-red'; // Đỏ: >= 10 phút
+  } else if (minutesElapsed >= 5) {
+    colorClass = 'timer-orange'; // Cam: 5-10 phút
+  }
+
+  return (
+    <span className={`timer-display ${colorClass}`}>
+      <Timer size={16} aria-hidden />
+      <span className="timer-value">{timeString}</span>
+    </span>
+  );
+};
 
 /** Hiển thị thời gian chờ dạng MM:SS min (phút chờ × 60 giây → mm:ss). */
 function formatAggregatedWaitMmSs(totalMinutes) {
@@ -116,7 +186,7 @@ function mapPendingOrderToUI(raw) {
   const tableLabel =
     raw.tableId > 0
       ? `BÀN ${String(raw.tableId).padStart(2, '0')}`
-      : 'Mang về / Tại quầy';
+      : 'Mang về ';
 
   const pending = raw.pendingItems || [];
   const items = pending.map((pi) => ({
@@ -205,6 +275,8 @@ const KitchenOrdersPage = () => {
   const [historyError, setHistoryError] = useState('');
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'item'
   const [itemSearch, setItemSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'pending' | 'preparing' | 'overdue'
+  const [sortBy, setSortBy] = useState('default'); // 'default' | 'longest-wait'
 
   const loadOrders = useCallback(async (options = {}) => {
     const silent = options.silent === true;
@@ -312,22 +384,10 @@ const KitchenOrdersPage = () => {
         existing.items = mergeItemLists(existing.items, rawItems);
       }
     });
-    return Array.from(map.values()).sort((a, b) => a.waitTime - b.waitTime);
-  }, [orders, inProgressOrders]);
 
-  const stats = useMemo(() => {
-    let overdueOrders = 0;
-    let pendingDishes = 0;
-    let cookingDishes = 0;
-    allOrders.forEach((o) => {
-      if (o.status === 'overdue') overdueOrders += 1;
-      (o.items || []).forEach((i) => {
-        if (i.status === 'pending') pendingDishes += 1;
-        if (i.status === 'preparing') cookingDishes += 1;
-      });
-    });
-    return { overdueOrders, pendingDishes, cookingDishes };
-  }, [allOrders]);
+    // 返回基础订单列表（不过滤、不排序）
+    return Array.from(map.values());
+  }, [orders, inProgressOrders]);
 
   /**
    * Gom tất cả items từ mọi đơn hàng → nhóm theo (foodId, itemName).
@@ -389,13 +449,51 @@ const KitchenOrdersPage = () => {
       .sort((a, b) => b.maxWaitMinutes - a.maxWaitMinutes);
   }, [allOrders]);
 
-  const filteredAggregatedItems = useMemo(
-    () =>
-      aggregatedItems.filter((g) =>
-        g.name.toLowerCase().includes(itemSearch.trim().toLowerCase())
-      ),
-    [aggregatedItems, itemSearch]
-  );
+  /** Theo Bàn: sắp xếp theo thời gian chờ (hiển thị tất cả) */
+  const cardOrders = useMemo(() => {
+    return [...allOrders].sort((a, b) => b.waitTime - a.waitTime);
+  }, [allOrders]);
+
+  /** Theo Món: tìm kiếm + lọc + sắp xếp */
+  const filteredAggregatedItems = useMemo(() => {
+    // 1) Tìm kiếm theo tên món
+    let result = aggregatedItems.filter((g) =>
+      g.name.toLowerCase().includes(itemSearch.trim().toLowerCase())
+    );
+
+    // 2) 筛选逻辑
+    if (filterStatus === 'pending') {
+      result = result.filter((g) => g.pendingQty > 0);
+    } else if (filterStatus === 'preparing') {
+      result = result.filter((g) => g.preparingQty > 0);
+    } else if (filterStatus === 'overdue') {
+      result = result.filter((g) => g.maxWaitMinutes >= 15);
+    }
+
+    // 3) 排序逻辑
+    if (sortBy === 'longest-wait') {
+      result.sort((a, b) => b.maxWaitMinutes - a.maxWaitMinutes);
+    } else {
+      result.sort((a, b) => a.maxWaitMinutes - b.maxWaitMinutes);
+    }
+
+    return result;
+  }, [aggregatedItems, itemSearch, filterStatus, sortBy]);
+
+  /** Thống kê cho footer */
+  const stats = useMemo(() => {
+    let overdueOrders = 0;
+    let pendingDishes = 0;
+    let cookingDishes = 0;
+    allOrders.forEach((o) => {
+      if (o.status === 'overdue') overdueOrders += 1;
+      (o.items || []).forEach((i) => {
+        if (i.status === 'pending') pendingDishes += 1;
+        if (i.status === 'preparing') cookingDishes += 1;
+      });
+    });
+    return { overdueOrders, pendingDishes, cookingDishes };
+  }, [allOrders]);
 
   const handleCancelItem = (item) => {
     setSelectedItem(item);
@@ -544,20 +642,10 @@ const KitchenOrdersPage = () => {
     }
   };
 
-  const getOrderCardClass = (status) => {
-    return `kds-order-card ${status === 'overdue' ? 'overdue' : ''}`;
-  };
-
   const getStatusBadgeClass = (status) => {
     if (status === 'cooking' || status === 'preparing') return 'cooking';
     if (status === 'pending') return 'pending';
     return '';
-  };
-
-  const getWaitTimeClass = (status) => {
-    if (status === 'overdue') return 'overdue';
-    if (status === 'new') return 'new';
-    return 'normal';
   };
 
   /** Bắt đầu tất cả món trong group (pending → preparing) — gọi batch trên mỗi order */
@@ -681,14 +769,44 @@ const KitchenOrdersPage = () => {
       )}
 
       {viewMode === 'item' && (
-        <div className="kds-item-search-wrap">
-          <input
-            type="text"
-            className="kds-item-search"
-            placeholder="Tìm kiếm món ăn..."
-            value={itemSearch}
-            onChange={(e) => setItemSearch(e.target.value)}
-          />
+        <div className="kds-item-controls">
+          <div className="kds-item-search-wrap">
+            <input
+              type="text"
+              className="kds-item-search"
+              placeholder="Tìm kiếm món ăn..."
+              value={itemSearch}
+              onChange={(e) => setItemSearch(e.target.value)}
+            />
+          </div>
+          <div className="kds-item-filters">
+            <div className="kds-filter-group">
+              <label htmlFor="filter-status" className="kds-filter-label">Trạng thái:</label>
+              <select
+                id="filter-status"
+                className="kds-filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">Tất cả</option>
+                <option value="pending">Chờ nấu</option>
+                <option value="preparing">Đang nấu</option>
+                <option value="overdue">Trễ</option>
+              </select>
+            </div>
+            <div className="kds-filter-group">
+              <label htmlFor="sort-by" className="kds-filter-label">Sắp xếp:</label>
+              <select
+                id="sort-by"
+                className="kds-filter-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="default">Thời gian ngắn → dài</option>
+                <option value="longest-wait">Thời gian dài → ngắn</option>
+              </select>
+            </div>
+          </div>
         </div>
       )}
 
@@ -708,7 +826,6 @@ const KitchenOrdersPage = () => {
                       <th className="kds-item-th kds-item-th-id">ID</th>
                       <th className="kds-item-th kds-item-th-dish">Tên món &amp; ghi chú</th>
                       <th className="kds-item-th kds-item-th-qty">SL</th>
-                      <th className="kds-item-th kds-item-th-wait">Thời gian chờ</th>
                       <th className="kds-item-th kds-item-th-status">Trạng thái</th>
                       <th className="kds-item-th kds-item-th-actions">Thao tác</th>
                     </tr>
@@ -716,7 +833,7 @@ const KitchenOrdersPage = () => {
                   <tbody>
                     {filteredAggregatedItems.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="kds-item-td kds-item-td-empty">
+                        <td colSpan={5} className="kds-item-td kds-item-td-empty">
                           {itemSearch.trim()
                             ? 'Không có món phù hợp tìm kiếm.'
                             : '—'}
@@ -724,6 +841,12 @@ const KitchenOrdersPage = () => {
                       </tr>
                     ) : (
                       filteredAggregatedItems.map((group) => {
+                        // Tìm một orderItem mẫu để lấy createdAt (lấy từ món đầu tiên trong group)
+                        const sampleItem = (allOrders
+                          .flatMap((o) => o.items || [])
+                          .find((it) => (it.foodId ?? it.name) === group.key)) || {};
+                        const createdAt = sampleItem.createdAt || sampleItem.orderCreatedAt;
+
                         const rowStatus =
                           group.maxWaitMinutes >= 15
                             ? 'late'
@@ -737,7 +860,7 @@ const KitchenOrdersPage = () => {
                         return (
                           <tr
                             key={group.key}
-                            className={`kds-item-tr ${rowStatus === 'late' ? 'kds-item-tr--late' : ''}`}
+                            className="kds-item-tr"
                           >
                             <td className="kds-item-td kds-item-td-id">#{displayId}</td>
                             <td className="kds-item-td kds-item-td-dish">
@@ -751,14 +874,6 @@ const KitchenOrdersPage = () => {
                                 className={`kds-item-qty-badge ${rowStatus === 'late' ? 'kds-item-qty-badge--late' : ''}`}
                               >
                                 {group.totalQty}
-                              </span>
-                            </td>
-                            <td className="kds-item-td kds-item-td-wait">
-                              <span
-                                className={`kds-item-wait kds-item-wait--${rowStatus}`}
-                              >
-                                <Timer size={16} aria-hidden />
-                                {formatAggregatedWaitMmSs(group.maxWaitMinutes)}
                               </span>
                             </td>
                             <td className="kds-item-td kds-item-td-status">
@@ -815,16 +930,16 @@ const KitchenOrdersPage = () => {
           </>
         ) : (
           <>
-        {loading && allOrders.length === 0 ? (
+        {loading && cardOrders.length === 0 ? (
           <p className="kds-loading-msg">Đang tải đơn chờ chế biến...</p>
-        ) : !loading && allOrders.length === 0 && !error ? (
+        ) : !loading && cardOrders.length === 0 && !error ? (
           <p className="kds-empty-msg">Chưa có món nào chờ chế biến.</p>
         ) : null}
-        {allOrders.map((order) => {
+        {cardOrders.map((order) => {
           const hasPendingItems = (order.items || []).some((i) => i.status === 'pending');
           return (
-          <div key={order.orderId ?? order.id} className={getOrderCardClass(order.status)}>
-            <div className={`kds-order-header ${order.status === 'overdue' ? 'overdue' : ''}`}>
+          <div key={order.orderId ?? order.id} className="kds-order-card">
+            <div className="kds-order-header">
               <div className="kds-table-info">
                 <span className="kds-table-label">Bàn</span>
                 <span className="kds-table-name">{order.table}</span>
@@ -836,16 +951,6 @@ const KitchenOrdersPage = () => {
             </div>
 
             <div className="kds-order-content">
-              <div className={`kds-wait-time ${getWaitTimeClass(order.status)}`}>
-                <Clock size={16} />
-                {order.status === 'new' 
-                  ? `MỚI NHẬN - ${order.waitTime} PHÚT`
-                  : order.status === 'overdue'
-                  ? `ĐÃ CHỜ ${order.waitTime} PHÚT`
-                  : `ĐÃ CHỜ ${order.waitTime} PHÚT`
-                }
-              </div>
-
               {order.note && (
                 <div className="kds-order-note warning">
                   <p className="note-label">Ghi chú</p>
@@ -854,66 +959,72 @@ const KitchenOrdersPage = () => {
               )}
 
               <div className="kds-items-list">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`kds-item ${item.status === 'preparing' || item.status === 'cooking' ? 'cooking' : item.status === 'ready' ? 'ready' : item.status}`}
-                  >
-                    <div className="kds-item-info">
-                      <span className="kds-item-qty">{item.quantity}x</span>
-                      <div>
-                        <p className={`kds-item-name ${item.status === 'ready' ? 'kds-item-name--ready' : ''}`}>{item.name}</p>
-                        {item.note && (
-                          <p className="kds-item-note">{item.note}</p>
-                        )}
+                {order.items.map((item) => {
+                  // Ưu tiên lấy createdAt/itemCreatedAt của riêng món, fallback về orderCreatedAt
+                  const itemCreatedAt = item.createdAt || item.orderCreatedAt || item.openingTime || order.orderCreatedAt;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`kds-item ${item.status === 'preparing' || item.status === 'cooking' ? 'cooking' : item.status === 'ready' ? 'ready' : item.status}`}
+                    >
+                      <div className="kds-item-info">
+                        <span className="kds-item-qty">{item.quantity}x</span>
+                        <div>
+                          <p className={`kds-item-name ${item.status === 'ready' ? 'kds-item-name--ready' : ''}`}>{item.name}</p>
+                          {item.note && (
+                            <p className="kds-item-note">{item.note}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="kds-item-actions">
-                      <span className={`kds-status-badge ${getStatusBadgeClass(item.status)}`}>
-                        {item.status === 'ready'
-                          ? 'Sẵn sàng'
-                          : item.status === 'preparing' || item.status === 'cooking'
-                            ? 'Đang nấu'
-                            : 'Chờ nấu'}
-                      </span>
-                      <div className="kds-item-api-btns">
-                        {item.status === 'pending' && (
-                          <>
+                      <div className="kds-item-actions">
+                        {/* Timer riêng cho từng món */}
+                        <TimerDisplay createdAt={itemCreatedAt} />
+                        <span className={`kds-status-badge ${getStatusBadgeClass(item.status)}`}>
+                          {item.status === 'ready'
+                            ? 'Sẵn sàng'
+                            : item.status === 'preparing' || item.status === 'cooking'
+                              ? 'Đang nấu'
+                              : 'Chờ nấu'}
+                        </span>
+                        <div className="kds-item-api-btns">
+                          {item.status === 'pending' && (
+                            <>
+                              <button
+                                type="button"
+                                className="kds-item-api-btn start"
+                                title="Bắt đầu chế biến (Preparing)"
+                                disabled={itemBusyId === item.orderItemId}
+                                onClick={() => handleItemPreparing(item.orderItemId)}
+                              >
+                                <PlayCircle size={18} />
+                              </button>
+                              <button
+                                type="button"
+                                className="kds-cancel-btn"
+                                onClick={() => handleCancelItem(item)}
+                                disabled={itemBusyId === item.orderItemId}
+                                aria-label="Hủy món"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </>
+                          )}
+                          {item.status === 'preparing' && (
                             <button
                               type="button"
-                              className="kds-item-api-btn start"
-                              title="Bắt đầu chế biến (Preparing)"
+                              className="kds-item-api-btn ready"
+                              title="Đã xong món (Ready)"
                               disabled={itemBusyId === item.orderItemId}
-                              onClick={() => handleItemPreparing(item.orderItemId)}
+                              onClick={() => handleItemReady(item.orderItemId)}
                             >
-                              <PlayCircle size={18} />
+                              <CheckCircle size={18} />
                             </button>
-                            <button
-                              type="button"
-                              className="kds-cancel-btn"
-                              onClick={() => handleCancelItem(item)}
-                              disabled={itemBusyId === item.orderItemId}
-                              aria-label="Hủy món"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </>
-                        )}
-                        {item.status === 'preparing' && (
-                          <button
-                            type="button"
-                            className="kds-item-api-btn ready"
-                            title="Đã xong món (Ready)"
-                            disabled={itemBusyId === item.orderItemId}
-                            onClick={() => handleItemReady(item.orderItemId)}
-                          >
-                            <CheckCircle size={18} />
-                          </button>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
