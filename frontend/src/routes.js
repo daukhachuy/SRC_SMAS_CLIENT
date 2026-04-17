@@ -36,6 +36,7 @@ import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import ManagerProfilePage from './pages/manager/ManagerProfilePage';
 import ManagerTablesPage from './pages/manager/ManagerTablesPage';
+import ManagerChatPage from './pages/manager/ManagerChatPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 import PaymentResult from './pages/PaymentResult';
@@ -235,6 +236,7 @@ const AppRoutes = () => {
           <Route path="staff/:staffId/profile" element={<StaffProfilePage />} />
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
+          <Route path="chat" element={<ManagerChatPage />} />
           <Route path="profile" element={<ManagerProfilePage />} />
         </Route>
 

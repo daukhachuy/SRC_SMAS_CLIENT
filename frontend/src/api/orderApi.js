@@ -1,5 +1,11 @@
 import instance from './axiosInstance';
 
+const withOptionalBearer = (token) => {
+  const raw = String(token || '').trim();
+  if (!raw) return undefined;
+  return { Authorization: `Bearer ${raw}` };
+};
+
 // Thêm món vào đơn hàng (orderCode) - endpoint cũ (1 item/request)
 export const addItemToOrder = async (orderCode, item) => {
   // item: { foodId, comboId, buffetId, quantity, note }
@@ -91,6 +97,25 @@ export const lookupOrder = async (type, keyword) => {
     throw error;
   }
 };
+
+// GET /api/reservation/check-availability-phoneoremail?request=...
+export const checkReservationAvailabilityByPhoneOrEmail = async (request) => {
+  const keyword = String(request || '').trim();
+  if (!keyword) return [];
+  try {
+    const response = await instance.get('/reservation/check-availability-phoneoremail', {
+      params: { request: keyword },
+    });
+    return response.data;
+  } catch (error) {
+    console.error(
+      'Lỗi tra cứu reservation/check-availability-phoneoremail:',
+      error.response?.status,
+      error.response?.data
+    );
+    throw error;
+  }
+};
 /** @deprecated dùng trực tiếp từ ./kitchenOrderApi — giữ để tương thích import cũ */
 export { apiGetPending as fetchPendingOrderItems } from './kitchenOrderApi';
 
@@ -166,7 +191,29 @@ export const getOrderSessionMenu = async ({ type, categoryId, keyword } = {}) =>
 
 // Lấy đơn hiện tại của phiên bàn
 // GET /api/order/session/current
-export const getCurrentOrderSession = async () => {
-  const response = await instance.get('/order/session/current');
+export const getCurrentOrderSession = async (token) => {
+  const response = await instance.get('/order/session/current', {
+    headers: withOptionalBearer(token),
+  });
+  return response.data;
+};
+
+// Lấy chi tiết đơn theo mã đơn (fallback cho luồng guest QR khi session/current không trả item lines)
+export const getOrderByCode = async (orderCode, token) => {
+  const code = encodeURIComponent(String(orderCode || '').trim());
+  if (!code) throw new Error('orderCode is required');
+  const response = await instance.get(`/order/${code}`, {
+    headers: withOptionalBearer(token),
+  });
+  return response.data;
+};
+
+// Lấy danh sách dòng món theo mã đơn
+export const getOrderItemsByCode = async (orderCode, token) => {
+  const code = encodeURIComponent(String(orderCode || '').trim());
+  if (!code) throw new Error('orderCode is required');
+  const response = await instance.get(`/order/${code}/items`, {
+    headers: withOptionalBearer(token),
+  });
   return response.data;
 };

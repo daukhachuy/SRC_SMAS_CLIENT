@@ -23,12 +23,17 @@ instance.interceptors.request.use(
     config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
     config.headers['Accept'] = config.headers['Accept'] || 'application/json';
 
-    const token =
-      localStorage.getItem('authToken') ||
-      localStorage.getItem('accessToken') ||
-      localStorage.getItem('tableAccessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const hasExplicitAuthHeader =
+      typeof config.headers.Authorization === 'string' &&
+      String(config.headers.Authorization).trim().length > 0;
+    if (!hasExplicitAuthHeader) {
+      const token =
+        localStorage.getItem('authToken') ||
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('tableAccessToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },

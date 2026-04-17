@@ -20,6 +20,7 @@ import {
   fetchOrderItemsHistoryToday
 } from './kitchenApi';
 import { formatCurrency } from '../../api/managerApi';
+import { createHubConnection, KITCHEN_HUB } from '../../realtime/signalrClient';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -234,6 +235,42 @@ const KitchenOrdersPage = () => {
 
   useEffect(() => {
     loadOrders();
+  }, [loadOrders]);
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem('authToken') ||
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('tableAccessToken');
+    if (!token) return undefined;
+
+    const conn = createHubConnection(KITCHEN_HUB);
+    const refreshOrders = () => {
+      void loadOrders({ silent: true });
+    };
+
+    conn.on('OrderItemStatusChanged', () => {
+      refreshOrders();
+    });
+    conn.on('AllItemsStatusChanged', () => {
+      refreshOrders();
+    });
+    conn.on('NewOrderItems', (payload) => {
+      refreshOrders();
+      const code = payload && String(payload.orderCode || '').trim();
+      setToastMsg(code ? `Có món mới (${code}).` : 'Có món mới vừa được thêm.');
+    });
+    conn.onreconnected(() => {
+      refreshOrders();
+    });
+
+    conn.start().catch(() => {
+      /* fallback polling/manual refresh */
+    });
+
+    return () => {
+      void conn.stop();
+    };
   }, [loadOrders]);
 
   // Auto-clear toast message after 3 seconds
