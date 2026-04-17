@@ -161,6 +161,15 @@
   overflow-x: auto;
 }
 
+/* Giới hạn độ rộng cột mô tả, không xuống dòng quá dài */
+.rest-table td:nth-child(6),
+.rest-table th:nth-child(6) {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rest-table {
   width: 100%;
   border-collapse: collapse;
@@ -191,6 +200,7 @@
   font-size: 0.875rem;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
+  white-space: nowrap;
 }
 
 .rest-table tbody tr:hover {
@@ -316,6 +326,9 @@
 }
 
 .rest-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.375rem;
   color: #6b7280;
   background: none;
@@ -324,6 +337,7 @@
   cursor: pointer;
   margin-right: 0.25rem;
   transition: color 0.2s, background 0.2s;
+  white-space: nowrap;
 }
 
 .rest-icon-btn:hover {
@@ -509,6 +523,8 @@
   border: 1px solid #e5e7eb;
   padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .rest-reviews-head {
@@ -516,6 +532,42 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rest-reviews-count {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.rest-reviews-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rest-reviews-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rest-reviews-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.rest-reviews-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.rest-reviews-search {
+  margin-bottom: 1rem;
+}
+
+.rest-reviews-search .rest-search-input {
+  width: 100%;
+  max-width: 300px;
 }
 
 .rest-reviews-title {

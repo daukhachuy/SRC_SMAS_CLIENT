@@ -126,6 +126,7 @@ const KitchenProfilePage = () => {
   });
 
   const [salaryTrend, setSalaryTrend] = useState([]);
+  const [salaryDetailNote, setSalaryDetailNote] = useState('');
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -143,6 +144,7 @@ const KitchenProfilePage = () => {
   const fetchProfilePageData = useCallback(async () => {
     setLoading(true);
     setError('');
+    setSalaryDetailNote('');
 
     try {
       const [profileRes, monthDetailRes, sixMonthsRes, monthHoursRes, monthShiftsRes] =
@@ -199,10 +201,18 @@ const KitchenProfilePage = () => {
         );
       }
 
-      const detail =
-        monthDetailRes.status === 'fulfilled'
-          ? monthDetailRes.value?.data?.data ?? monthDetailRes.value?.data ?? {}
-          : {};
+      let detail = {};
+      if (monthDetailRes.status === 'fulfilled') {
+        detail = monthDetailRes.value?.data?.data ?? monthDetailRes.value?.data ?? {};
+      } else {
+        const status = monthDetailRes.reason?.response?.status;
+        const msg = monthDetailRes.reason?.response?.data?.message;
+        if (status === 404 && msg) {
+          setSalaryDetailNote(String(msg));
+        } else if (msg) {
+          setSalaryDetailNote(String(msg));
+        }
+      }
       const totalHours =
         monthHoursRes.status === 'fulfilled'
           ? Number(monthHoursRes.value?.data?.data ?? monthHoursRes.value?.data ?? 0)
@@ -451,23 +461,32 @@ const KitchenProfilePage = () => {
               </div>
             </div>
 
-            <div className="waiter-salary-bars">
-              {salaryTrend.map((item, index) => {
-                const height = Math.max((item.value / maxSalary) * 100, 8);
-                const isCurrent = index === salaryTrend.length - 1;
-                return (
-                  <div key={`${item.month}-${index}`} className="waiter-salary-bar-col">
-                    <div
-                      className={`waiter-salary-bar ${isCurrent ? 'is-current' : ''}`}
-                      style={{ height: `${height}%` }}
-                    >
-                      <span>{(item.value / 1000000).toFixed(1)}M</span>
+            {salaryTrend.length === 0 ? (
+              <p className="waiter-profile-chart-empty">Chưa có dữ liệu lương 6 tháng gần nhất.</p>
+            ) : (
+              <div
+                className="waiter-salary-bars"
+                style={{
+                  gridTemplateColumns: `repeat(${salaryTrend.length}, minmax(0, 1fr))`,
+                }}
+              >
+                {salaryTrend.map((item, index) => {
+                  const height = Math.max((item.value / maxSalary) * 100, 8);
+                  const isCurrent = index === salaryTrend.length - 1;
+                  return (
+                    <div key={`${item.month}-${index}`} className="waiter-salary-bar-col">
+                      <div
+                        className={`waiter-salary-bar ${isCurrent ? 'is-current' : ''}`}
+                        style={{ height: `${height}%` }}
+                      >
+                        <span>{(item.value / 1000000).toFixed(1)}M</span>
+                      </div>
+                      <p className={isCurrent ? 'is-current' : ''}>{item.month}</p>
                     </div>
-                    <p className={isCurrent ? 'is-current' : ''}>{item.month}</p>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </>
       )}

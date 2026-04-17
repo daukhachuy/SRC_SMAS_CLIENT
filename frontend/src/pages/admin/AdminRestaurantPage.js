@@ -448,6 +448,10 @@ const AdminRestaurantPage = () => {
   const [feedbackRows, setFeedbackRows] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackLoadError, setFeedbackLoadError] = useState('');
+  const [feedbackSearch, setFeedbackSearch] = useState('');
+  const [feedbackStarFilter, setFeedbackStarFilter] = useState('all');
+  const [feedbackPage, setFeedbackPage] = useState(1);
+  const FEEDBACK_PAGE_SIZE = 5;
 
   /* ── Blog search + pagination ── */
   const [blogSearch, setBlogSearch] = useState('');
@@ -476,6 +480,30 @@ const AdminRestaurantPage = () => {
     setBlogSearch(e.target.value);
     setBlogPage(1);
   };
+
+  const filteredFeedback = useMemo(() => {
+    const q = feedbackSearch.trim().toLowerCase();
+    return feedbackRows.filter((r) => {
+      const matchSearch =
+        !q ||
+        (r.name || '').toLowerCase().includes(q) ||
+        (r.comment || '').toLowerCase().includes(q);
+      const matchStar =
+        feedbackStarFilter === 'all' ||
+        (feedbackStarFilter === 'positive' && r.stars >= 4) ||
+        (feedbackStarFilter === 'negative' && r.stars <= 2) ||
+        (feedbackStarFilter === 'neutral' && r.stars === 3) ||
+        r.stars === Number(feedbackStarFilter);
+      return matchSearch && matchStar;
+    });
+  }, [feedbackRows, feedbackSearch, feedbackStarFilter]);
+
+  const totalFeedbackPages = Math.max(1, Math.ceil(filteredFeedback.length / FEEDBACK_PAGE_SIZE));
+  const currentFeedbackPage = Math.min(feedbackPage, totalFeedbackPages);
+  const pagedFeedback = useMemo(
+    () => filteredFeedback.slice((currentFeedbackPage - 1) * FEEDBACK_PAGE_SIZE, currentFeedbackPage * FEEDBACK_PAGE_SIZE),
+    [filteredFeedback, currentFeedbackPage],
+  );
 
   const loadDiscounts = useCallback(async () => {
     setCodesLoading(true);
@@ -630,6 +658,10 @@ const AdminRestaurantPage = () => {
     setServiceImagePreview('');
     setEditingService(row);
     setServiceModalOpen(true);
+  };
+
+  const openServiceDetail = (row) => {
+    openEditService(row);
   };
 
   const buildServiceApiPayload = (imagePath) => {
@@ -792,6 +824,7 @@ const AdminRestaurantPage = () => {
 
   useEffect(() => {
     if (tab === 'reviews') {
+      setFeedbackPage(1);
       loadFeedback();
     }
   }, [tab, loadFeedback]);
@@ -834,6 +867,10 @@ const AdminRestaurantPage = () => {
     setEventImagePreview('');
     setEditingEvent(row);
     setEventModalOpen(true);
+  };
+
+  const openEventDetail = (row) => {
+    openEditEvent(row);
   };
 
   /** Swagger EventCreateDto — không gửi field lạ (additionalProperties: false) */
@@ -1250,6 +1287,10 @@ const AdminRestaurantPage = () => {
     setCodeModalOpen(true);
   };
 
+  const openCodeDetail = (row) => {
+    openEditCode(row);
+  };
+
   const openEditBlog = (blog) => {
     const raw = blog.raw || {};
     const pub = raw.publishedAt ? new Date(raw.publishedAt) : new Date();
@@ -1441,7 +1482,7 @@ const AdminRestaurantPage = () => {
     return String(row.code || '').toLowerCase().includes(q);
   });
 
-  const feedbackSummary = useMemo(() => computeFeedbackSummary(feedbackRows), [feedbackRows]);
+  const feedbackSummary = useMemo(() => computeFeedbackSummary(filteredFeedback), [filteredFeedback]);
 
   return (
     <div className="admin-restaurant">
@@ -1527,6 +1568,7 @@ const AdminRestaurantPage = () => {
                         <span className={`rest-badge rest-badge-${row.status}`}>{statusLabel(row.status)}</span>
                       </td>
                       <td>
+                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openCodeDetail(row)}><Eye size={16} /></button>
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditCode(row)}><Pencil size={16} /></button>
                         <button type="button" className="rest-icon-btn" aria-label="Xóa" onClick={() => handleDeleteCode(row)}><Trash2 size={16} /></button>
                       </td>
@@ -1596,7 +1638,7 @@ const AdminRestaurantPage = () => {
                     <th>NGÀY ĐĂNG</th>
                     <th>LƯỢT XEM</th>
                     <th>TRẠNG THÁI (BẬT/TẮT)</th>
-                    <th>THAO TÁC</th>
+                    <th>Hành Động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1703,6 +1745,29 @@ const AdminRestaurantPage = () => {
               </button>
             </p>
           )}
+          <div className="rest-toolbar" style={{ marginBottom: 12 }}>
+            <div className="rest-toolbar-search">
+              <input
+                type="text"
+                className="rest-search-input"
+                placeholder="Tìm kiếm theo tên, nội dung…"
+                value={feedbackSearch}
+                onChange={(e) => { setFeedbackSearch(e.target.value); setFeedbackPage(1); }}
+              />
+            </div>
+            <select
+              className="rest-select"
+              value={feedbackStarFilter}
+              onChange={(e) => { setFeedbackStarFilter(e.target.value); setFeedbackPage(1); }}
+            >
+              <option value="all">Tất cả sao</option>
+              <option value="5">5 sao</option>
+              <option value="4">4 sao</option>
+              <option value="3">3 sao</option>
+              <option value="2">2 sao</option>
+              <option value="1">1 sao</option>
+            </select>
+          </div>
         <div className="rest-reviews-layout">
           <div className="rest-reviews-left">
             <div className="rest-rating-card">
@@ -1736,15 +1801,13 @@ const AdminRestaurantPage = () => {
           </div>
           <div className="rest-reviews-right">
             <div className="rest-reviews-head">
-                <h3 className="rest-reviews-title">Phản hồi từ API</h3>
-                <select className="rest-select rest-select-sm" disabled aria-label="Sắp xếp">
-                <option>Mới nhất</option>
-              </select>
+                <span className="rest-reviews-count">{filteredFeedback.length} đánh giá</span>
             </div>
-              {!feedbackLoading && !feedbackLoadError && feedbackRows.length === 0 && (
+              {!feedbackLoading && !feedbackLoadError && filteredFeedback.length === 0 && (
                 <p className="rest-subtitle" style={{ marginTop: 8 }}>Chưa có phản hồi nào.</p>
               )}
-              {feedbackRows.map((r) => (
+              <div className="rest-reviews-list">
+              {filteredFeedback.map((r) => (
               <div key={r.id} className="rest-review-card">
                 <div className="rest-review-header">
                     {r.avatarUrl ? (
@@ -1763,6 +1826,7 @@ const AdminRestaurantPage = () => {
                   <p className="rest-review-comment">{r.comment || '—'}</p>
               </div>
             ))}
+              </div>
             </div>
           </div>
         </>
@@ -1850,6 +1914,9 @@ const AdminRestaurantPage = () => {
                         </div>
                       </td>
                       <td>
+                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openServiceDetail(row)} disabled={!!serviceDeletingId || serviceToggleBusyId === row.id}>
+                          <Eye size={16} />
+                        </button>
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditService(row)} disabled={!!serviceDeletingId || serviceToggleBusyId === row.id}>
                           <Pencil size={16} />
                         </button>
@@ -2002,6 +2069,9 @@ const AdminRestaurantPage = () => {
                         </div>
                       </td>
                       <td>
+                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openEventDetail(row)} disabled={!!eventDeletingId || eventToggleBusyId === row.id}>
+                          <Eye size={16} />
+                        </button>
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditEvent(row)} disabled={!!eventDeletingId || eventToggleBusyId === row.id}>
                           <Pencil size={16} />
                         </button>

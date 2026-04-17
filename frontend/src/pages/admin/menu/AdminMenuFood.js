@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Plus, Search, Pencil, Trash2, X, UploadCloud, AlertCircle,
+  Plus, Search, Pencil, Eye, Trash2, X, UploadCloud, AlertCircle,
   CheckCircle, RefreshCw, Sparkles, Store,
 } from 'lucide-react';
+
+const STATUS_FILTERS = ['Tất cả', 'Còn hàng', 'Hết hàng'];
 import {
   getFoodCategories,
   normalizeFoodCategoryPayload,
@@ -129,6 +131,7 @@ const AdminMenuFood = () => {
   /* ── Filter / Search ── */
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(STATUS_FILTERS[0]);
 
   /* ── Pagination ── */
   const [currentPage, setCurrentPage] = useState(1);
@@ -155,6 +158,10 @@ const AdminMenuFood = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingFood, setDeletingFood] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  /* ── Modal xem chi tiết ── */
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailFood, setDetailFood] = useState(null);
 
   /* ── Toggle status đang xử lý ── */
   const [toggleBusyId, setToggleBusyId] = useState(null);
@@ -215,10 +222,14 @@ const AdminMenuFood = () => {
     const list = foods.filter((d) => {
       const matchSearch = !search || (d.name || '').toLowerCase().includes(search.toLowerCase());
       const matchCat = !categoryFilter || d.categories.includes(categoryFilter) || d.category === categoryFilter;
-    return matchSearch && matchCat;
-  });
+      const matchStatus =
+        statusFilter === STATUS_FILTERS[0] ||
+        (statusFilter === STATUS_FILTERS[1] && d.status) ||
+        (statusFilter === STATUS_FILTERS[2] && !d.status);
+      return matchSearch && matchCat && matchStatus;
+    });
     return list;
-  }, [foods, search, categoryFilter]);
+  }, [foods, search, categoryFilter, statusFilter]);
 
   /* ── Paginated slice ── */
   const totalItems = filtered.length;
@@ -233,7 +244,7 @@ const AdminMenuFood = () => {
   /* Reset page when filter changes */
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, categoryFilter]);
+  }, [search, categoryFilter, statusFilter]);
 
   /* ── Helpers form ── */
   const setFormErrorsFn = (setter) => (errors) => setter(typeof errors === 'function' ? errors({}) : errors);
@@ -323,6 +334,16 @@ const AdminMenuFood = () => {
   const openDeleteModal = (row) => {
     setDeletingFood(row);
     setDeleteModalOpen(true);
+  };
+
+  const openDetailModal = (row) => {
+    setDetailFood(row);
+    setDetailModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    setDetailModalOpen(false);
+    setDetailFood(null);
   };
 
   /* ── SAVE NEW ── */
@@ -647,23 +668,27 @@ const AdminMenuFood = () => {
           />
         </div>
         <div className="menu-filters">
-          <button
-            type="button"
-            className={`menu-filter-btn ${categoryFilter === '' ? 'active' : ''}`}
-            onClick={() => setCategoryFilter('')}
-          >
-            Tất cả
-          </button>
-          {filterCats.filter(Boolean).map((cat) => (
+          {STATUS_FILTERS.map((s) => (
             <button
-              key={cat}
+              key={s}
               type="button"
-              className={`menu-filter-btn ${categoryFilter === cat ? 'active' : ''}`}
-              onClick={() => setCategoryFilter(categoryFilter === cat ? '' : cat)}
+              className={`menu-filter-btn ${statusFilter === s ? 'active' : ''}`}
+              onClick={() => setStatusFilter(s)}
             >
-              {cat}
+              {s}
             </button>
           ))}
+          <span style={{ width: '1px', height: '20px', background: '#d1d5db', margin: '0 4px' }} />
+              {filterCats.filter(Boolean).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`menu-filter-btn ${categoryFilter === cat ? 'active' : ''}`}
+                  onClick={() => setCategoryFilter(categoryFilter === cat ? '' : cat)}
+                >
+                  {cat}
+                </button>
+              ))}
         </div>
         <button type="button" className="menu-btn-primary" onClick={openAddModal}>
           <Plus size={18} />
@@ -791,6 +816,14 @@ const AdminMenuFood = () => {
                     <button
                       type="button"
                       className="menu-icon-btn"
+                      aria-label="Xem chi tiết"
+                      onClick={() => openDetailModal(row)}
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="menu-icon-btn"
                       aria-label="Sửa"
                       onClick={() => openEditModal(row)}
                     >
@@ -899,6 +932,167 @@ const AdminMenuFood = () => {
         handleSaveEdit,
         formELoading,
         editFileRef
+      )}
+
+      {/* ── Modal Xem Chi Tiết ── */}
+      {detailModalOpen && detailFood && (
+        <div className="kds-modal-overlay" onClick={closeDetailModal}>
+          <div className="kds-modal kds-modal-edit" onClick={(e) => e.stopPropagation()}>
+            <div className="kds-modal-header">
+              <div>
+                <h3 className="kds-modal-title">Chi tiết món ăn</h3>
+              </div>
+              <button
+                type="button"
+                className="kds-modal-close"
+                onClick={closeDetailModal}
+                aria-label="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="kds-modal-content">
+              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+                {detailFood.image && (
+                  <div style={{ flexShrink: 0 }}>
+                    <img
+                      src={detailFood.image}
+                      alt={detailFood.name}
+                      style={{ width: 180, height: 180, objectFit: 'cover', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}
+                    />
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>{detailFood.name}</h4>
+                    {(detailFood.isFeatured || detailFood.isDirectSale) && (
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        {detailFood.isFeatured && (
+                          <span style={{ padding: '0.2rem 0.5rem', fontSize: '0.6875rem', fontWeight: 700, background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: '9999px', textTransform: 'uppercase' }}>
+                            Nổi bật
+                          </span>
+                        )}
+                        {detailFood.isDirectSale && (
+                          <span style={{ padding: '0.2rem 0.5rem', fontSize: '0.6875rem', fontWeight: 700, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #93c5fd', borderRadius: '9999px', textTransform: 'uppercase' }}>
+                            Bán lẻ
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p style={{ margin: '0 0 1rem', color: '#6b7280', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                    {detailFood.description || 'Không có mô tả'}
+                  </p>
+
+                  {/* Giá */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'block' }}>Giá bán</span>
+                      <p style={{ margin: 0, fontWeight: 700, color: '#FF6C1F', fontSize: '1.125rem' }}>{detailFood.priceDisplay}</p>
+                      {detailFood.priceListDisplay && (
+                        <span style={{ fontSize: '0.75rem', color: '#9ca3af', textDecoration: 'line-through' }}>{detailFood.priceListDisplay}</span>
+                      )}
+                    </div>
+                    {detailFood.unit && (
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'block' }}>Đơn vị</span>
+                        <p style={{ margin: 0, fontWeight: 600, color: '#374151' }}>{detailFood.unit}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'block' }}>Trạng thái</span>
+                      <p style={{ margin: 0, fontWeight: 600, color: detailFood.status ? '#047857' : '#b91c1c' }}>
+                        {detailFood.status ? 'Còn hàng' : 'Hết hàng'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Thông tin bổ sung */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '0.75rem', background: '#f9fafb', borderRadius: '0.5rem', marginBottom: detailFood.notes ? '0.75rem' : 0 }}>
+                    {detailFood.preparationTime != null && (
+                      <div>
+                        <span style={{ fontSize: '0.6875rem', color: '#9ca3af', display: 'block' }}>Thời gian chuẩn bị</span>
+                        <p style={{ margin: 0, fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>{detailFood.preparationTime} phút</p>
+                      </div>
+                    )}
+                    {detailFood.calories != null && (
+                      <div>
+                        <span style={{ fontSize: '0.6875rem', color: '#9ca3af', display: 'block' }}>Calories</span>
+                        <p style={{ margin: 0, fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>{detailFood.calories} kcal</p>
+                      </div>
+                    )}
+                    <div>
+                      <span style={{ fontSize: '0.6875rem', color: '#9ca3af', display: 'block' }}>Lượt xem</span>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>{detailFood.viewCount || 0}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.6875rem', color: '#9ca3af', display: 'block' }}>Lượt đặt</span>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>{detailFood.orderCount || 0}</p>
+                    </div>
+                    {detailFood.rating != null && (
+                      <div>
+                        <span style={{ fontSize: '0.6875rem', color: '#9ca3af', display: 'block' }}>Đánh giá</span>
+                        <p style={{ margin: 0, fontWeight: 600, color: '#92400e', fontSize: '0.875rem' }}>★ {detailFood.rating}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ghi chú */}
+                  {detailFood.notes && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'block' }}>Ghi chú</span>
+                      <p style={{ margin: 0, color: '#374151', fontSize: '0.875rem' }}>{detailFood.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Danh mục */}
+                  {detailFood.categories && detailFood.categories.length > 0 && (
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'block' }}>Danh mục</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        {detailFood.categories.map((cat, idx) => (
+                          <span key={idx} style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem', fontWeight: 500, background: '#fff7ed', color: '#FF6C1F', borderRadius: '0.25rem' }}>
+                            {typeof cat === 'string' ? cat : cat.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Thông tin hệ thống */}
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '2rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+                {detailFood.createdAt && (
+                  <span>Ngày tạo: {new Date(detailFood.createdAt).toLocaleString('vi-VN')}</span>
+                )}
+                {detailFood.updatedAt && (
+                  <span>Ngày cập nhật: {new Date(detailFood.updatedAt).toLocaleString('vi-VN')}</span>
+                )}
+              </div>
+            </div>
+            <div className="kds-modal-footer">
+              <button
+                type="button"
+                className="kds-btn secondary"
+                onClick={closeDetailModal}
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                className="kds-btn primary"
+                onClick={() => {
+                  closeDetailModal();
+                  openEditModal(detailFood);
+                }}
+              >
+                <Pencil size={16} />
+                Chỉnh sửa
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Modal Xác nhận Xóa ── */}

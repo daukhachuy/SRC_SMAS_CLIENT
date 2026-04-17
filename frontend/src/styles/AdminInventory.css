@@ -132,6 +132,24 @@
   border-bottom: 1px solid #f3f4f6;
 }
 
+.inv-card-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inv-card-search .inv-search {
+  width: 200px;
+  padding: 0.375rem 0.625rem 0.375rem 2rem;
+}
+
+.inv-card-search .inv-search-icon {
+  position: absolute;
+  left: 0.625rem;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
 .inv-card-head-tabs {
   padding-bottom: 0;
   border-bottom: none;
@@ -531,6 +549,26 @@
   border-radius: 0.5rem;
   color: #111827;
   background: #fff;
+}
+
+/* Fix cho input type="date" hiển thị ngày tháng */
+.inv-form-group input[type="date"] {
+  width: 100%;
+  min-width: 180px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: #111827;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+}
+
+.inv-form-group input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.inv-form-group input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .inv-form-group textarea {

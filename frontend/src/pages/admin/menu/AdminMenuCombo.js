@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Plus, Search, Pencil, X, Calendar, Trash2, AlertCircle, CheckCircle, RefreshCw,
+  Plus, Search, Pencil, Eye, X, Calendar, Trash2, AlertCircle, CheckCircle, RefreshCw,
 } from 'lucide-react';
 import {
   getComboLists,
@@ -146,6 +146,11 @@ const AdminMenuCombo = () => {
   const [deletingCombo, setDeletingCombo] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [toggleBusyId, setToggleBusyId] = useState(null);
+
+  /* ── Modal xem chi tiết ── */
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailCombo, setDetailCombo] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const loadData = useCallback(async (opts = {}) => {
     if (!opts.silent) {
@@ -390,6 +395,25 @@ const AdminMenuCombo = () => {
     }
   };
 
+  const openDetailCombo = async (row) => {
+    setDetailCombo(null);
+    setDetailModalOpen(true);
+    setDetailLoading(true);
+    try {
+      const data = await getComboById(row.id);
+      setDetailCombo(normalizeComboRow(data));
+    } catch {
+      setDetailCombo(row);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetailCombo = () => {
+    setDetailModalOpen(false);
+    setDetailCombo(null);
+  };
+
   const handleToggleStatus = async (row) => {
     setToggleBusyId(row.id);
     try {
@@ -467,9 +491,8 @@ const AdminMenuCombo = () => {
                 <thead>
                   <tr>
                     <th style={{ width: 72 }}>HÌNH ẢNH</th>
-                    <th style={{ minWidth: 160 }}>TÊN COMBO</th>
+                    <th style={{ minWidth: 180 }}>TÊN COMBO</th>
                     <th style={{ minWidth: 200 }}>MÔ TẢ</th>
-                    <th style={{ minWidth: 200 }}>MÓN ĂN</th>
                     <th style={{ width: 120 }}>GIÁ</th>
                     <th style={{ width: 110 }}>HẾT HẠN</th>
                     <th style={{ width: 120 }}>TRẠNG THÁI</th>
@@ -479,7 +502,7 @@ const AdminMenuCombo = () => {
                 <tbody>
                   {paginated.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="menu-empty-row">
+                      <td colSpan={7} className="menu-empty-row">
                         {search || statusFilter !== 'Tất cả trạng thái'
                           ? 'Không có combo phù hợp.'
                           : 'Chưa có combo. Nhấn "Thêm Combo mới".'}
@@ -502,20 +525,6 @@ const AdminMenuCombo = () => {
                           <div className="menu-cell-code">Mã: {row.code}</div>
                         </td>
                         <td className="menu-cell-desc">{row.description || '—'}</td>
-                        <td className="menu-cell-combo-foods">
-                          {row.foodsLines?.length ? (
-                            <ul className="combo-foods-list">
-                              {row.foodsLines.map((f, idx) => (
-                                <li key={`${row.id}-${idx}`}>
-                                  <span className="combo-food-name">{f.foodName || '—'}</span>
-                                  <span className="combo-food-qty"> × {f.quantity}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
                         <td className="menu-cell-price">{row.priceDisplay}</td>
                         <td>{row.expiryDate || '—'}</td>
                         <td>
@@ -531,6 +540,14 @@ const AdminMenuCombo = () => {
                         </td>
                         <td>
                           <div className="menu-actions-cell">
+                            <button
+                              type="button"
+                              className="menu-icon-btn"
+                              aria-label="Xem chi tiết"
+                              onClick={() => openDetailCombo(row)}
+                            >
+                              <Eye size={16} />
+                            </button>
                             <button
                               type="button"
                               className="menu-icon-btn"
@@ -867,6 +884,120 @@ const AdminMenuCombo = () => {
                 <Trash2 size={18} />
                 {deleteLoading ? 'Đang xóa...' : 'Xác nhận xóa'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Xem Chi Tiết ── */}
+      {detailModalOpen && (
+        <div className="combo-create-overlay" onClick={closeDetailCombo}>
+          <div className="combo-create-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="combo-create-head">
+              <h2 className="combo-create-title">Chi tiết Combo</h2>
+              <button
+                type="button"
+                className="combo-create-close"
+                onClick={closeDetailCombo}
+                aria-label="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div className="combo-loading">
+                <RefreshCw size={24} className="spin" />
+                <span>Đang tải...</span>
+              </div>
+            ) : detailCombo ? (
+              <div style={{ padding: '0 0 1rem' }}>
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                  {detailCombo.imageUrl && (
+                    <div style={{ flexShrink: 0 }}>
+                      <img
+                        src={detailCombo.imageUrl}
+                        alt={detailCombo.name}
+                        style={{ width: 140, height: 140, objectFit: 'cover', borderRadius: '0.5rem' }}
+                      />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.125rem', color: '#111827' }}>{detailCombo.name}</h4>
+                    <p style={{ margin: '0 0 0.75rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                      {detailCombo.description || 'Không có mô tả'}
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Giá</span>
+                        <p style={{ margin: 0, fontWeight: 700, color: '#FF6C1F', fontSize: '1rem' }}>{detailCombo.priceDisplay}</p>
+                      </div>
+                      {detailCombo.discountPercent > 0 && (
+                        <div>
+                          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Giảm giá</span>
+                          <p style={{ margin: 0, fontWeight: 600, color: '#16a34a' }}>{detailCombo.discountPercent}%</p>
+                        </div>
+                      )}
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Trạng thái</span>
+                        <p style={{ margin: 0, fontWeight: 600, color: detailCombo.status ? '#047857' : '#b91c1c' }}>
+                          {detailCombo.status ? 'Đang bán' : 'Ngừng bán'}
+                        </p>
+                      </div>
+                    </div>
+                    {detailCombo.startDate && (
+                      <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>
+                        <span>Hiệu lực: {detailCombo.startDate}
+                          {detailCombo.expiryDate ? ` - ${detailCombo.expiryDate}` : ' - Không giới hạn'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {detailCombo.foodsLines && detailCombo.foodsLines.length > 0 && (
+                  <div>
+                    <h5 style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
+                      Danh sách món ăn ({detailCombo.foodsLines.length})
+                    </h5>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#374151', fontSize: '0.875rem' }}>
+                      {detailCombo.foodsLines.map((f, idx) => (
+                        <li key={idx} style={{ marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: 500 }}>{f.foodName || '—'}</span>
+                          <span style={{ color: '#6b7280' }}> × {f.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="combo-loading">
+                <span>Không có dữ liệu.</span>
+              </div>
+            )}
+
+            <div className="combo-create-actions">
+              <button
+                type="button"
+                className="combo-btn-cancel"
+                onClick={closeDetailCombo}
+              >
+                Đóng
+              </button>
+              {detailCombo && (
+                <button
+                  type="button"
+                  className="menu-btn-primary"
+                  onClick={() => {
+                    closeDetailCombo();
+                    openEditCombo(detailCombo);
+                  }}
+                >
+                  <Pencil size={16} />
+                  Chỉnh sửa
+                </button>
+              )}
             </div>
           </div>
         </div>

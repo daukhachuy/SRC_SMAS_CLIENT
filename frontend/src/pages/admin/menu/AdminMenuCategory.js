@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Pencil, X, FileImage } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Plus, Search, Pencil, Eye, X, FileImage } from 'lucide-react';
 import {
   getAllCategories,
   createCategory,
@@ -34,9 +34,17 @@ const AdminMenuCategory = () => {
   const [saving, setSaving]          = useState(false);
   const [togglingId, setTogglingId] = useState(null);
 
+  /* ── Pagination (pageSize = 5) ── */
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory]    = useState(null);
   const [categoryForm, setCategoryForm]          = useState(defaultCategoryForm());
+
+  /* ── Modal xem chi tiết ── */
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailCategory, setDetailCategory]   = useState(null);
 
   // ── Load categories ──
   const loadCategories = useCallback(async () => {
@@ -58,7 +66,19 @@ const AdminMenuCategory = () => {
     (c) => !search || c.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Toggle status ──
+  /* Reset page when filter changes */
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  /* ── Paginated categories ── */
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginated = useMemo(() => {
+    return filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  }, [filtered, safePage]);
+
+  /* ── Toggle status ── */
   const handleToggleStatus = async (row) => {
     const id = row.categoryId;
     if (id == null) return;
@@ -109,6 +129,16 @@ const AdminMenuCategory = () => {
       isAvailable:      row.isAvailable ?? true,
     });
     setCategoryModalOpen(true);
+  };
+
+  const openDetailCategory = (row) => {
+    setDetailCategory(row);
+    setDetailModalOpen(true);
+  };
+
+  const closeDetailCategory = () => {
+    setDetailModalOpen(false);
+    setDetailCategory(null);
   };
 
   // ── Save (create / update) ──
@@ -210,7 +240,7 @@ const AdminMenuCategory = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {paginated.map((row) => (
                   <tr key={row.categoryId}>
                     <td>
                       <div className="menu-table-img">
@@ -257,6 +287,15 @@ const AdminMenuCategory = () => {
                         <button
                           type="button"
                           className="menu-icon-btn"
+                          aria-label="Xem chi tiết"
+                          title="Xem chi tiết"
+                          onClick={() => openDetailCategory(row)}
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="menu-icon-btn"
                           aria-label="Sửa"
                           title="Sửa"
                           onClick={() => openEditCategory(row)}
@@ -272,12 +311,32 @@ const AdminMenuCategory = () => {
 
             <div className="menu-pagination">
               <span>
-                Hiển thị {filtered.length} / {categories.length} danh mục
+                Hiển thị {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)} / {filtered.length} danh mục
               </span>
               <div className="menu-pagination-btns">
-                <button type="button" className="menu-page-btn" disabled>‹</button>
-                <button type="button" className="menu-page-btn active">1</button>
-                <button type="button" className="menu-page-btn">›</button>
+                <button type="button" className="menu-page-btn" disabled={safePage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>‹</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                  .reduce((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${i}`} className="menu-page-ellipsis">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`menu-page-btn ${safePage === p ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(p)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button type="button" className="menu-page-btn" disabled={safePage >= totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>›</button>
               </div>
             </div>
           </>
@@ -438,6 +497,78 @@ const AdminMenuCategory = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Xem Chi Tiết ── */}
+      {detailModalOpen && detailCategory && (
+        <div className="category-modal-overlay" onClick={closeDetailCategory}>
+          <div className="category-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="category-modal-head">
+              <h2 className="category-modal-title">Chi tiết danh mục</h2>
+              <button
+                type="button"
+                className="category-modal-close"
+                onClick={closeDetailCategory}
+                aria-label="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="category-modal-form" style={{ padding: '0 0 1rem' }}>
+              {detailCategory.image && (
+                <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+                  <img
+                    src={detailCategory.image}
+                    alt={detailCategory.name}
+                    style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: '0.5rem' }}
+                  />
+                </div>
+              )}
+              <div className="category-form-group">
+                <label>Tên danh mục</label>
+                <p style={{ margin: 0, fontWeight: 600, color: '#111827' }}>{detailCategory.name}</p>
+              </div>
+              <div className="category-form-group">
+                <label>Mô tả</label>
+                <p style={{ margin: 0, color: '#6b7280' }}>{detailCategory.description || 'Không có mô tả'}</p>
+              </div>
+              <div className="category-form-group">
+                <label>Trạng thái</label>
+                <p style={{ margin: 0, fontWeight: 600, color: detailCategory.isAvailable ? '#047857' : '#b91c1c' }}>
+                  {detailCategory.isAvailable ? 'Đang hoạt động' : 'Ngừng hoạt động'}
+                </p>
+              </div>
+              {detailCategory.isProcessedGoods !== undefined && (
+                <div className="category-form-group">
+                  <label>Món cần chế biến</label>
+                  <p style={{ margin: 0, color: '#374151' }}>
+                    {detailCategory.isProcessedGoods ? 'Có' : 'Không'}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="category-modal-actions">
+              <button
+                type="button"
+                className="combo-btn-cancel"
+                onClick={closeDetailCategory}
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                className="menu-btn-primary"
+                onClick={() => {
+                  closeDetailCategory();
+                  openEditCategory(detailCategory);
+                }}
+              >
+                <Pencil size={16} />
+                Chỉnh sửa
+              </button>
+            </div>
           </div>
         </div>
       )}

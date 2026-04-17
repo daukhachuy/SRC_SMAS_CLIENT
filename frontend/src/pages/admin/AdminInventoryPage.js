@@ -46,9 +46,11 @@ const MOCK_CATEGORY = [
 const AdminInventoryPage = () => {
   const [mainTab, setMainTab] = useState('stock'); // 'stock' | 'category'
   const [searchStock, setSearchStock] = useState('');
+  const [searchHistory, setSearchHistory] = useState('');
   const [searchCategory, setSearchCategory] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateRange, setDateRange] = useState('01/10/2023 - 31/10/2023');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryTab, setCategoryTab] = useState('danh-muc'); // 'danh-muc' | 'lo-hang'
 
@@ -128,19 +130,23 @@ const AdminInventoryPage = () => {
       // Fields: inventoryLogId, ingredientName, unitOfMeasurement, batchCode,
       //         action ("Import" | "EXPORT"), oldQuantity, newQuantity, timestamp, fullname
       const rawLogs = Array.isArray(logs) ? logs : (logs?.$values || []);
+      const formatDisplayDate = (timestamp) => {
+        const d = new Date(timestamp);
+        if (isNaN(d.getTime())) return '';
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+      };
       const transformedHistory = rawLogs.map(item => {
         const isImport = item.action === 'Import' || item.action === 'import';
         const diff = (item.newQuantity ?? 0) - (item.oldQuantity ?? 0);
+        const timestampDate = item.timestamp ? new Date(item.timestamp) : null;
         return {
-          time: item.timestamp
-            ? new Date(item.timestamp).toLocaleString('vi-VN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : '',
+          time: formatDisplayDate(item.timestamp),
+          timestampRaw: timestampDate && !isNaN(timestampDate.getTime()) ? timestampDate : null,
           batchId: item.batchCode || '',
           material: item.ingredientName || '',
           type: isImport ? 'import' : 'export',
@@ -173,7 +179,7 @@ const AdminInventoryPage = () => {
   }, [searchStock]);
   useEffect(() => {
     setHistoryPage(1);
-  }, [searchStock, typeFilter]);
+  }, [searchHistory, typeFilter, startDate, endDate]);
   useEffect(() => {
     setCategoryPage(1);
   }, [searchCategory, statusFilter]);
@@ -299,11 +305,17 @@ const AdminInventoryPage = () => {
   /* ── History filtered & paginated ── */
   const filteredHistory = useMemo(() => {
     return historyData.filter((r) => {
-      const matchSearch = !searchStock || (r.material || '').toLowerCase().includes(searchStock.toLowerCase());
+      const matchSearch = !searchHistory || (r.material || '').toLowerCase().includes(searchHistory.toLowerCase());
       const matchType = typeFilter === 'all' || r.type === typeFilter;
-      return matchSearch && matchType;
+      // Dùng timestampRaw đã lưu sẵn từ API thay vì parse lại từ string display
+      const rowDate = r.timestampRaw;
+      const start = startDate ? new Date(startDate + 'T00:00:00') : null;
+      const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+      const matchStart = !start || (rowDate && rowDate >= start);
+      const matchEnd = !end || (rowDate && rowDate <= end);
+      return matchSearch && matchType && matchStart && matchEnd;
     });
-  }, [historyData, searchStock, typeFilter]);
+  }, [historyData, searchStock, typeFilter, startDate, endDate]);
 
   const histTotal = Math.max(1, Math.ceil(filteredHistory.length / historyPageSize));
   const histSafe = Math.min(Math.max(1, historyPage), histTotal);
@@ -370,16 +382,6 @@ const AdminInventoryPage = () => {
           <p className="inv-subtitle">Theo dõi nguyên liệu và lịch sử nhập xuất</p>
         </div>
         <div className="inv-top-actions">
-          <div className="inv-search-wrap">
-            <Search size={18} className="inv-search-icon" />
-            <input
-              type="text"
-              className="inv-search"
-              placeholder={mainTab === 'stock' ? 'Tìm kiếm nguyên liệu...' : 'Tìm kiếm tên nguyên liệu...'}
-              value={mainTab === 'stock' ? searchStock : searchCategory}
-              onChange={(e) => (mainTab === 'stock' ? setSearchStock(e.target.value) : setSearchCategory(e.target.value))}
-            />
-          </div>
           {mainTab === 'stock' ? (
             <button type="button" className="inv-btn-primary" onClick={openImportModal}>
               <Plus size={18} />
@@ -438,6 +440,16 @@ const AdminInventoryPage = () => {
           <section className="inv-card">
             <div className="inv-card-head">
               <h2 className="inv-card-title">Tồn kho hiện tại</h2>
+              <div className="inv-card-search">
+                <Search size={16} className="inv-search-icon" style={{ left: '0.625rem' }} />
+                <input
+                  type="text"
+                  className="inv-search"
+                  placeholder="Tìm kiếm lô hàng..."
+                  value={searchStock}
+                  onChange={(e) => setSearchStock(e.target.value)}
+                />
+              </div>
             </div>
             <div className="inv-table-wrap">
               <table className="inv-table">
@@ -483,8 +495,20 @@ const AdminInventoryPage = () => {
             <div className="inv-card-head">
               <h2 className="inv-card-title">Lịch sử Nhập/Xuất kho</h2>
               <div className="inv-filters">
+                <div className="inv-card-search">
+                  <Search size={16} className="inv-search-icon" style={{ left: '0.625rem' }} />
+                  <input
+                    type="text"
+                    className="inv-search"
+                    placeholder="Tìm nguyên liệu..."
+                    value={searchHistory}
+                    onChange={(e) => setSearchHistory(e.target.value)}
+                  />
+                </div>
                 <div className="inv-filter-date">
-                  <input type="text" className="inv-input" value={dateRange} readOnly />
+                  <input type="date" className="inv-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <span style={{ margin: '0 8px', color: '#666' }}>—</span>
+                  <input type="date" className="inv-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
                 <select className="inv-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
                   <option value="all">Tất cả loại</option>
@@ -678,6 +702,7 @@ const AdminInventoryPage = () => {
                 <label>Hạn sử dụng</label>
                 <input
                   type="date"
+                  placeholder="DD/MM/YYYY"
                   value={importForm.expiryDate}
                   onChange={(e) => setImportForm((f) => ({ ...f, expiryDate: e.target.value }))}
                 />
