@@ -3,6 +3,7 @@ import { Bell, ShoppingBag, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import NotificationDropdown from './NotificationDropdown';
+import CustomerConversationWidget from './CustomerConversationWidget';
 import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../api/notificationApi';
 import '../styles/Header.css';
 
@@ -14,6 +15,15 @@ const MENU_ITEMS = [
 ];
 
 const normalizeRole = (role) => String(role || '').trim().toLowerCase();
+
+const getStoredUserRole = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('user') || '{}');
+    return normalizeRole(parsed?.role);
+  } catch {
+    return '';
+  }
+};
 
 const getNotificationId = (item, idx = 0) => {
   const id = item?.id ?? item?.notificationId ?? item?.notificationID ?? item?.Id ?? item?.NotificationId;
@@ -146,6 +156,12 @@ const Header = () => {
   }, []);
 
   const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+  const shouldShowCustomerConversation = useMemo(() => {
+    const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+    if (!token) return false;
+    const role = getStoredUserRole();
+    return !['manager', 'waiter', 'kitchen', 'admin'].includes(role);
+  }, [location.pathname]);
 
   // Map path -> id
   const pathToId = useMemo(() => {
@@ -250,6 +266,7 @@ const Header = () => {
   }, [location.pathname, location.state, pathToId]);
 
   return (
+    <>
     <nav className={`hd-wrapper ${shrink ? 'is-shrink' : ''}`}>
       <div className="hd-container">
 
@@ -356,6 +373,8 @@ const Header = () => {
 
       </div>
     </nav>
+    {shouldShowCustomerConversation ? <CustomerConversationWidget /> : null}
+    </>
   );
 };
 

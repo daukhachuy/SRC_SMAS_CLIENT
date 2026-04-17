@@ -261,16 +261,26 @@ const MyOrders = () => {
     if (activeTab !== 'Delivery') return;
 
     const poll = async () => {
-      const latest = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
-      const fresh = Array.isArray(latest) ? latest : [];
-      setOrders((prev) => {
-        if (fresh.length === 0) return prev;
-        const cancelledIds = new Set(
-          fresh.filter((o) => o.orderStatus === 'Cancelled').map((o) => o.orderId)
-        );
-        if (cancelledIds.size === 0) return fresh;
-        return fresh.filter((o) => !cancelledIds.has(o.orderId));
-      });
+      try {
+        const latest = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
+        const fresh = Array.isArray(latest) ? latest : [];
+        setOrders((prev) => {
+          if (fresh.length === 0) return prev;
+          const cancelledIds = new Set(
+            fresh.filter((o) => o.orderStatus === 'Cancelled').map((o) => o.orderId)
+          );
+          if (cancelledIds.size === 0) return fresh;
+          return fresh.filter((o) => !cancelledIds.has(o.orderId));
+        });
+      } catch (err) {
+        // Polling chạy nền: khi mất mạng tạm thời thì giữ danh sách hiện tại, tránh văng lỗi runtime.
+        const isNetworkError = !err?.response;
+        if (isNetworkError) {
+          console.warn('[MyOrders] Poll skipped due to network issue.');
+        } else {
+          console.warn('[MyOrders] Poll failed:', err?.response?.status || err?.message);
+        }
+      }
     };
 
     const intervalId = setInterval(poll, 15_000); // 15s
