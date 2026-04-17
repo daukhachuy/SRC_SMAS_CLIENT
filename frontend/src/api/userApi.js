@@ -27,26 +27,53 @@ export async function getProfile(contact) {
 
 /**
  * Cập nhật profile khách hàng — PUT /api/user/profile
+ * Body: UserProfileUpdateDTO (theo Swagger)
+ * Chỉ gửi các trường có giá trị (tránh gửi undefined/null)
  */
 export async function updateProfile(profileData) {
   try {
     console.log('📝 Updating user profile...');
-    const updateData = {
-      fullname: profileData.fullname,
-      gender: profileData.gender,
-      dob: profileData.dob,
-      phone: profileData.phone,
-      address: profileData.address,
-      avatar: profileData.avatar,
-      ...(profileData.bankAccount !== undefined && { bankAccount: profileData.bankAccount }),
-      ...(profileData.bankName !== undefined && { bankName: profileData.bankName }),
-    };
 
-    if (profileData.oldPassword !== undefined) updateData.oldPassword = profileData.oldPassword;
-    if (profileData.confirmPassword && profileData.confirmPassword.trim()) {
-      updateData.newPassword = profileData.confirmPassword;
+    // Build updateData với chỉ những trường có giá trị
+    const updateData = {};
+
+    // Trường bắt buộc/có thể cập nhật
+    if (profileData.fullname !== undefined && profileData.fullname !== null && profileData.fullname.trim() !== '') {
+      updateData.fullname = profileData.fullname.trim();
+    }
+    if (profileData.gender !== undefined && profileData.gender !== null) {
+      updateData.gender = profileData.gender;
+    }
+    if (profileData.dob !== undefined && profileData.dob !== null && profileData.dob !== '') {
+      updateData.dob = profileData.dob;
+    }
+    if (profileData.phone !== undefined && profileData.phone !== null && profileData.phone.trim() !== '') {
+      updateData.phone = profileData.phone.trim();
+    }
+    if (profileData.address !== undefined && profileData.address !== null && profileData.address.trim() !== '') {
+      updateData.address = profileData.address.trim();
     }
 
+    // Trường tùy chọn (chỉ gửi nếu có giá trị)
+    if (profileData.avatar !== undefined && profileData.avatar !== null && profileData.avatar.trim() !== '') {
+      updateData.avatar = profileData.avatar.trim();
+    }
+    if (profileData.bankAccount !== undefined && profileData.bankAccount !== null && profileData.bankAccount.trim() !== '') {
+      updateData.bankAccount = profileData.bankAccount.trim();
+    }
+    if (profileData.bankName !== undefined && profileData.bankName !== null && profileData.bankName.trim() !== '') {
+      updateData.bankName = profileData.bankName.trim();
+    }
+
+    // Trường mật khẩu (nếu có)
+    if (profileData.oldPassword !== undefined && profileData.oldPassword !== null && profileData.oldPassword.trim() !== '') {
+      updateData.oldPassword = profileData.oldPassword.trim();
+    }
+    if (profileData.newPassword !== undefined && profileData.newPassword !== null && profileData.newPassword.trim() !== '') {
+      updateData.newPassword = profileData.newPassword.trim();
+    }
+
+    console.log('📤 Sending update data:', updateData);
     const response = await instance.put('/user/profile', updateData);
     console.log('✅ User profile updated');
     return response.data;
@@ -244,6 +271,127 @@ export async function createStaffNew(data) {
     throw {
       status: error.response?.status,
       message: error.response?.data?.message || 'Failed to create new staff.',
+      error,
+    };
+  }
+}
+
+/**
+ * Lấy danh sách địa chỉ giao hàng của khách hàng — GET /api/user/addresses
+ * @returns {Promise<Array>}
+ */
+export async function getCustomerAddresses() {
+  try {
+    console.log('📍 Fetching customer addresses...');
+    const response = await instance.get('/user/addresses');
+    const raw = response.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.data)) return raw.data;
+    if (raw && Array.isArray(raw.items)) return raw.items;
+    if (raw && raw.$values) return raw.$values;
+    return [];
+  } catch (error) {
+    console.error('❌ Failed to fetch customer addresses:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to load addresses.',
+      error,
+    };
+  }
+}
+
+/**
+ * Thêm địa chỉ giao hàng mới — POST /api/user/addresses
+ * @param {object} data - { street, district, city, addressType, memorableName, phone, setAsDefault }
+ */
+export async function addCustomerAddress(data) {
+  try {
+    console.log('📍 Adding customer address...', data);
+    const response = await instance.post('/user/addresses', {
+      street: data.street,
+      district: data.district,
+      city: data.city || 'Hồ Chí Minh',
+      addressType: data.addressType,
+      memorableName: data.memorableName,
+      phone: data.phone,
+      setAsDefault: data.setAsDefault,
+    });
+    console.log('✅ Customer address added:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to add customer address:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to add address.',
+      error,
+    };
+  }
+}
+
+/**
+ * Cập nhật địa chỉ giao hàng — PUT /api/user/addresses/{id}
+ * @param {number} addressId
+ * @param {object} data - { street, district, city, addressType, memorableName, phone, setAsDefault }
+ */
+export async function updateCustomerAddress(addressId, data) {
+  try {
+    console.log('📍 Updating customer address:', addressId, data);
+    const response = await instance.put(`/user/addresses/${addressId}`, {
+      street: data.street,
+      district: data.district,
+      city: data.city || 'Hồ Chí Minh',
+      addressType: data.addressType,
+      memorableName: data.memorableName,
+      phone: data.phone,
+      setAsDefault: data.setAsDefault,
+    });
+    console.log('✅ Customer address updated:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to update customer address:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to update address.',
+      error,
+    };
+  }
+}
+
+/**
+ * Xóa địa chỉ giao hàng — DELETE /api/user/addresses/{id}
+ * @param {number} addressId
+ */
+export async function deleteCustomerAddress(addressId) {
+  try {
+    console.log('📍 Deleting customer address:', addressId);
+    const response = await instance.delete(`/user/addresses/${addressId}`);
+    console.log('✅ Customer address deleted');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to delete customer address:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to delete address.',
+      error,
+    };
+  }
+}
+
+/**
+ * Đặt địa chỉ mặc định — PATCH /api/user/addresses/{id}/default
+ * @param {number} addressId
+ */
+export async function setDefaultCustomerAddress(addressId) {
+  try {
+    console.log('📍 Setting default address:', addressId);
+    const response = await instance.patch(`/user/addresses/${addressId}/default`);
+    console.log('✅ Default address set');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to set default address:', error.response?.data || error.message);
+    throw {
+      status: error.response?.status,
+      message: error.response?.data?.message || 'Failed to set default address.',
       error,
     };
   }

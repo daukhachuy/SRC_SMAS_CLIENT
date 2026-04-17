@@ -40,15 +40,17 @@ const mapCustomerDtoToRow = (dto) => {
 };
 
 const POSITION_OPTIONS = [
-  { value: 'manager', label: 'Quản lý' },
-  { value: 'kitchen', label: 'Bếp' },
-  { value: 'thuongtin', label: 'Thường tín' },
-  { value: 'server', label: 'Phục vụ (Waiter)' },
-  { value: 'cashier', label: 'Thu ngân' },
+  { value: 'Manager', label: 'Quản lý (Manager)' },
+  { value: 'Kitchen', label: 'Bếp (Kitchen)' },
+  { value: 'Waiter', label: 'Phục vụ (Waiter)' },
 ];
 
 const getPositionLabel = (positionValue) => {
-  const opt = POSITION_OPTIONS.find((o) => o.value === positionValue);
+  // Normalize: hỗ trợ cả 'manager', 'Manager', 'MANAGER', v.v.
+  const normalized = (positionValue || '').toLowerCase().trim();
+  const opt = POSITION_OPTIONS.find(
+    (o) => o.value.toLowerCase() === normalized || o.label.toLowerCase().includes(normalized)
+  );
   return opt ? opt.label : positionValue || '—';
 };
 
@@ -128,6 +130,11 @@ const AdminStaffPage = () => {
   const [addStaffSubmitting, setAddStaffSubmitting] = useState(false);
   const [customerToggleBusyId, setCustomerToggleBusyId] = useState(null);
   const [staffToggleBusyId, setStaffToggleBusyId] = useState(null);
+
+  /* ── Pagination (pageSize = 5) ── */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPageStaff, setCurrentPageStaff] = useState(1);
+  const pageSize = 5;
 
   const loadCustomers = useCallback(async (options = {}) => {
     const silent = options.silent === true;
@@ -421,6 +428,77 @@ const AdminStaffPage = () => {
     return list.slice(0, 12);
   }, [customers, addStaffCustomerSearch]);
 
+  /* Reset page when filter changes */
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPageStaff(1);
+  }, [search, statusFilter]);
+
+  /* Reset page when tab changes */
+  useEffect(() => {
+    setCurrentPage(1);
+    setCurrentPageStaff(1);
+  }, [tab]);
+
+  /* ── Paginated customers ── */
+  const customerTotal = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const customerSafePage = Math.min(Math.max(1, currentPage), customerTotal);
+  const paginatedCustomers = useMemo(() => {
+    return filteredCustomers.slice((customerSafePage - 1) * pageSize, customerSafePage * pageSize);
+  }, [filteredCustomers, customerSafePage]);
+
+  /* ── Paginated staff ── */
+  const staffTotal = Math.max(1, Math.ceil(filteredStaff.length / pageSize));
+  const staffSafePage = Math.min(Math.max(1, currentPageStaff), staffTotal);
+  const paginatedStaff = useMemo(() => {
+    return filteredStaff.slice((staffSafePage - 1) * pageSize, staffSafePage * pageSize);
+  }, [filteredStaff, staffSafePage]);
+
+  /* Pagination button helper */
+  const renderPagination = (total, safePage, setPage, label) => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, safePage - Math.floor(maxVisible / 2));
+    let end = Math.min(total, start + maxVisible - 1);
+    if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+    for (let i = start; i <= end; i++) {
+      pages.push(
+        <button
+          key={i}
+          type="button"
+          className={`staff-page-btn ${i === safePage ? 'active' : ''}`}
+          onClick={() => setPage(i)}
+        >
+          {i}
+        </button>
+      );
+    }
+    return (
+      <>
+        <button
+          type="button"
+          className="staff-page-btn"
+          disabled={safePage <= 1}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+        >
+          ‹
+        </button>
+        {pages}
+        <button
+          type="button"
+          className="staff-page-btn"
+          disabled={safePage >= total}
+          onClick={() => setPage((p) => Math.min(total, p + 1))}
+        >
+          ›
+        </button>
+      </>
+    );
+  };
+
   return (
     <div className="admin-staff">
       <header className="staff-header">
@@ -501,7 +579,7 @@ const AdminStaffPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredCustomers.map((row) => (
+                  paginatedCustomers.map((row) => (
                   <tr key={row.id} className="staff-row-clickable" onClick={() => setSelectedCustomer(row)}>
                     <td>
                       <div className="staff-info-cell">
@@ -545,14 +623,10 @@ const AdminStaffPage = () => {
                 ? '—'
                 : filteredCustomers.length === 0
                   ? `0 trong ${customers.length} tài khoản`
-                  : `Hiển thị 1-${filteredCustomers.length} trong ${customers.length} tài khoản`}
+                  : `Hiển thị ${(customerSafePage - 1) * pageSize + 1}–${Math.min(customerSafePage * pageSize, filteredCustomers.length)} / ${filteredCustomers.length} tài khoản`}
             </span>
             <div className="staff-pagination-btns">
-              <button type="button" className="staff-page-btn">&lt;</button>
-              <button type="button" className="staff-page-btn active">1</button>
-              <button type="button" className="staff-page-btn">2</button>
-              <button type="button" className="staff-page-btn">3</button>
-              <button type="button" className="staff-page-btn">&gt;</button>
+              {renderPagination(customerTotal, customerSafePage, setCurrentPage)}
             </div>
           </div>
         </div>
@@ -591,7 +665,7 @@ const AdminStaffPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredStaff.map((row) => (
+                  paginatedStaff.map((row) => (
                   <tr key={row.id} className="staff-row-clickable" onClick={() => openStaffDetail(row)}>
                     <td>
                       <div className="staff-info-cell">
@@ -635,14 +709,10 @@ const AdminStaffPage = () => {
                 ? '—'
                 : filteredStaff.length === 0
                   ? `0 trong ${staff.length} nhân viên`
-                  : `Hiển thị 1-${filteredStaff.length} trong ${staff.length} nhân viên`}
+                  : `Hiển thị ${(staffSafePage - 1) * pageSize + 1}–${Math.min(staffSafePage * pageSize, filteredStaff.length)} / ${filteredStaff.length} nhân viên`}
             </span>
             <div className="staff-pagination-btns">
-              <button type="button" className="staff-page-btn">&lt;</button>
-              <button type="button" className="staff-page-btn active">1</button>
-              <button type="button" className="staff-page-btn">2</button>
-              <button type="button" className="staff-page-btn">3</button>
-              <button type="button" className="staff-page-btn">&gt;</button>
+              {renderPagination(staffTotal, staffSafePage, setCurrentPageStaff)}
             </div>
           </div>
         </div>

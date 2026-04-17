@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/Profile.css';
-import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
-import { getProfile, updateProfile } from '../api/userApi';
+import { getProfile, updateProfile, changePassword } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { formatCurrency } from '../api/managerApi';
-import CustomerNoticeModal from '../components/CustomerNoticeModal';
-
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBHDr0B4X2T13T1nVBQczGvKkS8VQZmwc";
 
 /** Chuẩn hóa dob từ API → yyyy-mm-dd (tránh lệch ngày do timezone) */
 function normalizeDobFromApi(dob) {
@@ -78,8 +74,6 @@ const Profile = () => {
     dob: ''
   });
 
-  const [addresses, setAddresses] = useState([]);
-
   // ── Lịch sử đặt sự kiện ──
   const [eventOrders, setEventOrders] = useState([]);
   const [eventOrdersLoading, setEventOrdersLoading] = useState(false);
@@ -95,94 +89,12 @@ const Profile = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
-  /** Hiển thị ngày sinh dạng DD/MM/YYYY khi gõ (đồng bộ với userInfo.dob dạng ISO) */
   const [dobInput, setDobInput] = useState('');
   const [fieldErrors, setFieldErrors] = useState({ phone: '', dob: '' });
-  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
-  const [customerNotice, setCustomerNotice] = useState(null);
-  const [newAddress, setNewAddress] = useState({
-    street: '',
-    district: '',
-    city: 'Hồ Chí Minh',
-    addressType: 'Nhà riêng',
-    memorableName: '',
-    phone: '',
-    setAsDefault: false
-  });
-
-  // Google Maps
-  const defaultCenter = { lat: 10.8231, lng: 106.6297 }; // TP.HCM
-  const [mapCenter, setMapCenter] = useState(defaultCenter);
-  const [markerPos, setMarkerPos] = useState(null);
-  const { isLoaded: isMapLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
-
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const newPos = { lat: latitude, lng: longitude };
-          setMapCenter(newPos);
-          setMarkerPos(newPos);
-          console.log('GPS lấy được:', newPos);
-          // Tự động điền địa chỉ từ tọa độ
-          reverseGeocode(latitude, longitude);
-        },
-        (err) => {
-          console.error('Geolocation error:', err);
-          setCustomerNotice({
-            kind: 'alert',
-            title: 'Không lấy được vị trí',
-            message:
-              'Vui lòng cho phép truy cập vị trí trong trình duyệt, hoặc chọn điểm trên bản đồ.',
-            variant: 'info',
-          });
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      setCustomerNotice({
-        kind: 'alert',
-        title: 'Trình duyệt không hỗ trợ',
-        message: 'Trình duyệt của bạn không hỗ trợ định vị. Bạn vẫn có thể chọn vị trí trên bản đồ.',
-        variant: 'info',
-      });
-    }
-  };
-
-  const handleMapClick = (e) => {
-    if (e.latLng) {
-      const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-      setMarkerPos(newPos);
-      console.log('Đã chọn vị trí:', newPos);
-      // Tự động điền địa chỉ
-      reverseGeocode(newPos.lat, newPos.lng);
-    }
-  };
-
-  // Reverse geocoding: lấy địa chỉ từ tọa độ
-  const reverseGeocode = async (lat, lng) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const data = await response.json();
-      if (data.address) {
-        const parts = [];
-        if (data.address.house_number) parts.push(data.address.house_number);
-        if (data.address.road) parts.push(data.address.road);
-        if (data.address.suburb) parts.push(data.address.suburb);
-        if (data.address.city_district) parts.push(data.address.city_district);
-        if (data.address.city) parts.push(data.address.city);
-        const fullAddr = parts.join(', ');
-        setNewAddress(prev => ({ ...prev, street: fullAddr }));
-      }
-    } catch (err) {
-      console.error('Reverse geocode error:', err);
-    }
-  };
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -205,17 +117,6 @@ const Profile = () => {
           dob
         });
         setDobInput(isoToDdMmYyyy(dob));
-
-        if (address || phone) {
-          setAddresses([
-            { id: 'default', label: 'Nhà riêng', address: address || '—', phone: phone || '—', isDefault: true },
-            { id: 'office', label: 'Văn phòng', address: 'Tòa nhà Bitexco, 2 Hải Triều, Phường Bến Nghé, Quận 1, TP. HCM', phone: '028 12345678', isDefault: false }
-          ]);
-        } else {
-          setAddresses([
-            { id: 'default', label: 'Nhà riêng', address: '—', phone: '—', isDefault: true }
-          ]);
-        }
       } catch (err) {
         console.error('Error fetching profile:', err);
         setError('Không thể tải thông tin cá nhân. Vui lòng thử lại.');
@@ -245,11 +146,10 @@ const Profile = () => {
             ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—';
           const statusRaw = (item.status ?? item.contractStatus ?? '').toLowerCase();
           const statusMap = {
-            pending:      { label: 'Chờ duyệt',       cls: 'status-pending' },
-            approved:     { label: 'Đã duyệt',        cls: 'status-confirmed' },
-            rejected:     { label: 'Đã từ chối',      cls: 'status-cancelled' },
-            active:       { label: 'Đang hoạt động',  cls: 'status-signed' },
-            completed:    { label: 'Hoàn thành',      cls: 'status-signed' },
+            pending:      { label: 'Chờ xác nhận',  cls: 'status-pending' },
+            confirmed:    { label: 'Đã xác nhận',    cls: 'status-confirmed' },
+            signed:       { label: 'Đã ký hợp đồng', cls: 'status-signed' },
+            deposit:      { label: 'Chờ đặt cọc',    cls: 'status-deposit' },
             cancelled:    { label: 'Đã hủy',          cls: 'status-cancelled' },
             cancel:       { label: 'Đã hủy',          cls: 'status-cancelled' },
           };
@@ -338,7 +238,8 @@ const Profile = () => {
       setFieldErrors((prev) => ({ ...prev, phone: 'Vui lòng nhập số điện thoại.' }));
       return;
     }
-    const dobFinal = parseDdMmYyyyToIso(dobInput) || userInfo.dob;
+    // Xử lý ngày sinh - lấy từ userInfo.dob (đã được xử lý bởi handleDobChange/handleDobBlur)
+    const dobFinal = userInfo.dob;
     if (!dobFinal) {
       const msg = 'Vui lòng nhập ngày sinh đúng định dạng DD/MM/YYYY.';
       setError(msg);
@@ -353,14 +254,12 @@ const Profile = () => {
       return;
     }
     const phone = userInfo.phone.startsWith('0') ? '+84' + userInfo.phone.slice(1) : userInfo.phone;
-    const defaultAddr = addresses.find(a => a.isDefault);
     try {
       setIsSubmitting(true);
       await updateProfile({
         ...userInfo,
         dob: dobFinal,
         phone,
-        address: defaultAddr ? defaultAddr.address : userInfo.address
       });
       setSuccessMessage('Cập nhật thông tin thành công!');
     } catch (err) {
@@ -372,82 +271,72 @@ const Profile = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
+    setPasswordError('');
+    setPasswordSuccess('');
     const { currentPassword, newPassword, confirmPassword } = passwordForm;
+
+    // Validation mật khẩu hiện tại
+    if (!currentPassword || currentPassword.trim() === '') {
+      setPasswordError('Vui lòng nhập mật khẩu hiện tại.');
+      return;
+    }
+    if (currentPassword.length < 6) {
+      setPasswordError('Mật khẩu hiện tại phải có ít nhất 6 ký tự.');
+      return;
+    }
+
+    // Validation mật khẩu mới
     if (!newPassword || newPassword.length < 8) {
-      setError('Mật khẩu mới phải dài ít nhất 8 ký tự.');
+      setPasswordError('Mật khẩu mới phải dài ít nhất 8 ký tự.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('Mật khẩu mới không được trùng với mật khẩu hiện tại.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Xác nhận mật khẩu không khớp.');
+      setPasswordError('Xác nhận mật khẩu không khớp.');
       return;
     }
+
     try {
-      setIsPasswordSubmitting(true);
-      await updateProfile({
-        ...userInfo,
-        oldPassword: currentPassword,
-        confirmPassword: newPassword
-      });
+      setChangingPassword(true);
+      const response = await changePassword(currentPassword, newPassword);
+      
+      // Kiem tra response tu backend
+      if (response && response.success === false) {
+        const msg = response.message || response.error || '';
+        if (msg.toLowerCase().includes('current') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('sai') || msg.toLowerCase().includes('incorrect')) {
+          setPasswordError('Mật khẩu hiện tại không đúng. Vui lòng thử lại.');
+          return;
+        }
+        setPasswordError(msg || 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+        return;
+      }
+      
+      // Thanh cong
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setSuccessMessage('Cập nhật mật khẩu thành công!');
+      setPasswordSuccess('Đổi mật khẩu thành công!');
+      setTimeout(() => setShowPasswordModal(false), 1500);
     } catch (err) {
-      setError(err.message || 'Cập nhật mật khẩu thất bại.');
+      // Parse error tu response
+      const errorData = err?.response?.data || {};
+      const errorMsg = errorData.message || err.message || '';
+      const status = err?.status || err?.response?.status;
+      
+      // Kiem tra cac truong hop loi cu the
+      if (status === 400 || errorMsg.toLowerCase().includes('current') || errorMsg.toLowerCase().includes('wrong') || errorMsg.toLowerCase().includes('sai') || errorMsg.toLowerCase().includes('incorrect') || errorMsg.toLowerCase().includes('không đúng') || errorMsg.toLowerCase().includes('password')) {
+        setPasswordError('Mật khẩu hiện tại không đúng. Vui lòng thử lại.');
+      } else if (status === 401) {
+        setPasswordError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      } else if (status === 403) {
+        setPasswordError('Bạn không có quyền thực hiện thao tác này.');
+      } else {
+        setPasswordError(errorMsg || 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+      }
     } finally {
-      setIsPasswordSubmitting(false);
+      setChangingPassword(false);
     }
-  };
-
-  const DISTRICTS_HCM = ['Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10', 'Quận 11', 'Quận 12', 'Bình Thạnh', 'Phú Nhuận', 'Gò Vấp', 'Tân Bình', 'Tân Phú', 'Bình Tân', 'Thủ Đức', 'Củ Chi', 'Hóc Môn', 'Bình Chánh', 'Nhà Bè', 'Cần Giờ'];
-
-  const handleAddAddress = () => {
-    setNewAddress({
-      street: '',
-      district: '',
-      city: 'Hồ Chí Minh',
-      addressType: 'Nhà riêng',
-      memorableName: '',
-      phone: userInfo.phone || '',
-      setAsDefault: false
-    });
-    setShowAddAddressModal(true);
-  };
-
-  const handleCloseAddAddressModal = () => {
-    setShowAddAddressModal(false);
-  };
-
-  const handleSaveNewAddress = (e) => {
-    e.preventDefault();
-    const fullAddress = [newAddress.street, newAddress.district, newAddress.city].filter(Boolean).join(', ');
-    const label = newAddress.addressType;
-    const name = newAddress.memorableName.trim() || label;
-    const isDefault = newAddress.setAsDefault || addresses.length === 0;
-    let next = [...addresses];
-    if (isDefault) next = next.map(a => ({ ...a, isDefault: false }));
-    next.push({
-      id: Date.now(),
-      label: name,
-      address: fullAddress || '—',
-      phone: newAddress.phone || userInfo.phone || '—',
-      isDefault
-    });
-    setAddresses(next);
-    setShowAddAddressModal(false);
-    setSuccessMessage('Đã thêm địa chỉ mới.');
-  };
-
-  const setDefaultAddress = (id) => {
-    setAddresses(addresses.map(a => ({ ...a, isDefault: a.id === id })));
-  };
-
-  const removeAddress = (id) => {
-    const next = addresses.filter(a => a.id !== id);
-    if (next.length === 0) return;
-    const hadDefault = addresses.find(a => a.id === id)?.isDefault;
-    if (hadDefault && next.length > 0) next[0].isDefault = true;
-    setAddresses(next);
   };
 
   useEffect(() => {
@@ -475,7 +364,7 @@ const Profile = () => {
       {/* 1. Thông tin cá nhân */}
       <section className="Profile-Section">
         <h2 className="Profile-Section-Title">
-          <i className="fa-solid fa-location-dot Profile-Section-Icon"></i>
+          <i className="fa-solid fa-user Profile-Section-Icon"></i>
           Thông tin cá nhân
         </h2>
         <form onSubmit={handleSaveProfile} className="Profile-Form-Block">
@@ -486,23 +375,85 @@ const Profile = () => {
             </div>
             <div className="Profile-Field">
               <label>Ngày sinh</label>
-              <div className="Profile-Input-With-Icon">
+              <div className="Profile-Date-Input-Wrap">
                 <input
                   type="text"
-                  inputMode="numeric"
-                  autoComplete="bday"
                   name="dob"
                   value={dobInput}
                   onChange={handleDobChange}
                   onBlur={handleDobBlur}
                   placeholder="DD/MM/YYYY"
                   maxLength={10}
-                  className={fieldErrors.dob ? 'Profile-Input-Error' : ''}
+                  className={`Profile-Date-Text-Input ${fieldErrors.dob ? 'Profile-Input-Error' : ''}`}
                   aria-invalid={!!fieldErrors.dob}
                 />
-                <i className="fa-regular fa-calendar Profile-Field-Icon"></i>
+                <button
+                  type="button"
+                  className="Profile-Date-Picker-Btn"
+                  onClick={() => {
+                    console.log('📅 Calendar button clicked');
+                    try {
+                      // Tạo input date tạm
+                      const input = document.createElement('input');
+                      input.type = 'date';
+                      input.style.position = 'absolute';
+                      input.style.left = '-9999px';
+                      input.style.top = '-9999px';
+                      input.style.opacity = '0';
+                      document.body.appendChild(input);
+
+                      console.log('📅 Picker created, focusing...');
+                      input.focus();
+
+                      // Timeout để đảm bảo focus đã được set
+                      setTimeout(() => {
+                        if (document.activeElement === input) {
+                          console.log('📅 Input focused, showing picker');
+                        } else {
+                          console.log('📅 Input not focused, trying click');
+                          input.click();
+                        }
+                      }, 100);
+
+                      input.addEventListener('change', (e) => {
+                        const val = e.target.value;
+                        console.log('📅 Date selected:', val);
+                        if (val) {
+                          setUserInfo((prev) => ({ ...prev, dob: val }));
+                          setDobInput(isoToDdMmYyyy(val));
+                        }
+                        setFieldErrors((prev) => ({ ...prev, dob: '' }));
+                        document.body.removeChild(input);
+                      });
+
+                      input.addEventListener('blur', () => {
+                        console.log('📅 Picker blurred');
+                        if (document.body.contains(input)) {
+                          document.body.removeChild(input);
+                        }
+                      });
+                    } catch (err) {
+                      console.error('📅 Error showing picker:', err);
+                    }
+                  }}
+                  title="Chọn ngày từ lịch"
+                >
+                  <i className="fa-regular fa-calendar"></i>
+                </button>
               </div>
               {fieldErrors.dob && <p className="Profile-Field-Error">{fieldErrors.dob}</p>}
+            </div>
+            <div className="Profile-Field">
+              <label>Địa chỉ</label>
+              <input
+                type="text"
+                name="address"
+                autoComplete="street-address"
+                value={typeof userInfo.address === 'string' ? userInfo.address : (userInfo.address?.toString?.() || '')}
+                onChange={handleInputChange}
+                placeholder="Ví dụ: 123 Nguyễn Huệ, Quận 1, TP.HCM"
+                maxLength={200}
+              />
             </div>
             <div className="Profile-Field">
               <label>Giới tính</label>
@@ -538,6 +489,11 @@ const Profile = () => {
               <label>Email</label>
               <input type="email" value={typeof userInfo.email === 'string' ? userInfo.email : (userInfo.email?.toString?.() || '')} readOnly className="Profile-Input-Readonly" />
             </div>
+            <div className="Profile-Field-Compact">
+              <button type="button" className="Profile-Link-Edit" onClick={() => setShowPasswordModal(true)}>
+                <i className="fa-solid fa-key"></i> Đổi mật khẩu
+              </button>
+            </div>
           </div>
           <div className="Profile-Form-Actions">
             <button type="submit" className="Profile-Btn Primary" disabled={isSubmitting}>
@@ -547,243 +503,54 @@ const Profile = () => {
         </form>
       </section>
 
-      {/* 2. Địa chỉ giao hàng */}
-      <section className="Profile-Section">
-        <div className="Profile-Section-Header">
-          <h2 className="Profile-Section-Title">
-            <i className="fa-solid fa-location-dot Profile-Section-Icon"></i>
-            Địa chỉ giao hàng
-          </h2>
-          <button type="button" className="Profile-Link-Add" onClick={handleAddAddress}>
-            <i className="fa-solid fa-location-dot"></i> Thêm địa chỉ mới
-          </button>
-        </div>
-        <div className="Profile-Address-List">
-          {addresses.map((addr) => (
-            <div key={addr.id} className={`Profile-Address-Card ${addr.isDefault ? 'Default' : ''}`}>
-              <div className="Profile-Address-Icon">
-                <i className={addr.label === 'Văn phòng' ? 'fa-solid fa-briefcase' : addr.label === 'Khác' ? 'fa-solid fa-location-dot' : 'fa-solid fa-house'}></i>
-              </div>
-              <div className="Profile-Address-Body">
-                <div className="Profile-Address-Row">
-                  <span className="Profile-Address-Label">{addr.label}</span>
-                  {addr.isDefault && <span className="Profile-Address-Default">MẶC ĐỊNH</span>}
-                </div>
-                <p className="Profile-Address-Text">{addr.address}</p>
-                <p className="Profile-Address-Phone">SĐT: {typeof addr.phone === 'string' ? addr.phone : (addr.phone?.toString?.() || '---')}</p>
-              </div>
-              <div className="Profile-Address-Actions">
-                <button type="button" className="Profile-Address-Action" title="Sửa" onClick={() => setDefaultAddress(addr.id)}><i className="fa-solid fa-pencil"></i></button>
-                <button type="button" className="Profile-Address-Action" title="Xóa" onClick={() => removeAddress(addr.id)}><i className="fa-regular fa-trash-can"></i></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-
-      {/* 4. Đổi mật khẩu */}
-      <section className="Profile-Section">
-        <h2 className="Profile-Section-Title">
-          <i className="fa-solid fa-lock Profile-Section-Icon"></i>
-          Đổi mật khẩu
-        </h2>
-        <form onSubmit={handleChangePassword} className="Profile-Form-Block">
-          <div className="Profile-Password-Fields">
-            <div className="Profile-Field">
-              <label>Mật khẩu hiện tại</label>
-              <div className="Profile-Input-With-Icon">
-                <input
-                  type={showPass.current ? 'text' : 'password'}
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder="********"
-                />
-                <i className={`fa-solid ${showPass.current ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, current: !showPass.current })}></i>
-              </div>
-            </div>
-            <div className="Profile-Field">
-              <label>Mật khẩu mới</label>
-              <div className="Profile-Input-With-Icon">
-                <input
-                  type={showPass.new ? 'text' : 'password'}
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  placeholder="********"
-                />
-                <i className={`fa-solid ${showPass.new ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, new: !showPass.new })}></i>
-              </div>
-            </div>
-            <div className="Profile-Field">
-              <label>Xác nhận mật khẩu</label>
-              <div className="Profile-Input-With-Icon">
-                <input
-                  type={showPass.confirm ? 'text' : 'password'}
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  placeholder="********"
-                />
-                <i className={`fa-solid ${showPass.confirm ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, confirm: !showPass.confirm })}></i>
-              </div>
-            </div>
-          </div>
-          <p className="Profile-Password-Hint">Mật khẩu phải dài ít nhất 8 ký tự, bao gồm chữ cái và số.</p>
-          <div className="Profile-Form-Actions">
-            <button type="submit" className="Profile-Btn Primary" disabled={isPasswordSubmitting}>
-              {isPasswordSubmitting ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {/* Modal Thêm địa chỉ mới - layout rộng cho máy tính */}
-      {showAddAddressModal && (
-        <div className="AddressModal-Overlay" onClick={handleCloseAddAddressModal}>
-          <div className="AddressModal-Box" onClick={(e) => e.stopPropagation()}>
-            <div className="AddressModal-Header">
-              <button type="button" className="AddressModal-Back" onClick={handleCloseAddAddressModal} aria-label="Đóng">
-                <i className="fa-solid fa-arrow-left"></i>
+      {/* Modal Đổi mật khẩu */}
+      {showPasswordModal && (
+        <div className="AddressModal-Overlay" onClick={() => setShowPasswordModal(false)}>
+          <div className="PasswordModal-Box" onClick={(e) => e.stopPropagation()}>
+            <div className="PasswordModal-Header">
+              <button type="button" className="AddressModal-Back" onClick={() => setShowPasswordModal(false)} aria-label="Đóng">
+                <i className="fa-solid fa-xmark"></i>
               </button>
-              <h2 className="AddressModal-Title">Thêm địa chỉ mới</h2>
-              <button type="button" className="AddressModal-Help">Trợ giúp</button>
+              <h2 className="AddressModal-Title">Đổi mật khẩu</h2>
+              <div style={{ width: 40 }}></div>
             </div>
-            <form onSubmit={handleSaveNewAddress}>
-              <div className="AddressModal-Body">
-                <div className="AddressModal-MapCol">
-                  <div className="AddressModal-MapWrap">
-                    {loadError ? (
-                      <div>Lỗi tải bản đồ. Vui lòng thử lại sau.</div>
-                    ) : !isMapLoaded ? (
-                      <div>Đang tải bản đồ...</div>
-                    ) : (
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={mapCenter}
-                        zoom={14}
-                        onClick={handleMapClick}
-                      >
-                        {markerPos && <MarkerF position={markerPos} />}
-                      </GoogleMap>
-                    )}
+            <form onSubmit={handleChangePassword}>
+              <div className="PasswordModal-Body">
+                {passwordError && <p className="PasswordModal-Message PasswordModal-Error">{passwordError}</p>}
+                {passwordSuccess && <p className="PasswordModal-Message PasswordModal-Success">{passwordSuccess}</p>}
+                <div className="PasswordModal-Field">
+                  <label>Mật khẩu hiện tại</label>
+                  <div className="PasswordModal-InputWrap">
+                    <i className="fa-solid fa-lock"></i>
+                    <input type={showPass.current ? 'text' : 'password'} placeholder="Nhập mật khẩu hiện tại" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} required />
+                    <button type="button" className="PasswordModal-PassToggle" onClick={() => setShowPass({ ...showPass, current: !showPass.current })}><i className={`fa-solid ${showPass.current ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
                   </div>
-                  <button type="button" className="AddressModal-ConfirmMap" onClick={getCurrentLocation}>
-                    <i className="fa-solid fa-crosshairs"></i> Xác nhận vị trí trên bản đồ
-                  </button>
                 </div>
-                <div className="AddressModal-FormCol">
-                  <div className="AddressModal-Field">
-                    <label>SỐ NHÀ, TÊN ĐƯỜNG</label>
-                    <div className="AddressModal-InputWrap">
-                      <i className="fa-solid fa-house AddressModal-InputIcon"></i>
-                      <input
-                        type="text"
-                        placeholder="Ví dụ: 123 Nguyễn Huệ"
-                        value={newAddress.street}
-                        onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
-                      />
-                    </div>
+                <div className="PasswordModal-Field">
+                  <label>Mật khẩu mới</label>
+                  <div className="PasswordModal-InputWrap">
+                    <i className="fa-solid fa-key"></i>
+                    <input type={showPass.new ? 'text' : 'password'} placeholder="Nhập mật khẩu mới" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} required />
+                    <button type="button" className="PasswordModal-PassToggle" onClick={() => setShowPass({ ...showPass, new: !showPass.new })}><i className={`fa-solid ${showPass.new ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
                   </div>
-                  <div className="AddressModal-Row">
-                    <div className="AddressModal-Field">
-                      <label>QUẬN / HUYỆN</label>
-                      <select
-                        value={newAddress.district}
-                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
-                      >
-                        <option value="">Chọn Quận</option>
-                        {DISTRICTS_HCM.map((d) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="AddressModal-Field">
-                      <label>THÀNH PHỐ</label>
-                      <select
-                        value={newAddress.city}
-                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-                      >
-                        <option value="Hồ Chí Minh">Hồ Chí Minh</option>
-                        <option value="Đà Nẵng">Đà Nẵng</option>
-                        <option value="Hà Nội">Hà Nội</option>
-                      </select>
-                    </div>
+                </div>
+                <div className="PasswordModal-Field">
+                  <label>Xác nhận mật khẩu mới</label>
+                  <div className="PasswordModal-InputWrap">
+                    <i className="fa-solid fa-key"></i>
+                    <input type={showPass.confirm ? 'text' : 'password'} placeholder="Nhập lại mật khẩu mới" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} required />
+                    <button type="button" className="PasswordModal-PassToggle" onClick={() => setShowPass({ ...showPass, confirm: !showPass.confirm })}><i className={`fa-solid ${showPass.confirm ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
                   </div>
-                  <div className="AddressModal-Field">
-                    <label>TÊN ĐỊA CHỈ</label>
-                    <div className="AddressModal-TypeGroup">
-                      <button
-                        type="button"
-                        className={`AddressModal-TypeBtn ${newAddress.addressType === 'Nhà riêng' ? 'active' : ''}`}
-                        onClick={() => setNewAddress({ ...newAddress, addressType: 'Nhà riêng' })}
-                      >
-                        <i className="fa-solid fa-house"></i> Nhà riêng
-                      </button>
-                      <button
-                        type="button"
-                        className={`AddressModal-TypeBtn ${newAddress.addressType === 'Văn phòng' ? 'active' : ''}`}
-                        onClick={() => setNewAddress({ ...newAddress, addressType: 'Văn phòng' })}
-                      >
-                        <i className="fa-solid fa-briefcase"></i> Văn phòng
-                      </button>
-                      <button
-                        type="button"
-                        className={`AddressModal-TypeBtn ${newAddress.addressType === 'Khác' ? 'active' : ''}`}
-                        onClick={() => setNewAddress({ ...newAddress, addressType: 'Khác' })}
-                      >
-                        <i className="fa-solid fa-plus"></i> Khác
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Tên gợi nhớ (Ví dụ: Nhà nội, Studio...)"
-                      value={newAddress.memorableName}
-                      onChange={(e) => setNewAddress({ ...newAddress, memorableName: e.target.value })}
-                      className="AddressModal-InputNoIcon"
-                    />
-                  </div>
-                  <div className="AddressModal-Field">
-                    <label>SỐ ĐIỆN THOẠI NGƯỜI NHẬN</label>
-                    <div className="AddressModal-InputWrap">
-                      <i className="fa-solid fa-phone AddressModal-InputIcon"></i>
-                      <input
-                        type="text"
-                        placeholder="09xx xxx xxx"
-                        value={newAddress.phone}
-                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value.replace(/\D/g, '') })}
-                        maxLength={11}
-                      />
-                    </div>
-                    <p className="AddressModal-Hint">
-                      Tài xế sẽ liên hệ số này khi giao hàng
-                    </p>
-                  </div>
-                  <label className="AddressModal-Checkbox">
-                    <input
-                      type="checkbox"
-                      checked={newAddress.setAsDefault}
-                      onChange={(e) => setNewAddress({ ...newAddress, setAsDefault: e.target.checked })}
-                    />
-                    Đặt làm địa chỉ mặc định
-                  </label>
                 </div>
               </div>
-              <div className="AddressModal-Footer">
-                <button type="button" className="AddressModal-BtnCancel" onClick={handleCloseAddAddressModal}>
-                  Hủy bỏ
-                </button>
-                <button type="submit" className="AddressModal-BtnSave">
-                  Lưu địa chỉ
-                </button>
+              <div className="PasswordModal-Footer">
+                <button type="button" className="PasswordModal-BtnCancel" onClick={() => setShowPasswordModal(false)}>Hủy</button>
+                <button type="submit" className="PasswordModal-BtnSave" disabled={changingPassword}>{changingPassword ? 'Đang xử lý...' : 'Xác nhận'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <CustomerNoticeModal
-        config={customerNotice}
-        onRequestClose={() => setCustomerNotice(null)}
-      />
     </div>
   );
 };

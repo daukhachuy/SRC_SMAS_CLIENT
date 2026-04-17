@@ -110,7 +110,7 @@ const OrderHistory = () => {
       }
       const orderData = Array.isArray(res) ? res : [];
 
-      const processedOrders = orderData
+          const processedOrders = orderData
         .map((order) => {
           const statusRaw = pickOrderStatusRaw(order);
           const effectiveStatus = normalizeOrderEffectiveStatus(statusRaw);
@@ -123,8 +123,6 @@ const OrderHistory = () => {
             'Khách hàng';
           const displayPhone =
             order.delivery?.recipientPhone || cust.phone || order.delivery?.phone || null;
-          const displayTable =
-            formatTablesDisplay(order.tables) || order.tableNumber || null;
 
             return {
             ...order,
@@ -135,9 +133,6 @@ const OrderHistory = () => {
             displayDate: order.createdAt ?? order.CreatedAt,
             displayCustomer,
             displayPhone,
-            displayGuests: order.numberOfGuests,
-            displayTable,
-            displayEvent: order.eventName || order.note || '—',
             displayTotal: order.totalAmount,
             typeName: mapOrderTypeLabel(order.orderType ?? order.OrderType),
             rawStatus: statusRaw,
@@ -288,26 +283,9 @@ const OrderHistory = () => {
                   </div>
                   <div className="Grid-Col">
                     <p>
-                      <span className="Grid-Label">SỐ NGƯỜI</span>
-                      <br />
-                      <span className="Grid-Value">{item.displayGuests != null ? `${item.displayGuests} người` : '—'}</span>
-                    </p>
-                    <p>
                       <span className="Grid-Label">ĐẶT NGÀY</span>
                       <br />
                       <span className="Grid-Value">{formattedDate}</span>
-                    </p>
-                  </div>
-                  <div className="Grid-Col">
-                    <p>
-                      <span className="Grid-Label">SỐ BÀN</span>
-                      <br />
-                      <span className="Grid-Value">{item.displayTable || '—'}</span>
-                    </p>
-                    <p>
-                      <span className="Grid-Label">SỰ KIỆN</span>
-                      <br />
-                      <span className="Grid-Value">{item.displayEvent || '—'}</span>
                     </p>
                   </div>
                 </div>
