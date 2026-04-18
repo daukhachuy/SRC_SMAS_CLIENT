@@ -598,8 +598,8 @@ const MyOrders = () => {
             <p>GIỜ: <span>{fmtRawTime(ev.bookingTime || ev.eventTime)}</span></p>
           </div>
           <div className="Grid-Col Total-Col">
-            <p>SỐ KHÁCH</p>
-            <h2 className="Price-Text">{(ev.numberOfGuests || ev.guestCount || 0)} người</h2>
+            <p>SỐ BÀN</p>
+            <h2 className="Price-Text">{(ev.numberOfGuests || ev.guestCount || 0)} bàn</h2>
             {canShowDepositButton && (
               <button
                 type="button"

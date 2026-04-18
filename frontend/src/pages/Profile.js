@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/Profile.css';
-import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 import { getProfile, updateProfile } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { formatCurrency } from '../api/managerApi';
 import CustomerNoticeModal from '../components/CustomerNoticeModal';
 
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBHDr0B4X2T13T1nVBQczGvKkS8VQZmwc";
+/** Strips legacy "|@lat,lng" suffix if present (old saved addresses). */
+function stripLegacyGpsSuffix(text) {
+  return String(text || '').replace(/\|@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s*$/, '').trim();
+}
 
 /** Chuẩn hóa dob từ API → yyyy-mm-dd (tránh lệch ngày do timezone) */
 function normalizeDobFromApi(dob) {
@@ -99,90 +101,19 @@ const Profile = () => {
   const [dobInput, setDobInput] = useState('');
   const [fieldErrors, setFieldErrors] = useState({ phone: '', dob: '' });
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState(null);
   const [customerNotice, setCustomerNotice] = useState(null);
   const [newAddress, setNewAddress] = useState({
     street: '',
     district: '',
-    city: 'Hồ Chí Minh',
+    city: '',
     addressType: 'Nhà riêng',
     memorableName: '',
     phone: '',
     setAsDefault: false
   });
-
-  // Google Maps
-  const defaultCenter = { lat: 10.8231, lng: 106.6297 }; // TP.HCM
-  const [mapCenter, setMapCenter] = useState(defaultCenter);
-  const [markerPos, setMarkerPos] = useState(null);
-  const { isLoaded: isMapLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
-
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const newPos = { lat: latitude, lng: longitude };
-          setMapCenter(newPos);
-          setMarkerPos(newPos);
-          console.log('GPS lấy được:', newPos);
-          // Tự động điền địa chỉ từ tọa độ
-          reverseGeocode(latitude, longitude);
-        },
-        (err) => {
-          console.error('Geolocation error:', err);
-          setCustomerNotice({
-            kind: 'alert',
-            title: 'Không lấy được vị trí',
-            message:
-              'Vui lòng cho phép truy cập vị trí trong trình duyệt, hoặc chọn điểm trên bản đồ.',
-            variant: 'info',
-          });
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      setCustomerNotice({
-        kind: 'alert',
-        title: 'Trình duyệt không hỗ trợ',
-        message: 'Trình duyệt của bạn không hỗ trợ định vị. Bạn vẫn có thể chọn vị trí trên bản đồ.',
-        variant: 'info',
-      });
-    }
-  };
-
-  const handleMapClick = (e) => {
-    if (e.latLng) {
-      const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-      setMarkerPos(newPos);
-      console.log('Đã chọn vị trí:', newPos);
-      // Tự động điền địa chỉ
-      reverseGeocode(newPos.lat, newPos.lng);
-    }
-  };
-
-  // Reverse geocoding: lấy địa chỉ từ tọa độ
-  const reverseGeocode = async (lat, lng) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const data = await response.json();
-      if (data.address) {
-        const parts = [];
-        if (data.address.house_number) parts.push(data.address.house_number);
-        if (data.address.road) parts.push(data.address.road);
-        if (data.address.suburb) parts.push(data.address.suburb);
-        if (data.address.city_district) parts.push(data.address.city_district);
-        if (data.address.city) parts.push(data.address.city);
-        const fullAddr = parts.join(', ');
-        setNewAddress(prev => ({ ...prev, street: fullAddr }));
-      }
-    } catch (err) {
-      console.error('Reverse geocode error:', err);
-    }
-  };
+  const [provinceOptions, setProvinceOptions] = useState([]);
+  const [districtOptions, setDistrictOptions] = useState([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -193,6 +124,7 @@ const Profile = () => {
         const fullname = (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '';
         const phone = (profileData.phone && profileData.phone !== 'string') ? (profileData.phone || '').replace('+84', '0') : '';
         const address = (profileData.address && profileData.address !== 'string') ? profileData.address : '';
+        const addressDisplay = stripLegacyGpsSuffix(address);
         const dob = normalizeDobFromApi(profileData.dob);
         const gender = (profileData.gender && profileData.gender !== 'string') ? profileData.gender : 'Nam';
 
@@ -201,20 +133,17 @@ const Profile = () => {
           gender: gender === 'Nữ' ? 'Nữ' : 'Nam',
           phone,
           email: profileData.email || '',
-          address,
+          address: addressDisplay,
           dob
         });
         setDobInput(isoToDdMmYyyy(dob));
 
         if (address || phone) {
           setAddresses([
-            { id: 'default', label: 'Nhà riêng', address: address || '—', phone: phone || '—', isDefault: true },
-            { id: 'office', label: 'Văn phòng', address: 'Tòa nhà Bitexco, 2 Hải Triều, Phường Bến Nghé, Quận 1, TP. HCM', phone: '028 12345678', isDefault: false }
+            { id: 'default', label: 'Nhà riêng', address: address || '—', phone: phone || '—', isDefault: true }
           ]);
         } else {
-          setAddresses([
-            { id: 'default', label: 'Nhà riêng', address: '—', phone: '—', isDefault: true }
-          ]);
+          setAddresses([]);
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -263,7 +192,8 @@ const Profile = () => {
             dateStr,
             timeStr,
             numberOfGuests: item.numberOfGuests ?? item.numberGuest ?? 0,
-            numberOfTables: item.numberTable ?? item.numberOfTables ?? 0,
+            numberOfTables:
+              item.numberTable ?? item.numberOfTables ?? item.numberOfGuests ?? item.numberGuest ?? 0,
             totalAmount: item.totalAmount ?? item.estimatedRevenue ?? 0,
             status: st.label,
             statusCls: st.cls,
@@ -399,13 +329,98 @@ const Profile = () => {
     }
   };
 
-  const DISTRICTS_HCM = ['Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10', 'Quận 11', 'Quận 12', 'Bình Thạnh', 'Phú Nhuận', 'Gò Vấp', 'Tân Bình', 'Tân Phú', 'Bình Tân', 'Thủ Đức', 'Củ Chi', 'Hóc Môn', 'Bình Chánh', 'Nhà Bè', 'Cần Giờ'];
+  const normalizeAddressText = (s) =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .trim();
+
+  const getMatchedProvinceName = (raw, options = provinceOptions) => {
+    const normalizedRaw = normalizeAddressText(raw);
+    if (!normalizedRaw) return '';
+
+    const direct = options.find((p) => normalizeAddressText(p.name) === normalizedRaw);
+    if (direct) return direct.name;
+
+    const byContains = options.find((p) => {
+      const n = normalizeAddressText(p.name);
+      return normalizedRaw.includes(n) || n.includes(normalizedRaw);
+    });
+    if (byContains) return byContains.name;
+
+    // fallback các cách ghi phổ biến
+    if (normalizedRaw.includes('hcm') || normalizedRaw.includes('ho chi minh')) return 'Thành phố Hồ Chí Minh';
+    if (normalizedRaw.includes('ha noi')) return 'Thành phố Hà Nội';
+    if (normalizedRaw.includes('da nang')) return 'Thành phố Đà Nẵng';
+    return '';
+  };
+
+  useEffect(() => {
+    if (!showAddAddressModal || provinceOptions.length > 0) return;
+
+    const fetchProvinces = async () => {
+      try {
+        const res = await fetch('https://provinces.open-api.vn/api/p/');
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [];
+        const mapped = rows
+          .map((p) => ({ code: Number(p.code), name: String(p.name || '').trim() }))
+          .filter((p) => p.code > 0 && p.name);
+        if (mapped.length > 0) {
+          setProvinceOptions(mapped);
+          return;
+        }
+      } catch (err) {
+        console.warn('Không tải được danh sách tỉnh/thành từ API:', err);
+      }
+      setProvinceOptions([
+        { code: 79, name: 'Thành phố Hồ Chí Minh' },
+        { code: 1, name: 'Thành phố Hà Nội' },
+        { code: 48, name: 'Thành phố Đà Nẵng' },
+      ]);
+    };
+
+    fetchProvinces();
+  }, [showAddAddressModal, provinceOptions.length]);
+
+  useEffect(() => {
+    if (!showAddAddressModal || !newAddress.city) {
+      setDistrictOptions([]);
+      return;
+    }
+
+    const province = provinceOptions.find((p) => p.name === newAddress.city);
+    if (!province?.code) {
+      setDistrictOptions([]);
+      return;
+    }
+
+    const fetchDistricts = async () => {
+      try {
+        const res = await fetch(`https://provinces.open-api.vn/api/p/${province.code}?depth=2`);
+        const data = await res.json();
+        const districts = Array.isArray(data?.districts) ? data.districts : [];
+        const mapped = districts
+          .map((d) => String(d?.name || '').trim())
+          .filter(Boolean);
+        setDistrictOptions(mapped);
+      } catch (err) {
+        console.warn('Không tải được danh sách quận/huyện:', err);
+        setDistrictOptions([]);
+      }
+    };
+
+    fetchDistricts();
+  }, [showAddAddressModal, newAddress.city, provinceOptions]);
 
   const handleAddAddress = () => {
+    setEditingAddressId(null);
     setNewAddress({
       street: '',
       district: '',
-      city: 'Hồ Chí Minh',
+      city: '',
       addressType: 'Nhà riêng',
       memorableName: '',
       phone: userInfo.phone || '',
@@ -416,26 +431,88 @@ const Profile = () => {
 
   const handleCloseAddAddressModal = () => {
     setShowAddAddressModal(false);
+    setEditingAddressId(null);
   };
 
-  const handleSaveNewAddress = (e) => {
+  const handleEditAddress = (id) => {
+    const target = addresses.find((a) => String(a.id) === String(id));
+    if (!target) return;
+    const textClean = stripLegacyGpsSuffix(target.address);
+    const parts = String(textClean || '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const cityRaw = parts.length > 0 ? parts[parts.length - 1] : '';
+    const cityNormalized = getMatchedProvinceName(cityRaw);
+    const district = parts.length > 1 ? parts[parts.length - 2] : '';
+    const street = parts.length > 2 ? parts.slice(0, -2).join(', ') : (parts[0] || '');
+    setEditingAddressId(target.id);
+    setNewAddress({
+      street,
+      district,
+      city: cityNormalized || '',
+      addressType: target.label === 'Văn phòng' || target.label === 'Khác' ? target.label : 'Nhà riêng',
+      memorableName:
+        target.label === 'Nhà riêng' || target.label === 'Văn phòng' || target.label === 'Khác'
+          ? ''
+          : String(target.label || ''),
+      phone: String(target.phone || '').replace(/\D/g, ''),
+      setAsDefault: !!target.isDefault
+    });
+    setShowAddAddressModal(true);
+  };
+
+  const handleSaveNewAddress = async (e) => {
     e.preventDefault();
+    if (!newAddress.city) {
+      setError('Vui lòng chọn Thành phố/Tỉnh.');
+      return;
+    }
+    if (!newAddress.district) {
+      setError('Vui lòng chọn Quận/Huyện.');
+      return;
+    }
     const fullAddress = [newAddress.street, newAddress.district, newAddress.city].filter(Boolean).join(', ');
     const label = newAddress.addressType;
     const name = newAddress.memorableName.trim() || label;
     const isDefault = newAddress.setAsDefault || addresses.length === 0;
     let next = [...addresses];
     if (isDefault) next = next.map(a => ({ ...a, isDefault: false }));
-    next.push({
-      id: Date.now(),
+    const updatedAddress = {
+      id: editingAddressId ?? Date.now(),
       label: name,
-      address: fullAddress || '—',
+      address: fullAddress.trim() ? fullAddress : '—',
       phone: newAddress.phone || userInfo.phone || '—',
       isDefault
-    });
-    setAddresses(next);
-    setShowAddAddressModal(false);
-    setSuccessMessage('Đã thêm địa chỉ mới.');
+    };
+    if (editingAddressId != null) {
+      next = next.map((a) => (String(a.id) === String(editingAddressId) ? updatedAddress : a));
+    } else {
+      next.push(updatedAddress);
+    }
+    const defaultAddr = next.find((a) => a.isDefault) || updatedAddress;
+    const phone = userInfo.phone.startsWith('0') ? '+84' + userInfo.phone.slice(1) : userInfo.phone;
+
+    try {
+      setIsSubmitting(true);
+      await updateProfile({
+        ...userInfo,
+        phone,
+        address: defaultAddr?.address || userInfo.address || ''
+      });
+      setAddresses(next);
+      setUserInfo((prev) => ({
+        ...prev,
+        address: stripLegacyGpsSuffix(defaultAddr?.address || prev.address),
+      }));
+      setShowAddAddressModal(false);
+      setEditingAddressId(null);
+      setSuccessMessage(editingAddressId != null ? 'Đã cập nhật địa chỉ.' : 'Đã thêm địa chỉ mới.');
+    } catch (err) {
+      setError(err.message || 'Không thể lưu địa chỉ. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const setDefaultAddress = (id) => {
@@ -569,11 +646,11 @@ const Profile = () => {
                   <span className="Profile-Address-Label">{addr.label}</span>
                   {addr.isDefault && <span className="Profile-Address-Default">MẶC ĐỊNH</span>}
                 </div>
-                <p className="Profile-Address-Text">{addr.address}</p>
+                <p className="Profile-Address-Text">{stripLegacyGpsSuffix(addr.address)}</p>
                 <p className="Profile-Address-Phone">SĐT: {typeof addr.phone === 'string' ? addr.phone : (addr.phone?.toString?.() || '---')}</p>
               </div>
               <div className="Profile-Address-Actions">
-                <button type="button" className="Profile-Address-Action" title="Sửa" onClick={() => setDefaultAddress(addr.id)}><i className="fa-solid fa-pencil"></i></button>
+                <button type="button" className="Profile-Address-Action" title="Sửa" onClick={() => handleEditAddress(addr.id)}><i className="fa-solid fa-pencil"></i></button>
                 <button type="button" className="Profile-Address-Action" title="Xóa" onClick={() => removeAddress(addr.id)}><i className="fa-regular fa-trash-can"></i></button>
               </div>
             </div>
@@ -644,32 +721,11 @@ const Profile = () => {
               <button type="button" className="AddressModal-Back" onClick={handleCloseAddAddressModal} aria-label="Đóng">
                 <i className="fa-solid fa-arrow-left"></i>
               </button>
-              <h2 className="AddressModal-Title">Thêm địa chỉ mới</h2>
+              <h2 className="AddressModal-Title">{editingAddressId != null ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}</h2>
               <button type="button" className="AddressModal-Help">Trợ giúp</button>
             </div>
             <form onSubmit={handleSaveNewAddress}>
               <div className="AddressModal-Body">
-                <div className="AddressModal-MapCol">
-                  <div className="AddressModal-MapWrap">
-                    {loadError ? (
-                      <div>Lỗi tải bản đồ. Vui lòng thử lại sau.</div>
-                    ) : !isMapLoaded ? (
-                      <div>Đang tải bản đồ...</div>
-                    ) : (
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={mapCenter}
-                        zoom={14}
-                        onClick={handleMapClick}
-                      >
-                        {markerPos && <MarkerF position={markerPos} />}
-                      </GoogleMap>
-                    )}
-                  </div>
-                  <button type="button" className="AddressModal-ConfirmMap" onClick={getCurrentLocation}>
-                    <i className="fa-solid fa-crosshairs"></i> Xác nhận vị trí trên bản đồ
-                  </button>
-                </div>
                 <div className="AddressModal-FormCol">
                   <div className="AddressModal-Field">
                     <label>SỐ NHÀ, TÊN ĐƯỜNG</label>
@@ -685,26 +741,28 @@ const Profile = () => {
                   </div>
                   <div className="AddressModal-Row">
                     <div className="AddressModal-Field">
-                      <label>QUẬN / HUYỆN</label>
+                      <label>THÀNH PHỐ</label>
                       <select
-                        value={newAddress.district}
-                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
+                        value={newAddress.city}
+                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value, district: '' })}
                       >
-                        <option value="">Chọn Quận</option>
-                        {DISTRICTS_HCM.map((d) => (
-                          <option key={d} value={d}>{d}</option>
+                        <option value="">Chọn Thành phố</option>
+                        {provinceOptions.map((province) => (
+                          <option key={province.code} value={province.name}>{province.name}</option>
                         ))}
                       </select>
                     </div>
                     <div className="AddressModal-Field">
-                      <label>THÀNH PHỐ</label>
+                      <label>QUẬN / HUYỆN</label>
                       <select
-                        value={newAddress.city}
-                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                        value={newAddress.district}
+                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
+                        disabled={!newAddress.city}
                       >
-                        <option value="Hồ Chí Minh">Hồ Chí Minh</option>
-                        <option value="Đà Nẵng">Đà Nẵng</option>
-                        <option value="Hà Nội">Hà Nội</option>
+                        <option value="">{newAddress.city ? 'Chọn Quận/Huyện' : 'Chọn Thành phố trước'}</option>
+                        {districtOptions.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -772,7 +830,7 @@ const Profile = () => {
                   Hủy bỏ
                 </button>
                 <button type="submit" className="AddressModal-BtnSave">
-                  Lưu địa chỉ
+                  {editingAddressId != null ? 'Lưu thay đổi' : 'Lưu địa chỉ'}
                 </button>
               </div>
             </form>

@@ -18,6 +18,7 @@ import {
   User,
   Users,
   Utensils,
+  Printer,
   X
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
@@ -38,6 +39,9 @@ import { createRemainingPaymentQr, payOrderCash } from '../../api/paymentService
 import { getWaiterTables } from '../../api/waiterApiTable';
 import { initTableSession } from '../../api/tableSessionApi';
 import { getProfile } from '../../api/userApi';
+import { ORDER_VAT_RATE, resolveOrderVatAndGrandTotal, roundOrderMoney } from '../../constants/orderPricing';
+import { printSalesInvoice } from '../../utils/orderInvoicePrint';
+import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import TableQRCode from '../../components/TableQRCode';
 
 // Helper: formatCurrency
@@ -101,6 +105,8 @@ const normalizeOrderType = (value) =>
     .replace(/[^a-z]/g, '');
 
 const isDineInOrder = (order) => normalizeOrderType(order?.channel || order?.orderType) === 'dinein';
+
+const isDeliveryOrder = (order) => normalizeOrderType(order?.channel || order?.orderType) === 'delivery';
 
 const resolveOrderCode = (order) =>
   String(order?.orderCode || order?.id || order?.code || '')
@@ -523,7 +529,8 @@ const mapApiOrderToWaiter = (order) => {
     phone,
     note: order?.note || order?.customerNote || '',
     deliveryFee: Number(order?.deliveryPrice || order?.deliveryFee || 0),
-    discount: Number(order?.discountAmount || order?.discount || 0),
+    // Theo yêu cầu nghiệp vụ: đơn giao hàng không áp dụng mã giảm giá.
+    discount: isDelivery ? 0 : Number(order?.discountAmount || order?.discount || 0),
     totalAmount,
   };
 };
@@ -650,19 +657,19 @@ const mapApiOrderToWaiter = (order) => {
     if (!raw) return '';
 
     if (/^request failed with status code\s+400$/i.test(raw)) {
-      return 'Bad request (400). Please verify the input data and try again.';
+      return 'Yêu cầu không hợp lệ (400). Vui lòng kiểm tra dữ liệu và thử lại.';
     }
     if (/^request failed with status code\s+401$/i.test(raw)) {
-      return 'Unauthorized (401). Please sign in again.';
+      return 'Bạn chưa đăng nhập hoặc phiên đã hết hạn (401). Vui lòng đăng nhập lại.';
     }
     if (/^request failed with status code\s+403$/i.test(raw)) {
-      return 'Forbidden (403). You do not have permission for this action.';
+      return 'Bạn không có quyền thực hiện thao tác này (403).';
     }
     if (/^request failed with status code\s+404$/i.test(raw)) {
-      return 'Resource not found (404).';
+      return 'Không tìm thấy dữ liệu (404).';
     }
     if (/^request failed with status code\s+5\d\d$/i.test(raw)) {
-      return 'Server error. Please try again in a moment.';
+      return 'Hệ thống đang bận. Vui lòng thử lại sau ít phút.';
     }
 
     const replacements = [
@@ -685,7 +692,7 @@ const mapApiOrderToWaiter = (order) => {
     ];
 
     for (const [vi, en] of replacements) {
-      if (raw === vi) return en;
+      if (raw === en) return vi;
     }
 
     return raw;
@@ -1330,6 +1337,7 @@ const mapApiOrderToWaiter = (order) => {
 
   useEffect(() => {
     if (!showPaymentModal || !selectedOrder) return;
+    setVoucherCode('');
     setReceivedMoney('');
   }, [showPaymentModal, selectedOrder]);
 
@@ -1358,14 +1366,68 @@ const mapApiOrderToWaiter = (order) => {
     ].filter((n) => Number.isFinite(n) && n > 0);
 
     const backendSubtotal = backendSubtotalCandidates.length > 0 ? backendSubtotalCandidates[0] : 0;
-    return Math.max(itemsSubtotal, backendSubtotal);
+    // Tạm tính phải là tổng tiền món (chưa VAT). Chỉ fallback backend khi không có dữ liệu món.
+    return itemsSubtotal > 0 ? itemsSubtotal : Math.max(0, backendSubtotal);
   };
 
 
-  const calculateOrderTotal = (order) => {
-    const backendTotal = Number(order?.totalAmount || 0);
-    if (Number.isFinite(backendTotal) && backendTotal > 0) return backendTotal;
-    return calculateOrderSubtotal(order) + Number(order?.deliveryFee || 0) - Number(order?.discount || 0);
+  const getOrderBilling = (order) =>
+    resolveOrderVatAndGrandTotal({
+      subtotal: calculateOrderSubtotal(order),
+      deliveryFee: Number(order?.deliveryFee || 0) || 0,
+      discountAmount: Number(order?.discount ?? order?.discountAmount ?? 0) || 0,
+      apiTotalAmount: order?.totalAmount,
+      apiTaxAmount: order?.taxAmount ?? order?.vatAmount,
+    });
+
+  const calculateOrderTotal = (order) => getOrderBilling(order).grand;
+
+  const calculateOrderVat = (order) => getOrderBilling(order).vat;
+
+  const handlePrintWaiterOrderInvoice = async () => {
+    if (!selectedOrder) return;
+    const o = selectedOrder;
+    const code = String(o.orderCode || o.code || '').trim();
+    if (code) {
+      try {
+        await downloadInvoicePdf(code);
+        return;
+      } catch (e) {
+        const msg = await getPdfErrorMessage(e);
+        console.warn('[pdf-export/invoice]', msg);
+      }
+    }
+    const lines = (orderItemsState || []).map((it) => {
+      const q = Number(it.quantity) || 0;
+      const pr = Number(it.price) || 0;
+      return { name: String(it.name || 'Món'), qty: q, unitPrice: pr, lineTotal: q * pr };
+    });
+    const sub = calculateOrderSubtotal(o);
+    const del = Number(o?.deliveryFee || 0) || 0;
+    const disc = Number(o?.discount ?? o?.discountAmount ?? 0) || 0;
+    const vat = calculateOrderVat(o);
+    const grand = calculateOrderTotal(o);
+    const dine = isDineInOrder(o);
+    const ot = String(o?.orderType || '').toLowerCase();
+    let typeLbl = 'Giao hàng';
+    if (dine) typeLbl = 'Tại chỗ / Đặt bàn';
+    else if (ot.includes('take')) typeLbl = 'Mang đi';
+    printSalesInvoice({
+      orderCode: String(o.orderCode || o.code || o.id || ''),
+      orderTypeLabel: typeLbl,
+      dateTime: o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '—',
+      buyerName: dine ? (o.customerName || 'Khách tại bàn') : (o.customerName || 'Khách hàng'),
+      buyerPhone: String(o.phone || '—'),
+      buyerAddress: dine ? 'Tại nhà hàng' : String(o.address || '—'),
+      tableInfo: dine ? String(o.tableNumber || o.tableCode || '').trim() : '',
+      lines,
+      subtotal: sub,
+      shippingFee: del,
+      discountAmount: disc,
+      vatAmount: vat,
+      grandTotal: grand,
+      note: String(o.note || ''),
+    });
   };
 
   const paymentTotal = Number(calculateOrderTotal(selectedOrder || { items: [] }) || 0);
@@ -1569,7 +1631,7 @@ const mapApiOrderToWaiter = (order) => {
           ? res.data
           : res?.data?.message || 'Hủy đơn giao hàng thành công.';
 
-      setUiNotice(successMessage);
+      setUiNotice(normalizeNoticeMessage(successMessage));
       closeCancelModal();
       closeOrderDetailModal();
       await fetchWaiterOrders();
@@ -1663,6 +1725,11 @@ const mapApiOrderToWaiter = (order) => {
       closeItemCancelModal();
       return;
     }
+    if (isDeliveryOrder(selectedOrder)) {
+      alert('Đơn giao hàng không cho phép hủy món từ phần phục vụ.');
+      closeItemCancelModal();
+      return;
+    }
     const ids = resolveOrderItemNumericIds(item);
     if (ids.length === 0) {
       alert('Không tìm thấy mã dòng món (orderItemId) để hủy.');
@@ -1713,7 +1780,7 @@ const mapApiOrderToWaiter = (order) => {
 
     const isStartAction = String(order?.deliveryActionLabel || '').trim().toUpperCase() === 'BẮT ĐẦU GIAO';
     if (isStartAction && !canStartDeliveryByItems(order)) {
-      setUiNotice('Kitchen has not finished all dishes. Start delivery only when all dishes are ready.');
+      setUiNotice('Bếp chưa làm xong món. Chỉ bắt đầu giao khi tất cả món đã sẵn sàng.');
       return;
     }
 
@@ -1721,7 +1788,7 @@ const mapApiOrderToWaiter = (order) => {
       String(order?.deliveryWorkflowStatus || '').toLowerCase()
     );
     if (isDelivering && !order?.isPaid) {
-      setUiNotice('This order is not paid yet. Please complete payment before finishing delivery.');
+      setUiNotice('Đơn chưa thanh toán. Cần thanh toán trước khi hoàn thành giao hàng.');
       return;
     }
 
@@ -1800,7 +1867,10 @@ const mapApiOrderToWaiter = (order) => {
         await payOrderCash({
           orderId,
           amount,
-          note: voucherCode ? `Thanh toán tiền mặt - voucher: ${voucherCode}` : 'Thanh toán tiền mặt tại quầy',
+          note:
+            isDineInOrder(selectedOrder) && voucherCode.trim()
+              ? `Thanh toán tiền mặt - voucher: ${voucherCode.trim()}`
+              : 'Thanh toán tiền mặt tại quầy',
         });
 
         let completedAfterCash = false;
@@ -2665,6 +2735,11 @@ const mapApiOrderToWaiter = (order) => {
                       }).filter(item => (item.foodId || item.comboId || item.buffetId))
                     };
                     if (payload.orderItems.length === 0) delete payload.orderItems;
+                    const walkVat = roundOrderMoney(cartTotal * ORDER_VAT_RATE);
+                    payload.taxAmount = walkVat;
+                    payload.vatAmount = walkVat;
+                    payload.totalAmount = cartTotal + walkVat;
+                    payload.TotalAmount = cartTotal + walkVat;
                     apiFunc = createGuestOrder;
                   } else if (createOrderType === 'reservation') {
                     const reserved =
@@ -2969,7 +3044,9 @@ const mapApiOrderToWaiter = (order) => {
                       const dishStatus = getDishStatus(item.dishStatus || 'pending');
                       const itemRowIds = resolveOrderItemNumericIds(item);
                       const canCancelThisItem =
-                        item.dishStatus === 'pending' && itemRowIds.length > 0;
+                        !isDeliveryOrder(selectedOrder) &&
+                        item.dishStatus === 'pending' &&
+                        itemRowIds.length > 0;
                       return (
                         <tr key={item.name + idx}>
                           <td>
@@ -3048,6 +3125,12 @@ const mapApiOrderToWaiter = (order) => {
                   <span>Tạm tính</span>
                   <strong>{formatCurrency(calculateOrderSubtotal(selectedOrder))}</strong>
                 </div>
+                {calculateOrderVat(selectedOrder) > 0 && (
+                  <div>
+                    <span>VAT (10%)</span>
+                    <strong>{formatCurrency(calculateOrderVat(selectedOrder))}</strong>
+                  </div>
+                )}
                 {(selectedOrder?.deliveryFee || 0) > 0 && (
                   <div>
                     <span>Phí ship</span>
@@ -3072,6 +3155,9 @@ const mapApiOrderToWaiter = (order) => {
                 Đóng
               </button>
               <div className="detail-footer-actions">
+                <button type="button" className="btn-add-outline" onClick={handlePrintWaiterOrderInvoice}>
+                  <Printer size={16} /> Xuất hóa đơn
+                </button>
                 {isDineInOrder(selectedOrder) && (
                   <button className="btn-add-outline" onClick={() => setShowAddItemsModal(true)}>
                     <Plus size={16} /> Thêm món
@@ -3242,7 +3328,6 @@ const mapApiOrderToWaiter = (order) => {
                 </div>
                 <div>
                   <h3 className="modal-title">Thanh toán đơn hàng #{selectedOrder.id}</h3>
-                  <p className="modal-subtitle">Nhân viên: Nguyễn Văn An</p>
                 </div>
               </div>
               <button className="modal-close-btn" onClick={() => setShowPaymentModal(false)}>
@@ -3271,6 +3356,12 @@ const mapApiOrderToWaiter = (order) => {
                     <span>Tạm tính:</span>
                     <strong>{formatCurrency(calculateOrderSubtotal(selectedOrder))}</strong>
                   </div>
+                  {calculateOrderVat(selectedOrder) > 0 && (
+                    <div>
+                      <span>VAT (10%):</span>
+                      <strong>{formatCurrency(calculateOrderVat(selectedOrder))}</strong>
+                    </div>
+                  )}
                   <div className="grand-total-box">
                     <span>Tổng cộng:</span>
                     <strong>{formatCurrency(calculateOrderTotal(selectedOrder))}</strong>
@@ -3279,25 +3370,27 @@ const mapApiOrderToWaiter = (order) => {
               </div>
 
               <div className="payment-right">
-                <div className="field-group">
-                  <label>Nhập mã Voucher</label>
-                  <div className="voucher-input">
-                    <TicketPercent size={16} />
-                    <input
-                      type="text"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value)}
-                    />
-                    <button type="button">Áp dụng</button>
+                {isDineInOrder(selectedOrder) && (
+                  <div className="field-group">
+                    <label>Nhập mã Voucher</label>
+                    <div className="voucher-input">
+                      <TicketPercent size={16} />
+                      <input
+                        type="text"
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value)}
+                      />
+                      <button type="button">Áp dụng</button>
+                    </div>
+                    {voucherCode.trim() ? (
+                      <p className="voucher-ok">
+                        <CheckCircle2 size={14} /> Đã nhập mã {voucherCode}
+                      </p>
+                    ) : (
+                      <p className="voucher-ok">Chưa áp dụng voucher</p>
+                    )}
                   </div>
-                  {voucherCode.trim() ? (
-                    <p className="voucher-ok">
-                      <CheckCircle2 size={14} /> Đã nhập mã {voucherCode}
-                    </p>
-                  ) : (
-                    <p className="voucher-ok">Chưa áp dụng voucher</p>
-                  )}
-                </div>
+                )}
 
                 <div className="field-group">
                   <label>Phương thức thanh toán</label>
@@ -3316,13 +3409,6 @@ const mapApiOrderToWaiter = (order) => {
                     >
                       {/* QRCode icon cho thanh toán, không phải QR nhỏ bàn */}
                       QR Code
-                    </button>
-                    <button
-                      type="button"
-                      className={activePaymentMethod === 'card' ? 'active' : ''}
-                      onClick={() => setActivePaymentMethod('card')}
-                    >
-                      <CreditCard size={18} /> Thẻ
                     </button>
                   </div>
                 </div>
@@ -3359,9 +3445,17 @@ const mapApiOrderToWaiter = (order) => {
               </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer payment-modal-footer">
               <button
-                className="btn-continue full"
+                type="button"
+                className="btn-add-outline payment-invoice-btn"
+                onClick={handlePrintWaiterOrderInvoice}
+                disabled={isPaying}
+              >
+                <Printer size={16} /> Xuất hóa đơn
+              </button>
+              <button
+                className="btn-continue payment-complete-btn"
                 onClick={handleProceedPayment}
                 disabled={isPaying || (activePaymentMethod === 'cash' && !isCashAmountValid)}
                 title={activePaymentMethod === 'cash' && !isCashAmountValid ? 'Tiền khách đưa phải lớn hơn 0.' : ''}
@@ -3745,7 +3839,7 @@ const mapApiOrderToWaiter = (order) => {
 
                 <div className="cart-footer">
                   <div className="cart-total-row">
-                    <span>Tổng cộng tạm tính</span>
+                    <span>Tạm tính</span>
                     <strong>{formatCurrency(cartTotal)}</strong>
                   </div>
                   <button

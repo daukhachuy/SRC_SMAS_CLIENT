@@ -3,12 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import { eventBookingAPI } from '../../api/managerApi';
 import { 
-  Calendar, Users, CheckCircle, FileText, 
+  Calendar, CheckCircle, FileText, 
   ChevronRight, DollarSign,
   UtensilsCrossed, Scale
 } from 'lucide-react';
 import '../../styles/EventDetailPage.css';
 import TransactionHistoryModal from '../../components/TransactionHistoryModal';
+import { ORDER_VAT_RATE } from '../../constants/orderPricing';
+
+/** Cùng logic đặt sự kiện (Services): VAT 10% trên (thực đơn + phí dịch vụ), không tính trên decoration. */
 
 const createEmptyEventData = (eventId) => ({
   id: eventId || '',
@@ -18,19 +21,24 @@ const createEmptyEventData = (eventId) => ({
   date: '--/--/----',
   time: '--:--',
   tables: 0,
-  guests: 0,
   status: 'pending',
   statusText: 'Chưa có hợp đồng',
   comboName: 'Chưa cập nhật',
   menu: [],
   policies: [],
   services: [],
+  contractId: 0,
+  contractCode: '',
+  hasTransactions: false,
+  hasContractLink: false,
+  showConfirmPayment2: false,
   payment: {
     pricePerTable: 0,
     quantity: 0,
     subtotal: 0,
     serviceVAT: 0,
     decoration: 0,
+    vatAmount: 0,
     total: 0,
     deposit: 0,
     remaining: 0,
@@ -87,6 +95,28 @@ const EventDetailPage = () => {
     return Number.isFinite(n) ? n : fallback;
   };
 
+  const sumFoodLinesAmount = (foods) => {
+    if (!Array.isArray(foods)) return 0;
+    return foods.reduce((sum, m) => {
+      const line = toNum(pickField(m, ['subtotal', 'lineTotal', 'total', 'Subtotal', 'LineTotal']), 0);
+      if (line > 0) return sum + line;
+      const qty = toNum(pickField(m, ['quantity', 'qty', 'Quantity']), 1);
+      const unit = toNum(pickField(m, ['unitPrice', 'price', 'Price', 'UnitPrice']), 0);
+      return sum + unit * qty;
+    }, 0);
+  };
+
+  const sumServiceLinesAmount = (svcs) => {
+    if (!Array.isArray(svcs)) return 0;
+    return svcs.reduce((sum, s) => {
+      const line = toNum(pickField(s, ['subtotal', 'total', 'Subtotal', 'Total']), 0);
+      if (line > 0) return sum + line;
+      const qty = toNum(pickField(s, ['quantity', 'Quantity']), 1);
+      const unit = toNum(pickField(s, ['unitPrice', 'price', 'UnitPrice', 'Price']), 0);
+      return sum + unit * qty;
+    }, 0);
+  };
+
   useEffect(() => {
     const loadDetail = async () => {
       if (!eventId) {
@@ -131,33 +161,107 @@ const EventDetailPage = () => {
             ?? pickField(detail, ['reservationTime', 'eventTime', 'time'])
         );
 
-        const total = toNum(pickField(paymentData, ['totalAmount', 'total', 'grandTotal'], 0));
+        let total = toNum(
+          pickField(paymentData, ['totalAmount', 'total', 'grandTotal', 'GrandTotal'], 0)
+            || pickField(detail, ['totalAmount', 'TotalAmount', 'grandTotal', 'GrandTotal'], 0),
+          0
+        );
         const deposit = toNum(pickField(paymentData, ['depositAmount', 'depositedAmount', 'deposit'], 0));
         const paidAmount = toNum(pickField(paymentData, ['paidAmount'], 0));
         const remainingRaw = pickField(paymentData, ['remainingAmount', 'remainAmount']);
-        const remaining = remainingRaw !== null ? toNum(remainingRaw, 0) : Math.max(total - deposit, 0);
 
         const explicitTables = pickField(eventInfo, ['numberOfTables', 'tableCount', 'tables'])
           ?? pickField(detail, ['numberOfTables', 'tableCount', 'tables']);
-        const guestsRaw = toNum(
+        const legacyTableCount = toNum(
           pickField(eventInfo, ['numberOfGuests', 'guestCount', 'guests'])
             ?? pickField(detail, ['numberOfGuests', 'guestCount', 'guests'], 0)
         );
 
         const explicitTableCount = toNum(explicitTables, 0);
-        const inferredTableCount = guestsRaw > 0 ? Math.max(1, Math.round(guestsRaw / 10)) : 0;
-        const quantity = explicitTableCount > 0 ? explicitTableCount : inferredTableCount;
-        const computedGuests = guestsRaw > 0 ? guestsRaw : (quantity * 10);
-        const pricePerTable = toNum(
-          pickField(paymentData, ['pricePerTable', 'unitPrice'])
-            ?? pickField(detail, ['pricePerTable', 'unitPrice'], 0)
-        );
-        const subtotal = toNum(
-          pickField(paymentData, ['subtotal', 'subTotal']),
-          pricePerTable * quantity || total
-        );
+        const quantity = explicitTableCount > 0 ? explicitTableCount : legacyTableCount;
 
         const menuItems = pickField(detail, ['foods', 'menuItems', 'items'], []);
+        const computedServiceTotal = sumServiceLinesAmount(detail?.services);
+        let computedFoodTotal = sumFoodLinesAmount(menuItems);
+        if (
+          quantity > 1 &&
+          Array.isArray(menuItems) &&
+          menuItems.length === 1 &&
+          computedFoodTotal > 0
+        ) {
+          const m = menuItems[0];
+          const lineQty = toNum(pickField(m, ['quantity', 'qty', 'Quantity']), 1);
+          if (lineQty === 1) {
+            const scaled = computedFoodTotal * quantity;
+            if (
+              Math.abs(total - scaled - computedServiceTotal) <=
+                Math.abs(total - computedFoodTotal - computedServiceTotal) ||
+              (total <= 0 && scaled > computedFoodTotal)
+            ) {
+              computedFoodTotal = scaled;
+            }
+          }
+        }
+
+        const rawPricePerTable = pickField(paymentData, ['pricePerTable', 'unitPrice', 'menuPricePerTable'])
+          ?? pickField(detail, ['pricePerTable', 'unitPrice', 'menuPricePerTable'], null);
+        let pricePerTable = toNum(rawPricePerTable, 0);
+        if (pricePerTable <= 0 && quantity > 0 && computedFoodTotal > 0) {
+          pricePerTable = Math.round(computedFoodTotal / quantity);
+        }
+
+        const rawMenuSub = pickField(paymentData, ['subtotal', 'subTotal', 'foodSubtotal', 'menuSubtotal']);
+        let menuSubtotalAll = toNum(rawMenuSub, NaN);
+        if (!Number.isFinite(menuSubtotalAll) || menuSubtotalAll <= 0) {
+          menuSubtotalAll = computedFoodTotal > 0
+            ? computedFoodTotal
+            : (pricePerTable > 0 && quantity > 0 ? pricePerTable * quantity : 0);
+        }
+
+        const rawServiceFee = pickField(paymentData, [
+          'serviceVAT', 'serviceFee', 'serviceTotal', 'servicesTotal', 'vat',
+        ]);
+        let serviceFee = toNum(rawServiceFee, NaN);
+        if (!Number.isFinite(serviceFee) || serviceFee <= 0) {
+          serviceFee = computedServiceTotal;
+        }
+
+        const rawDecoration = pickField(paymentData, ['decorationFee', 'decoration', 'extraFee', 'audioVisualFee']);
+        let decoration = toNum(rawDecoration, NaN);
+        if (!Number.isFinite(decoration) || decoration < 0) {
+          decoration = 0;
+        }
+
+        const preVatForVat = menuSubtotalAll + serviceFee;
+        const vatFromApi = toNum(pickField(paymentData, ['vatAmount', 'VatAmount']), NaN);
+        const beforeVatFromApi = toNum(
+          pickField(paymentData, ['amountBeforeVat', 'AmountBeforeVat']),
+          NaN
+        );
+        let vatUiAmount = 0;
+        let displayTotal = total;
+        if (Number.isFinite(beforeVatFromApi) && beforeVatFromApi > 0 && Number.isFinite(vatFromApi) && vatFromApi > 0) {
+          vatUiAmount = Math.round(vatFromApi);
+          displayTotal = Math.round(beforeVatFromApi + vatUiAmount + decoration);
+        } else if (preVatForVat > 0) {
+          vatUiAmount = Math.round(preVatForVat * ORDER_VAT_RATE);
+          const sumNoVat = menuSubtotalAll + serviceFee + decoration;
+          const withVat = preVatForVat + vatUiAmount + decoration;
+          if (total <= 0 || Math.abs(total - sumNoVat) <= 1) {
+            displayTotal = withVat;
+          } else if (total >= withVat - 2) {
+            displayTotal = total;
+            vatUiAmount = Math.max(0, Math.round(total - sumNoVat));
+          }
+        }
+
+        const effectiveDeposit = Math.max(deposit, paidAmount);
+        const remaining =
+          remainingRaw !== null && remainingRaw !== undefined && String(remainingRaw).trim() !== ''
+            ? toNum(remainingRaw, 0)
+            : Math.max(displayTotal - effectiveDeposit, 0);
+
+        const subtotal = menuSubtotalAll;
         const menu = Array.isArray(menuItems) && menuItems.length
           ? [{
             category: 'Thực đơn',
@@ -173,8 +277,10 @@ const EventDetailPage = () => {
         const services = Array.isArray(detail?.services)
           ? detail.services.map((s) => {
             const name = pickField(s, ['name', 'serviceName'], 'Dịch vụ');
-            const qty = toNum(pickField(s, ['quantity'], 0));
-            const value = toNum(pickField(s, ['subtotal', 'unitPrice'], 0));
+            const qty = toNum(pickField(s, ['quantity', 'Quantity'], 0), 1);
+            const line = toNum(pickField(s, ['subtotal', 'lineTotal', 'total', 'Subtotal']), 0);
+            const unit = toNum(pickField(s, ['unitPrice', 'price', 'UnitPrice']), 0);
+            const value = line > 0 ? line : unit * (qty || 1);
             if (qty > 0 && value > 0) return `${name} x${qty} - ${new Intl.NumberFormat('vi-VN').format(value)}đ`;
             if (qty > 0) return `${name} x${qty}`;
             return name;
@@ -189,31 +295,63 @@ const EventDetailPage = () => {
             .filter(Boolean)
           : [];
 
+        const contractIdNum = toNum(
+          pickField(contract, ['contractId', 'id', 'ContractId']),
+          0
+        );
+        const contractCodeStr = String(
+          pickField(contract, ['contractCode', 'code', 'ContractNumber']) || ''
+        ).trim();
+        const bookingCodeStr = String(
+          pickField(detail, ['bookingCode', 'bookEventCode', 'eventCode', 'code']) || ''
+        ).trim();
+        const hasContractLink = contractIdNum > 0 || Boolean(contractCodeStr);
+
+        const rawTx =
+          detail?.transactions ??
+          detail?.payment?.transactions ??
+          detail?.paymentHistory ??
+          detail?.payment?.history;
+        const transactionsList = Array.isArray(rawTx)
+          ? rawTx
+          : Array.isArray(rawTx?.$values)
+            ? rawTx.$values
+            : [];
+        const hasTransactions = transactionsList.length > 0;
+
+        const showConfirmPayment2 =
+          displayTotal > 0 && remaining > 0 && effectiveDeposit > 0;
+
         setEventData({
           id: pickField(detail, ['bookEventId', 'bookingCode', 'id'], eventId),
-          bookingCode: pickField(detail, ['bookingCode', 'bookEventCode', 'eventCode', 'code'], ''),
+          bookingCode: bookingCodeStr,
           title: pickField(detail, ['eventTitle', 'eventName', 'title'], pickField(eventInfo, ['title', 'eventTitle'], `Sự kiện ${pickField(detail, ['bookingCode'], '')}`)),
           venue: pickField(detail, ['venue', 'hallName', 'location'], 'Chưa cập nhật'),
           date: dt.date,
           time: dt.time,
           tables: quantity,
-          guests: computedGuests,
           status: statusRaw,
           statusText: statusLabelMap[statusRaw] || pickField(detail, ['status', 'contractStatus'], 'Chưa có hợp đồng'),
           comboName: pickField(detail, ['comboName', 'packageName', 'menuPackageName'], pickField(eventInfo, ['note'], 'Chưa cập nhật')),
           menu,
           policies,
           services,
+          contractId: contractIdNum,
+          contractCode: contractCodeStr,
+          hasTransactions,
+          hasContractLink,
           payment: {
             pricePerTable,
             quantity,
             subtotal,
-            serviceVAT: toNum(pickField(paymentData, ['serviceVAT', 'serviceFee', 'vat'], 0)),
-            decoration: toNum(pickField(paymentData, ['decorationFee', 'decoration', 'extraFee'], 0)),
-            total,
-            deposit: Math.max(deposit, paidAmount),
+            serviceVAT: serviceFee,
+            decoration,
+            vatAmount: vatUiAmount,
+            total: displayTotal,
+            deposit: effectiveDeposit,
             remaining,
           },
+          showConfirmPayment2,
         });
       } catch (err) {
         console.error('Lỗi tải chi tiết đặt sự kiện:', err);
@@ -269,14 +407,6 @@ const EventDetailPage = () => {
             <span className="info-card-label">Số lượng bàn</span>
           </div>
           <p className="info-card-value">{eventData.tables} bàn tiệc</p>
-        </div>
-
-        <div className="info-card">
-          <div className="info-card-header">
-            <Users className="info-card-icon" size={20} />
-            <span className="info-card-label">Khách dự kiến</span>
-          </div>
-          <p className="info-card-value">{eventData.guests} khách mời</p>
         </div>
 
         <div className="info-card status-card">
@@ -394,22 +524,36 @@ const EventDetailPage = () => {
             </h3>
 
             <div className="payment-details">
-              <div className="payment-row">
-                <span>Đơn giá thực đơn (/bàn)</span>
-                <span className="payment-value">{formatCurrency(eventData.payment.pricePerTable)}</span>
-              </div>
-              <div className="payment-row">
-                <span>Số lượng ({eventData.payment.quantity} bàn)</span>
-                <span className="payment-value">{formatCurrency(eventData.payment.subtotal)}</span>
-              </div>
-              <div className="payment-row">
-                <span>Phí dịch vụ</span>
-                <span className="payment-value">{formatCurrency(eventData.payment.serviceVAT)}</span>
-              </div>
-              <div className="payment-row">
-                <span>Trang trí & Âm thanh</span>
-                <span className="payment-value">{formatCurrency(eventData.payment.decoration)}</span>
-              </div>
+              {eventData.payment.pricePerTable > 0 && (
+                <div className="payment-row">
+                  <span>Đơn giá thực đơn (/bàn)</span>
+                  <span className="payment-value">{formatCurrency(eventData.payment.pricePerTable)}</span>
+                </div>
+              )}
+              {eventData.payment.subtotal > 0 && (
+                <div className="payment-row">
+                  <span>Số lượng ({eventData.payment.quantity} bàn)</span>
+                  <span className="payment-value">{formatCurrency(eventData.payment.subtotal)}</span>
+                </div>
+              )}
+              {eventData.payment.serviceVAT > 0 && (
+                <div className="payment-row">
+                  <span>Phí dịch vụ</span>
+                  <span className="payment-value">{formatCurrency(eventData.payment.serviceVAT)}</span>
+                </div>
+              )}
+              {eventData.payment.decoration > 0 && (
+                <div className="payment-row">
+                  <span>Trang trí & Âm thanh</span>
+                  <span className="payment-value">{formatCurrency(eventData.payment.decoration)}</span>
+                </div>
+              )}
+              {eventData.payment.vatAmount > 0 && (
+                <div className="payment-row">
+                  <span>VAT (10%)</span>
+                  <span className="payment-value">{formatCurrency(eventData.payment.vatAmount)}</span>
+                </div>
+              )}
 
               <hr className="payment-divider" />
 
@@ -419,36 +563,51 @@ const EventDetailPage = () => {
               </div>
 
               <div className="payment-status-box">
-                <div className="payment-deposit">
-                  <span>Tiền cọc đã đóng (30%)</span>
-                  <span className="deposit-amount">- {formatCurrency(eventData.payment.deposit)}</span>
-                </div>
+                {eventData.payment.deposit > 0 && (
+                  <div className="payment-deposit">
+                    <span>Tiền cọc đã đóng (30%)</span>
+                    <span className="deposit-amount">- {formatCurrency(eventData.payment.deposit)}</span>
+                  </div>
+                )}
                 <div className="payment-remaining">
                   <span>Còn lại cần thanh toán</span>
                   <span className="remaining-amount">{formatCurrency(eventData.payment.remaining)}</span>
                 </div>
               </div>
 
-              <div className="payment-actions">
-                <button className="btn-confirm-payment">
-                  Xác nhận thanh toán đợt 2
-                </button>
-                <button 
-                  className="btn-transaction-history"
-                  onClick={() => setShowTransactionModal(true)}
-                >
-                  Lịch sử giao dịch
-                </button>
-                <button 
-                  className="btn-transaction-history"
-                  onClick={() => {
-                    const bookingQuery = eventData.bookingCode ? `?bookingCode=${encodeURIComponent(eventData.bookingCode)}` : '';
-                    navigate(`${base}/reservations/${eventData.id}/contract${bookingQuery}`);
-                  }}
-                >
-                  Xem hợp đồng
-                </button>
-              </div>
+              {(eventData.showConfirmPayment2 ||
+                eventData.hasTransactions ||
+                eventData.hasContractLink) && (
+                <div className="payment-actions">
+                  {eventData.showConfirmPayment2 && (
+                    <button type="button" className="btn-confirm-payment">
+                      Xác nhận thanh toán đợt 2
+                    </button>
+                  )}
+                  {eventData.hasTransactions && (
+                    <button
+                      type="button"
+                      className="btn-transaction-history"
+                      onClick={() => setShowTransactionModal(true)}
+                    >
+                      Lịch sử giao dịch
+                    </button>
+                  )}
+                  {eventData.hasContractLink && (
+                    <button
+                      type="button"
+                      className="btn-transaction-history"
+                      onClick={() => {
+                        const code = eventData.contractCode || eventData.bookingCode;
+                        const q = code ? `?bookingCode=${encodeURIComponent(code)}` : '';
+                        navigate(`${base}/reservations/${eventData.id}/contract${q}`);
+                      }}
+                    >
+                      Xem hợp đồng
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </section>
         </div>

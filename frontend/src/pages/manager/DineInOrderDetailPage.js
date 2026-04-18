@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import PaymentModal from '../../components/PaymentModal';
 import { orderAPI } from '../../api/managerApi';
+import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import '../../styles/DineInOrderDetailPage.css';
 
 const asArray = (value) => {
@@ -98,6 +99,7 @@ function DineInOrderDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams(); // Get order ID from URL
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [invoicePdfLoading, setInvoicePdfLoading] = useState(false);
 
 
   // Decode the ID if it contains encoded characters
@@ -216,6 +218,22 @@ function DineInOrderDetailPage() {
     navigate(-1);
   };
 
+  const handleInvoicePdf = async () => {
+    const code = String(orderData?.code || orderData?.orderCode || '').trim();
+    if (!code) {
+      window.alert('Không có mã đơn để tải PDF.');
+      return;
+    }
+    setInvoicePdfLoading(true);
+    try {
+      await downloadInvoicePdf(code);
+    } catch (e) {
+      window.alert((await getPdfErrorMessage(e)) || 'Tải PDF thất bại.');
+    } finally {
+      setInvoicePdfLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="dinein-detail-page-wrapper"><div style={{padding: 40, textAlign: 'center'}}>Đang tải chi tiết đơn hàng...</div></div>;
   }
@@ -247,7 +265,13 @@ function DineInOrderDetailPage() {
             </div>
           </div>
           <div className="dinein-detail-header-actions">
-            <button className="dinein-detail-icon-btn">
+            <button
+              type="button"
+              className="dinein-detail-icon-btn"
+              title="Tải PDF hóa đơn"
+              disabled={invoicePdfLoading}
+              onClick={handleInvoicePdf}
+            >
               <Printer size={18} />
             </button>
             <button className="dinein-detail-icon-btn">
@@ -389,9 +413,14 @@ function DineInOrderDetailPage() {
                 </div>
               </div>
               <div className="dinein-detail-payment-buttons">
-                <button className="dinein-detail-secondary-btn">
+                <button
+                  type="button"
+                  className="dinein-detail-secondary-btn"
+                  disabled={invoicePdfLoading}
+                  onClick={handleInvoicePdf}
+                >
                   <Printer size={16} />
-                  In hóa đơn
+                  {invoicePdfLoading ? 'Đang tải PDF…' : 'Tải PDF hóa đơn'}
                 </button>
                 <button className="dinein-detail-secondary-btn">
                   <Edit size={16} />

@@ -464,47 +464,9 @@
 
 .AddressModal-Body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 24px;
   padding: 24px;
-}
-
-.AddressModal-MapCol {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.AddressModal-MapWrap {
-  height: 320px;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 2px solid var(--pf-border);
-}
-
-.AddressModal-ConfirmMap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  padding: 14px 20px;
-  background: linear-gradient(135deg, rgba(236, 91, 19, 0.15), rgba(255, 159, 94, 0.2));
-  border: 2px solid var(--pf-primary-light);
-  border-radius: 12px;
-  color: var(--pf-primary);
-  font-weight: 800;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: var(--pf-transition);
-}
-
-.AddressModal-ConfirmMap:hover {
-  background: linear-gradient(135deg, rgba(236, 91, 19, 0.25), rgba(255, 159, 94, 0.3));
-}
-
-.AddressModal-ConfirmMap i {
-  font-size: 1.1rem;
 }
 
 .AddressModal-FormCol {
@@ -674,10 +636,6 @@
 @media (max-width: 900px) {
   .AddressModal-Body {
     grid-template-columns: 1fr;
-  }
-  
-  .AddressModal-MapWrap {
-    height: 250px;
   }
 }
 

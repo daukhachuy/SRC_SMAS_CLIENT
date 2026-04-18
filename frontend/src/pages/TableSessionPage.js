@@ -9,6 +9,7 @@ import { orderAPI } from '../api/managerApi';
 import { handlePaymentSuccess } from '../utils/paymentHandler';
 import useTableSession from '../hooks/useTableSession';
 import { ShoppingCart, LogOut, Loader, AlertCircle } from 'lucide-react';
+import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
 import '../styles/TableSessionPage.css';
 
 /**
@@ -270,6 +271,10 @@ const TableSessionPage = () => {
     );
   }
 
+  const cartSessionSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartSessionVat = roundOrderMoney(cartSessionSubtotal * ORDER_VAT_RATE);
+  const cartSessionTotal = cartSessionSubtotal + cartSessionVat;
+
   return (
     <div className="table-session-page">
       {/* Header */}
@@ -350,8 +355,10 @@ const TableSessionPage = () => {
                     </div>
                   ))}
                 </div>
-                <div className="cart-total">
-                  Tổng: {cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString()}đ
+                <div className="cart-total" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
+                  <span>Tạm tính: {cartSessionSubtotal.toLocaleString()}đ</span>
+                  <span>VAT (10%): +{cartSessionVat.toLocaleString()}đ</span>
+                  <span style={{ fontWeight: 700 }}>Tổng: {cartSessionTotal.toLocaleString()}đ</span>
                 </div>
                 <button
                   className="btn btn-primary"

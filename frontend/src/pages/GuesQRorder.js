@@ -13,6 +13,7 @@ import {
   getOrderItemsByCode,
   getOrderSessionMenu,
 } from '../api/orderApi';
+import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
 import '../styles/MenuPage.css';
 
 const MENU_TABS = ['Food', 'Combo', 'Buffet'];
@@ -1021,15 +1022,19 @@ const GuesQRorder = () => {
     }
   };
 
-  const subtotal = cart.reduce((sum, item) => {
-    if (item.itemType === 'Buffet') {
-      const adult = Number(item.price || 0) * Number(item.quantity || 0);
-      const child = Number(item.childrenPrice || 0) * Number(item.quantityBufferChildent || 0);
-      return sum + adult + child;
-    }
-    return sum + Number(item.price || 0) * Number(item.quantity || 0);
-  }, 0);
-  const total = subtotal;
+  const sumCartLines = (items) =>
+    (items || []).reduce((sum, item) => {
+      if (item.itemType === 'Buffet') {
+        const adult = Number(item.price || 0) * Number(item.quantity || 0);
+        const child = Number(item.childrenPrice || 0) * Number(item.quantityBufferChildent || 0);
+        return sum + adult + child;
+      }
+      return sum + Number(item.price || 0) * Number(item.quantity || 0);
+    }, 0);
+
+  const subtotal = sumCartLines(cart);
+  const vatCart = roundOrderMoney(subtotal * ORDER_VAT_RATE);
+  const total = subtotal + vatCart;
 
   const getOrderedItemQuantity = (item) =>
     Number(item?.quantity || 0) + Number(item?.quantityBufferChildent || 0);
@@ -1056,6 +1061,9 @@ const GuesQRorder = () => {
       { totalQty: 0, totalAmount: 0 }
     );
   }, [orderedItems]);
+
+  const orderedVatAmount = roundOrderMoney(orderedItemsSummary.totalAmount * ORDER_VAT_RATE);
+  const orderedGrandWithVat = orderedItemsSummary.totalAmount + orderedVatAmount;
 
   useEffect(() => {
     if (tableCode) {
@@ -1117,12 +1125,18 @@ const GuesQRorder = () => {
         return;
       }
 
+      const subPreVat = sumCartLines(cart);
+      const vatSend = roundOrderMoney(subPreVat * ORDER_VAT_RATE);
       const payload = {
         orderType: 'DineIn',
         tableIds: [tableId],
         numberOfGuests: 1,
         note: `QR order at table ${tableCode}`,
         orderItems: cart.map(toGuestOrderItemPayload),
+        taxAmount: vatSend,
+        vatAmount: vatSend,
+        totalAmount: subPreVat + vatSend,
+        TotalAmount: subPreVat + vatSend,
       };
       const created = await createGuestOrder(payload);
       const { orderId: createdOrderId, orderCode: createdOrderCode } = extractOrderMeta(created);
@@ -1455,6 +1469,10 @@ const GuesQRorder = () => {
               <span>Tạm tính</span>
               <span style={{fontWeight: 700, color: '#222'}}>{formatCurrency(subtotal)}</span>
             </div>
+            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#888', marginBottom: 6}}>
+              <span>VAT (10%)</span>
+              <span style={{fontWeight: 700, color: '#222'}}>+{formatCurrency(vatCart)}</span>
+            </div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10}}>
               <span style={{fontWeight: 800, fontSize: 18}}>Tổng cộng</span>
               <span style={{fontWeight: 900, fontSize: 28, color: '#FF7A21'}}>{formatCurrency(total)}</span>
@@ -1603,8 +1621,16 @@ const GuesQRorder = () => {
                 <div style={{ color: '#374151', fontWeight: 700 }}>
                   Tổng số món: {orderedItemsSummary.totalQty}
                 </div>
-                <div style={{ color: '#ea580c', fontWeight: 900, fontSize: 18 }}>
-                  Tổng tiền: {formatCurrency(orderedItemsSummary.totalAmount)}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  <div style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
+                    Tạm tính: {formatCurrency(orderedItemsSummary.totalAmount)}
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
+                    VAT (10%): +{formatCurrency(orderedVatAmount)}
+                  </div>
+                  <div style={{ color: '#ea580c', fontWeight: 900, fontSize: 18 }}>
+                    Tổng cộng: {formatCurrency(orderedGrandWithVat)}
+                  </div>
                 </div>
               </div>
             ) : null}
