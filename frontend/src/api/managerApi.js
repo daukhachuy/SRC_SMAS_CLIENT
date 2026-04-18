@@ -52,7 +52,14 @@ export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
     instance.delete(`/Staff/${workStaffId}`),
 
   // Lịch sử ca làm việc của nhân viên
-  getStaffWorkHistory: (staffId) => instance.get(`/Staff/${staffId}/work-history`),
+  getStaffWorkHistory: (staffId, query = {}) => {
+    const month = Number(query?.month);
+    const year = Number(query?.year);
+    const params = {};
+    if (Number.isFinite(month) && month >= 1 && month <= 12) params.month = month;
+    if (Number.isFinite(year) && year > 1900) params.year = year;
+    return instance.get(`/Staff/${staffId}/work-history`, { params });
+  },
 };
 
 // ===== CALL API + MAP =====
@@ -220,10 +227,11 @@ export async function getAllStaffSchedule() {
   }
 
   const IMAGES = {
-    dine: 'https://images.pexels.com/photos/461382/pexels-photo-461382.jpeg?auto=compress&w=800&q=80', // Bàn ăn nhà hàng
-    takeaway: 'https://images.pexels.com/photos/70497/pexels-photo-70497.jpeg?auto=compress&w=800&q=80', // Đồ ăn mang về
-    delivery: 'https://images.pexels.com/photos/1931536/pexels-photo-1931536.jpeg?auto=compress&w=800&q=80', // Giao hàng tận nơi
-    event: 'https://images.pexels.com/photos/1679825/pexels-photo-1679825.jpeg?auto=compress&w=800&q=80', // Sự kiện, tiệc
+    // Ảnh fallback theo loại đơn khi backend chưa trả imageUrl/thumbnail.
+    dine: 'https://images.pexels.com/photos/67468/pexels-photo-67468.jpeg?auto=compress&w=800&q=80', // Ăn tại chỗ
+    takeaway: 'https://images.pexels.com/photos/5638331/pexels-photo-5638331.jpeg?auto=compress&w=800&q=80', // Mang về
+    delivery: 'https://res.cloudinary.com/dmzuier4p/image/upload/v1776440756/hinh-anh-shipper-61_hncew9.jpg', // Vận chuyển (theo ảnh user cung cấp)
+    event: 'https://images.pexels.com/photos/587741/pexels-photo-587741.jpeg?auto=compress&w=800&q=80', // Sự kiện
   };
 
   function defaultImageByType(icon) {

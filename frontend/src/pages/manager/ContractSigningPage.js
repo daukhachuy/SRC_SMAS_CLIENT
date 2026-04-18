@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import { contractAPI, createBookEventContract, eventBookingAPI } from '../../api/managerApi';
+import { getRestaurantInfo } from '../../api/homeApi';
 import { 
   ArrowLeft, FileText, ShieldCheck, Building2, User,
   CheckCircle, Download, Edit3
@@ -51,6 +52,15 @@ const createInitialContractData = () => ({
   },
   cancellation: [],
 });
+
+const firstNonEmptyString = (...values) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+};
 
 const ContractSigningPage = () => {
   const { base, homePath } = useRoleSectionBasePath();
@@ -172,6 +182,25 @@ const ContractSigningPage = () => {
         const eventInfo = detail?.eventInfo || {};
         const confirmedBy = detail?.confirmedBy || {};
         const detailPayment = detail?.payment || {};
+        let restaurantInfo = null;
+        try {
+          restaurantInfo = await getRestaurantInfo();
+        } catch (restaurantErr) {
+          console.warn('Không lấy được thông tin nhà hàng từ public info:', restaurantErr?.message || restaurantErr);
+        }
+
+        const restaurantName = firstNonEmptyString(
+          contract?.restaurantName,
+          contract?.restaurant?.name,
+          detail?.restaurantName,
+          detail?.restaurant?.name,
+          detail?.restaurant?.title,
+          eventInfo?.restaurantName,
+          restaurantInfo?.restaurantName,
+          restaurantInfo?.name,
+          restaurantInfo?.title,
+          'Nhà hàng FPT'
+        );
 
         const rawStatus = String(contract?.status || detail?.status || 'draft').toLowerCase();
         const total = toNum(detailPayment?.totalAmount ?? contract?.totalAmount ?? contract?.amount, 0);
@@ -186,9 +215,23 @@ const ContractSigningPage = () => {
           ...services.map((x) => ({ name: x?.name || 'Dịch vụ', category: 'Dịch vụ' })),
         ];
 
-        const guests = toNum(eventInfo?.numberOfGuests, 0);
-        const tables = toNum(eventInfo?.numberOfTables ?? eventInfo?.tableCount, guests);
-        const guestsPerTable = tables > 0 ? Math.max(1, Math.round(guests / tables)) : 10;
+        const guests = toNum(
+          eventInfo?.numberOfGuests ?? eventInfo?.guestCount ?? detail?.numberOfGuests,
+          0
+        );
+        const explicitTablesRaw =
+          eventInfo?.numberOfTables ??
+          eventInfo?.tableCount ??
+          eventInfo?.numberTable ??
+          detail?.numberOfTables ??
+          detail?.tableCount ??
+          detail?.numberTable;
+        const explicitTables = toNum(explicitTablesRaw, 0);
+        const inferredTablesFromGuests = guests > 0 ? Math.max(1, Math.round(guests / 10)) : 0;
+        const tables = explicitTables > 0 ? explicitTables : inferredTablesFromGuests;
+        const guestsPerTable = guests > 0 && tables > 0
+          ? Math.max(1, Math.round(guests / tables))
+          : 10;
 
         const terms = contract?.termsAndConditions || detail?.contract?.termsAndConditions || DEFAULT_CREATE_TERMS;
         const cancellation = terms
@@ -209,7 +252,7 @@ const ContractSigningPage = () => {
           status: rawStatus,
           statusText: statusLabel[rawStatus] || contract?.status || detail?.status || 'Nháp',
           partyA: {
-            name: 'Nhà hàng Gourmet Luxury',
+            name: restaurantName,
             address: 'Chưa cập nhật',
             representative: confirmedBy?.fullName || 'Chưa cập nhật',
             position: 'Quản lý',

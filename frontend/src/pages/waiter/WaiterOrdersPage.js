@@ -34,7 +34,7 @@ import { getFoodByFilter, getBuffetLists, getComboLists } from '../../api/foodAp
 import { patchOrderItemServed } from '../../api/orderItemApi';
 import { createHubConnection, KITCHEN_HUB } from '../../realtime/signalrClient';
 import { apiCancelItem } from '../../api/kitchenOrderApi';
-import { createPaymentLink, payOrderCash } from '../../api/paymentService';
+import { createRemainingPaymentQr, payOrderCash } from '../../api/paymentService';
 import { getWaiterTables } from '../../api/waiterApiTable';
 import { initTableSession } from '../../api/tableSessionApi';
 import { getProfile } from '../../api/userApi';
@@ -577,6 +577,7 @@ const mapApiOrderToWaiter = (order) => {
     }
 
     try {
+      setIsAddingItems(true);
       console.log('[AddItems] orderCode:', orderCode, 'payload:', payload);
       await addItemsToOrder(orderCode, payload);
       alert('Đã thêm món vào đơn hàng!');
@@ -591,7 +592,9 @@ const mapApiOrderToWaiter = (order) => {
         setShowAddItemsModal(false);
       }
 
-      fetchWaiterOrders();
+      await refreshSelectedOrderDetail(orderCode);
+      // Làm mới list đơn ở nền để giao diện không bị khựng.
+      void fetchWaiterOrders({ silent: true });
     } catch (err) {
       const data = err?.response?.data;
       const status = err?.response?.status;
@@ -606,6 +609,8 @@ const mapApiOrderToWaiter = (order) => {
       const msg = data?.message || data?.title || err?.message || 'Lỗi khi thêm món vào đơn hàng!';
       alert(detail ? `${msg}\n${detail}` : `${msg}${raw ? `\n${raw}` : ''} (HTTP ${status || 'N/A'})`);
       console.error(err);
+    } finally {
+      setIsAddingItems(false);
     }
   };
   const [showAddItemsModal, setShowAddItemsModal] = useState(false);
@@ -629,6 +634,7 @@ const mapApiOrderToWaiter = (order) => {
   const [receivedMoney, setReceivedMoney] = useState('');
   const [activePaymentMethod, setActivePaymentMethod] = useState('cash');
   const [isPaying, setIsPaying] = useState(false);
+  const [isAddingItems, setIsAddingItems] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [itemCancelIndex, setItemCancelIndex] = useState(null);
   const [itemCancelReason, setItemCancelReason] = useState('');
@@ -639,8 +645,54 @@ const mapApiOrderToWaiter = (order) => {
   const [tableQrLoading, setTableQrLoading] = useState(false);
   const [tableQrError, setTableQrError] = useState('');
 
+  const normalizeNoticeMessage = (message) => {
+    const raw = String(message ?? '').trim();
+    if (!raw) return '';
+
+    if (/^request failed with status code\s+400$/i.test(raw)) {
+      return 'Bad request (400). Please verify the input data and try again.';
+    }
+    if (/^request failed with status code\s+401$/i.test(raw)) {
+      return 'Unauthorized (401). Please sign in again.';
+    }
+    if (/^request failed with status code\s+403$/i.test(raw)) {
+      return 'Forbidden (403). You do not have permission for this action.';
+    }
+    if (/^request failed with status code\s+404$/i.test(raw)) {
+      return 'Resource not found (404).';
+    }
+    if (/^request failed with status code\s+5\d\d$/i.test(raw)) {
+      return 'Server error. Please try again in a moment.';
+    }
+
+    const replacements = [
+      ['Vui lòng nhập lý do hủy đơn.', 'Please enter a cancellation reason.'],
+      ['Không tìm thấy mã đơn để hủy.', 'Order code was not found.'],
+      ['Vui lòng chọn hoặc nhập lý do hủy món.', 'Please choose or enter a cancellation reason.'],
+      ['Không tìm thấy mã dòng món (orderItemId) để hủy.', 'Order item ID was not found.'],
+      ['Không tìm thấy mã đơn giao hàng.', 'Delivery order code was not found.'],
+      ['Cần phục vụ xong tất cả món trước khi thanh toán.', 'All dishes must be served before payment.'],
+      ['Không xác định được mã đơn để thanh toán.', 'Order code is missing for payment.'],
+      ['Không xác định được orderId để thanh toán tiền mặt.', 'orderId is missing for cash payment.'],
+      ['Tiền khách đưa phải lớn hơn 0.', 'Cash amount must be greater than 0.'],
+      ['Không tạo được QR thanh toán phần còn thiếu.', 'Could not create a QR checkout for the remaining amount.'],
+      ['Lỗi thanh toán tiền mặt.', 'Cash payment failed.'],
+      ['Lỗi kết nối API thanh toán.', 'Payment API connection failed.'],
+      ['Không thể thanh toán: còn món chưa được phục vụ.', 'Cannot proceed to payment: some dishes are not served yet.'],
+      ['Đang mở màn hình thanh toán...', 'Opening payment screen...'],
+      ['Bếp chưa làm xong món. Chỉ bắt đầu giao khi tất cả món đã sẵn sàng.', 'Kitchen has not finished all dishes. Start delivery only when all dishes are ready.'],
+      ['Đơn chưa thanh toán. Cần thanh toán trước khi hoàn thành giao hàng.', 'This order is not paid yet. Please complete payment before finishing delivery.'],
+    ];
+
+    for (const [vi, en] of replacements) {
+      if (raw === vi) return en;
+    }
+
+    return raw;
+  };
+
   const alert = (message) => {
-    setUiNotice(String(message ?? ''));
+    setUiNotice(normalizeNoticeMessage(message));
   };
 
   // --- FIX: BỔ SUNG STATE searchInput ---
@@ -1124,9 +1176,17 @@ const mapApiOrderToWaiter = (order) => {
     mainTableId: null,
     mergedTableIds: []
   });
+  const hasSelectedTable = Boolean(tableSelection.mainTableId);
 
   // Danh sách bàn thực tế từ API
   const [tables, setTables] = useState([]);
+
+  useEffect(() => {
+    if (!hasSelectedTable) return;
+    setOrderForm((prev) =>
+      prev.orderType === 'at-place' ? prev : { ...prev, orderType: 'at-place' }
+    );
+  }, [hasSelectedTable]);
 
   const reloadTables = async () => {
     try {
@@ -1207,6 +1267,20 @@ const mapApiOrderToWaiter = (order) => {
     }
   }, []);
 
+  const refreshSelectedOrderDetail = useCallback(async (orderCode) => {
+    const code = String(orderCode || '').replace(/^#/, '').trim();
+    if (!code) return;
+    try {
+      const detailRes = await orderAPI.getByCode(code);
+      const detailPayload = detailRes?.data?.data || detailRes?.data || {};
+      const mappedDetail = mapApiOrderToWaiter(detailPayload);
+      setSelectedOrder((prev) => (prev ? { ...prev, ...mappedDetail } : mappedDetail));
+      setOrderItemsState((mappedDetail?.items || []).map((item) => ({ ...item })));
+    } catch (err) {
+      console.warn('[Waiter] Không thể làm mới chi tiết đơn hàng:', err?.message || err);
+    }
+  }, []);
+
   async function fetchWaiterServiceHistory() {
     try {
       const res = await orderAPI.getHistoryMySevenDays();
@@ -1228,7 +1302,7 @@ const mapApiOrderToWaiter = (order) => {
     fetchWaiterServiceHistory();
   }, [fetchWaiterOrders]);
 
-  // Realtime hub kitchen: refresh khi co thay doi mon/don
+  // Realtime theo SignalR backend như cũ.
   useEffect(() => {
     const token =
       localStorage.getItem('authToken') ||
@@ -1237,8 +1311,12 @@ const mapApiOrderToWaiter = (order) => {
     if (!token) return undefined;
 
     const conn = createHubConnection(KITCHEN_HUB);
-    const refresh = () => {
-      void fetchWaiterOrders({ silent: true });
+    const refresh = async () => {
+      await fetchWaiterOrders({ silent: true });
+      if (showOrderDetailModal && selectedOrder) {
+        const orderCode = resolveOrderCode(selectedOrder);
+        await refreshSelectedOrderDetail(orderCode);
+      }
     };
     conn.on('OrderItemStatusChanged', refresh);
     conn.on('AllItemsStatusChanged', refresh);
@@ -1248,7 +1326,7 @@ const mapApiOrderToWaiter = (order) => {
     return () => {
       void conn.stop();
     };
-  }, [fetchWaiterOrders]);
+  }, [fetchWaiterOrders, refreshSelectedOrderDetail, selectedOrder, showOrderDetailModal]);
 
   useEffect(() => {
     if (!showPaymentModal || !selectedOrder) return;
@@ -1293,7 +1371,10 @@ const mapApiOrderToWaiter = (order) => {
   const paymentTotal = Number(calculateOrderTotal(selectedOrder || { items: [] }) || 0);
   const receivedMoneyValue = Number(receivedMoney || 0);
   const hasReceivedMoney = receivedMoney.trim() !== '';
-  const isCashAmountValid = hasReceivedMoney && receivedMoneyValue >= paymentTotal;
+  const isCashAmountValid = hasReceivedMoney && receivedMoneyValue > 0;
+  const remainingAfterCash = hasReceivedMoney
+    ? Math.max(0, paymentTotal - receivedMoneyValue)
+    : paymentTotal;
   const changeAmount = hasReceivedMoney
     ? Math.max(0, receivedMoneyValue - paymentTotal)
     : null;
@@ -1437,19 +1518,9 @@ const mapApiOrderToWaiter = (order) => {
     setTableQrCode('');
     setTableQrError('');
 
-    if (normalizeOrderType(order?.channel || order?.orderType) === 'delivery') {
-      const orderCode = resolveOrderCode(order);
-      if (orderCode) {
-        try {
-          const detailRes = await orderAPI.getByCode(orderCode);
-          const detailPayload = detailRes?.data?.data || detailRes?.data || {};
-          const mappedDetail = mapApiOrderToWaiter(detailPayload);
-          setSelectedOrder((prev) => ({ ...prev, ...mappedDetail }));
-          setOrderItemsState((mappedDetail?.items || []).map((item) => ({ ...item })));
-        } catch (err) {
-          console.warn('[Waiter] Không lấy được chi tiết đơn giao hàng, dùng dữ liệu danh sách.', err?.message || err);
-        }
-      }
+    const orderCode = resolveOrderCode(order);
+    if (orderCode) {
+      await refreshSelectedOrderDetail(orderCode);
     }
 
   };
@@ -1642,7 +1713,7 @@ const mapApiOrderToWaiter = (order) => {
 
     const isStartAction = String(order?.deliveryActionLabel || '').trim().toUpperCase() === 'BẮT ĐẦU GIAO';
     if (isStartAction && !canStartDeliveryByItems(order)) {
-      setUiNotice('Bếp chưa làm xong món. Chỉ bắt đầu giao khi tất cả món đã sẵn sàng.');
+      setUiNotice('Kitchen has not finished all dishes. Start delivery only when all dishes are ready.');
       return;
     }
 
@@ -1650,7 +1721,7 @@ const mapApiOrderToWaiter = (order) => {
       String(order?.deliveryWorkflowStatus || '').toLowerCase()
     );
     if (isDelivering && !order?.isPaid) {
-      setUiNotice('Đơn chưa thanh toán. Cần thanh toán trước khi hoàn thành giao hàng.');
+      setUiNotice('This order is not paid yet. Please complete payment before finishing delivery.');
       return;
     }
 
@@ -1658,7 +1729,7 @@ const mapApiOrderToWaiter = (order) => {
       setChangingDeliveryOrderCode(orderCode);
       const res = await orderAPI.changeStatus(orderCode);
       const message = typeof res?.data === 'string' ? res.data : (res?.data?.message || 'Cập nhật trạng thái giao hàng thành công.');
-      setUiNotice(message);
+      setUiNotice(normalizeNoticeMessage(message));
       await fetchWaiterOrders();
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || err?.message || 'Không cập nhật được trạng thái giao hàng.';
@@ -1675,9 +1746,45 @@ const mapApiOrderToWaiter = (order) => {
       return;
     }
 
+    const orderCode = resolveOrderCode(selectedOrder);
+    if (!orderCode) {
+      alert('Không xác định được mã đơn để thanh toán.');
+      return;
+    }
+
+    const pickApiMessage = (err, fallback) => {
+      const data = err?.response?.data;
+      if (typeof data === 'string' && data.trim()) return data.trim();
+      if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim();
+      if (typeof data?.title === 'string' && data.title.trim()) return data.title.trim();
+      return err?.message || fallback;
+    };
+
+    const openRemainingQr = async () => {
+      const returnTo = `${window.location.pathname}${window.location.search || ''}`;
+      const res = await createRemainingPaymentQr({
+        orderCode,
+        returnUrl: `${window.location.origin}/payment/success?orderCode=${encodeURIComponent(orderCode)}&returnTo=${encodeURIComponent(returnTo)}`,
+        cancelUrl: `${window.location.origin}/payment/cancel?orderCode=${encodeURIComponent(orderCode)}&returnTo=${encodeURIComponent(returnTo)}`,
+      });
+      const payload = res?.data?.data ?? res?.data ?? {};
+      const checkoutUrl = String(payload?.checkoutUrl || '').trim();
+      const qrCode = String(payload?.qrCode || '').trim();
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return true;
+      }
+      if (qrCode) {
+        alert(`Đã tạo QR thanh toán phần còn thiếu.\nMã QR: ${qrCode}`);
+        return true;
+      }
+      alert('Không tạo được QR thanh toán phần còn thiếu.');
+      return false;
+    };
+
     if (activePaymentMethod === 'cash') {
       if (!isCashAmountValid) {
-        alert('Tiền khách đưa phải lớn hơn hoặc bằng tổng thanh toán.');
+        alert('Tiền khách đưa phải lớn hơn 0.');
         return;
       }
 
@@ -1689,47 +1796,50 @@ const mapApiOrderToWaiter = (order) => {
 
       try {
         setIsPaying(true);
-        const amount = paymentTotal;
+        const amount = receivedMoneyValue;
         await payOrderCash({
           orderId,
           amount,
           note: voucherCode ? `Thanh toán tiền mặt - voucher: ${voucherCode}` : 'Thanh toán tiền mặt tại quầy',
         });
-        alert('Thanh toán tiền mặt thành công.');
-        setShowPaymentModal(false);
-        closeOrderDetailModal();
+
+        let completedAfterCash = false;
+        try {
+          const refreshedRes = await orderAPI.getByCode(orderCode);
+          const raw = refreshedRes?.data?.data ?? refreshedRes?.data ?? {};
+          const mapped = mapApiOrderToWaiter(raw);
+          completedAfterCash = mapped.status === 'completed' || mapped.isPaid === true;
+        } catch {
+          // fallback: nếu chưa đọc được đơn mới thì vẫn refresh danh sách ngoài
+        }
+
+        if (completedAfterCash) {
+          alert('Thanh toán thành công. Đơn đã hoàn tất.');
+          setShowPaymentModal(false);
+          closeOrderDetailModal();
+          await fetchWaiterOrders();
+          return;
+        }
+
+        alert(
+          `Đã ghi nhận thanh toán tiền mặt ${formatCurrency(amount)}. ` +
+          `Đơn còn thiếu ${formatCurrency(remainingAfterCash)} và sẽ chuyển sang thanh toán QR.`
+        );
+        await openRemainingQr();
         await fetchWaiterOrders();
       } catch (err) {
-        alert(err?.response?.data?.message || err?.message || 'Lỗi thanh toán tiền mặt.');
+        alert(pickApiMessage(err, 'Lỗi thanh toán tiền mặt.'));
       } finally {
         setIsPaying(false);
       }
       return;
     }
 
-    const orderId = Number(selectedOrder.orderId || selectedOrder.rawOrderId || 0);
-    if (!Number.isFinite(orderId) || orderId <= 0) {
-      alert('Không xác định được orderId để tạo link thanh toán.');
-      return;
-    }
-
     try {
       setIsPaying(true);
-      const res = await createPaymentLink({
-        orderId,
-        returnUrl: `${window.location.origin}/payment-result?success=true&orderId=${orderId}`,
-        cancelUrl: `${window.location.origin}/payment-result?success=false&orderId=${orderId}`,
-      });
-
-      const checkoutUrl = res?.data?.checkoutUrl;
-      if (res?.data?.success && checkoutUrl) {
-        window.location.href = checkoutUrl;
-        return;
-      }
-
-      alert(res?.data?.message || 'Không tạo được link thanh toán.');
+      await openRemainingQr();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Lỗi kết nối API thanh toán.');
+      alert(pickApiMessage(err, 'Lỗi kết nối API thanh toán.'));
     } finally {
       setIsPaying(false);
     }
@@ -1803,7 +1913,7 @@ const mapApiOrderToWaiter = (order) => {
   // DEBUG: Log currentOrders để kiểm tra dữ liệu thực tế
   console.log('[DEBUG][UI] currentOrders:', currentOrders);
 
-  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần/i.test(uiNotice);
+  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|error|failed|cannot|missing|forbidden|unauthorized|bad request/i.test(uiNotice);
 
   return (
     <div className="waiter-orders-container">
@@ -2419,6 +2529,7 @@ const mapApiOrderToWaiter = (order) => {
                       <label>Loại đơn hàng</label>
                       <select
                         value={orderForm.orderType}
+                        disabled={hasSelectedTable}
                         onChange={(e) =>
                           setOrderForm((prev) => ({ ...prev, orderType: e.target.value }))
                         }
@@ -2428,6 +2539,11 @@ const mapApiOrderToWaiter = (order) => {
                         <option value="delivery">Giao hàng</option>
                         <option value="event">Sự kiện</option>
                       </select>
+                      {hasSelectedTable && (
+                        <small style={{ color: '#6b7280' }}>
+                          Đã chọn bàn nên loại đơn hàng được khóa ở "Ăn tại chỗ".
+                        </small>
+                      )}
                     </div>
                   </div>
 
@@ -3221,15 +3337,23 @@ const mapApiOrderToWaiter = (order) => {
                   />
                   {activePaymentMethod === 'cash' && hasReceivedMoney && !isCashAmountValid && (
                     <p style={{ color: '#d4380d', marginTop: 8, fontSize: 13 }}>
-                      Tiền khách đưa phải lớn hơn hoặc bằng {formatCurrency(paymentTotal)}.
+                      Tiền khách đưa phải lớn hơn 0.
                     </p>
                   )}
                 </div>
 
                 <div className="change-box">
-                  <span>Tiền thừa trả khách:</span>
+                  <span>
+                    {activePaymentMethod === 'cash'
+                      ? 'Còn thiếu sau tiền mặt:'
+                      : 'Tiền thừa trả khách:'}
+                  </span>
                   <strong>
-                    {hasReceivedMoney ? formatCurrency(changeAmount) : '--'}
+                    {hasReceivedMoney
+                      ? (activePaymentMethod === 'cash'
+                        ? formatCurrency(remainingAfterCash)
+                        : formatCurrency(changeAmount))
+                      : '--'}
                   </strong>
                 </div>
               </div>
@@ -3240,7 +3364,7 @@ const mapApiOrderToWaiter = (order) => {
                 className="btn-continue full"
                 onClick={handleProceedPayment}
                 disabled={isPaying || (activePaymentMethod === 'cash' && !isCashAmountValid)}
-                title={activePaymentMethod === 'cash' && !isCashAmountValid ? 'Tiền khách đưa chưa đủ để thanh toán.' : ''}
+                title={activePaymentMethod === 'cash' && !isCashAmountValid ? 'Tiền khách đưa phải lớn hơn 0.' : ''}
               >
                 <Receipt size={18} /> {isPaying ? 'ĐANG XỬ LÝ THANH TOÁN...' : 'XÁC NHẬN THANH TOÁN & IN HÓA ĐƠN'}
               </button>
@@ -3626,9 +3750,11 @@ const mapApiOrderToWaiter = (order) => {
                   </div>
                   <button
                     className="btn-continue full"
+                    type="button"
+                    disabled={isAddingItems}
                     onClick={handleConfirmAddItems}
                   >
-                    Xác nhận thêm món
+                    {isAddingItems ? 'Đang thêm món...' : 'Xác nhận thêm món'}
                     <ArrowLeft size={16} className="rotate-180" />
                   </button>
                 </div>

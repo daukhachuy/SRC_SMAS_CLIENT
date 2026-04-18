@@ -101,6 +101,11 @@ const Services = () => {
   const [selectedEventTime, setSelectedEventTime] = useState(''); // giờ tổ chức HH:mm
   const [eventStepError, setEventStepError] = useState(''); // lỗi validation step 1
   const [selectedServices, setSelectedServices] = useState([]);
+  const [servicePricingModal, setServicePricingModal] = useState({
+    open: false,
+    service: null,
+    selectedHours: 1,
+  });
   const [menuDishes, setMenuDishes] = useState([]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
   const [showAllServicesModal, setShowAllServicesModal] = useState(false);
@@ -709,20 +714,114 @@ const Services = () => {
   // Dịch vụ sự kiện: ưu tiên từ API GET /api/services, không có thì dùng fallback
   // Cả API lẫn fallback đều lọc isAvailable !== false
   const fallbackEventServices = [
-    { id: 1, name: 'MC Tố Châu', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200', description: 'MC tổ chức có chuyên môn cao, dẫn dắt sự kiện chuyên nghiệp', price: 100000, isAvailable: true },
-    { id: 2, name: 'MC Minh Hạ', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200', description: 'MC nổi tiếng với phong cách dẫn dắt hài hước và cuốn hút', price: 100000, isAvailable: true },
-    { id: 3, name: 'Backdrop Tiêu Chuẩn', image: 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200', description: 'Backdrop trang trí cơ bản với các mẫu tiêu chuẩn', price: 2000000, isAvailable: true },
-    { id: 4, name: 'Backdrop VIP', image: 'https://images.unsplash.com/photo-1537904904737-13fc2b3560a1?auto=format&fit=crop&q=80&w=200', description: 'Backdrop cao cấp với thiết kế riêng, trang trí sang trọng', price: 5000000, isAvailable: true },
-    { id: 5, name: 'Âm thanh & Âm nhạc', image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống âm thanh chuyên nghiệp, DJ live để làm nóng không khí', price: 3000000, isAvailable: true },
-    { id: 6, name: 'Chụp Ảnh & Video', image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&q=80&w=200', description: 'Chụp ảnh và quay phim chuyên nghiệp suốt sự kiện', price: 2500000, isAvailable: true },
-    { id: 7, name: 'Lighting LED', image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống đèn LED hiện đại tạo không khí sôi động', price: 2000000, isAvailable: true },
-    { id: 8, name: 'Hoa trang trí', image: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?auto=format&fit=crop&q=80&w=200', description: 'Hoa tươi và trang trí hoa cao cấp cho sự kiện', price: 1500000, isAvailable: true },
+    { id: 1, name: 'MC Tố Châu', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200', description: 'MC tổ chức có chuyên môn cao, dẫn dắt sự kiện chuyên nghiệp', price: 100000, unit: 'Giờ', isAvailable: true },
+    { id: 2, name: 'MC Minh Hạ', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200', description: 'MC nổi tiếng với phong cách dẫn dắt hài hước và cuốn hút', price: 100000, unit: 'Giờ', isAvailable: true },
+    { id: 3, name: 'Backdrop Tiêu Chuẩn', image: 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=200', description: 'Backdrop trang trí cơ bản với các mẫu tiêu chuẩn', price: 2000000, unit: 'Buổi', isAvailable: true },
+    { id: 4, name: 'Backdrop VIP', image: 'https://images.unsplash.com/photo-1537904904737-13fc2b3560a1?auto=format&fit=crop&q=80&w=200', description: 'Backdrop cao cấp với thiết kế riêng, trang trí sang trọng', price: 5000000, unit: 'Buổi', isAvailable: true },
+    { id: 5, name: 'Âm thanh & Âm nhạc', image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống âm thanh chuyên nghiệp, DJ live để làm nóng không khí', price: 3000000, unit: 'Buổi', isAvailable: true },
+    { id: 6, name: 'Chụp Ảnh & Video', image: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&q=80&w=200', description: 'Chụp ảnh và quay phim chuyên nghiệp suốt sự kiện', price: 2500000, unit: 'Giờ', isAvailable: true },
+    { id: 7, name: 'Lighting LED', image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?auto=format&fit=crop&q=80&w=200', description: 'Hệ thống đèn LED hiện đại tạo không khí sôi động', price: 2000000, unit: 'Buổi', isAvailable: true },
+    { id: 8, name: 'Hoa trang trí', image: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?auto=format&fit=crop&q=80&w=200', description: 'Hoa tươi và trang trí hoa cao cấp cho sự kiện', price: 1500000, unit: 'Buổi', isAvailable: true },
   ];
 
   // Ghép: API đã lọc isAvailable ở load time, fallback cũng đã có isAvailable = true
   // Dùng .filter ở đây để đảm bảo an toàn nếu sau này backend trả thêm
   const eventServices = (eventServicesFromApi.length > 0 ? eventServicesFromApi : fallbackEventServices)
     .filter((s) => s.isAvailable !== false);
+
+  const getServiceSelection = (serviceId) =>
+    selectedServices.find((item) => Number(item?.serviceId) === Number(serviceId)) || null;
+
+  const isServiceSelected = (serviceId) => Boolean(getServiceSelection(serviceId));
+
+  const normalizeServiceUnit = (unitValue) => {
+    const normalized = String(unitValue || '')
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    return normalized.includes('gio') ? 'hourly' : 'session';
+  };
+
+  const getServiceUnitMeta = (service) => {
+    const mode = normalizeServiceUnit(service?.unit);
+    return mode === 'hourly'
+      ? { mode: 'hourly', label: 'Theo giờ', unitLabel: '/ giờ' }
+      : { mode: 'session', label: 'Theo buổi', unitLabel: '/ buổi' };
+  };
+
+  const isHourlyService = (service) => getServiceUnitMeta(service).mode === 'hourly';
+
+  const buildServiceSelection = (service, selectedHours = 1) => {
+    const unitMeta = getServiceUnitMeta(service);
+    const basePrice = Number(service?.price) || 0;
+    const hours = unitMeta.mode === 'hourly' ? Math.max(1, Number(selectedHours) || 1) : 1;
+    const quantity = unitMeta.mode === 'hourly' ? hours : 1;
+    const totalPrice = basePrice * quantity;
+    const hoursText = unitMeta.mode === 'hourly' ? ` - ${hours} giờ` : '';
+    return {
+      serviceId: service.id,
+      serviceName: service.name || service.title || 'Dịch vụ',
+      pricingMode: unitMeta.mode,
+      pricingModeLabel: unitMeta.label,
+      pricingUnitLabel: unitMeta.unitLabel,
+      baseUnitPrice: basePrice,
+      hours,
+      quantity,
+      unitPrice: totalPrice,
+      note: `${unitMeta.label}${unitMeta.unitLabel}${hoursText} - ${totalPrice} VND`,
+    };
+  };
+
+  const upsertServiceSelection = (selection) => {
+    if (!selection?.serviceId) return;
+    setSelectedServices((prev) => {
+      const next = prev.filter((item) => Number(item?.serviceId) !== Number(selection.serviceId));
+      return [...next, selection];
+    });
+  };
+
+  const removeServiceSelection = (serviceId) => {
+    setSelectedServices((prev) => prev.filter((item) => Number(item?.serviceId) !== Number(serviceId)));
+  };
+
+  const openServicePricingPicker = (service) => {
+    const currentSelection = getServiceSelection(service?.id);
+    const defaultHours = Math.max(1, Number(currentSelection?.hours) || 1);
+    setServicePricingModal({
+      open: true,
+      service,
+      selectedHours: defaultHours,
+    });
+  };
+
+  const closeServicePricingPicker = () => {
+    setServicePricingModal({
+      open: false,
+      service: null,
+      selectedHours: 1,
+    });
+  };
+
+  const handleConfirmServiceSelection = () => {
+    const service = servicePricingModal.service;
+    if (!service?.id) return closeServicePricingPicker();
+    upsertServiceSelection(buildServiceSelection(service, servicePricingModal.selectedHours));
+    closeServicePricingPicker();
+  };
+
+  const handleServiceCardClick = (service) => {
+    if (!service?.id) return;
+    if (isServiceSelected(service.id)) {
+      removeServiceSelection(service.id);
+      return;
+    }
+    if (isHourlyService(service)) {
+      openServicePricingPicker(service);
+      return;
+    }
+    upsertServiceSelection(buildServiceSelection(service, 1));
+  };
 
   // Validate Step 1 trước khi chuyển bước
   const handleNextStep = () => {
@@ -769,20 +868,10 @@ const Services = () => {
     setEventStep(2);
   };
 
-  // Function to toggle service selection
-  const toggleService = (serviceId) => {
-    setSelectedServices(prev => 
-      prev.includes(serviceId) 
-        ? prev.filter(id => id !== serviceId)
-        : [...prev, serviceId]
-    );
-  };
-
   // Calculate total service cost
   const calculateServiceTotal = () => {
-    return selectedServices.reduce((total, serviceId) => {
-      const service = eventServices.find(s => s.id === serviceId);
-      return total + (service?.price || 0);
+    return selectedServices.reduce((total, item) => {
+      return total + (Number(item?.unitPrice) || 0);
     }, 0);
   };
 
@@ -852,15 +941,17 @@ const Services = () => {
 
       const payload = {
         numberOfGuests: expectedGuests,
+        numberOfTables: numTables,
+        guestsPerTable,
         reservationDate: formatReservationDate(selectedDate),
         reservationTime,
         note: eventForm.note || '',
         area: 'Trong nhà (Máy lạnh)',
         eventId: selectedEventId,
-        services: selectedServices.map(id => ({
-          serviceId: id,
-          quantity: 1,
-          note: ''
+        services: selectedServices.map((item) => ({
+          serviceId: item.serviceId,
+          quantity: Number(item.quantity) || 1,
+          note: item.note || ''
         })),
         foods: foodItems
       };
@@ -1500,17 +1591,28 @@ const Services = () => {
                         eventServices.slice(0, 6).map(service => (
                           <div
                             key={service.id}
-                            className={`event-service-card-v2 ${selectedServices.includes(service.id) ? 'selected' : ''}`}
-                            onClick={() => toggleService(service.id)}
+                            className={`event-service-card-v2 ${isServiceSelected(service.id) ? 'selected' : ''}`}
+                            onClick={() => handleServiceCardClick(service)}
                           >
                             <div className="event-service-card-v2-img">
                               <img src={service.image} alt={service.name} />
-                              {selectedServices.includes(service.id) && (
+                              {isServiceSelected(service.id) && (
                                 <div className="event-service-card-v2-check"><Check size={18} strokeWidth={3} /></div>
                               )}
                             </div>
                             <h5 className="event-service-card-v2-title">{service.name}</h5>
-                            <p className="event-service-card-v2-price">{formatCurrency(service.price).replace('₫', '')} đ</p>
+                            <p className="event-service-card-v2-price">
+                              {formatCurrency(getServiceSelection(service.id)?.unitPrice ?? service.price).replace('₫', '')} đ
+                            </p>
+                            {getServiceSelection(service.id)?.pricingModeLabel ? (
+                              <p className="event-service-card-v2-option">
+                                {getServiceSelection(service.id)?.pricingModeLabel}
+                                {getServiceSelection(service.id)?.pricingUnitLabel || ''}
+                                {getServiceSelection(service.id)?.pricingMode === 'hourly'
+                                  ? ` x${getServiceSelection(service.id)?.hours || 1} giờ`
+                                  : ''}
+                              </p>
+                            ) : null}
                             <p className="event-service-card-v2-desc">{service.description}</p>
                           </div>
                         ))
@@ -1833,17 +1935,28 @@ const Services = () => {
                         {eventServices.map(service => (
                           <div
                             key={service.id}
-                            className={`event-service-card-v2 ${selectedServices.includes(service.id) ? 'selected' : ''}`}
-                            onClick={() => toggleService(service.id)}
+                            className={`event-service-card-v2 ${isServiceSelected(service.id) ? 'selected' : ''}`}
+                            onClick={() => handleServiceCardClick(service)}
                           >
                             <div className="event-service-card-v2-img">
                               <img src={service.image} alt={service.name} />
-                              {selectedServices.includes(service.id) && (
+                              {isServiceSelected(service.id) && (
                                 <div className="event-service-card-v2-check"><Check size={18} strokeWidth={3} /></div>
                               )}
                             </div>
                             <h5 className="event-service-card-v2-title">{service.name}</h5>
-                            <p className="event-service-card-v2-price">{formatCurrency(service.price).replace('₫', '')} đ</p>
+                            <p className="event-service-card-v2-price">
+                              {formatCurrency(getServiceSelection(service.id)?.unitPrice ?? service.price).replace('₫', '')} đ
+                            </p>
+                            {getServiceSelection(service.id)?.pricingModeLabel ? (
+                              <p className="event-service-card-v2-option">
+                                {getServiceSelection(service.id)?.pricingModeLabel}
+                                {getServiceSelection(service.id)?.pricingUnitLabel || ''}
+                                {getServiceSelection(service.id)?.pricingMode === 'hourly'
+                                  ? ` x${getServiceSelection(service.id)?.hours || 1} giờ`
+                                  : ''}
+                              </p>
+                            ) : null}
                             <p className="event-service-card-v2-desc">{service.description}</p>
                           </div>
                         ))}
@@ -1852,6 +1965,93 @@ const Services = () => {
                     <div className="event-all-services-modal-footer">
                       <span>Đã chọn {selectedServices.length} dịch vụ</span>
                       <button type="button" className="event-btn-primary" onClick={() => setShowAllServicesModal(false)}>Đóng</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {servicePricingModal.open && servicePricingModal.service && (
+                <div className="event-all-services-modal-overlay" onClick={closeServicePricingPicker}>
+                  <div className="event-service-pricing-modal" onClick={(e) => e.stopPropagation()}>
+                    <div className="event-all-services-modal-header">
+                      <h4>Thiết lập dịch vụ {servicePricingModal.service.name}</h4>
+                      <button type="button" className="event-modal-close" onClick={closeServicePricingPicker} aria-label="Đóng">×</button>
+                    </div>
+                    <div className="event-all-services-modal-body">
+                      <div className="event-service-pricing-options">
+                        <div className="event-service-pricing-option active">
+                          <div>
+                            <div className="event-service-pricing-option-title">
+                              {getServiceUnitMeta(servicePricingModal.service).label}
+                              {getServiceUnitMeta(servicePricingModal.service).unitLabel}
+                            </div>
+                            <div className="event-service-pricing-option-note">
+                              Đơn giá từ backend: {formatCurrency(servicePricingModal.service.price).replace('₫', '')} đ
+                            </div>
+                            {isHourlyService(servicePricingModal.service) ? (
+                              <div className="event-service-pricing-hours-wrap">
+                                <span className="event-service-pricing-hours-label">Số giờ:</span>
+                                <div className="event-service-pricing-hours-control">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setServicePricingModal((prev) => ({
+                                        ...prev,
+                                        selectedHours: Math.max(1, (Number(prev.selectedHours) || 1) - 1),
+                                      }))
+                                    }
+                                  >
+                                    -
+                                  </button>
+                                  <span>{Math.max(1, Number(servicePricingModal.selectedHours) || 1)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setServicePricingModal((prev) => ({
+                                        ...prev,
+                                        selectedHours: Math.min(24, (Number(prev.selectedHours) || 1) + 1),
+                                      }))
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="event-service-pricing-option-price">
+                            {formatCurrency(
+                              isHourlyService(servicePricingModal.service)
+                                ? (Number(servicePricingModal.service.price) || 0) * Math.max(1, Number(servicePricingModal.selectedHours) || 1)
+                                : Number(servicePricingModal.service.price) || 0
+                            ).replace('₫', '')} đ
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="event-all-services-modal-footer">
+                      <span>
+                        {isHourlyService(servicePricingModal.service)
+                          ? 'Dịch vụ tính theo giờ: tổng tiền = đơn giá x số giờ.'
+                          : 'Dịch vụ tính theo buổi: lấy đúng giá backend.'}
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {isServiceSelected(servicePricingModal.service.id) ? (
+                          <button
+                            type="button"
+                            className="event-btn-back"
+                            onClick={() => {
+                              removeServiceSelection(servicePricingModal.service.id);
+                              closeServicePricingPicker();
+                            }}
+                          >
+                            Bỏ chọn
+                          </button>
+                        ) : null}
+                        <button type="button" className="event-btn-primary" onClick={handleConfirmServiceSelection}>
+                          Xác nhận
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
