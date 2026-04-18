@@ -23,12 +23,17 @@ instance.interceptors.request.use(
     config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
     config.headers['Accept'] = config.headers['Accept'] || 'application/json';
 
-    const token =
-      localStorage.getItem('authToken') ||
-      localStorage.getItem('accessToken') ||
-      localStorage.getItem('tableAccessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const hasExplicitAuthHeader =
+      typeof config.headers.Authorization === 'string' &&
+      String(config.headers.Authorization).trim().length > 0;
+    if (!hasExplicitAuthHeader) {
+      const token =
+        localStorage.getItem('authToken') ||
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('tableAccessToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -48,6 +53,7 @@ instance.interceptors.response.use(
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message;
     const requestUrl = String(error?.config?.url || '').toLowerCase();
+    const isContractSignRequest = requestUrl.includes('/contract/sign');
     
     console.error(`[API Error] Status: ${status}, Message: ${message}`);
 
@@ -58,7 +64,8 @@ instance.interceptors.response.use(
       localStorage.removeItem('authToken');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
-      if (hadToken && !window.location.pathname.includes('/auth')) {
+      const shouldRedirectToAuth = hadToken || isContractSignRequest;
+      if (shouldRedirectToAuth && !window.location.pathname.includes('/auth')) {
         window.location.href = '/auth';
       }
     }

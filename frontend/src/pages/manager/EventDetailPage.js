@@ -144,14 +144,10 @@ const EventDetailPage = () => {
             ?? pickField(detail, ['numberOfGuests', 'guestCount', 'guests'], 0)
         );
 
-        // Backend hiện trả numberOfGuests theo ngữ cảnh số bàn ở một số API detail.
-        // Nếu thiếu số bàn rõ ràng, dùng numberOfGuests làm số bàn và quy đổi khách = bàn * 10.
-        const quantity = explicitTables !== null && explicitTables !== undefined
-          ? toNum(explicitTables, 0)
-          : guestsRaw;
-        const computedGuests = explicitTables !== null && explicitTables !== undefined
-          ? (guestsRaw || (quantity * 10))
-          : (quantity * 10);
+        const explicitTableCount = toNum(explicitTables, 0);
+        const inferredTableCount = guestsRaw > 0 ? Math.max(1, Math.round(guestsRaw / 10)) : 0;
+        const quantity = explicitTableCount > 0 ? explicitTableCount : inferredTableCount;
+        const computedGuests = guestsRaw > 0 ? guestsRaw : (quantity * 10);
         const pricePerTable = toNum(
           pickField(paymentData, ['pricePerTable', 'unitPrice'])
             ?? pickField(detail, ['pricePerTable', 'unitPrice'], 0)

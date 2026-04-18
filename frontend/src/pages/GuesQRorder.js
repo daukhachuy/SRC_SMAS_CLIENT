@@ -1,20 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bell, User, ShoppingCart, CreditCard } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { getBuffetDetail, getBuffetLists, getComboLists, resolveFoodImageUrl } from '../api/foodApi';
-import { createPaymentLink } from '../api/paymentService';
-import { addItemToOrder, addItemsToOrder, createGuestOrder, getCurrentOrderSession, getFoodsBufferByOrderCode, getOrderSessionMenu } from '../api/orderApi';
+import { getAllCategories } from '../api/categoryApi';
+import {
+  addItemToOrder,
+  addItemsToOrder,
+  createGuestOrder,
+  getCurrentOrderSession,
+  getFoodsBufferByOrderCode,
+  getOrderByCode,
+  getOrderItemsByCode,
+  getOrderSessionMenu,
+} from '../api/orderApi';
 import '../styles/MenuPage.css';
 
 const MENU_TABS = ['Food', 'Combo', 'Buffet'];
 
-const CATEGORY_CHIPS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'appetizer', label: 'Khai vị' },
-  { key: 'main', label: 'Món chính' },
-  { key: 'drink', label: 'Đồ uống' },
-  { key: 'dessert', label: 'Tráng miệng' },
-];
+const CATEGORY_ALL_KEY = 'all';
 
 const stripVietnamese = (value) =>
   String(value || '')
@@ -172,10 +175,31 @@ const mapMenuItem = (item, idx, forcedType) => {
   const id = rawId || idx + 1;
   const foodName = item.foodName || item.comboName || item.buffetName || item.name || `Món ${id}`;
   const rawPrice = Number(item.price ?? item.unitPrice ?? item.amount ?? 0);
-  const categoryRaw = String(item.categoryName || item.foodCategoryName || item.category || '').trim();
+  const firstCategory = Array.isArray(item?.categories) ? item.categories[0] : null;
+  const categoryRaw = String(
+    item.categoryName ||
+    item.foodCategoryName ||
+    firstCategory?.name ||
+    item.category?.name ||
+    item.category ||
+    ''
+  ).trim();
+  const categoryId = Number(
+    item.categoryId ??
+    item.foodCategoryId ??
+    item.idCategory ??
+    firstCategory?.categoryId ??
+    firstCategory?.id ??
+    item.category?.categoryId ??
+    item.category?.id ??
+    0
+  );
   const categoryKey = categoryRaw
     ? normalizeCategoryKey(categoryRaw)
     : inferCategoryKeyFromName(foodName);
+  const categoryFilterKey = Number.isFinite(categoryId) && categoryId > 0
+    ? `id:${categoryId}`
+    : `key:${categoryKey}`;
 
   return {
     id,
@@ -192,8 +216,10 @@ const mapMenuItem = (item, idx, forcedType) => {
     buffetPriceChild: Number(item.priceOfChildren ?? item.childrenPrice ?? item.priceChild ?? item.childPrice ?? item.childAmount ?? 0),
     buffetIncludes: itemType === 'Buffet' ? extractBuffetIncludes(item) : [],
     buffetFoods: [],
+    categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : 0,
     category: categoryRaw || categoryLabelByKey[categoryKey] || 'Món chính',
     categoryKey,
+    categoryFilterKey,
     tag: item.isBestSeller || item.isChefChoice ? `CHEF'S CHOICE` : '',
   };
 };
@@ -290,19 +316,39 @@ const extractCurrentOrderItems = (payload) => {
   return [];
 };
 
-const mapCurrentOrderItem = (item) => {
+const mapCurrentOrderItem = (item, idx = 0) => {
+  const normalizeDishStatus = (value) => {
+    const status = String(value || '').trim().toLowerCase();
+    if (
+      status.includes('cho xu ly') ||
+      status.includes('chờ xử lý') ||
+      status.includes('pending') ||
+      status.includes('confirm')
+    ) return 'pending';
+    if (status.includes('preparing') || status.includes('cooking')) return 'preparing';
+    if (status.includes('dang lam') || status.includes('đang làm') || status.includes('che bien') || status.includes('chế biến')) return 'preparing';
+    if (status.includes('ready') || status.includes('completed')) return 'ready';
+    if (status.includes('san sang') || status.includes('sẵn sàng')) return 'ready';
+    if (status.includes('served') || status.includes('delivered')) return 'served';
+    if (status.includes('da phuc vu') || status.includes('đã phục vụ')) return 'served';
+    if (status.includes('cancel')) return 'cancelled';
+    if (status.includes('da huy') || status.includes('đã hủy')) return 'cancelled';
+    return 'pending';
+  };
+
   const rawType = String(item.type || item.itemType || item.menuType || '').toLowerCase();
   const hasComboId = Number(item.comboId || item.idCombo || 0) > 0;
   const hasBuffetId = Number(item.buffetId || item.bufferId || item.idBuffer || 0) > 0;
   const itemType = rawType.includes('combo')
     ? 'Combo'
     : (rawType.includes('buffet') ? 'Buffet' : (hasBuffetId ? 'Buffet' : (hasComboId ? 'Combo' : 'Food')));
-  const id =
+  const resolvedId =
     itemType === 'Combo'
       ? (item.comboId || item.idCombo || item.id || item.itemId || item.menuItemId)
       : (itemType === 'Buffet'
         ? (item.buffetId || item.bufferId || item.idBuffer || item.id || item.itemId || item.menuItemId)
         : (item.foodId || item.id || item.menuItemId || item.itemId));
+  const id = resolvedId || `line-${idx + 1}`;
   const quantity = Number(item.quantity || item.qty || 1);
   const price = Number(item.price ?? item.unitPrice ?? item.amount ?? 0);
 
@@ -310,9 +356,9 @@ const mapCurrentOrderItem = (item) => {
     id,
     cartKey: `${itemType}-${id}`,
     itemType,
-    foodId: Number(item.foodId || (itemType === 'Food' ? id : 0) || 0),
-    comboId: Number(item.comboId || item.idCombo || (itemType === 'Combo' ? id : 0) || 0),
-    buffetId: Number(item.buffetId || item.bufferId || item.idBuffer || (itemType === 'Buffet' ? id : 0) || 0),
+    foodId: Number(item.foodId || (itemType === 'Food' ? resolvedId : 0) || 0),
+    comboId: Number(item.comboId || item.idCombo || (itemType === 'Combo' ? resolvedId : 0) || 0),
+    buffetId: Number(item.buffetId || item.bufferId || item.idBuffer || (itemType === 'Buffet' ? resolvedId : 0) || 0),
     name: item.foodName || item.name || item.itemName || 'Món ăn',
     price: Number.isFinite(price) ? price : 0,
     childrenPrice: Number(item.childrenPrice || item.priceOfChildren || item.childPrice || 0),
@@ -320,6 +366,12 @@ const mapCurrentOrderItem = (item) => {
     img: resolveFoodImageUrl(item.image || item.imageUrl || item.thumbnail),
     desc: item.description || item.note || '',
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    dishStatus: normalizeDishStatus(
+      item.dishStatus ||
+      item.status ||
+      item.itemStatus ||
+      item.orderItemStatus
+    ),
   };
 };
 
@@ -332,14 +384,19 @@ const GuesQRorder = () => {
   const [foodsError, setFoodsError] = useState('');
   const [activeMenuType, setActiveMenuType] = useState('Food');
   const [searchText, setSearchText] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState(CATEGORY_ALL_KEY);
+  const [foodCategories, setFoodCategories] = useState([]);
   const [cart, setCart] = useState([]);
   const [buffetDraftQty, setBuffetDraftQty] = useState({});
-  const [isRedirectingPayment, setIsRedirectingPayment] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [lockedBuffetId, setLockedBuffetId] = useState(0);
   const [orderBuffetFoods, setOrderBuffetFoods] = useState([]);
   const [showOrderBuffetFoods, setShowOrderBuffetFoods] = useState(false);
+  const [showOrderedItemsModal, setShowOrderedItemsModal] = useState(false);
+  const [orderedItemsLoading, setOrderedItemsLoading] = useState(false);
+  const [orderedItemsError, setOrderedItemsError] = useState('');
+  const [orderedItems, setOrderedItems] = useState([]);
+  const [currentOrderCode, setCurrentOrderCode] = useState('');
 
   const tableCode = searchParams.get('tableCode') || localStorage.getItem('tableCode') || '04';
   const tableName = searchParams.get('tableName') || localStorage.getItem('tableName') || '';
@@ -352,6 +409,31 @@ const GuesQRorder = () => {
 
   const formatCurrency = (value) =>
     `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await getAllCategories();
+        const rows = Array.isArray(res)
+          ? res
+          : (Array.isArray(res?.$values)
+            ? res.$values
+            : (Array.isArray(res?.data)
+              ? res.data
+              : (Array.isArray(res?.data?.$values) ? res.data.$values : [])));
+        const mapped = rows
+          .map((x) => ({
+            id: Number(x?.categoryId ?? x?.id ?? 0),
+            name: String(x?.name || x?.categoryName || '').trim(),
+          }))
+          .filter((x) => Number.isFinite(x.id) && x.id > 0 && x.name);
+        setFoodCategories(mapped);
+      } catch {
+        setFoodCategories([]);
+      }
+    };
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     const loadFoods = async () => {
@@ -410,6 +492,23 @@ const GuesQRorder = () => {
             .map((item, idx) => mapMenuItem(item, idx, 'Buffet'));
         }
 
+        if (activeMenuType === 'Food' && mapped.length > 0 && foodCategories.length > 0) {
+          const categoryIdByName = new Map(
+            foodCategories.map((cat) => [stripVietnamese(cat.name), cat.id])
+          );
+          mapped = mapped.map((food) => {
+            if (food.itemType !== 'Food') return food;
+            if (Number(food.categoryId || 0) > 0) return food;
+            const matchedCategoryId = categoryIdByName.get(stripVietnamese(food.category));
+            if (!matchedCategoryId) return food;
+            return {
+              ...food,
+              categoryId: matchedCategoryId,
+              categoryFilterKey: `id:${matchedCategoryId}`,
+            };
+          });
+        }
+
         if (activeMenuType === 'Buffet' && mapped.length > 0) {
           mapped = await enrichBuffetIncludesWithDetail(mapped);
         }
@@ -434,20 +533,15 @@ const GuesQRorder = () => {
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [activeMenuType, searchText, tableToken]);
+  }, [activeMenuType, searchText, tableToken, foodCategories]);
 
   useEffect(() => {
     const loadCurrentOrder = async () => {
       try {
-        if (tableToken) {
-          localStorage.setItem('tableAccessToken', tableToken);
-        }
-        const current = await getCurrentOrderSession();
-        const rows = extractCurrentOrderItems(current);
-        const mapped = rows.map(mapCurrentOrderItem).filter((item) => Number.isFinite(Number(item.id)) && Number(item.id) > 0);
-        if (mapped.length > 0) {
-          setCart(mapped);
-        }
+        const { current, orderCode: activeOrderCode, mapped, rawRows } = await resolveOrderedItemsFromSession();
+        const rows = rawRows;
+        setCurrentOrderCode(String(activeOrderCode || ''));
+        setOrderedItems(mapped);
 
         const buffetIdFromItems = Array.from(
           new Set(
@@ -532,6 +626,8 @@ const GuesQRorder = () => {
         }
         setOrderBuffetFoods([]);
         setShowOrderBuffetFoods(false);
+        setOrderedItems([]);
+        setCurrentOrderCode('');
         console.debug('Không lấy được đơn hiện tại theo session:', err?.response?.data || err?.message);
       }
     };
@@ -539,10 +635,36 @@ const GuesQRorder = () => {
     loadCurrentOrder();
   }, [tableToken, searchParams]);
 
+  const foodCategoryChips = useMemo(() => {
+    const foodsOnly = foods.filter((item) => item.itemType === 'Food');
+    const byId = new Map(foodCategories.map((cat) => [cat.id, cat.name]));
+    const chips = [{ key: CATEGORY_ALL_KEY, label: 'Tất cả' }];
+    const seen = new Set([CATEGORY_ALL_KEY]);
+
+    // Đồng bộ thứ tự danh mục như trang thực đơn customer.
+    foodCategories.forEach((cat) => {
+      const key = `id:${cat.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      chips.push({ key, label: cat.name });
+    });
+
+    // Fallback: món chưa có categoryId vẫn có thể hiển thị nhóm suy đoán.
+    foodsOnly.forEach((food) => {
+      if (Number(food.categoryId || 0) > 0) return;
+      const fallbackKey = String(food.categoryFilterKey || `key:${food.categoryKey || 'main'}`);
+      if (seen.has(fallbackKey)) return;
+      seen.add(fallbackKey);
+      chips.push({ key: fallbackKey, label: food.category || categoryLabelByKey[food.categoryKey] || 'Món chính' });
+    });
+
+    return chips;
+  }, [foods, foodCategories]);
+
   const filteredFoods = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
     return foods.filter((food) => {
-      const byCategory = activeMenuType !== 'Food' || activeCategory === 'all' || food.categoryKey === activeCategory;
+      const byCategory = activeMenuType !== 'Food' || activeCategory === CATEGORY_ALL_KEY || String(food.categoryFilterKey || '') === activeCategory;
       const bySearch =
         !keyword ||
         food.name.toLowerCase().includes(keyword) ||
@@ -799,6 +921,106 @@ const GuesQRorder = () => {
     }
   };
 
+  const normalizeOrderItemRows = (rows) => {
+    const direct = normalizeArrayPayload(rows);
+    if (!Array.isArray(direct) || direct.length === 0) return [];
+
+    // Trường hợp endpoint trả về list order, mỗi phần tử chứa items/orderItems.
+    const hasWrappedOrder = direct.some((x) => Array.isArray(x?.items) || Array.isArray(x?.orderItems));
+    if (!hasWrappedOrder) return direct;
+
+    const expanded = [];
+    direct.forEach((row) => {
+      const nested = [
+        ...normalizeArrayPayload(row?.items),
+        ...normalizeArrayPayload(row?.orderItems),
+        ...normalizeArrayPayload(row?.orderDetails),
+        ...normalizeArrayPayload(row?.details),
+      ];
+      if (nested.length > 0) {
+        expanded.push(...nested);
+      }
+    });
+    return expanded.length > 0 ? expanded : direct;
+  };
+
+  const resolveOrderedItemsFromSession = async () => {
+    if (tableToken) {
+      localStorage.setItem('tableAccessToken', tableToken);
+    }
+
+    const current = await getCurrentOrderSession(tableToken);
+    const meta = extractOrderMeta(current);
+    let rows = normalizeOrderItemRows(extractCurrentOrderItems(current));
+
+    if (rows.length === 0 && meta.orderCode) {
+      try {
+        const detail = await getOrderByCode(meta.orderCode, tableToken);
+        const detailRows = normalizeOrderItemRows(extractCurrentOrderItems(detail));
+        if (detailRows.length > 0) {
+          rows = detailRows;
+        }
+      } catch {
+        // fallback bên dưới
+      }
+    }
+
+    if (rows.length === 0 && meta.orderCode) {
+      try {
+        const itemLines = await getOrderItemsByCode(meta.orderCode, tableToken);
+        rows = normalizeOrderItemRows(itemLines);
+      } catch {
+        // giữ rỗng nếu backend không cho endpoint này với token bàn
+      }
+    }
+
+    const mapped = rows.map((item, idx) => mapCurrentOrderItem(item, idx));
+
+    return {
+      current,
+      orderCode: String(meta.orderCode || ''),
+      mapped,
+      rawRows: rows,
+    };
+  };
+
+  const getDishStatusMeta = (dishStatus) => {
+    const normalized = String(dishStatus || 'pending').toLowerCase();
+    if (normalized === 'preparing') {
+      return { label: 'Đang chế biến', color: '#b45309', bg: '#ffedd5' };
+    }
+    if (normalized === 'ready') {
+      return { label: 'Sẵn sàng', color: '#166534', bg: '#dcfce7' };
+    }
+    if (normalized === 'served') {
+      return { label: 'Đã phục vụ', color: '#1d4ed8', bg: '#dbeafe' };
+    }
+    if (normalized === 'cancelled') {
+      return { label: 'Đã hủy', color: '#991b1b', bg: '#fee2e2' };
+    }
+    return { label: 'Chờ xác nhận', color: '#374151', bg: '#e5e7eb' };
+  };
+
+  const handleOpenOrderedItems = async () => {
+    setShowOrderedItemsModal(true);
+    setOrderedItemsLoading(true);
+    setOrderedItemsError('');
+    try {
+      const { mapped, orderCode } = await resolveOrderedItemsFromSession();
+      setCurrentOrderCode(String(orderCode || ''));
+      setOrderedItems(mapped);
+    } catch (err) {
+      setOrderedItemsError(
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không tải được danh sách món đã order.'
+      );
+      setOrderedItems([]);
+    } finally {
+      setOrderedItemsLoading(false);
+    }
+  };
+
   const subtotal = cart.reduce((sum, item) => {
     if (item.itemType === 'Buffet') {
       const adult = Number(item.price || 0) * Number(item.quantity || 0);
@@ -808,6 +1030,32 @@ const GuesQRorder = () => {
     return sum + Number(item.price || 0) * Number(item.quantity || 0);
   }, 0);
   const total = subtotal;
+
+  const getOrderedItemQuantity = (item) =>
+    Number(item?.quantity || 0) + Number(item?.quantityBufferChildent || 0);
+
+  const getOrderedItemLineAmount = (item) => {
+    const adultQty = Number(item?.quantity || 0);
+    const childQty = Number(item?.quantityBufferChildent || 0);
+    const adultPrice = Number(item?.price || 0);
+    const childPrice = Number(item?.childrenPrice || 0);
+    if (item?.itemType === 'Buffet') {
+      return adultQty * adultPrice + childQty * childPrice;
+    }
+    return getOrderedItemQuantity(item) * adultPrice;
+  };
+
+  const orderedItemsSummary = useMemo(() => {
+    return orderedItems.reduce(
+      (acc, item) => {
+        // Tổng số món = số dòng món (không cộng dồn theo quantity).
+        acc.totalQty += 1;
+        acc.totalAmount += getOrderedItemLineAmount(item);
+        return acc;
+      },
+      { totalQty: 0, totalAmount: 0 }
+    );
+  }, [orderedItems]);
 
   useEffect(() => {
     if (tableCode) {
@@ -820,98 +1068,6 @@ const GuesQRorder = () => {
       localStorage.setItem('tableAccessToken', tableToken);
     }
   }, [tableCode, tableName, tableToken]);
-
-  const handlePayment = async () => {
-    const resolveTableId = () => {
-      const raw = String(tableCode || '').trim();
-      const match = raw.match(/(\d+)/);
-      return match ? Number(match[1]) : Number(raw);
-    };
-
-    const createOrderFromCart = async () => {
-      if (cart.length === 0) {
-        throw new Error('Vui lòng chọn món trước khi gọi món.');
-      }
-
-      const tableId = resolveTableId();
-      if (!Number.isFinite(tableId) || tableId <= 0) {
-        throw new Error('Không xác định được bàn để tạo đơn.');
-      }
-
-      const payload = {
-        orderType: 'DineIn',
-        tableIds: [tableId],
-        numberOfGuests: 1,
-        note: `QR order at table ${tableCode}`,
-        orderItems: cart.map(toGuestOrderItemPayload),
-      };
-
-      const created = await createGuestOrder(payload);
-      const { orderId: createdOrderId, orderCode: createdOrderCode } = extractOrderMeta(created);
-      if (!Number.isFinite(createdOrderId) || createdOrderId <= 0) {
-        throw new Error('Tạo đơn thành công nhưng không lấy được orderId.');
-      }
-      sessionStorage.setItem('pendingOrderId', String(createdOrderId));
-      if (createdOrderCode) {
-        sessionStorage.setItem('pendingOrderCode', String(createdOrderCode));
-      }
-      return createdOrderId;
-    };
-
-    let orderId = Number(searchParams.get('orderId') || sessionStorage.getItem('pendingOrderId') || 0);
-
-    if (!Number.isFinite(orderId) || orderId <= 0) {
-      try {
-        const current = await getCurrentOrderSession();
-        const { orderId: currentOrderId, orderCode: currentOrderCode } = extractOrderMeta(current);
-        if (currentOrderCode && cart.length > 0) {
-          await addCartItemsToOrderCode(currentOrderCode);
-          sessionStorage.setItem('pendingOrderCode', String(currentOrderCode));
-        }
-        if (currentOrderId > 0) {
-          orderId = currentOrderId;
-          sessionStorage.setItem('pendingOrderId', String(currentOrderId));
-        }
-      } catch {
-        // Không có đơn hiện tại theo session thì tạo đơn mới ở bước dưới.
-      }
-    }
-
-    if (!Number.isFinite(orderId) || orderId <= 0) {
-      try {
-        setIsPlacingOrder(true);
-        orderId = await createOrderFromCart();
-      } catch (err) {
-        alert(err?.message || 'Không thể tạo đơn gọi món.');
-        return;
-      } finally {
-        setIsPlacingOrder(false);
-      }
-    }
-
-    try {
-      setIsRedirectingPayment(true);
-      const res = await createPaymentLink({
-        orderId,
-        returnUrl: `${window.location.origin}/payment-result?success=true&orderId=${orderId}`,
-        cancelUrl: `${window.location.origin}/payment-result?success=false&orderId=${orderId}`,
-      });
-      const checkoutUrl = res?.data?.checkoutUrl;
-      if (res?.data?.success && checkoutUrl) {
-        window.location.href = checkoutUrl;
-        return;
-      }
-      alert(res?.data?.message || 'Không tạo được link thanh toán');
-    } catch (err) {
-      if (Number(err?.response?.status || 0) === 401) {
-        alert('Phiên QR hiện tại không có quyền tạo link thanh toán. Vui lòng gọi nhân viên hỗ trợ thanh toán.');
-      } else {
-        alert(err?.response?.data?.message || err?.message || 'Lỗi kết nối API thanh toán');
-      }
-    } finally {
-      setIsRedirectingPayment(false);
-    }
-  };
 
   const handlePlaceOrder = async () => {
     const resolveTableId = () => {
@@ -1014,7 +1170,7 @@ const GuesQRorder = () => {
                 key={tab}
                 onClick={() => {
                   setActiveMenuType(tab);
-                  setActiveCategory('all');
+                  setActiveCategory(CATEGORY_ALL_KEY);
                 }}
                 style={{
                   border: 'none',
@@ -1032,12 +1188,31 @@ const GuesQRorder = () => {
           })}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: '#f3f4f6', fontWeight: 800 }}>
-            <ShoppingCart size={14} /> {tableLabel}
-          </div>
-          <Bell size={18} color="#374151" />
-          <User size={18} color="#374151" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            onClick={handleOpenOrderedItems}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 14px',
+              borderRadius: 999,
+              background: '#fff7f1',
+              color: '#b45309',
+              fontWeight: 900,
+              border: '1px solid #ffd2ae',
+              cursor: 'pointer',
+              boxShadow: '0 3px 10px rgba(255,122,33,0.16)',
+            }}
+            title={`Đơn hàng của ${tableLabel}`}
+          >
+            <ShoppingCart size={14} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 0.2 }}>
+              Bạn đang ở
+            </span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>{tableLabel}</span>
+          </button>
         </div>
       </div>
 
@@ -1049,16 +1224,43 @@ const GuesQRorder = () => {
           </h1>
           <p className="menu-desc" style={{color: '#6d7680', marginBottom: 24}}>Khám phá tinh hoa ẩm thực Pháp giữa lòng Sài Gòn</p>
           {activeMenuType === 'Food' && (
-            <div className="menu-tabs-row" style={{marginBottom: 24}}>
-              {CATEGORY_CHIPS.map((cat) => (
-                <button
-                  key={cat.key}
-                  className={`menu-tab-btn ${activeCategory === cat.key ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(cat.key)}
-                >
-                  {cat.label}
-                </button>
-              ))}
+            <div style={{ marginBottom: 24 }}>
+              <div
+                style={{
+                  border: '1px solid #f1e4d7',
+                  background: 'linear-gradient(180deg, #fff 0%, #fff9f4 100%)',
+                  borderRadius: 14,
+                  padding: '12px 14px',
+                }}
+              >
+                <div style={{ fontWeight: 800, fontSize: 14, color: '#374151', marginBottom: 10 }}>
+                  Danh Mục Món Ăn
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {foodCategoryChips.map((cat) => (
+                  <button
+                    key={cat.key}
+                    onClick={() => setActiveCategory(cat.key)}
+                    style={{
+                      height: 34,
+                      padding: '0 16px',
+                      borderRadius: 999,
+                      border: activeCategory === cat.key ? 'none' : '1px solid #e5e7eb',
+                      background: activeCategory === cat.key ? '#ff8a2a' : '#f5f7fb',
+                      color: activeCategory === cat.key ? '#fff' : '#334155',
+                      fontSize: 12,
+                      fontWeight: 800,
+                      letterSpacing: 0.2,
+                      cursor: 'pointer',
+                      boxShadow: activeCategory === cat.key ? '0 6px 14px rgba(255,122,33,0.28)' : 'none',
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+                </div>
+              </div>
             </div>
           )}
           <div style={{marginBottom: 24, position: 'relative', maxWidth: 320}}>
@@ -1258,24 +1460,157 @@ const GuesQRorder = () => {
               <span style={{fontWeight: 900, fontSize: 28, color: '#FF7A21'}}>{formatCurrency(total)}</span>
             </div>
           </div>
-          <div style={{display: 'flex', gap: 10}}>
-            <button
-              onClick={handlePlaceOrder}
-              disabled={isPlacingOrder}
-              style={{flex: 1, background: '#fff', color: '#FF7A21', border: '2px solid #FF7A21', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isPlacingOrder ? 0.8 : 1}}
-            >
-              {isPlacingOrder ? 'ĐANG GỬI...' : 'XÁC NHẬN THÊM MÓN'}
-            </button>
-            <button
-              onClick={handlePayment}
-              disabled={isRedirectingPayment || isPlacingOrder}
-              style={{flex: 1, background: '#FF7A21', color: '#fff', border: 'none', borderRadius: 10, padding: '14px 0', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isRedirectingPayment ? 0.8 : 1}}
-            >
-              <CreditCard size={18} /> {isRedirectingPayment ? 'ĐANG XỬ LÝ THANH TOÁN...' : 'Thanh toán'}
-            </button>
-          </div>
+          {cart.length > 0 ? (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder}
+                style={{
+                  width: '100%',
+                  background: '#fff',
+                  color: '#FF7A21',
+                  border: '2px solid #FF7A21',
+                  borderRadius: 10,
+                  padding: '14px 0',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  opacity: isPlacingOrder ? 0.8 : 1,
+                }}
+              >
+                {isPlacingOrder ? "ĐANG GỬI..." : "XÁC NHẬN THÊM MÓN"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {showOrderedItemsModal ? (
+        <div
+          onClick={() => setShowOrderedItemsModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 60,
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 640,
+              maxHeight: '82vh',
+              overflow: 'auto',
+              background: '#fff',
+              borderRadius: 16,
+              padding: 20,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 20, color: '#111827' }}>Món đã order</div>
+                <div style={{ color: '#6b7280', fontSize: 13 }}>
+                  {tableLabel}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOrderedItemsModal(false)}
+                style={{ border: 'none', background: '#f3f4f6', borderRadius: 10, padding: '6px 10px', cursor: 'pointer' }}
+              >
+                Đóng
+              </button>
+            </div>
+
+            {orderedItemsLoading ? (
+              <p style={{ color: '#6b7280' }}>Đang tải danh sách món...</p>
+            ) : null}
+            {!orderedItemsLoading && orderedItemsError ? (
+              <p style={{ color: '#b91c1c' }}>⚠ {orderedItemsError}</p>
+            ) : null}
+            {!orderedItemsLoading && !orderedItemsError && orderedItems.length === 0 ? (
+              <p style={{ color: '#6b7280' }}>Chưa có món nào được order cho bàn này.</p>
+            ) : null}
+
+            {!orderedItemsLoading && !orderedItemsError && orderedItems.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {orderedItems.map((item) => {
+                  const st = getDishStatusMeta(item.dishStatus);
+                  const lineQty = getOrderedItemQuantity(item);
+                  const lineAmount = getOrderedItemLineAmount(item);
+                  return (
+                    <div
+                      key={`ordered-${item.cartKey || item.id}`}
+                      style={{
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 12,
+                        padding: '10px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#111827' }}>{item.name}</div>
+                        <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 2 }}>
+                          Số lượng: {lineQty}
+                        </div>
+                        <div style={{ color: '#f97316', fontSize: 13, fontWeight: 800 }}>
+                          Thành tiền: {formatCurrency(lineAmount)}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 999,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          color: st.color,
+                          background: st.bg,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {st.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {!orderedItemsLoading && !orderedItemsError && orderedItems.length > 0 ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  borderTop: '1px dashed #e5e7eb',
+                  paddingTop: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ color: '#374151', fontWeight: 700 }}>
+                  Tổng số món: {orderedItemsSummary.totalQty}
+                </div>
+                <div style={{ color: '#ea580c', fontWeight: 900, fontSize: 18 }}>
+                  Tổng tiền: {formatCurrency(orderedItemsSummary.totalAmount)}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

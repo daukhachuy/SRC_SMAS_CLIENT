@@ -2,7 +2,7 @@ import GuesQRorder from './pages/GuesQRorder';
   {/* Trang đặt món QR cho khách */}
   <Route path="/guest-qr-order" element={<GuesQRorder />} />
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Home, { COMBOS_DATA, BEST_SELLERS_DATA } from './pages/Home';
 import ComboPage from './pages/ComboPage';
@@ -13,6 +13,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import AboutPage from './pages/AboutPage';
 import Services from './pages/Services';
+import ServiceTermsPage from './pages/ServiceTermsPage';
 import Profile from './pages/Profile'; 
 import MyOrders from './pages/MyOrders'; 
 import UserLayout from './components/UserLayout';
@@ -35,9 +36,11 @@ import ManagerInventoryPage from './pages/manager/ManagerInventoryPage';
 import ManagerSalaryPage from './pages/manager/ManagerSalaryPage';
 import ManagerProfilePage from './pages/manager/ManagerProfilePage';
 import ManagerTablesPage from './pages/manager/ManagerTablesPage';
+import ManagerChatPage from './pages/manager/ManagerChatPage';
 import DineInOrdersPage from './pages/DineInOrdersPage';
 import TakeawayOrdersPage from './pages/manager/TakeawayOrdersPage';
 import PaymentResult from './pages/PaymentResult';
+import PaymentCallbackPage from './pages/PaymentCallbackPage';
 import ContractCustomerSignPage from './pages/ContractCustomerSignPage';
 import WaiterLayout from './pages/waiter/WaiterLayout';
 import WaiterOrdersPage from './pages/waiter/WaiterOrdersPage';
@@ -114,6 +117,29 @@ const CustomerPublicRoute = ({ children }) => {
   return <Navigate to={getRoleHomePath(role)} replace />;
 };
 
+const getStoredAuthToken = () =>
+  localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+
+const RequireLoginForContractSign = ({ children }) => {
+  const location = useLocation();
+  const token = getStoredAuthToken();
+
+  if (!token) {
+    return (
+      <Navigate
+        to="/auth"
+        replace
+        state={{
+          authMessage: 'Vui lòng đăng nhập để ký hợp đồng.',
+          redirectTo: `${location.pathname}${location.search}`,
+        }}
+      />
+    );
+  }
+
+  return children;
+};
+
 const AppRoutes = () => {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -130,6 +156,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Services />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/services/terms"
+          element={
+            <ProtectedRoute>
+              <ServiceTermsPage />
             </ProtectedRoute>
           }
         />
@@ -173,7 +207,16 @@ const AppRoutes = () => {
         </Route>
 
         <Route path="/payment-result" element={<PaymentResult />} />
-        <Route path="/contract/sign" element={<ContractCustomerSignPage />} />
+        <Route path="/payment/success" element={<PaymentCallbackPage />} />
+        <Route path="/payment/cancel" element={<PaymentCallbackPage />} />
+        <Route
+          path="/contract/sign"
+          element={
+            <RequireLoginForContractSign>
+              <ContractCustomerSignPage />
+            </RequireLoginForContractSign>
+          }
+        />
 
         {/* Manager pages - BẢO VỆ BỞI ProtectedRoute với role Manager */}
         <Route path="/manager" element={
@@ -196,6 +239,7 @@ const AppRoutes = () => {
           <Route path="staff/:staffId/profile" element={<StaffProfilePage />} />
           <Route path="inventory" element={<ManagerInventoryPage />} />
           <Route path="salary" element={<ManagerSalaryPage />} />
+          <Route path="chat" element={<ManagerChatPage />} />
           <Route path="profile" element={<ManagerProfilePage />} />
         </Route>
 

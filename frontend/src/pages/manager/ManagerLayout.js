@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Boxes, Calendar, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X, User, Camera, IdCard } from 'lucide-react';
+import { Bell, Boxes, Calendar, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X, User, Camera, IdCard, MessageCircle } from 'lucide-react';
 import axios from 'axios';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import { useAuth } from '../../context/AuthContext';
 import { getProfile, updateProfile } from '../../api/userApi';
 import { staffApi } from '../../api/staffApi';
 import { mapNotificationToUI, notificationAPI } from '../../api/managerApi';
+import { conversationApi } from '../../api/conversationApi';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
 
@@ -14,6 +15,7 @@ const ManagerLayout = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -244,6 +246,27 @@ const ManagerLayout = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadChatUnread = async () => {
+      try {
+        const rows = await conversationApi.getManagerConversationsMy();
+        const unread = rows.reduce((sum, item) => sum + (Number(item.unreadCount || 0) || 0), 0);
+        if (mounted) setChatUnread(unread);
+      } catch {
+        if (mounted) setChatUnread(0);
+      }
+    };
+
+    loadChatUnread();
+    const timer = setInterval(loadChatUnread, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
 
   const navItems = useMemo(
@@ -254,9 +277,10 @@ const ManagerLayout = () => {
       { to: '/manager/reservations', label: 'Đặt bàn', icon: CalendarRange },
       { to: '/manager/staff', label: 'Nhân viên', icon: Users },
       { to: '/manager/inventory', label: 'Kho hàng', icon: Boxes },
-      { to: '/manager/salary', label: 'Lương', icon: CreditCard }
+      { to: '/manager/salary', label: 'Lương', icon: CreditCard },
+      { to: '/manager/chat', label: 'Chat khách hàng', icon: MessageCircle, badge: chatUnread }
     ],
-    []
+    [chatUnread]
   );
 
   const handleLogout = () => {
@@ -376,6 +400,9 @@ const ManagerLayout = () => {
               >
                 <Icon size={16} />
                 <span>{item.label}</span>
+                {item.badge > 0 ? (
+                  <span className="manager-nav-badge">{item.badge > 99 ? '99+' : item.badge}</span>
+                ) : null}
               </NavLink>
             );
           })}

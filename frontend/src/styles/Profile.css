@@ -271,7 +271,121 @@
   cursor: not-allowed;
 }
 
+.Profile-Btn.Secondary {
+  background: var(--pf-white);
+  color: var(--pf-primary);
+  border: 2px solid var(--pf-primary);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.Profile-Btn.Secondary:hover {
+  background: var(--pf-primary);
+  color: var(--pf-white);
+}
+
+.Profile-Btn.Secondary i {
+  font-size: 0.85rem;
+}
+
+/* Link-style edit button */
+.Profile-Link-Edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--pf-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: var(--pf-transition);
+}
+
+.Profile-Link-Edit:hover {
+  background: rgba(236, 91, 19, 0.08);
+}
+
+.Profile-Link-Edit i {
+  font-size: 0.8rem;
+}
+
 /* Địa chỉ - List card */
+.Profile-Section-Header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.Profile-Section-AddBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 2px solid var(--pf-primary);
+  border-radius: 12px;
+  background: var(--pf-white);
+  color: var(--pf-primary);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
+}
+
+.Profile-Section-AddBtn:hover {
+  background: var(--pf-primary);
+  color: var(--pf-white);
+}
+
+.Profile-Address-Empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--pf-text-muted);
+  text-align: center;
+}
+
+.Profile-Address-Empty i {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  color: #CBD5E1;
+}
+
+.Profile-Address-Empty p {
+  font-size: 1rem;
+  margin-bottom: 16px;
+  color: var(--pf-text-muted);
+}
+
+.Profile-Address-Empty-Btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--pf-primary), var(--pf-primary-light));
+  color: var(--pf-white);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(236, 91, 19, 0.35);
+  transition: var(--pf-transition);
+}
+
+.Profile-Address-Empty-Btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(236, 91, 19, 0.45);
+}
+
 .Profile-Address-List {
   display: flex;
   flex-direction: column;
@@ -653,6 +767,25 @@
   color: var(--pf-text);
 }
 
+.AddressModal-BtnDelete {
+  padding: 14px 20px;
+  border: 2px solid #ef4444;
+  border-radius: 12px;
+  background: var(--pf-white);
+  color: #ef4444;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--pf-transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.AddressModal-BtnDelete:hover {
+  background: #ef4444;
+  color: var(--pf-white);
+}
+
 .AddressModal-BtnSave {
   padding: 14px 32px;
   border: none;
@@ -668,6 +801,173 @@
 .AddressModal-BtnSave:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(236, 91, 19, 0.45);
+}
+
+/* Modal Đổi mật khẩu - nhỏ gọn */
+.PasswordModal-Box {
+  background: var(--pf-white);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.PasswordModal-Header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--pf-border);
+  background: linear-gradient(135deg, var(--pf-primary), var(--pf-primary-light));
+  border-radius: 20px 20px 0 0;
+}
+
+.PasswordModal-Header .AddressModal-Title {
+  color: var(--pf-white);
+}
+
+.PasswordModal-Header .AddressModal-Back {
+  color: var(--pf-white);
+}
+
+.PasswordModal-Header .AddressModal-Back:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--pf-white);
+}
+
+.PasswordModal-Body {
+  padding: 28px 24px;
+}
+
+.PasswordModal-Field {
+  margin-bottom: 20px;
+}
+
+.PasswordModal-Field label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pf-text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.PasswordModal-InputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.PasswordModal-InputWrap input {
+  width: 100%;
+  height: 48px;
+  padding: 0 44px 0 44px;
+  border: 2px solid var(--pf-border);
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: var(--pf-transition);
+  background: var(--pf-bg);
+  line-height: 48px;
+}
+
+.PasswordModal-InputWrap input:focus {
+  outline: none;
+  border-color: var(--pf-primary);
+  background: var(--pf-white);
+  box-shadow: 0 0 0 4px rgba(236, 91, 19, 0.1);
+}
+
+.PasswordModal-InputWrap i {
+  position: absolute;
+  left: 14px;
+  color: var(--pf-text-muted);
+  font-size: 1rem;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.PasswordModal-PassToggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--pf-text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: var(--pf-transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.PasswordModal-PassToggle:hover {
+  color: var(--pf-primary);
+}
+
+.PasswordModal-Message {
+  text-align: center;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.PasswordModal-Error {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.PasswordModal-Success {
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.PasswordModal-Footer {
+  display: flex;
+  gap: 12px;
+  padding: 0 24px 24px;
+}
+
+.PasswordModal-Footer button {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--pf-transition);
+}
+
+.PasswordModal-BtnCancel {
+  background: var(--pf-bg);
+  border: 2px solid var(--pf-border);
+  color: var(--pf-text);
+}
+
+.PasswordModal-BtnCancel:hover {
+  background: var(--pf-border);
+}
+
+.PasswordModal-BtnSave {
+  background: linear-gradient(135deg, var(--pf-primary), var(--pf-primary-light));
+  border: none;
+  color: var(--pf-white);
+  box-shadow: 0 4px 15px rgba(236, 91, 19, 0.35);
+}
+
+.PasswordModal-BtnSave:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(236, 91, 19, 0.45);
+}
+
+.PasswordModal-BtnSave:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* Responsive */
@@ -861,4 +1161,62 @@
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* ── Ngày sinh - Date Picker ── */
+.Profile-Date-Input-Wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.Profile-Date-Text-Input {
+  width: 100%;
+  padding: 14px 60px 14px 18px !important;
+  border: 2px solid var(--pf-border);
+  border-radius: 12px;
+  font-size: 1rem;
+  background: var(--pf-bg);
+  transition: var(--pf-transition);
+  color: var(--pf-text);
+  letter-spacing: 0.5px;
+}
+
+.Profile-Date-Text-Input:focus {
+  outline: none;
+  border-color: var(--pf-primary);
+  background: var(--pf-white);
+  box-shadow: 0 0 0 4px rgba(236, 91, 19, 0.1);
+}
+
+.Profile-Date-Picker-Btn {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pf-primary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  z-index: 2;
+  transition: var(--pf-transition);
+}
+
+.Profile-Date-Picker-Btn:hover {
+  background: rgba(236, 91, 19, 0.1);
+  color: var(--pf-primary-light);
+}
+
+.Profile-Date-Picker-Hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
 }

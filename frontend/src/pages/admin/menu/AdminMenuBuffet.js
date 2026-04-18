@@ -99,7 +99,7 @@ export default function AdminMenuBuffet() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTERS[0]);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 6;
+  const pageSize = 5;
 
   const [createBuffetOpen, setCreateBuffetOpen] = useState(false);
   const [editBuffetId, setEditBuffetId] = useState(null);
@@ -727,53 +727,43 @@ export default function AdminMenuBuffet() {
   };
 
   return (
-    <div className="admin-menu-management">
-      {renderToast()}
-      {renderFormModal()}
-      {renderDetailModal()}
-
-      {/* Header */}
-      <div className="buffet-page-header">
-        <div className="buffet-page-header-left">
-          <h2 className="buffet-page-title">Quản lý Buffet</h2>
-          <p className="buffet-page-subtitle">Danh sách các gói buffet của nhà hàng</p>
-        </div>
-        <div className="buffet-page-header-right">
-          <button className="buffet-refresh-btn" onClick={() => loadData()} title="Làm mới">
-            <RefreshCw size={18} />
-          </button>
-          <button className="buffet-add-btn" onClick={openAddBuffet}>
-            <Plus size={18} /> Thêm Buffet
-          </button>
-        </div>
-      </div>
-
-      {/* Search & Filter */}
-      <div className="buffet-search-bar">
-        <div className="buffet-search-wrap">
+    <div className="menu-management-section">
+      {/* ── Toolbar ── */}
+      <div className="menu-section-toolbar">
+        <div className="buffet-search-wrap" style={{ flex: 1, maxWidth: 400 }}>
           <Search size={18} className="buffet-search-icon" />
           <input
             type="text"
             className="buffet-search-input"
+            style={{ width: '100%', padding: '0.625rem 1rem 0.625rem 2.75rem', border: '1px solid #e5e7eb', borderRadius: '0.5rem', fontSize: '0.875rem' }}
             placeholder="Tìm kiếm tên gói buffet..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
           />
         </div>
-        <div className="buffet-filter-tabs">
+        <div className="menu-filters">
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
-              className={`buffet-filter-tab ${statusFilter === s ? 'active' : ''}`}
+              type="button"
+              className={`menu-filter-btn ${statusFilter === s ? 'active' : ''}`}
               onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
             >
               {s}
             </button>
           ))}
         </div>
+        <button type="button" className="menu-btn-primary" onClick={openAddBuffet}>
+          <Plus size={18} />
+          Thêm Buffet
+        </button>
       </div>
 
-      {/* Grid Cards */}
+      {renderToast()}
+      {renderFormModal()}
+      {renderDetailModal()}
+
+      {/* ── Card Grid ── */}
       <div className="buffet-grid-container">
         {loading ? (
           <div className="buffet-loading-state">
@@ -871,41 +861,49 @@ export default function AdminMenuBuffet() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="buffet-pagination">
-                <button
-                  className="buffet-page-btn"
-                  disabled={safePage <= 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                >
-                  ‹
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
-                  .reduce((acc, p, idx, arr) => {
-                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((p, i) =>
-                    p === '...' ? (
-                      <span key={`ellipsis-${i}`} className="buffet-page-ellipsis">…</span>
-                    ) : (
-                      <button
-                        key={p}
-                        className={`buffet-page-btn ${safePage === p ? 'active' : ''}`}
-                        onClick={() => setCurrentPage(p)}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                <button
-                  className="buffet-page-btn"
-                  disabled={safePage >= totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                >
-                  ›
-                </button>
+              <div className="menu-pagination">
+                <span>
+                  Hiển thị {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)} / {filtered.length} buffet
+                </span>
+                <div className="menu-pagination-btns">
+                  <button
+                    type="button"
+                    className="menu-page-btn"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  >
+                    ‹
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                    .reduce((acc, p, idx, arr) => {
+                      if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) =>
+                      p === '...' ? (
+                        <span key={`ellipsis-${i}`} className="menu-page-ellipsis">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`menu-page-btn ${safePage === p ? 'active' : ''}`}
+                          onClick={() => setCurrentPage(p)}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+                  <button
+                    type="button"
+                    className="menu-page-btn"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    ›
+                  </button>
+                </div>
               </div>
             )}
           </>

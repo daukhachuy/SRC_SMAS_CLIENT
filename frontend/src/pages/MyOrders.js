@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { myOrderAPI } from '../api/myOrderApi';
 import OrderDetailModal from './OrderDetailModal';
 import EventOrderDetailModal from './EventOrderDetailModal';
@@ -78,11 +79,14 @@ const isForHistory = (status) => ['Completed', 'Cancelled', 'Cancel'].includes(s
 const DELIVERY_API_STATUSES = ['Pending', 'Confirmed'];
 
 const MyOrders = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('Delivery');
   /** Lọc phụ tab Giao hàng: all | Pending | Confirm */
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('all');
   /** Lọc phụ tab Đặt chỗ: all | 1-Pending | 2-Confirmed | 3-Cancelled | 4-Seated */
   const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
+  /** Lọc phụ tab Sự kiện: all | pending | approved | active | completed | cancelled | rejected */
+  const [eventStatusFilter, setEventStatusFilter] = useState('all');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -114,6 +118,28 @@ const MyOrders = () => {
     if (str === 'Completed' || str === 'Complete') return { text: 'Hoàn thành', class: 'Success' };
     if (str === 'Processing') return { text: 'Đang xử lý', class: 'Processing' };
     return { text: 'Chờ xác nhận', class: 'Waiting' };
+  };
+
+  const getEventStatusDisplay = (status) => {
+    const s = String(status ?? '').trim().toLowerCase();
+    if (s === 'approved') return { text: 'Đã duyệt', class: 'Processing' };
+    if (s === 'rejected') return { text: 'Đã từ chối', class: 'Cancelled' };
+    if (s === 'active') return { text: 'Đang hoạt động', class: 'Processing' };
+    if (s === 'cancelled' || s === 'cancel') return { text: 'Đã hủy', class: 'Cancelled' };
+    if (s === 'completed') return { text: 'Hoàn thành', class: 'Success' };
+    return { text: 'Chờ duyệt', class: 'Waiting' };
+  };
+
+  const reloadEventOrders = async () => {
+    try {
+      const data = await myOrderAPI.getMyBookEvents();
+      const raw = Array.isArray(data) ? data : [];
+      setEventsData(raw);
+      setReservations([]);
+      setOrders([]);
+    } catch {
+      setEventsData([]);
+    }
   };
 
   const fetchOrders = async () => {
@@ -153,8 +179,63 @@ const MyOrders = () => {
     setCurrentPage(1);
     setDeliveryStatusFilter('all');
     setBookingStatusFilter('all');
+    setEventStatusFilter('all');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
+
+  useEffect(() => {
+    const tab = String(searchParams.get('tab') || '').trim().toLowerCase();
+    if (tab === 'event') setActiveTab('Event');
+  }, [searchParams]);
+
+  useEffect(() => {
+    const payment = String(searchParams.get('payment') || '').trim().toLowerCase();
+    if (!payment) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('payment');
+    nextParams.set('tab', 'event');
+    nextParams.delete('bookEventId');
+    setSearchParams(nextParams, { replace: true });
+    setActiveTab('Event');
+
+    const show = (title, message, variant = 'info') => {
+      setCustomerNotice({ kind: 'alert', title, message, variant });
+    };
+
+    if (payment === 'success') {
+      show('Thanh toán cọc thành công', 'Nhà hàng đã ghi nhận tiền đặt cọc của bạn.', 'success');
+      reloadEventOrders();
+      return;
+    }
+    if (payment === 'cancel') {
+      show('Bạn đã hủy thanh toán', 'Bạn có thể thực hiện lại thanh toán đặt cọc khi cần.', 'warning');
+      reloadEventOrders();
+      return;
+    }
+    if (payment === 'error') {
+      show('Thanh toán thất bại', 'Có lỗi xảy ra, vui lòng thử lại.', 'danger');
+      reloadEventOrders();
+      return;
+    }
+    if (payment === 'pending_verify') {
+      show('Đang xử lý thanh toán', 'PayOS đang xác nhận giao dịch. Hệ thống sẽ tự làm mới sau vài giây.', 'info');
+      setTimeout(() => {
+        reloadEventOrders();
+      }, 4000);
+      return;
+    }
+    if (payment === 'contract_invalid') {
+      show('Hợp đồng không hợp lệ', 'Hợp đồng đã bị hủy hoặc không còn ở trạng thái Đã ký.', 'warning');
+      reloadEventOrders();
+      return;
+    }
+    if (payment === 'expired') {
+      show('Đã hết hạn thanh toán cọc', 'Vui lòng liên hệ nhà hàng để được hỗ trợ tiếp theo.', 'warning');
+      reloadEventOrders();
+      return;
+    }
+  }, [searchParams, setSearchParams]);
 
   /* ── Filter Đặt chỗ → gọi lại API kèm status ── */
   useEffect(() => {
@@ -180,16 +261,26 @@ const MyOrders = () => {
     if (activeTab !== 'Delivery') return;
 
     const poll = async () => {
-      const latest = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
-      const fresh = Array.isArray(latest) ? latest : [];
-      setOrders((prev) => {
-        if (fresh.length === 0) return prev;
-        const cancelledIds = new Set(
-          fresh.filter((o) => o.orderStatus === 'Cancelled').map((o) => o.orderId)
-        );
-        if (cancelledIds.size === 0) return fresh;
-        return fresh.filter((o) => !cancelledIds.has(o.orderId));
-      });
+      try {
+        const latest = await myOrderAPI.getOrders(activeTab, DELIVERY_API_STATUSES);
+        const fresh = Array.isArray(latest) ? latest : [];
+        setOrders((prev) => {
+          if (fresh.length === 0) return prev;
+          const cancelledIds = new Set(
+            fresh.filter((o) => o.orderStatus === 'Cancelled').map((o) => o.orderId)
+          );
+          if (cancelledIds.size === 0) return fresh;
+          return fresh.filter((o) => !cancelledIds.has(o.orderId));
+        });
+      } catch (err) {
+        // Polling chạy nền: khi mất mạng tạm thời thì giữ danh sách hiện tại, tránh văng lỗi runtime.
+        const isNetworkError = !err?.response;
+        if (isNetworkError) {
+          console.warn('[MyOrders] Poll skipped due to network issue.');
+        } else {
+          console.warn('[MyOrders] Poll failed:', err?.response?.status || err?.message);
+        }
+      }
     };
 
     const intervalId = setInterval(poll, 15_000); // 15s
@@ -220,9 +311,15 @@ const MyOrders = () => {
     return normalizeReservationStatusNum(res) === want;
   };
 
+  const matchesEventStatusFilter = (ev) => {
+    if (eventStatusFilter === 'all') return true;
+    const st = String(ev?.effectiveStatus || ev?.status || ev?.bookingStatus || '').trim().toLowerCase();
+    return st === eventStatusFilter;
+  };
+
   const filteredData = allData
     .map((item) => {
-      const withEffective = applyAutoCancel(item);
+      const withEffective = activeTab === 'Event' ? item : applyAutoCancel(item);
       const eff = withEffective.effectiveStatus ?? withEffective.orderStatus ?? withEffective.status;
       return { ...withEffective, _isHistory: isForHistory(eff) };
     })
@@ -231,6 +328,7 @@ const MyOrders = () => {
     .filter((item) => {
       if (activeTab === 'Delivery' && !matchesDeliveryStatusFilter(item)) return false;
       if (activeTab === 'Booking' && !matchesBookingStatusFilter(item)) return false;
+      if (activeTab === 'Event' && !matchesEventStatusFilter(item)) return false;
       if (!searchQuery.trim()) return true;
       const query = searchQuery.toLowerCase().trim();
       const code = item.orderCode || item.reservationCode || item.eventBookingCode || item.bookingCode || '';
@@ -306,6 +404,42 @@ const MyOrders = () => {
 
   const getEventBookingCode = (ev) =>
     String(ev?.bookingCode || ev?.eventBookingCode || ev?.raw?.bookingCode || '').trim();
+
+  const getEventContractStatus = (ev) =>
+    String(
+      ev?.contractStatus
+      || ev?.contract?.status
+      || ev?.raw?.contractStatus
+      || ev?.raw?.contract?.status
+      || ''
+    ).trim().toLowerCase();
+
+  const getContractStatusDisplay = (ev) => {
+    const s = getEventContractStatus(ev);
+    if (s === 'draft') return { text: 'Bản nháp', class: 'Waiting' };
+    if (s === 'sent') return { text: 'Đã gửi', class: 'Processing' };
+    if (s === 'signed') return { text: 'Đã ký', class: 'Success' };
+    if (s === 'deposited' || s === 'deposit') return { text: 'Đã đặt cọc', class: 'Success' };
+    if (s === 'cancelled' || s === 'canceled' || s === 'cancel') return { text: 'Đã hủy', class: 'Cancelled' };
+    return { text: 'Chưa có HĐ', class: 'Contract-None' };
+  };
+
+  const canPayEventDeposit = (ev) => {
+    const signedAt =
+      ev?.signedAt
+      || ev?.contractSignedAt
+      || ev?.contract?.signedAt
+      || ev?.raw?.signedAt
+      || ev?.raw?.contract?.signedAt;
+
+    const contractStatus = getEventContractStatus(ev);
+    const eventStatus = String(ev?.effectiveStatus || ev?.status || ev?.bookingStatus || '').trim().toLowerCase();
+
+    if (['deposited', 'deposit', 'completed', 'cancelled', 'canceled'].includes(contractStatus)) return false;
+    if (['active', 'completed', 'cancelled', 'rejected'].includes(eventStatus)) return false;
+    if (contractStatus === 'signed') return true;
+    return Boolean(signedAt);
+  };
 
   /** Lấy checkoutUrl từ body JSON (có thể lồng data). */
   const pickDepositCheckoutUrl = (payload) => {
@@ -418,9 +552,11 @@ const MyOrders = () => {
   };
 
   const renderEventCard = (ev) => {
-    const status = getStatusDisplay(ev.effectiveStatus || ev.status || ev.bookingStatus || '');
+    const status = getEventStatusDisplay(ev.effectiveStatus || ev.status || ev.bookingStatus || '');
+    const contractStatus = getContractStatusDisplay(ev);
     const isAutoCancelled = ev.autoCancelled && ev.effectiveStatus === 'Cancelled';
     const eventBookingId = ev.eventBookingId || ev.bookEventId || ev.id;
+    const canShowDepositButton = canPayEventDeposit(ev);
     return (
       <div key={ev.eventBookingId || ev.id} className="Order-Horizontal-Card">
         <div className="Card-Top-Row">
@@ -438,6 +574,9 @@ const MyOrders = () => {
               {status.text}
               {isAutoCancelled && <span style={{ fontSize: '0.75em', marginLeft: 4 }}>(quá hạn)</span>}
             </div>
+            <button type="button" className={`Status-Label Contract-Status-Btn ${contractStatus.class}`}>
+              {contractStatus.text}
+            </button>
             <button
               className="Btn-View-Detail"
               onClick={() => {
@@ -461,14 +600,16 @@ const MyOrders = () => {
           <div className="Grid-Col Total-Col">
             <p>SỐ KHÁCH</p>
             <h2 className="Price-Text">{(ev.numberOfGuests || ev.guestCount || 0)} người</h2>
-            <button
-              type="button"
-              className="Btn-Deposit-Pay"
-              onClick={() => handlePayEventDeposit(ev)}
-              disabled={payingEventId === eventBookingId}
-            >
-              {payingEventId === eventBookingId ? 'ĐANG MỞ...' : 'THANH TOÁN ĐẶT CỌC'}
-            </button>
+            {canShowDepositButton && (
+              <button
+                type="button"
+                className="Btn-Deposit-Pay"
+                onClick={() => handlePayEventDeposit(ev)}
+                disabled={payingEventId === eventBookingId}
+              >
+                {payingEventId === eventBookingId ? 'ĐANG MỞ...' : 'THANH TOÁN ĐẶT CỌC'}
+              </button>
+            )}
           </div>
         </div>
         {(ev.specialRequests || ev.note) && (
@@ -599,6 +740,18 @@ const MyOrders = () => {
           <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '2' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('2'); setCurrentPage(1); }}>Đã xác nhận</button>
           <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '4' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('4'); setCurrentPage(1); }}>Đã đến</button>
           <button type="button" className={`Order-Tab-Btn ${bookingStatusFilter === '3' ? 'Active' : ''}`} onClick={() => { setBookingStatusFilter('3'); setCurrentPage(1); }}>Hủy</button>
+        </div>
+      )}
+
+      {activeTab === 'Event' && (
+        <div className="Order-Tabs-Container Delivery-Sub-Filters" role="group" aria-label="Lọc trạng thái sự kiện">
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'all' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('all'); setCurrentPage(1); }}>Tất cả</button>
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'pending' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('pending'); setCurrentPage(1); }}>Chờ duyệt</button>
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'approved' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('approved'); setCurrentPage(1); }}>Đã duyệt</button>
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'active' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('active'); setCurrentPage(1); }}>Đang hoạt động</button>
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'completed' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('completed'); setCurrentPage(1); }}>Hoàn thành</button>
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'cancelled' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('cancelled'); setCurrentPage(1); }}>Đã hủy</button>
+          <button type="button" className={`Order-Tab-Btn ${eventStatusFilter === 'rejected' ? 'Active' : ''}`} onClick={() => { setEventStatusFilter('rejected'); setCurrentPage(1); }}>Đã từ chối</button>
         </div>
       )}
 

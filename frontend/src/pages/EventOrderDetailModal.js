@@ -42,17 +42,17 @@ const fmtTime = (timeStr) => {
 };
 
 const STATUS_CONFIG = {
-  'Pending':    { text: 'Chờ xác nhận', class: 'Pending', bg: '#FFF3E0', color: '#F39C12' },
-  'Confirmed':   { text: 'Đã xác nhận', class: 'Confirmed', bg: '#E3F2FD', color: '#1976D2' },
-  'Signed':     { text: 'Đã ký hợp đồng', class: 'Success', bg: '#E8F5E9', color: '#27AE60' },
-  'Completed':  { text: 'Hoàn thành', class: 'Success', bg: '#E8F5E9', color: '#27AE60' },
-  'Cancelled':  { text: 'Đã hủy', class: 'Cancelled', bg: '#FFEBEE', color: '#FF3B30' },
-  'Deposit':    { text: 'Chờ đặt cọc', class: 'Pending', bg: '#FFF3E0', color: '#F39C12' },
-  'Active':     { text: 'Đang hoạt động', class: 'Processing', bg: '#E3F2FD', color: '#1976D2' },
+  pending:    { text: 'Chờ duyệt', class: 'Pending', bg: '#FFF3E0', color: '#F39C12' },
+  approved:   { text: 'Đã duyệt', class: 'Confirmed', bg: '#E3F2FD', color: '#1976D2' },
+  rejected:   { text: 'Đã từ chối', class: 'Cancelled', bg: '#FFEBEE', color: '#FF3B30' },
+  completed:  { text: 'Hoàn thành', class: 'Success', bg: '#E8F5E9', color: '#27AE60' },
+  cancelled:  { text: 'Đã hủy', class: 'Cancelled', bg: '#FFEBEE', color: '#FF3B30' },
+  active:     { text: 'Đang hoạt động', class: 'Processing', bg: '#E3F2FD', color: '#1976D2' },
 };
 
 const getStatusConfig = (status) => {
-  return STATUS_CONFIG[status] || STATUS_CONFIG['Pending'];
+  const key = String(status || 'pending').trim().toLowerCase();
+  return STATUS_CONFIG[key] || STATUS_CONFIG.pending;
 };
 
 const formatCurrency = (amount) => {

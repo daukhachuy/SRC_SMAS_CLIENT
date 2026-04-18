@@ -20,7 +20,7 @@
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 10px 1rem 1rem 1rem;
+  padding: 0 1rem 1rem 1rem;
   background-color: var(--Bg-Body);
   min-height: 100vh;
   box-sizing: border-box;
@@ -256,6 +256,18 @@
   color: #1976D2;
 }
 
+.Status-Label.Contract-None {
+  background: #EEF2F7;
+  color: #64748B;
+}
+
+.Contract-Status-Btn {
+  border: none;
+  text-transform: none;
+  cursor: default;
+  white-space: nowrap;
+}
+
 .Status-Label.Cancel {
   background: #FFEBEE;
   color: var(--Danger-Red);
@@ -282,7 +294,7 @@
 /* Grid nội dung - compact */
 .Card-Main-Grid {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 12px 16px;
   margin-bottom: 0;
   padding-top: 12px;
