@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import { contractAPI, createBookEventContract, eventBookingAPI } from '../../api/managerApi';
-import { getRestaurantInfo } from '../../api/homeApi';
+import { downloadContractPdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import { 
   ArrowLeft, FileText, ShieldCheck, Building2, User,
   CheckCircle, Download, Edit3
@@ -11,10 +11,13 @@ import '../../styles/ContractSigningPage.css';
 
 const DEFAULT_CREATE_TERMS = [
   'Bên B thanh toán đặt cọc theo tỷ lệ đã thỏa thuận trong vòng 24 giờ kể từ khi nhận hợp đồng.',
-  'Mọi thay đổi về số lượng khách phải được thông báo trước tối thiểu 48 giờ.',
+  'Mọi thay đổi về số lượng bàn phải được thông báo trước tối thiểu 48 giờ.',
   'Hai bên phối hợp xác nhận lại danh mục món ăn/dịch vụ trước ngày tổ chức 03 ngày.',
   'Chi phí phát sinh ngoài phạm vi hợp đồng sẽ được xác nhận bằng phụ lục hoặc biên bản bổ sung.',
 ].join('\n');
+
+const PARTY_A_RESTAURANT_NAME = 'NHÀ HÀNG SMAS';
+const PARTY_A_RESTAURANT_ADDRESS = '123 Võ Nguyên Giáp, Đà Nẵng';
 
 const createInitialContractData = () => ({
   contractNumericId: null,
@@ -23,8 +26,8 @@ const createInitialContractData = () => ({
   statusText: 'Nháp',
   bookingCode: '',
   partyA: {
-    name: 'Nhà hàng Gourmet Luxury',
-    address: 'Chưa cập nhật',
+    name: PARTY_A_RESTAURANT_NAME,
+    address: PARTY_A_RESTAURANT_ADDRESS,
     representative: 'Chưa cập nhật',
     position: 'Quản lý',
     signed: false,
@@ -42,9 +45,9 @@ const createInitialContractData = () => ({
     date: '--/--/----',
     time: '--:--',
     tables: 0,
-    guestsPerTable: 10,
   },
   menu: [],
+  menuArticle2: { foods: [], services: [] },
   payment: {
     total: 0,
     depositPercent: 30,
@@ -52,15 +55,6 @@ const createInitialContractData = () => ({
   },
   cancellation: [],
 });
-
-const firstNonEmptyString = (...values) => {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return '';
-};
 
 const ContractSigningPage = () => {
   const { base, homePath } = useRoleSectionBasePath();
@@ -80,6 +74,7 @@ const ContractSigningPage = () => {
   });
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
   const [sendingDepositRequest, setSendingDepositRequest] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const [contractData, setContractData] = useState(createInitialContractData);
 
@@ -182,26 +177,6 @@ const ContractSigningPage = () => {
         const eventInfo = detail?.eventInfo || {};
         const confirmedBy = detail?.confirmedBy || {};
         const detailPayment = detail?.payment || {};
-        let restaurantInfo = null;
-        try {
-          restaurantInfo = await getRestaurantInfo();
-        } catch (restaurantErr) {
-          console.warn('Không lấy được thông tin nhà hàng từ public info:', restaurantErr?.message || restaurantErr);
-        }
-
-        const restaurantName = firstNonEmptyString(
-          contract?.restaurantName,
-          contract?.restaurant?.name,
-          detail?.restaurantName,
-          detail?.restaurant?.name,
-          detail?.restaurant?.title,
-          eventInfo?.restaurantName,
-          restaurantInfo?.restaurantName,
-          restaurantInfo?.name,
-          restaurantInfo?.title,
-          'Nhà hàng FPT'
-        );
-
         const rawStatus = String(contract?.status || detail?.status || 'draft').toLowerCase();
         const total = toNum(detailPayment?.totalAmount ?? contract?.totalAmount ?? contract?.amount, 0);
         const deposit = toNum(detailPayment?.depositAmount ?? contract?.depositAmount, 0);
@@ -210,15 +185,7 @@ const ContractSigningPage = () => {
 
         const foods = Array.isArray(detail?.foods) ? detail.foods : [];
         const services = Array.isArray(detail?.services) ? detail.services : [];
-        const mergedMenu = [
-          ...foods.map((x) => ({ name: x?.name || 'Món ăn', category: 'Món ăn' })),
-          ...services.map((x) => ({ name: x?.name || 'Dịch vụ', category: 'Dịch vụ' })),
-        ];
 
-        const guests = toNum(
-          eventInfo?.numberOfGuests ?? eventInfo?.guestCount ?? detail?.numberOfGuests,
-          0
-        );
         const explicitTablesRaw =
           eventInfo?.numberOfTables ??
           eventInfo?.tableCount ??
@@ -227,11 +194,62 @@ const ContractSigningPage = () => {
           detail?.tableCount ??
           detail?.numberTable;
         const explicitTables = toNum(explicitTablesRaw, 0);
-        const inferredTablesFromGuests = guests > 0 ? Math.max(1, Math.round(guests / 10)) : 0;
-        const tables = explicitTables > 0 ? explicitTables : inferredTablesFromGuests;
-        const guestsPerTable = guests > 0 && tables > 0
-          ? Math.max(1, Math.round(guests / tables))
-          : 10;
+        const legacyTableCount = toNum(
+          eventInfo?.numberOfGuests ?? eventInfo?.guestCount ?? detail?.numberOfGuests,
+          0
+        );
+        const tables = explicitTables > 0 ? explicitTables : legacyTableCount;
+
+        const mergedMenu = [
+          ...foods.map((x) => ({ name: x?.name || 'Món ăn', category: 'Món ăn' })),
+          ...services.map((x) => ({ name: x?.name || 'Dịch vụ', category: 'Dịch vụ' })),
+        ];
+
+        const fmtInt = (n) =>
+          new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(Number(n) || 0)));
+
+        const menuArticle2Foods = foods.map((x) => {
+          const name = x?.name || x?.foodName || 'Món ăn';
+          const unit = toNum(x?.unitPrice ?? x?.price ?? x?.Price, 0);
+          const q = toNum(x?.quantity ?? x?.qty ?? x?.Quantity, 1);
+          const tableCount = Math.max(0, tables);
+          const lineAmount =
+            unit > 0 && q > 0
+              ? Math.round(unit * q * (tableCount > 0 ? tableCount : 1))
+              : toNum(x?.subtotal ?? x?.lineTotal ?? x?.Subtotal, 0);
+          const detailText =
+            unit > 0 && q > 0
+              ? tableCount > 0
+                ? `( ${fmtInt(unit)} × ${q} × ${tableCount} bàn )`
+                : `( ${fmtInt(unit)} × ${q} )`
+              : '';
+          return { name, detailText, typeLabel: 'Món', lineAmount };
+        });
+
+        const menuArticle2Services = services.map((x) => {
+          const name = x?.name || x?.serviceName || 'Dịch vụ';
+          const unit = toNum(x?.unitPrice ?? x?.price ?? x?.Price, 0);
+          const qty = toNum(x?.quantity ?? x?.qty ?? x?.Quantity, 1);
+          const hours = toNum(x?.hours, 0);
+          const pricingStr = String(x?.pricingMode || x?.pricingType || x?.unit || '').toLowerCase();
+          const isHourly =
+            hours > 0 ||
+            pricingStr.includes('hour') ||
+            pricingStr.includes('gio') ||
+            pricingStr.includes('giờ');
+          let line = toNum(x?.subtotal ?? x?.lineTotal ?? x?.total ?? x?.Subtotal, 0);
+          if (line <= 0 && unit > 0) {
+            line = unit * (isHourly && hours > 0 ? hours : qty);
+          }
+          let detailText = '';
+          if (isHourly && unit > 0) {
+            const h = hours > 0 ? hours : qty;
+            detailText = `( ${h} Giờ × ${fmtInt(unit)} )`;
+          } else if (unit > 0 && qty > 0) {
+            detailText = `( ${fmtInt(unit)} × ${qty} )`;
+          }
+          return { name, detailText, typeLabel: 'DV', lineAmount: line };
+        });
 
         const terms = contract?.termsAndConditions || detail?.contract?.termsAndConditions || DEFAULT_CREATE_TERMS;
         const cancellation = terms
@@ -252,8 +270,8 @@ const ContractSigningPage = () => {
           status: rawStatus,
           statusText: statusLabel[rawStatus] || contract?.status || detail?.status || 'Nháp',
           partyA: {
-            name: restaurantName,
-            address: 'Chưa cập nhật',
+            name: PARTY_A_RESTAURANT_NAME,
+            address: PARTY_A_RESTAURANT_ADDRESS,
             representative: confirmedBy?.fullName || 'Chưa cập nhật',
             position: 'Quản lý',
             signed: Boolean(signedAt),
@@ -271,9 +289,9 @@ const ContractSigningPage = () => {
             date: dt.date,
             time: dt.time,
             tables,
-            guestsPerTable,
           },
           menu: mergedMenu,
+          menuArticle2: { foods: menuArticle2Foods, services: menuArticle2Services },
           payment: {
             total,
             deposit,
@@ -304,8 +322,21 @@ const ContractSigningPage = () => {
     setIsSignaturePadOpen(true);
   };
 
-  const handleDownloadPDF = () => {
-    alert('Tính năng tải PDF đang được phát triển');
+  const handleDownloadPDF = async () => {
+    const code = String(contractData.contractId || '').trim();
+    if (!code || code === '--') {
+      alert('Chưa có mã hợp đồng để tải PDF.');
+      return;
+    }
+    setDownloadingPdf(true);
+    try {
+      await downloadContractPdf(code);
+    } catch (e) {
+      const msg = await getPdfErrorMessage(e);
+      alert(msg || 'Tải PDF hợp đồng thất bại.');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const handleSendToCustomerSign = () => {
@@ -407,7 +438,7 @@ const ContractSigningPage = () => {
     setCreatingContract(true);
     try {
       await createBookEventContract(Number(eventId), {
-        depositPercent: Number(createForm.depositPercent) || 0,
+        depositPercent: Math.min(100, Math.max(0, Number(createForm.depositPercent) || 0)),
         termsAndConditions: createForm.termsAndConditions,
         note: createForm.note,
       });
@@ -472,10 +503,12 @@ const ContractSigningPage = () => {
           {!isPendingCreate && (
             <button 
               className="btn-download-pdf"
+              type="button"
+              disabled={downloadingPdf}
               onClick={handleDownloadPDF}
             >
               <Download size={18} />
-              Tải bản nháp PDF
+              {downloadingPdf ? 'Đang tải PDF…' : 'Tải PDF hợp đồng'}
             </button>
           )}
         </div>
@@ -566,38 +599,74 @@ const ContractSigningPage = () => {
               <div className="event-detail-card">
                 <p className="card-label">Số lượng bàn</p>
                 <p className="card-value">
-                  {contractData.event.tables} Bàn ({contractData.event.guestsPerTable} người/bàn)
+                  {contractData.event.tables} bàn
                 </p>
               </div>
             </div>
           </section>
 
-          {/* Section 2: Menu */}
+          {/* Section 2: Điều 2 — Thực đơn & dịch vụ (bố cục giống văn bản hợp đồng) */}
           <section className="contract-section">
             <h4 className="section-title">
               <span className="section-number">2</span>
-              Thực đơn đã chọn
+              Chi tiết thực đơn và dịch vụ
             </h4>
-            <div className="menu-table-wrapper">
-              <table className="menu-table">
+            <div className="contract-article2-table-wrap">
+              <table className="contract-article2-table">
                 <thead>
-                  <tr>
-                    <th>Món ăn</th>
-                    <th>Loại món</th>
+                  <tr className="contract-article2-thead-cols">
+                    <th className="contract-article2-th-content">Nội dung</th>
+                    <th className="contract-article2-th-type">Loại</th>
+                    <th className="contract-article2-th-amount">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {contractData.menu.length === 0 && (
+                  {contractData.menuArticle2.foods.length === 0 &&
+                    contractData.menuArticle2.services.length === 0 && (
                     <tr>
-                      <td colSpan="2" className="menu-item-category">Chưa có dữ liệu món ăn/dịch vụ</td>
+                      <td colSpan={3} className="contract-article2-empty">
+                        Chưa có dữ liệu món ăn/dịch vụ
+                      </td>
                     </tr>
                   )}
-                  {contractData.menu.map((item, index) => (
-                    <tr key={index}>
-                      <td className="menu-item-name">{item.name}</td>
-                      <td className="menu-item-category">{item.category}</td>
-                    </tr>
-                  ))}
+                  {contractData.menuArticle2.foods.length > 0 && (
+                    <>
+                      <tr className="contract-article2-subhead">
+                        <td colSpan={3}>A. THỰC ĐƠN (tính theo bàn)</td>
+                      </tr>
+                      {contractData.menuArticle2.foods.map((row, index) => (
+                        <tr key={`f-${index}`}>
+                          <td className="contract-article2-content">
+                            <div className="contract-article2-name">{row.name}</div>
+                            {row.detailText ? (
+                              <div className="contract-article2-detail">{row.detailText}</div>
+                            ) : null}
+                          </td>
+                          <td className="contract-article2-type">{row.typeLabel}</td>
+                          <td className="contract-article2-amount">{formatCurrency(row.lineAmount)}</td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                  {contractData.menuArticle2.services.length > 0 && (
+                    <>
+                      <tr className="contract-article2-subhead">
+                        <td colSpan={3}>B. DỊCH VỤ</td>
+                      </tr>
+                      {contractData.menuArticle2.services.map((row, index) => (
+                        <tr key={`s-${index}`}>
+                          <td className="contract-article2-content">
+                            <div className="contract-article2-name">{row.name}</div>
+                            {row.detailText ? (
+                              <div className="contract-article2-detail">{row.detailText}</div>
+                            ) : null}
+                          </td>
+                          <td className="contract-article2-type">{row.typeLabel}</td>
+                          <td className="contract-article2-amount">{formatCurrency(row.lineAmount)}</td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -622,12 +691,30 @@ const ContractSigningPage = () => {
                 </label>
                 <label style={{ fontWeight: 600 }}>
                   Tỉ lệ đặt cọc (%)
+                  {/* Tạm: min 0 để test; khi production cần sàn 30% thì đổi min/onBlur/handleCreate về 30 */}
                   <input
                     type="number"
                     min={0}
                     max={100}
+                    step={1}
                     value={createForm.depositPercent}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, depositPercent: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setCreateForm((prev) => ({ ...prev, depositPercent: 0 }));
+                        return;
+                      }
+                      const n = Number(raw);
+                      if (!Number.isFinite(n)) return;
+                      setCreateForm((prev) => ({ ...prev, depositPercent: n }));
+                    }}
+                    onBlur={() => {
+                      setCreateForm((prev) => {
+                        const n = Number(prev.depositPercent);
+                        const v = !Number.isFinite(n) ? 0 : Math.min(100, Math.max(0, n));
+                        return { ...prev, depositPercent: v };
+                      });
+                    }}
                     style={{ width: '100%', marginTop: 6, padding: '10px 12px', borderRadius: 10, border: '1px solid #d8dee9' }}
                   />
                 </label>
@@ -647,9 +734,17 @@ const ContractSigningPage = () => {
                     <span className="payment-amount">{formatCurrency(contractData.payment.total)}</span>
                   </div>
                   <div className="payment-deposit">
-                    <span className="deposit-label">Tiền đặt cọc ({createForm.depositPercent}%):</span>
+                    <span className="deposit-label">
+                      Tiền đặt cọc ({Math.min(100, Math.max(0, Number(createForm.depositPercent) || 0))}%):
+                    </span>
                     <span className="deposit-amount">
-                      {formatCurrency(Math.round((contractData.payment.total || 0) * (Number(createForm.depositPercent) || 0) / 100))}
+                      {formatCurrency(
+                        Math.round(
+                          ((contractData.payment.total || 0) *
+                            Math.min(100, Math.max(0, Number(createForm.depositPercent) || 0))) /
+                            100
+                        )
+                      )}
                     </span>
                   </div>
                 </div>

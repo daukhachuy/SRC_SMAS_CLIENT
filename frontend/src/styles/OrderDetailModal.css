@@ -277,6 +277,28 @@
   color: #16a34a;
 }
 
+.od-btn-invoice {
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 108, 31, 0.45);
+  background: #fff;
+  font-weight: 700;
+  color: #c2410c;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.od-btn-invoice:hover:not(:disabled) {
+  background: #fff7ed;
+}
+
+.od-btn-invoice:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .od-btn-secondary {
   padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;

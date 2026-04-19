@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/Services.css';
-import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, Users, UtensilsCrossed, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, Bell, Star, Sparkles, AlertTriangle, CircleCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, User, Phone, Mail, UtensilsCrossed, FileText, ChevronDown, List, Check, ShieldCheck, Headphones, Utensils, Bell, Star, Sparkles, AlertTriangle, CircleCheck } from 'lucide-react';
 import { getProfile } from '../api/userApi';
 import { createReservation } from '../api/homeApi';
 import { eventBookingAPI, serviceAPI, EVENT_TYPES_LIST } from '../api/managerApi';
@@ -16,6 +16,7 @@ import AuthRequiredModal from '../components/AuthRequiredModal';
 import AddDishModal from '../components/AddDishModal';
 import FoodListModal from '../components/FoodListModal';
 import ComboListModal from '../components/ComboListModal';
+import { ORDER_VAT_RATE } from '../constants/orderPricing';
 
 /** Tháng lịch hiển thị T2–CN: trả về mảng (null ô trống | Date). month: 0–11 */
 function getMonthDays(year, month) {
@@ -80,7 +81,6 @@ const Services = () => {
     email: '',
     phone: '',
     numTables: '1',
-    numGuests: '10',
     note: ''
   });
   const [bookingForm, setBookingForm] = useState({
@@ -140,7 +140,6 @@ const Services = () => {
   const bookingGuestsRef = useRef(null);
   const eventTypeChipsRef = useRef(null);
   const eventTimeGridRef = useRef(null);
-  const eventGuestsRef = useRef(null);
   const eventTablesRef = useRef(null);
   const eventFullNameRef = useRef(null);
   const eventPhoneRef = useRef(null);
@@ -258,15 +257,19 @@ const Services = () => {
         const imageBase = apiUrl.replace(/\/api\/?$/, '') || window.location.origin;
         const mapped = (Array.isArray(list) ? list : [])
           .filter((e) => e.isActive !== false)
-          .map((e) => ({
-            id: e.eventId ?? e.id,
+          .map((e) => {
+            const rawId = e.eventId ?? e.EventId ?? e.id ?? e.Id;
+            const numId = Number(rawId);
+            return {
+            id: Number.isFinite(numId) && numId > 0 ? numId : rawId,
             title: e.title || '',
             description: e.description || '',
             isActive: e.isActive,
             image: e.image
               ? (e.image.startsWith('http') ? e.image : imageBase + (e.image.startsWith('/') ? e.image : `/${e.image}`))
               : 'https://images.unsplash.com/photo-1519671482677-76ce3692eb04?auto=format&fit=crop&q=80&w=400',
-          }));
+          };
+          });
         setShowcaseEventsFromApi(mapped);
       } catch (err) {
         console.warn('[Services] Failed to load events for showcase:', err);
@@ -560,10 +563,6 @@ const Services = () => {
       scrollToTarget(eventPhoneRef, true);
       return;
     }
-    if (lower.includes('khách')) {
-      scrollToTarget(eventGuestsRef, true);
-      return;
-    }
     if (lower.includes('số lượng bàn')) {
       scrollToTarget(eventTablesRef, true);
       return;
@@ -692,12 +691,18 @@ const Services = () => {
   // Event Types - từ GET /api/events, chỉ lấy isActive === true
   const eventTypes = showcaseEventsFromApi
     .filter((e) => e.isActive !== false)
-    .map((e) => ({
-      id: e.id ?? e.eventId,
+    .map((e) => {
+      const rawId = e.id ?? e.eventId ?? e.EventId;
+      const numId = Number(rawId);
+      const id = Number.isFinite(numId) && numId > 0 ? numId : 0;
+      return {
+      id,
       name: String(e.title || '').trim().toLowerCase() === 'hội nghị - hội thảo'
         ? 'Tiệc kỷ niệm'
         : (e.title || ''),
-    }));
+    };
+    })
+    .filter((e) => e.id > 0);
 
   const eventSessionOptions = [
     { id: 'morning', label: 'Sáng', icon: '🌅' },
@@ -828,7 +833,8 @@ const Services = () => {
     setEventStepError('');
 
     // 1) Chọn loại sự kiện
-    if (!selectedEventId || selectedEventId < 1) {
+    const nextStepEventId = Number(selectedEventId);
+    if (!Number.isFinite(nextStepEventId) || nextStepEventId < 1) {
       setEventStepError('eventId');
       return;
     }
@@ -837,13 +843,7 @@ const Services = () => {
       setEventStepError('time');
       return;
     }
-    // 3) Số khách trong 1 bàn
-    const guestsPerTable = parseInt(eventForm.numGuests, 10);
-    if (!guestsPerTable || guestsPerTable < 4 || guestsPerTable > 10) {
-      setEventStepError('Số khách / bàn chỉ được từ 4 đến 10 khách.');
-      return;
-    }
-    // 4) Số bàn
+    // 3) Số bàn
     const tables = parseInt(eventForm.numTables, 10);
     if (!tables || tables < 1) {
       setEventStepError('Vui lòng nhập số lượng bàn (≥1).');
@@ -853,12 +853,12 @@ const Services = () => {
       setEventStepError('Số lượng bàn tối đa là 30.');
       return;
     }
-    // 5) Họ tên
+    // 4) Họ tên
     if (!eventForm.fullName || !eventForm.fullName.trim()) {
       setEventStepError('fullName');
       return;
     }
-    // 6) SĐT
+    // 5) SĐT
     if (!eventForm.phone || !eventForm.phone.trim()) {
       setEventStepError('phone');
       return;
@@ -891,24 +891,20 @@ const Services = () => {
       return;
     }
 
-    if (!selectedEventId || selectedEventId < 1) {
+    const eventIdNum = Number(selectedEventId);
+    if (!Number.isFinite(eventIdNum) || eventIdNum < 1) {
       setEventError('Vui lòng chọn loại sự kiện.');
+      setEventStep(1);
       return;
     }
 
     const numTables = parseInt(eventForm.numTables, 10);
-    const guestsPerTable = parseInt(eventForm.numGuests, 10);
-    const expectedGuests = numTables * guestsPerTable;
     if (!numTables || numTables < 1) {
       setEventError('Số lượng bàn phải lớn hơn 0.');
       return;
     }
     if (numTables > 30) {
       setEventError('Số lượng bàn tối đa là 30.');
-      return;
-    }
-    if (!guestsPerTable || guestsPerTable < 4 || guestsPerTable > 10) {
-      setEventError('Số khách / bàn chỉ được từ 4 đến 10 khách.');
       return;
     }
 
@@ -924,7 +920,6 @@ const Services = () => {
     eventSubmitRef.current = true;
 
     try {
-      // Payload đúng spec Swagger: CreateBookEventApiRequestDTO
       // reservationTime: format "time" = HH:mm:ss
       const timeStr = selectedEventTime || '00:00';
       const reservationTime = timeStr.includes(':') && timeStr.split(':').length === 2
@@ -939,24 +934,45 @@ const Services = () => {
         }))
         .filter(f => f.foodId > 0);
 
+      const menuPerTable = menuDishes.reduce((sum, dish) => sum + (Number(dish.subtotal) || 0), 0);
+      const menuFee = menuPerTable * numTables;
+      const servicesFee = selectedServices.reduce((t, item) => t + (Number(item?.unitPrice) || 0), 0);
+      // Tổng lưu CSDL = sau VAT (tạm tính × 1.1). Một số BE chỉ đọc `payment.*` / `EstimatedBudget` / `GrandTotal`.
+      const amountBase = menuFee + servicesFee;
+      const totalToPersist = Math.round(amountBase * (1 + ORDER_VAT_RATE));
+
+      const moneyTotals = {
+        totalAmount: totalToPersist,
+        TotalAmount: totalToPersist,
+        total: totalToPersist,
+        Total: totalToPersist,
+        grandTotal: totalToPersist,
+        GrandTotal: totalToPersist,
+        estimatedBudget: totalToPersist,
+        EstimatedBudget: totalToPersist,
+        estimatedRevenue: totalToPersist,
+        EstimatedRevenue: totalToPersist,
+      };
+
       const payload = {
-        numberOfGuests: expectedGuests,
-        numberOfTables: numTables,
-        guestsPerTable,
+        numberOfGuests: numTables,
         reservationDate: formatReservationDate(selectedDate),
         reservationTime,
         note: eventForm.note || '',
         area: 'Trong nhà (Máy lạnh)',
-        eventId: selectedEventId,
+        eventId: eventIdNum,
         services: selectedServices.map((item) => ({
           serviceId: item.serviceId,
           quantity: Number(item.quantity) || 1,
           note: item.note || ''
         })),
-        foods: foodItems
+        foods: foodItems,
+        ...moneyTotals,
+        payment: { ...moneyTotals },
+        Payment: { ...moneyTotals },
       };
 
-      console.log('[Event] Submitting book-event:', payload);
+      console.log('[Event] book-event/create — tạm tính:', amountBase, '| sau VAT (mọi alias):', totalToPersist);
       const response = await eventBookingAPI.create(payload);
       console.log('[Event] Success:', response?.data);
       setEventSuccess(
@@ -988,18 +1004,14 @@ const Services = () => {
     }).format(value);
   };
 
-  const guestsPerTableInput = Number.parseInt(eventForm.numGuests, 10);
   const tablesInput = Number.parseInt(eventForm.numTables, 10);
-  const expectedGuestCount =
-    Number.isFinite(guestsPerTableInput) && guestsPerTableInput > 0 &&
-    Number.isFinite(tablesInput) && tablesInput > 0
-      ? guestsPerTableInput * tablesInput
-      : 0;
   const tableCount = Number.isFinite(tablesInput) && tablesInput > 0 ? tablesInput : 0;
   const menuPerTableAmount = menuDishes.reduce((sum, dish) => sum + (Number(dish.subtotal) || 0), 0);
   const menuFeeAmount = menuPerTableAmount * tableCount;
   const servicesFeeAmount = calculateServiceTotal();
-  const eventGrandTotal = menuFeeAmount + servicesFeeAmount;
+  const eventSubtotalBeforeVat = menuFeeAmount + servicesFeeAmount;
+  const eventGrandTotal = Math.round(eventSubtotalBeforeVat * (1 + ORDER_VAT_RATE));
+  const eventVatAmount = eventGrandTotal - eventSubtotalBeforeVat;
 
   // FAQ Data
   const faqItems = [
@@ -1275,7 +1287,7 @@ const Services = () => {
                   <div className="event-form-card event-form-card-new">
                     <div className="event-step1-grid">
 
-                      {/* ── CỘT TRÁI: Event + Date/Time + Guests/Tables ── */}
+                      {/* ── CỘT TRÁI: Event + Date/Time + Số bàn ── */}
                       <div className="event-step1-left">
                         <h4 className="event-step1-col-title">
                           <CalendarClock size={18} className="icon-orange" />
@@ -1406,27 +1418,8 @@ const Services = () => {
                           )}
                         </div>
 
-                        {/* Số khách + Số bàn */}
+                        {/* Số bàn */}
                         <div className="event-step1-row-2">
-                          <div className="event-field-block">
-                            <label className="event-field-label">
-                              <Users size={14} className="icon-orange" />
-                              Số khách / bàn <span className="required-asterisk">*</span>
-                            </label>
-                            <input
-                              type="number"
-                              className={`event-step1-input ${String(eventStepError).toLowerCase().includes('khách') ? 'input-invalid' : ''}`}
-                              value={eventForm.numGuests}
-                              min="4"
-                              max="10"
-                              ref={eventGuestsRef}
-                              onChange={(e) => {
-                                setEventForm({ ...eventForm, numGuests: clampNumberInput(e.target.value, 4, 10) });
-                                setEventStepError('');
-                              }}
-                              placeholder="4 - 10"
-                            />
-                          </div>
                           <div className="event-field-block">
                             <label className="event-field-label">
                               <UtensilsCrossed size={14} className="icon-orange" />
@@ -1447,18 +1440,6 @@ const Services = () => {
                             />
                           </div>
                         </div>
-                        <div className="event-expected-guests-box">
-                          <label className="event-field-label">
-                            <Users size={14} className="icon-orange" />
-                            Số khách dự kiến
-                          </label>
-                          <div className="event-expected-guests-value">
-                            {expectedGuestCount.toLocaleString('vi-VN')} khách
-                          </div>
-                        </div>
-                        {(eventStepError === 'guests' || eventStepError === 'tables') && (
-                          <p className="event-field-error">{eventStepError}</p>
-                        )}
                       </div>
 
                       {/* ── CỘT PHẢI: Thông tin liên hệ ── */}
@@ -1542,7 +1523,7 @@ const Services = () => {
                     </div>
 
                     {/* Lỗi tổng hợp */}
-                    {eventStepError && !['eventId', 'time', 'fullName', 'phone', 'guests', 'tables'].includes(eventStepError) && (
+                    {eventStepError && !['eventId', 'time', 'fullName', 'phone', 'tables'].includes(eventStepError) && (
                       <div className="form-alert form-alert-error event-form-error-summary" role="alert" aria-live="assertive" ref={eventStepErrorAlertRef}>
                         <AlertTriangle size={18} />
                         <span>{eventStepError}</span>
@@ -1737,9 +1718,19 @@ const Services = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="event-payment-grand-total-row">
-                      <span>Tổng cộng</span>
-                      <span className="event-payment-total-amount">{formatCurrency(eventGrandTotal)}</span>
+                    <div className="event-payment-grand-summary">
+                      <div className="event-payment-grand-total-row event-payment-grand-subline">
+                        <span>Tạm tính</span>
+                        <span>{formatCurrency(eventSubtotalBeforeVat)}</span>
+                      </div>
+                      <div className="event-payment-grand-total-row event-payment-grand-subline">
+                        <span>VAT (10%)</span>
+                        <span>{formatCurrency(eventVatAmount)}</span>
+                      </div>
+                      <div className="event-payment-grand-total-row event-payment-grand-final">
+                        <span>Tổng cộng</span>
+                        <span className="event-payment-total-amount">{formatCurrency(eventGrandTotal)}</span>
+                      </div>
                     </div>
 
                     <p className="event-payment-terms">

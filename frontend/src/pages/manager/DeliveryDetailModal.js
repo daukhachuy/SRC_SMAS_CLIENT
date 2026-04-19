@@ -16,6 +16,9 @@ import {
 } from 'lucide-react';
 
 import { orderAPI, getWorkingStaffToday } from '../../api/managerApi';
+import { resolveOrderVatAndGrandTotal } from '../../constants/orderPricing';
+import { printSalesInvoice } from '../../utils/orderInvoicePrint';
+import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import '../../styles/DeliveryDetailModal.css';
 
 const asArray = (payload) => {
@@ -71,6 +74,18 @@ const extractApiErrorMessage = (error, fallback) => {
 
   if (typeof error?.message === 'string' && error.message.trim()) return error.message;
   return fallback;
+};
+
+const parseMoney = (v) => {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v)
+    .replace(/\s/g, '')
+    .replace(/[\u0111\u20AB]/gi, '')
+    .replace(/\./g, '')
+    .replace(/,/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
 };
 
 const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotify }) => {
@@ -157,6 +172,16 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     drivers: Array.isArray(deliveryData?.drivers) ? deliveryData.drivers : [],
   };
 
+  const bill = resolveOrderVatAndGrandTotal({
+    subtotal: parseMoney(delivery.payment?.subtotal),
+    deliveryFee: parseMoney(delivery.payment?.shippingFee),
+    discountAmount: parseMoney(delivery.payment?.discount),
+    apiTotalAmount: parseMoney(delivery.payment?.total) || orderDetail?.totalAmount,
+    apiTaxAmount: parseMoney(orderDetail?.taxAmount ?? orderDetail?.vatAmount),
+  });
+
+  const formatVnd = (n) => `${Math.round(Number(n) || 0).toLocaleString('vi-VN')} đ`;
+
   const handleDriverChange = (e) => {
     setSelectedDriver(e.target.value);
   };
@@ -240,6 +265,45 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     }
   };
 
+  const handlePrintDeliveryInvoice = async () => {
+    const orderCode = String(
+      orderDetail?.orderCode || delivery.orderId || orderDetail?.code || ''
+    ).trim();
+    if (orderCode) {
+      try {
+        await downloadInvoicePdf(orderCode);
+        return;
+      } catch (e) {
+        const msg = await getPdfErrorMessage(e);
+        if (typeof onNotify === 'function') onNotify(`${msg} — mở bản in nhanh.`);
+        else window.alert(`${msg}\n\nMở bản in nhanh trên trình duyệt.`);
+      }
+    }
+    const lines = (delivery.menuItems || []).map((it) => {
+      const q = parseMoney(it.quantity) || 1;
+      let pr = parseMoney(it.price);
+      let tot = parseMoney(it.total);
+      if (!tot && q && pr) tot = q * pr;
+      if (!pr && q && tot) pr = tot / q;
+      return { name: String(it.name || '—'), qty: q, unitPrice: pr, lineTotal: tot || q * pr };
+    });
+    printSalesInvoice({
+      orderCode: String(delivery.orderId || ''),
+      orderTypeLabel: 'Giao hàng',
+      dateTime: delivery.orderTime ? new Date(delivery.orderTime).toLocaleString('vi-VN') : '—',
+      buyerName: delivery.customerName || '',
+      buyerPhone: delivery.phone || '',
+      buyerAddress: delivery.address || '',
+      lines,
+      subtotal: bill.subtotal,
+      shippingFee: bill.delivery,
+      discountAmount: bill.discount,
+      vatAmount: bill.vat,
+      grandTotal: bill.grand,
+      note: String(orderDetail?.note || orderDetail?.delivery?.note || ''),
+    });
+  };
+
   const getStatusBadgeClass = () => {
     switch (delivery.statusColor) {
       case 'orange':
@@ -317,21 +381,27 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
             <div className="delivery-payment-summary">
               <div className="delivery-payment-row">
                 <span className="delivery-payment-label">Tạm tính</span>
-                <span className="delivery-payment-value">{delivery.payment?.subtotal || ''}</span>
+                <span className="delivery-payment-value">{formatVnd(bill.subtotal)}</span>
               </div>
+              {bill.vat > 0 && (
+                <div className="delivery-payment-row">
+                  <span className="delivery-payment-label">VAT (10%)</span>
+                  <span className="delivery-payment-value">{formatVnd(bill.vat)}</span>
+                </div>
+              )}
               <div className="delivery-payment-row">
                 <span className="delivery-payment-label">Phí ship</span>
-                <span className="delivery-payment-value">{delivery.payment?.shippingFee || ''}</span>
+                <span className="delivery-payment-value">{formatVnd(bill.delivery)}</span>
               </div>
               <div className="delivery-payment-row">
                 <span className="delivery-payment-label">Giảm giá</span>
                 <span className="delivery-payment-value delivery-payment-discount">
-                  {delivery.payment?.discount || ''}
+                  {bill.discount > 0 ? `-${bill.discount.toLocaleString('vi-VN')} đ` : ''}
                 </span>
               </div>
               <div className="delivery-payment-total-row">
                 <span className="delivery-payment-total-label">Tổng cộng</span>
-                <span className="delivery-payment-total-amount">{delivery.payment?.total || ''}</span>
+                <span className="delivery-payment-total-amount">{formatVnd(bill.grand)}</span>
               </div>
             </div>
           </div>
@@ -437,6 +507,15 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
             Hủy đơn hàng
           </button>
           <div className="delivery-footer-actions">
+            <button
+              type="button"
+              className="delivery-btn-close"
+              onClick={handlePrintDeliveryInvoice}
+              style={{ borderColor: '#ea580c', color: '#c2410c' }}
+            >
+              <Receipt size={18} />
+              Xuất hóa đơn
+            </button>
             <button className="delivery-btn-close" onClick={onClose}>
               Đóng
             </button>

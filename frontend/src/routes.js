@@ -186,8 +186,15 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Admin pages */}
-        <Route path="/admin" element={<AdminLayout />}>
+        {/* Admin pages - BẢO VỆ BỞI ProtectedRoute với role Admin */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requiredRole="Admin">
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<AdminDashboard />} />
           <Route path="orders" element={<ManagerOrdersPage />} />
           <Route path="orders/dine-in/:id" element={<DineInOrderDetailPage />} />

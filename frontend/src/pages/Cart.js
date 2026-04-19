@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import instance from '../api/axiosInstance';
 import Header from '../components/Header'; 
 import Footer from '../components/Footer'; 
-import { getProfile } from '../api/userApi'; 
+import { getProfile } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { discountAPI } from '../api/discountApi';
 import { useNavigate } from 'react-router-dom';
 import CustomerNoticeModal from '../components/CustomerNoticeModal';
+import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
 import '../styles/Cart.css';
+
+function stripLegacyGpsSuffix(text) {
+  return String(text || '').replace(/\|@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s*$/, '').trim();
+}
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -47,7 +52,9 @@ const Cart = () => {
             recipientPhone: (profileData.phone && profileData.phone !== 'string') 
               ? profileData.phone.replace('+84', '0') 
               : prev.recipientPhone,
-            address: (profileData.address && profileData.address !== 'string') ? profileData.address : prev.address,
+            address: stripLegacyGpsSuffix(
+              (profileData.address && profileData.address !== 'string') ? profileData.address : prev.address
+            ),
           }));
         }
       } catch (err) {
@@ -217,7 +224,9 @@ const Cart = () => {
   };
 
   const discountAmount = calculateDiscount();
-  const finalPrice = totalPrice - discountAmount + deliveryFee;
+  /** VAT 10% trên tạm tính (chưa trừ mã giảm). Tổng = tạm tính + VAT + phí ship - giảm giá. */
+  const vatAmount = roundOrderMoney(totalPrice * ORDER_VAT_RATE);
+  const finalPrice = Math.max(0, totalPrice + vatAmount + deliveryFee - discountAmount);
 
   // --- LOGIC ĐẶT HÀNG & THANH TOÁN (THEO QUY TRÌNH 3 BƯỚC) ---
   const handleFinalOrder = async () => {
@@ -237,6 +246,9 @@ const Cart = () => {
         };
       }).filter(i => i.foodId || i.comboId);
 
+      const vatSend = roundOrderMoney(totalPrice * ORDER_VAT_RATE);
+      const totalSend = Math.max(0, totalPrice + vatSend + deliveryFee - discountAmount);
+
       const orderPayload = {
         discountCode: appliedDiscount?.code || discountCode || null,
         note: customerInfo.note || null,
@@ -244,9 +256,13 @@ const Cart = () => {
         deliveryInfo: {
           recipientName: customerInfo.recipientName,
           recipientPhone: customerInfo.recipientPhone,
-          address: customerInfo.address,
+          address: stripLegacyGpsSuffix(customerInfo.address),
           note: customerInfo.note || null
-        }
+        },
+        taxAmount: vatSend,
+        vatAmount: vatSend,
+        totalAmount: totalSend,
+        TotalAmount: totalSend,
       };
 
       const orderRes = await instance.post('/order/create/delivery', orderPayload);
@@ -421,15 +437,18 @@ const Cart = () => {
             <div className="Summary-Left">
               <div className="Sum-Item">Tất cả: <strong>{cartItems.length} Món</strong></div>
               <div className="Sum-Item">Tạm tính: <strong>{totalPrice.toLocaleString()} đ</strong></div>
-              {appliedDiscount && (
-                <div className="Sum-Item" style={{ color: 'green' }}>
-                  Giảm giá: <strong>-{discountAmount.toLocaleString()} đ</strong>
-                </div>
-              )}
+              <div className="Sum-Item">
+                VAT (10%): <strong>+{vatAmount.toLocaleString()} đ</strong>
+              </div>
               <div className="Sum-Item">
                 Phí vận chuyển:{' '}
                 <strong>{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()} đ` : 'Miễn phí'}</strong>
               </div>
+              {appliedDiscount && (
+                <div className="Sum-Item" style={{ color: '#15803d' }}>
+                  Giảm giá: <strong>-{discountAmount.toLocaleString()} đ</strong>
+                </div>
+              )}
               <div className="Sum-Item" style={{ fontSize: '16px', fontWeight: 'bold' }}>
                 Tổng cộng: <strong className="text-orange">{finalPrice.toLocaleString()} đ</strong>
               </div>
@@ -524,16 +543,21 @@ const Cart = () => {
 
                     <div className="Bill-Footer-Fixed">
                       <div className="Bill-Divider"></div>
-                      {appliedDiscount && (
-                        <div className="Bill-Row" style={{ color: 'green' }}>
-                          <span>Giảm giá ({appliedDiscount.code}):</span> <span>-{discountAmount.toLocaleString()}đ</span>
-                        </div>
-                      )}
                       <div className="Bill-Row"><span>Tạm tính:</span> <span>{totalPrice.toLocaleString()}đ</span></div>
+                      <div className="Bill-Row">
+                        <span>VAT (10%)</span>
+                        <span>+{vatAmount.toLocaleString()}đ</span>
+                      </div>
                       <div className="Bill-Row">
                         <span>Phí vận chuyển</span>
                         <span>{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()}đ` : 'Miễn phí'}</span>
                       </div>
+                      {appliedDiscount && (
+                        <div className="Bill-Row" style={{ color: '#15803d' }}>
+                          <span>Giảm giá ({appliedDiscount.code}):</span>{' '}
+                          <span>-{discountAmount.toLocaleString()}đ</span>
+                        </div>
+                      )}
                       <div className="Bill-Total"><span>Tổng cộng:</span> <span>{finalPrice.toLocaleString()}đ</span></div>
                     </div>
                   </div>

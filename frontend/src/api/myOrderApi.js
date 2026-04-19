@@ -83,7 +83,8 @@ const normalizeBookEventItem = (raw) => {
     bookingDate,
     bookingTime,
     customerId,
-    numberOfGuests: Number(raw?.numberOfGuests || raw?.guestCount || 0) || 0,
+    numberOfGuests:
+      Number(firstDefined(raw?.numberOfTables, raw?.numberOfTable, raw?.numberOfGuests) ?? 0) || 0,
     note: firstDefined(raw?.note, raw?.specialRequests) || '',
     contractId,
     checkoutUrl,
@@ -302,7 +303,12 @@ export const myOrderAPI = {
   // GET /api/book-event/{id}/detail — chi tiết một đặt sự kiện
   getBookEventDetail: async (bookEventId) => {
     const response = await instance.get(`/book-event/${bookEventId}/detail`);
-    return response.data;
+    const body = response.data;
+    if (body && typeof body === 'object') {
+      const inner = body.data ?? body.Data ?? body.result ?? body.Result;
+      if (inner && typeof inner === 'object') return inner;
+    }
+    return body;
   },
 
   // POST /api/contract/{id}/deposit — tạo link thanh toán đặt cọc (PayOS)

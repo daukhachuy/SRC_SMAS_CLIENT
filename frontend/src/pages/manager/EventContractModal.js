@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   FileText, 
   Download 
 } from 'lucide-react';
+import { downloadContractPdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import '../../styles/EventContractModal.css';
 
 const EventContractModal = ({ isOpen, onClose, contractData }) => {
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   if (!isOpen) return null;
 
   // Default contract data
@@ -56,10 +58,21 @@ const EventContractModal = ({ isOpen, onClose, contractData }) => {
     statusColor: 'green'
   };
 
-  const handleDownloadPDF = () => {
-    // TODO: Implement PDF download functionality
-    console.log('Downloading contract PDF...');
-    alert('Chức năng tải xuống PDF đang được phát triển');
+  const handleDownloadPDF = async () => {
+    const code = String(contract.contractNumber || contract.contractId || '').trim();
+    if (!code) {
+      alert('Chưa có mã hợp đồng để tải PDF.');
+      return;
+    }
+    setDownloadingPdf(true);
+    try {
+      await downloadContractPdf(code);
+    } catch (e) {
+      const msg = await getPdfErrorMessage(e);
+      alert(msg || 'Tải PDF thất bại.');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   return (
@@ -243,9 +256,14 @@ const EventContractModal = ({ isOpen, onClose, contractData }) => {
             </span>
           </div>
           <div className="contract-footer-actions">
-            <button className="contract-download-btn" onClick={handleDownloadPDF}>
+            <button
+              type="button"
+              className="contract-download-btn"
+              disabled={downloadingPdf}
+              onClick={handleDownloadPDF}
+            >
               <Download size={18} />
-              Tải xuống PDF
+              {downloadingPdf ? 'Đang tải…' : 'Tải xuống PDF'}
             </button>
           </div>
         </div>

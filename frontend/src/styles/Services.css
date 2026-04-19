@@ -3157,6 +3157,34 @@
   color: var(--deep-black);
 }
 
+.event-payment-grand-summary {
+  margin: 0 auto 24px;
+  max-width: 780px;
+}
+
+.event-payment-grand-summary .event-payment-grand-total-row {
+  margin: 0;
+}
+
+.event-payment-grand-subline {
+  border-top: none;
+  border-bottom: 1px solid #eee;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 20px;
+}
+
+.event-payment-grand-summary .event-payment-grand-subline:first-child {
+  border-top: 2px solid #eee;
+}
+
+.event-payment-grand-final {
+  border-top: none;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 16px 20px 12px;
+}
+
 .event-payment-discount {
   margin-top: 20px;
   padding-top: 16px;

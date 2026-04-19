@@ -63,6 +63,23 @@ function formatWeekRange(weekDays) {
   return `${first.toLocaleDateString('vi-VN')} - ${last.toLocaleDateString('vi-VN')}`;
 }
 
+function normalizeNoticeText(input) {
+  const raw = String(input ?? '').trim();
+  if (!raw) return '';
+  if (/^request failed with status code\s+400$/i.test(raw)) return 'Yêu cầu không hợp lệ (400).';
+  if (/^request failed with status code\s+401$/i.test(raw)) return 'Bạn chưa đăng nhập hoặc phiên đã hết hạn (401).';
+  if (/^request failed with status code\s+403$/i.test(raw)) return 'Bạn không có quyền thực hiện thao tác này (403).';
+  if (/^request failed with status code\s+404$/i.test(raw)) return 'Không tìm thấy dữ liệu (404).';
+  if (/^request failed with status code\s+5\d\d$/i.test(raw)) return 'Hệ thống đang bận, vui lòng thử lại sau.';
+
+  const replacements = new Map([
+    ['System notification', 'Thông báo hệ thống'],
+    ['You have a new notification.', 'Bạn có thông báo mới.'],
+    ['Shift update', 'Cập nhật ca làm'],
+  ]);
+  return replacements.get(raw) || raw;
+}
+
 function normalizeShift(item, dayKey) {
   const name = item?.shiftName || item?.shift || 'Ca làm việc';
   const startTime = String(item?.startTime || '').slice(0, 5) || '--:--';
@@ -186,7 +203,14 @@ const WaiterSchedulePage = () => {
 
       if (notificationRes.status === 'fulfilled') {
         const notificationItems = unwrapResponse(notificationRes.value);
-        const mappedNotis = notificationItems.map((n, idx) => mapNotificationToUI(n, idx));
+        const mappedNotis = notificationItems.map((n, idx) => {
+          const base = mapNotificationToUI(n, idx);
+          return {
+            ...base,
+            title: normalizeNoticeText(base.title),
+            message: normalizeNoticeText(base.message),
+          };
+        });
         if (mappedNotis.length > 0) {
           setNotifications(mappedNotis);
         } else {
@@ -220,7 +244,7 @@ const WaiterSchedulePage = () => {
         ]);
       }
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không thể tải lịch làm việc.');
+      setError(normalizeNoticeText(err?.response?.data?.message || err?.message || 'Không thể tải lịch làm việc.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
