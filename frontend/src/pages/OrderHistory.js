@@ -123,6 +123,12 @@ const OrderHistory = () => {
             'Khách hàng';
           const displayPhone =
             order.delivery?.recipientPhone || cust.phone || order.delivery?.phone || null;
+          const displayTable =
+            formatTablesDisplay(order.tables) || order.tableNumber || null;
+          const orderTypeRaw = String(order.orderType ?? order.OrderType ?? '').trim();
+          const orderTypeNorm = orderTypeRaw.toLowerCase();
+          const isEventBookingOrder =
+            orderTypeNorm === 'eventbooking' || orderTypeNorm === 'event';
 
             return {
             ...order,
@@ -133,6 +139,10 @@ const OrderHistory = () => {
             displayDate: order.createdAt ?? order.CreatedAt,
             displayCustomer,
             displayPhone,
+            displayGuests: order.numberOfGuests,
+            isEventBookingOrder,
+            displayTable,
+            displayEvent: order.eventName || order.note || '—',
             displayTotal: order.totalAmount,
             typeName: mapOrderTypeLabel(order.orderType ?? order.OrderType),
             rawStatus: statusRaw,
@@ -282,6 +292,15 @@ const OrderHistory = () => {
                     </p>
                   </div>
                   <div className="Grid-Col">
+                    <p>
+                      <span className="Grid-Label">{item.isEventBookingOrder ? 'SỐ BÀN' : 'SỐ NGƯỜI'}</span>
+                      <br />
+                      <span className="Grid-Value">
+                        {item.displayGuests != null
+                          ? `${item.displayGuests} ${item.isEventBookingOrder ? 'bàn' : 'người'}`
+                          : '—'}
+                      </span>
+                    </p>
                     <p>
                       <span className="Grid-Label">ĐẶT NGÀY</span>
                       <br />

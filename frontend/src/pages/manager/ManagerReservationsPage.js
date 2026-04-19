@@ -829,7 +829,7 @@ const ManagerReservationsPage = () => {
                       <td>
                         <div className="guests-info">
                           <Users className="guests-icon" size={18} />
-                          <span className="guests-count">{event.guests} khách</span>
+                          <span className="guests-count">{event.tableCount ?? event.guests} bàn</span>
                         </div>
                       </td>
                       <td>

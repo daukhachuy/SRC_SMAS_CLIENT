@@ -352,7 +352,7 @@ export async function getAllStaffSchedule() {
         return res;
       }),
 
-    // POST /api/book-event/create
+    // POST /api/book-event/create — body phẳng theo Swagger; numberOfGuests (API) = số bàn.
     create: (data) => instance.post('/book-event/create', data)
       .then(res => {
         console.log('[eventBookingAPI.create] ✅ Success:', res.status, res.data);
@@ -583,8 +583,10 @@ export async function getAllStaffSchedule() {
       'phone', 'phoneNumber', 'customerPhone', 'contactPhone', 'telephone'
     ], '---');
 
-    const guests = Number(pick(item, [
-      'numberOfGuests', 'guestCount', 'guests', 'numberOfTable'
+    const tableCount = Number(pick(item, [
+      'numberOfTables', 'tableCount', 'tables',
+      'numberOfGuests',
+      'numberOfTable',
     ], 0));
 
     // Lấy ngày giờ từ nhiều field - ưu tiên reservationDate + reservationTime
@@ -670,7 +672,8 @@ export async function getAllStaffSchedule() {
       phone,
       eventType: eventTypeName,
       eventTypeColor: eventTypeColor,
-      guests,
+      tableCount,
+      guests: tableCount,
       date,
       time,
       status: normalized.status,

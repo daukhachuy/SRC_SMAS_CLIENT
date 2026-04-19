@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Edit3, FileText, ShieldCheck } from 'lucide-react';
 import { contractTokenAPI } from '../api/managerApi';
+import { extractUserFromToken } from '../utils/jwtHelper';
 import '../styles/ContractSigningPage.css';
 
 const createInitialData = () => ({
@@ -40,64 +41,158 @@ const toDateTime = (rawDate) => {
 /** API .NET thường trả PascalCase; một số DTO lồng customer / partyB khác tên trường. */
 function firstNonEmpty(...vals) {
   for (const v of vals) {
-    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'object') continue;
+    const s = String(v).trim();
+    if (s !== '') return s;
   }
   return '';
 }
 
-function nestedCustomerLike(contract) {
-  if (!contract || typeof contract !== 'object') return {};
-  return (
-    contract.customer ||
-    contract.Customer ||
-    contract.partyB ||
-    contract.PartyB ||
-    contract.reservation?.customer ||
-    contract.Reservation?.Customer ||
-    contract.booking?.customer ||
-    contract.Booking?.Customer ||
-    {}
-  );
+const CUSTOMER_NAME_KEYS = [
+  'fullName',
+  'FullName',
+  'fullname',
+  'Fullname',
+  'name',
+  'Name',
+  'customerName',
+  'CustomerName',
+  'guestName',
+  'GuestName',
+  'contactName',
+  'ContactName',
+  'clientName',
+  'ClientName',
+  'representativeName',
+  'RepresentativeName',
+  'displayName',
+  'DisplayName',
+  'userName',
+  'UserName',
+];
+
+const CUSTOMER_PHONE_KEYS = [
+  'phone',
+  'Phone',
+  'phoneNumber',
+  'PhoneNumber',
+  'mobile',
+  'Mobile',
+  'mobilePhone',
+  'MobilePhone',
+  'cellPhone',
+  'CellPhone',
+  'customerPhone',
+  'CustomerPhone',
+  'telephone',
+  'Telephone',
+  'tel',
+  'Tel',
+  'contactPhone',
+  'ContactPhone',
+  'soDienThoai',
+  'SoDienThoai',
+  'primaryPhone',
+  'PrimaryPhone',
+  'userPhone',
+  'UserPhone',
+];
+
+const CUSTOMER_EMAIL_KEYS = [
+  'email',
+  'Email',
+  'customerEmail',
+  'CustomerEmail',
+  'contactEmail',
+  'ContactEmail',
+  'emailAddress',
+  'EmailAddress',
+  'mail',
+  'Mail',
+  'userEmail',
+  'UserEmail',
+];
+
+function collectCustomerObjects(contract) {
+  const out = [];
+  const push = (o) => {
+    if (o && typeof o === 'object' && !Array.isArray(o)) out.push(o);
+  };
+  push(contract);
+  push(contract?.customer);
+  push(contract?.Customer);
+  push(contract?.partyB);
+  push(contract?.PartyB);
+  push(contract?.eventBooking?.customer);
+  push(contract?.EventBooking?.Customer);
+  push(contract?.bookEvent?.customer);
+  push(contract?.BookEvent?.Customer);
+  push(contract?.booking?.customer);
+  push(contract?.Booking?.Customer);
+  push(contract?.reservation?.customer);
+  push(contract?.Reservation?.Customer);
+  push(contract?.user);
+  push(contract?.User);
+  push(contract?.contact);
+  push(contract?.Contact);
+  push(contract?.applicationUser);
+  push(contract?.ApplicationUser);
+  push(contract?.guest);
+  push(contract?.Guest);
+  return out;
+}
+
+function pickFromObjects(objs, keys) {
+  for (const o of objs) {
+    for (const k of keys) {
+      const t = firstNonEmpty(o[k]);
+      if (t) return t;
+    }
+  }
+  return '';
+}
+
+const getStoredAuthToken = () =>
+  localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+
+/** Khi API hợp đồng theo token không trả Party B, dùng user đang đăng nhập (đúng luồng khách ký). Email có thể lấy thêm từ JWT. */
+function readLoggedInUserFallback() {
+  try {
+    let name = '';
+    let phone = '';
+    let email = '';
+    const s = localStorage.getItem('user');
+    if (s) {
+      const u = JSON.parse(s);
+      name = firstNonEmpty(u.fullName, u.fullname, u.name, u.displayName);
+      phone = firstNonEmpty(u.phone, u.phoneNumber, u.mobile, u.PhoneNumber);
+      email = firstNonEmpty(u.email, u.Email);
+    }
+    const token = getStoredAuthToken();
+    if (token) {
+      const fromJwt = extractUserFromToken(token);
+      if (fromJwt) {
+        name = firstNonEmpty(name, fromJwt.fullname);
+        email = firstNonEmpty(email, fromJwt.email);
+      }
+    }
+    return { name, phone, email };
+  } catch {
+    return { name: '', phone: '', email: '' };
+  }
 }
 
 function pickCustomerFromContract(contract) {
-  const c = nestedCustomerLike(contract);
-  const name = firstNonEmpty(
-    contract.customerName,
-    contract.CustomerName,
-    contract.guestName,
-    contract.GuestName,
-    c.fullName,
-    c.FullName,
-    c.name,
-    c.Name,
-    c.fullname,
-    c.Fullname
-  );
-  const phone = firstNonEmpty(
-    contract.customerPhone,
-    contract.CustomerPhone,
-    contract.phone,
-    contract.Phone,
-    c.phone,
-    c.Phone,
-    c.phoneNumber,
-    c.PhoneNumber,
-    c.mobile,
-    c.Mobile
-  );
-  const email = firstNonEmpty(
-    contract.customerEmail,
-    contract.CustomerEmail,
-    contract.email,
-    contract.Email,
-    c.email,
-    c.Email
-  );
+  const objs = collectCustomerObjects(contract);
+  const name = pickFromObjects(objs, CUSTOMER_NAME_KEYS);
+  const phone = pickFromObjects(objs, CUSTOMER_PHONE_KEYS);
+  const email = pickFromObjects(objs, CUSTOMER_EMAIL_KEYS);
+  const fb = readLoggedInUserFallback();
   return {
-    customerName: name || 'Khách hàng',
-    customerPhone: phone || '---',
-    customerEmail: email || '---',
+    customerName: firstNonEmpty(name, fb.name) || 'Khách hàng',
+    customerPhone: firstNonEmpty(phone, fb.phone) || '---',
+    customerEmail: firstNonEmpty(email, fb.email) || '---',
   };
 }
 
@@ -109,9 +204,52 @@ function pickEventNameFromContract(contract) {
       contract.eventName,
       contract.EventName,
       contract.title,
-      contract.Title
+      contract.Title,
+      contract.eventBooking?.eventTitle,
+      contract.EventBooking?.EventTitle,
+      contract.eventBooking?.title,
+      contract.bookEvent?.eventTitle,
+      contract.BookEvent?.EventTitle
     ) || 'Sự kiện'
   );
+}
+
+/** Chuẩn hóa body API (data / data.data / contract lồng nhau). */
+function resolveContractFromSignResponse(res) {
+  const root = res?.data ?? {};
+  const candidates = [
+    root?.data?.data,
+    root?.Data?.Data,
+    root?.data?.contract,
+    root?.data?.Contract,
+    root?.contract,
+    root?.Contract,
+    root?.data,
+    root?.Data,
+    root,
+  ];
+  for (const c of candidates) {
+    const obj = Array.isArray(c) ? c[0] : c;
+    if (obj && typeof obj === 'object') return obj;
+  }
+  return null;
+}
+
+/** Cùng logic với `routes.js` — khách về `/`, nhân viên về dashboard role. */
+function getHomePathAfterSign() {
+  try {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return '/';
+    const user = JSON.parse(userStr);
+    const role = String(user?.role || '').trim().toLowerCase();
+    if (role === 'manager') return '/manager';
+    if (role === 'waiter') return '/waiter';
+    if (role === 'kitchen') return '/kitchen';
+    if (role === 'admin') return '/admin';
+  } catch (_) {
+    /* ignore */
+  }
+  return '/';
 }
 
 const statusLabel = {
@@ -122,9 +260,6 @@ const statusLabel = {
   cancelled: 'Đã hủy',
   canceled: 'Đã hủy',
 };
-
-const getStoredAuthToken = () =>
-  localStorage.getItem('authToken') || localStorage.getItem('accessToken');
 
 const ContractCustomerSignPage = () => {
   const navigate = useNavigate();
@@ -137,6 +272,17 @@ const ContractCustomerSignPage = () => {
   const [signing, setSigning] = useState(false);
   const [signNotice, setSignNotice] = useState('');
   const [data, setData] = useState(createInitialData);
+  const [thankYouAfterSign, setThankYouAfterSign] = useState(false);
+  const redirectHomeTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (redirectHomeTimerRef.current) {
+        clearTimeout(redirectHomeTimerRef.current);
+        redirectHomeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const loadByToken = async () => {
@@ -162,8 +308,7 @@ const ContractCustomerSignPage = () => {
       setError('');
       try {
         const res = await contractTokenAPI.getBySignToken(token);
-        const payload = res?.data?.data ?? res?.data;
-        const contract = Array.isArray(payload) ? payload[0] : payload;
+        const contract = resolveContractFromSignResponse(res);
 
         if (!contract || typeof contract !== 'object') {
           throw new Error('Dữ liệu hợp đồng không hợp lệ.');
@@ -243,7 +388,8 @@ const ContractCustomerSignPage = () => {
     try {
       const res = await contractTokenAPI.confirmSignByToken(token);
       const payload = res?.data?.data ?? res?.data ?? {};
-      setSignNotice(payload?.message || 'Ký hợp đồng thành công.');
+      setSignNotice('');
+      setThankYouAfterSign(true);
       setData((prev) => ({
         ...prev,
         contractId: payload?.contractId || prev.contractId,
@@ -252,6 +398,13 @@ const ContractCustomerSignPage = () => {
         statusText: 'Đã ký',
         signedAt: payload?.signedAt || new Date().toISOString(),
       }));
+      if (redirectHomeTimerRef.current) {
+        clearTimeout(redirectHomeTimerRef.current);
+      }
+      redirectHomeTimerRef.current = setTimeout(() => {
+        redirectHomeTimerRef.current = null;
+        navigate(getHomePathAfterSign(), { replace: true });
+      }, 5000);
     } catch (err) {
       setSignNotice(err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Ký hợp đồng thất bại.');
     } finally {
@@ -304,6 +457,19 @@ const ContractCustomerSignPage = () => {
 
   return (
     <div className="contract-signing-page">
+      {thankYouAfterSign ? (
+        <div className="contract-sign-thankyou-overlay" role="alertdialog" aria-live="polite">
+          <div className="contract-sign-thankyou-card">
+            <CheckCircle size={52} className="contract-sign-thankyou-icon" aria-hidden />
+            <h2 className="contract-sign-thankyou-title">Cảm ơn quý khách</h2>
+            <p className="contract-sign-thankyou-text">
+              Quý khách đã ký hợp đồng thành công. Chúng tôi đã ghi nhận xác nhận của quý khách.
+            </p>
+            <p className="contract-sign-thankyou-hint">Đang chuyển về trang chủ sau vài giây…</p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="contract-header-bar" style={{ marginTop: 24 }}>
         <div className="header-info">
           <h1 className="contract-title">KÝ HỢP ĐỒNG ĐIỆN TỬ</h1>
@@ -333,7 +499,7 @@ const ContractCustomerSignPage = () => {
               <div className="detail-row"><span className="detail-label">Mã hợp đồng:</span><span className="detail-value">{data.contractCode}</span></div>
               <div className="detail-row"><span className="detail-label">Sự kiện:</span><span className="detail-value">{data.eventName}</span></div>
               <div className="detail-row"><span className="detail-label">Thời gian:</span><span className="detail-value">{data.eventTime} - {data.eventDate}</span></div>
-              <div className="detail-row"><span className="detail-label">Số lượng khách:</span><span className="detail-value">{data.numberOfGuests} khách</span></div>
+              <div className="detail-row"><span className="detail-label">Số lượng bàn:</span><span className="detail-value">{data.numberOfGuests} bàn</span></div>
             </div>
           </div>
 

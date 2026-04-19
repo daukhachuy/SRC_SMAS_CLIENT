@@ -54,6 +54,31 @@ const WaiterLayout = () => {
     return id != null ? String(id) : `fallback-${idx}`;
   };
 
+  const normalizeNoticeText = (input) => {
+    const raw = String(input ?? '').trim();
+    if (!raw) return '';
+    if (/^request failed with status code\s+400$/i.test(raw)) return 'Yêu cầu không hợp lệ (400).';
+    if (/^request failed with status code\s+401$/i.test(raw)) return 'Bạn chưa đăng nhập hoặc phiên đã hết hạn (401).';
+    if (/^request failed with status code\s+403$/i.test(raw)) return 'Bạn không có quyền thực hiện thao tác này (403).';
+    if (/^request failed with status code\s+404$/i.test(raw)) return 'Không tìm thấy dữ liệu (404).';
+    if (/^request failed with status code\s+5\d\d$/i.test(raw)) return 'Hệ thống đang bận, vui lòng thử lại sau.';
+
+    const replacements = new Map([
+      ['Please enter a cancellation reason.', 'Vui lòng nhập lý do hủy.'],
+      ['Order code was not found.', 'Không tìm thấy mã đơn.'],
+      ['Order item ID was not found.', 'Không tìm thấy mã dòng món.'],
+      ['Cash payment failed.', 'Thanh toán tiền mặt thất bại.'],
+      ['Payment API connection failed.', 'Lỗi kết nối API thanh toán.'],
+      ['Cannot proceed to payment: some dishes are not served yet.', 'Không thể thanh toán: còn món chưa được phục vụ.'],
+      ['Opening payment screen...', 'Đang mở màn hình thanh toán...'],
+      ['Kitchen has not finished all dishes. Start delivery only when all dishes are ready.', 'Bếp chưa làm xong món. Chỉ bắt đầu giao khi tất cả món đã sẵn sàng.'],
+      ['This order is not paid yet. Please complete payment before finishing delivery.', 'Đơn chưa thanh toán. Cần thanh toán trước khi hoàn thành giao hàng.'],
+      ['System notification', 'Thông báo hệ thống'],
+      ['You have a new notification.', 'Bạn có thông báo mới.'],
+    ]);
+    return replacements.get(raw) || raw;
+  };
+
   // Load user info và ưu tiên dữ liệu thật từ Profile API
   useEffect(() => {
     let isMounted = true;
@@ -161,6 +186,8 @@ const WaiterLayout = () => {
           return {
             ...base,
             id: base.id ?? rowId,
+            title: normalizeNoticeText(base.title),
+            message: normalizeNoticeText(base.message),
             isRead: isMarkedUnreadByEndpoint ? false : base.isRead,
           };
         });

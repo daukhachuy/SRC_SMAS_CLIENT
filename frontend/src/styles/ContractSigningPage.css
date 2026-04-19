@@ -394,6 +394,91 @@
   color: #718096;
 }
 
+/* Điều 2 — bảng chi tiết thực đơn (tone giống văn bản hợp đồng) */
+.contract-article2-table-wrap {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.contract-article2-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.contract-article2-thead-cols th {
+  background: #334155;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #1e293b;
+}
+
+.contract-article2-th-content {
+  text-align: left;
+  width: 58%;
+}
+
+.contract-article2-th-type {
+  text-align: center;
+  width: 12%;
+}
+
+.contract-article2-th-amount {
+  text-align: right;
+  width: 30%;
+}
+
+.contract-article2-table tbody td {
+  border: 1px solid #94a3b8;
+  padding: 0.55rem 0.7rem;
+  vertical-align: middle;
+  color: #1a202c;
+}
+
+.contract-article2-subhead td {
+  background: #e2edf8;
+  font-weight: 700;
+  text-align: left;
+  border-color: #94a3b8;
+}
+
+.contract-article2-content {
+  text-align: left;
+}
+
+.contract-article2-name {
+  font-weight: 600;
+}
+
+.contract-article2-detail {
+  margin-top: 0.2rem;
+  font-size: 0.6875rem;
+  color: #4a5568;
+}
+
+.contract-article2-type {
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.contract-article2-amount {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.contract-article2-empty {
+  text-align: center;
+  color: #718096;
+  font-style: italic;
+}
+
 /* Payment Grid */
 .payment-grid {
   display: grid;
@@ -839,4 +924,55 @@
   .contract-footer {
     padding: 1.5rem;
   }
+}
+
+/* Trang ký hợp đồng khách — cảm ơn sau khi ký thành công */
+.contract-sign-thankyou-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.contract-sign-thankyou-card {
+  max-width: 420px;
+  width: 100%;
+  padding: 2rem 1.75rem;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+  text-align: center;
+  border: 1px solid #e2e8f0;
+}
+
+.contract-sign-thankyou-icon {
+  color: #15803d;
+  margin: 0 auto 1rem;
+  display: block;
+}
+
+.contract-sign-thankyou-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: #1a202c;
+}
+
+.contract-sign-thankyou-text {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: #4a5568;
+}
+
+.contract-sign-thankyou-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #718096;
 }

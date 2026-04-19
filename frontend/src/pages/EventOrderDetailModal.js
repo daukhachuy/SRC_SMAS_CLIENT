@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { myOrderAPI } from '../api/myOrderApi';
+import { printEventBookingInvoice } from '../utils/orderInvoicePrint';
+import { downloadContractPdf, downloadInvoicePdf, getPdfErrorMessage } from '../api/pdfExportApi';
 
 const EVENT_TYPE_MAP = {
   1: { name: 'Tiệc Cưới', color: '#f43f5e' },
@@ -69,10 +71,126 @@ const pick = (obj, keys, fallback = null) => {
   return fallback;
 };
 
+const firstPositiveNumber = (...vals) => {
+  for (const v of vals) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+};
+
+/**
+ * Tổng hiển thị phải khớp tiền đã gửi khi đặt (Services: totalAmount = tạm tính + VAT).
+ * API detail đôi khi trả estimatedBudget (chưa VAT) trước totalAmount → ưu tiên totalAmount / payment.
+ */
+const resolveEventGrandTotal = (ev) => {
+  if (!ev || typeof ev !== 'object') return null;
+  const pay = ev.payment || ev.Payment || ev.paymentInfo || ev.PaymentInfo || {};
+  const fromParts = () => {
+    const sub = firstPositiveNumber(
+      ev.amountBeforeVat,
+      ev.AmountBeforeVat,
+      ev.subtotal,
+      ev.Subtotal
+    );
+    const vat = Number(ev.vatAmount ?? ev.VatAmount ?? 0);
+    if (sub != null && Number.isFinite(vat) && vat >= 0) {
+      const sum = Math.round(sub + vat);
+      if (sum > 0) return sum;
+    }
+    return null;
+  };
+  return (
+    firstPositiveNumber(
+      ev.totalAmount,
+      ev.TotalAmount,
+      pay.totalAmount,
+      pay.TotalAmount,
+      pay.grandTotal,
+      ev.grandTotal,
+      ev.finalAmount,
+      ev.FinalAmount
+    ) ??
+    fromParts() ??
+    firstPositiveNumber(
+      ev.estimatedRevenue,
+      ev.EstimatedRevenue,
+      ev.estimatedBudget,
+      ev.EstimatedBudget,
+      ev.budget,
+      ev.total
+    )
+  );
+};
+
+const VAT_RATE_DISPLAY = 0.1;
+
+/**
+ * Tạm tính + VAT 10% giống trang đặt sự kiện (Services).
+ * Nếu API chỉ trả totalAmount = tạm tính (chưa VAT) → vẫn hiển thị đủ 3 dòng nhờ tính từ món × bàn + dịch vụ.
+ */
+const getEventPaymentDisplay = (ev, computedPreVat) => {
+  const pay = ev.payment || ev.Payment || {};
+  const apiVat = Number(pick(ev, ['vatAmount', 'VatAmount'], NaN));
+  const apiBefore = Number(pick(ev, ['amountBeforeVat', 'AmountBeforeVat', 'subtotal', 'Subtotal'], NaN));
+  const apiTotal = firstPositiveNumber(
+    ev.totalAmount,
+    ev.TotalAmount,
+    pay.totalAmount,
+    pay.TotalAmount
+  );
+
+  const pre = Number(computedPreVat);
+  const hasLines = Number.isFinite(pre) && pre > 0;
+  const vatFromPre = Math.round(pre * VAT_RATE_DISPLAY);
+  const grandFromPre = pre + vatFromPre;
+
+  if (Number.isFinite(apiBefore) && apiBefore > 0 && Number.isFinite(apiVat) && apiVat >= 0) {
+    return {
+      subtotal: Math.round(apiBefore),
+      vat: Math.round(apiVat),
+      grand: Math.round(apiBefore + apiVat),
+      vatPercent: Number(pick(ev, ['vatPercent', 'VatPercent'], 10)) || 10,
+    };
+  }
+
+  if (hasLines) {
+    if (apiTotal != null && apiTotal >= grandFromPre - 2) {
+      return {
+        subtotal: Math.round(pre),
+        vat: Math.max(0, Math.round(apiTotal - pre)),
+        grand: Math.round(apiTotal),
+        vatPercent: 10,
+      };
+    }
+    if (apiTotal == null || apiTotal <= pre + 1) {
+      return {
+        subtotal: Math.round(pre),
+        vat: vatFromPre,
+        grand: grandFromPre,
+        vatPercent: 10,
+      };
+    }
+    return {
+      subtotal: Math.round(pre),
+      vat: vatFromPre,
+      grand: grandFromPre,
+      vatPercent: 10,
+    };
+  }
+
+  const fallback = resolveEventGrandTotal(ev);
+  if (fallback != null) {
+    return { subtotal: null, vat: null, grand: Math.round(fallback), vatPercent: null };
+  }
+  return { subtotal: null, vat: null, grand: null, vatPercent: null };
+};
+
 const EventOrderDetailModal = ({ eventData, onClose }) => {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pdfExporting, setPdfExporting] = useState(false);
 
   // Xác định bookEventId từ eventData
   const bookEventId = pick(eventData, ['bookEventId', 'eventBookingId', 'eventId', 'id', 'bookingId']);
@@ -119,9 +237,9 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
   // Lấy thông tin sự kiện
   const eventDate = pick(ev, ['eventDate', 'bookingDate', 'reservationDate', 'eventTime', 'bookingTime']) ? fmtDate(ev.eventDate || ev.bookingDate || ev.reservationDate) : '—';
   const eventTime = fmtTime(ev.eventTime || ev.bookingTime || ev.reservationTime);
-  const numberOfGuests = pick(ev, ['numberOfGuests', 'guestCount', 'guests'], 0);
+  const numberOfTables = pick(ev, ['numberOfGuests', 'guestCount', 'guests'], 0);
+  const tablesForPricing = Math.max(1, Number(numberOfTables) || 1);
   const note = pick(ev, ['note', 'specialRequests', 'requirements'], '');
-  const estimatedBudget = pick(ev, ['estimatedBudget', 'budget', 'totalAmount', 'estimatedRevenue', 'total'], null);
 
   // Thực đơn & dịch vụ
   const menuItems = ev.foods || ev.menuItems || ev.eventFoods || [];
@@ -129,11 +247,96 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
   const contractCode = pick(ev, ['contractCode', 'contractNumber', 'contractId'], '');
   const contractStatus = pick(ev, ['contractStatus', 'signed'], null);
 
-  const totalMenu = menuItems.reduce((sum, item) => {
-    const price = Number(pick(item, ['price', 'unitPrice', 'totalPrice', 'amount'], 0));
+  const menuPerTable = menuItems.reduce((sum, item) => {
+    const line = Number(pick(item, ['subtotal', 'Subtotal', 'lineTotal', 'LineTotal'], NaN));
+    if (Number.isFinite(line) && line >= 0) return sum + line;
+    const price = Number(pick(item, ['price', 'unitPrice', 'UnitPrice', 'totalPrice', 'amount'], 0));
     const qty = Number(pick(item, ['quantity', 'qty', 'count'], 1));
     return sum + price * qty;
   }, 0);
+  const menuFeeAllTables = menuPerTable * tablesForPricing;
+
+  const servicesFeeTotal = services.reduce((sum, svc) => {
+    const line = Number(pick(svc, ['subtotal', 'Subtotal', 'lineTotal', 'total', 'Total'], NaN));
+    if (Number.isFinite(line) && line >= 0) return sum + line;
+    const p = Number(pick(svc, ['unitPrice', 'price', 'Price', 'amount'], 0));
+    const q = Number(pick(svc, ['quantity', 'qty'], 1));
+    return sum + p * q;
+  }, 0);
+
+  const computedPreVat = menuFeeAllTables + servicesFeeTotal;
+  const paymentDisplay = getEventPaymentDisplay(ev, computedPreVat);
+
+  const printEventInvoiceClient = () => {
+    const menuLines = (menuItems || []).map((item) => {
+      const line = Number(pick(item, ['subtotal', 'Subtotal', 'lineTotal', 'LineTotal'], NaN));
+      const price = Number(pick(item, ['price', 'unitPrice', 'UnitPrice', 'totalPrice', 'amount'], 0));
+      const qty = Number(pick(item, ['quantity', 'qty', 'count'], 1));
+      const amount = Number.isFinite(line) && line >= 0 ? line : price * qty;
+      return {
+        name: pick(item, ['name', 'foodName', 'dishName'], 'Món'),
+        qty,
+        amount,
+      };
+    });
+    const serviceLines = (services || []).map((svc) => {
+      const line = Number(pick(svc, ['subtotal', 'Subtotal', 'lineTotal', 'total', 'Total'], NaN));
+      const p = Number(pick(svc, ['unitPrice', 'price', 'Price', 'amount'], 0));
+      const q = Number(pick(svc, ['quantity', 'qty'], 1));
+      const amount = Number.isFinite(line) && line >= 0 ? line : p * q;
+      return { name: pick(svc, ['name', 'serviceName', 'title'], 'Dịch vụ'), amount };
+    });
+    printEventBookingInvoice({
+      bookingCode,
+      eventTypeName,
+      dateTime: `${eventDate} ${eventTime}`.trim(),
+      tables: String(numberOfTables || ''),
+      buyerName: customerName,
+      buyerPhone: phone,
+      buyerEmail: email,
+      menuLines,
+      serviceLines,
+      subtotal: paymentDisplay.subtotal,
+      vat: paymentDisplay.vat,
+      grandTotal: paymentDisplay.grand != null ? paymentDisplay.grand : 0,
+      note,
+    });
+  };
+
+  const handlePrintEventInvoice = async () => {
+    const invKey = String(bookingCode || '').replace(/^#/, '').trim();
+    setPdfExporting(true);
+    try {
+      if (invKey) {
+        try {
+          await downloadInvoicePdf(invKey);
+          return;
+        } catch (e1) {
+          const msg = await getPdfErrorMessage(e1);
+          console.warn('[pdf-export/invoice booking]', msg);
+        }
+      }
+      printEventInvoiceClient();
+    } finally {
+      setPdfExporting(false);
+    }
+  };
+
+  const handleDownloadEventContractPdf = async () => {
+    const cc = String(contractCode || '').trim();
+    if (!cc) {
+      window.alert('Chưa có mã hợp đồng để tải PDF.');
+      return;
+    }
+    setPdfExporting(true);
+    try {
+      await downloadContractPdf(cc);
+    } catch (e) {
+      window.alert((await getPdfErrorMessage(e)) || 'Tải PDF hợp đồng thất bại.');
+    } finally {
+      setPdfExporting(false);
+    }
+  };
 
   return (
     <div className="event-modal-overlay" onClick={onClose}>
@@ -179,8 +382,8 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
                   <p className="event-type-name">{eventTypeName}</p>
                 </div>
                 <div className="event-guest-count">
-                  <span className="event-guest-num">{numberOfGuests}</span>
-                  <span className="event-guest-unit">khách</span>
+                  <span className="event-guest-num">{numberOfTables}</span>
+                  <span className="event-guest-unit">bàn</span>
                 </div>
               </div>
 
@@ -226,8 +429,8 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
                       <span className="event-info-value">{eventTime}</span>
                     </div>
                     <div className="event-info-row">
-                      <span className="event-info-label">Số khách</span>
-                      <span className="event-info-value">{numberOfGuests} người</span>
+                      <span className="event-info-label">Số bàn</span>
+                      <span className="event-info-value">{numberOfTables} bàn</span>
                     </div>
                     {contractCode && (
                       <div className="event-info-row">
@@ -273,10 +476,10 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
                       </div>
                     ))}
                   </div>
-                  {totalMenu > 0 && (
+                  {menuFeeAllTables > 0 && (
                     <div className="event-menu-total">
-                      <span>Tổng thực đơn</span>
-                      <span className="event-menu-total-price">{formatCurrency(totalMenu)}</span>
+                      <span>Tổng thực đơn{Number(numberOfTables) > 1 ? ` (${numberOfTables} bàn)` : ''}</span>
+                      <span className="event-menu-total-price">{formatCurrency(menuFeeAllTables)}</span>
                     </div>
                   )}
                 </div>
@@ -305,12 +508,26 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
                 </div>
               )}
 
-              {/* Budget Summary */}
-              {estimatedBudget != null && (
+              {/* Tổng: ưu tiên API; nếu API thiếu VAT → tính 10% như lúc đặt (Services) */}
+              {paymentDisplay.grand != null && (
                 <div className="event-budget-section">
+                  {paymentDisplay.subtotal != null && paymentDisplay.subtotal > 0 && (
+                    <div className="event-budget-row event-budget-subrow">
+                      <span className="event-budget-label-muted">Tạm tính</span>
+                      <span className="event-budget-subvalue">{formatCurrency(paymentDisplay.subtotal)}</span>
+                    </div>
+                  )}
+                  {paymentDisplay.vat != null && paymentDisplay.vat > 0 && (
+                    <div className="event-budget-row event-budget-subrow">
+                      <span className="event-budget-label-muted">
+                        VAT{paymentDisplay.vatPercent ? ` (${paymentDisplay.vatPercent}%)` : ''}
+                      </span>
+                      <span className="event-budget-subvalue">{formatCurrency(paymentDisplay.vat)}</span>
+                    </div>
+                  )}
                   <div className="event-budget-row">
-                    <span className="event-budget-label">Ước tính tổng chi phí</span>
-                    <span className="event-budget-value">{formatCurrency(estimatedBudget)}</span>
+                    <span className="event-budget-label">Tổng chi phí</span>
+                    <span className="event-budget-value">{formatCurrency(paymentDisplay.grand)}</span>
                   </div>
                 </div>
               )}
@@ -320,6 +537,34 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
 
         {/* Footer */}
         <div className="event-modal-footer">
+          {contractCode ? (
+            <button
+              type="button"
+              className="event-modal-btn"
+              disabled={pdfExporting}
+              onClick={handleDownloadEventContractPdf}
+              style={{
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid rgba(29, 78, 216, 0.35)',
+              }}
+            >
+              <i className="fa-solid fa-file-pdf" /> PDF hợp đồng
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="event-modal-btn"
+            disabled={pdfExporting}
+            onClick={handlePrintEventInvoice}
+            style={{
+              background: '#fff7ed',
+              color: '#c2410c',
+              border: '1px solid rgba(236, 91, 19, 0.45)',
+            }}
+          >
+            <i className="fa-solid fa-print" /> {pdfExporting ? 'Đang xử lý…' : 'Xuất hóa đơn (PDF)'}
+          </button>
           <button className="event-modal-btn event-modal-btn-close" onClick={onClose}>
             <i className="fa-solid fa-arrow-left"></i> Đóng
           </button>
@@ -630,6 +875,21 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
           font-weight: 700;
           color: #64748b;
         }
+        .event-budget-label-muted {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #94a3b8;
+        }
+        .event-budget-subrow {
+          padding-bottom: 6px;
+          margin-bottom: 6px;
+          border-bottom: 1px dashed #e2e8f0;
+        }
+        .event-budget-subvalue {
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: #64748b;
+        }
         .event-budget-value {
           font-size: 1.2rem;
           font-weight: 900;
@@ -640,6 +900,8 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
           border-top: 1px solid #e2e8f0;
           display: flex;
           justify-content: flex-end;
+          align-items: center;
+          flex-wrap: wrap;
           gap: 12px;
           flex-shrink: 0;
         }

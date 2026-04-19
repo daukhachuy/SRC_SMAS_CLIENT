@@ -15,9 +15,13 @@ import {
   Headphones,
   Tag,
   CheckCircle,
+  Printer,
 } from 'lucide-react';
 import { myOrderAPI } from '../api/myOrderApi';
 import { createOrUpdateFeedback } from '../api/feedbackApi';
+import { resolveOrderVatAndGrandTotal } from '../constants/orderPricing';
+import { printSalesInvoice } from '../utils/orderInvoicePrint';
+import { downloadInvoicePdf, getPdfErrorMessage } from '../api/pdfExportApi';
 import '../styles/OrderDetailModal.css';
 
 const FEEDBACK_TAGS = [
@@ -56,6 +60,7 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [invoiceExporting, setInvoiceExporting] = useState(false);
 
   useEffect(() => {
     if (!orderProp?.orderCode) {
@@ -173,12 +178,82 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
         0
     ) || 0;
   const discountAmount = Number(order.discountAmount ?? order.discount ?? 0) || 0;
-  const taxAmount = Number(order.taxAmount ?? 0) || 0;
+  const billing = resolveOrderVatAndGrandTotal({
+    subtotal,
+    deliveryFee,
+    discountAmount,
+    apiTotalAmount: order.totalAmount,
+    apiTaxAmount: order.taxAmount ?? order.vatAmount ?? order.VatAmount,
+  });
+  const taxAmount = billing.vat;
+  const grandTotal = billing.grand;
 
-  const apiTotal = order.totalAmount != null ? Number(order.totalAmount) : null;
-  const computedTotal = subtotal + deliveryFee + taxAmount - discountAmount;
-  const grandTotal =
-    apiTotal != null && !Number.isNaN(apiTotal) ? apiTotal : computedTotal;
+  const mapOrderTypeVi = () => {
+    const t = String(order.orderType ?? order.OrderType ?? '').trim().toLowerCase();
+    if (t.includes('delivery')) return 'Giao hàng';
+    if (t.includes('take')) return 'Mang đi';
+    if (t.includes('dine')) return 'Tại chỗ / Đặt bàn';
+    return String(order.orderType || order.OrderType || '').trim() || '—';
+  };
+
+  const tableInfoForInvoice = () => {
+    const tabs = order?.tables;
+    if (!Array.isArray(tabs) || tabs.length === 0) return '';
+    const parts = tabs
+      .map((tb) => tb?.tableCode ?? tb?.tableNumber ?? tb?.code ?? tb?.name)
+      .filter(Boolean);
+    return parts.length ? parts.join(', ') : '';
+  };
+
+  const handlePrintInvoice = () => {
+    const lines = items.map((item) => ({
+      name: item.itemName,
+      qty: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal ?? item.quantity * item.unitPrice,
+    }));
+    printSalesInvoice({
+      orderCode: String(order.orderCode || order.code || order.id || ''),
+      orderTypeLabel: mapOrderTypeVi(),
+      dateTime: orderDate,
+      buyerName:
+        order.delivery?.recipientName ||
+        order.customer?.fullName ||
+        order.customer?.fullname ||
+        '',
+      buyerPhone:
+        order.delivery?.phone || order.customer?.phone || order.delivery?.recipientPhone || '',
+      buyerAddress: order.delivery?.address || '',
+      tableInfo: tableInfoForInvoice(),
+      lines,
+      subtotal,
+      shippingFee: deliveryFee,
+      discountAmount,
+      vatAmount: taxAmount,
+      grandTotal,
+      note: order.note || order.delivery?.note || order.deliveryInfo?.note || '',
+    });
+  };
+
+  const handleExportInvoicePdf = async () => {
+    const code = String(order.orderCode || order.code || '').trim();
+    if (!code) {
+      setToast({ type: 'error', message: 'Thiếu mã đơn để tải PDF.' });
+      handlePrintInvoice();
+      return;
+    }
+    setInvoiceExporting(true);
+    try {
+      await downloadInvoicePdf(code);
+      setToast({ type: 'success', message: 'Đã tải hóa đơn PDF từ server.' });
+    } catch (e) {
+      const msg = await getPdfErrorMessage(e);
+      handlePrintInvoice();
+      setToast({ type: 'error', message: `${msg} Đã mở bản in nhanh trên trình duyệt.` });
+    } finally {
+      setInvoiceExporting(false);
+    }
+  };
 
   const statusLabel = order.orderStatus || order.status || order.displayStatus || 'Đang xử lý';
   /** Hiện nút đánh giá: đúng `order.status === 'Completed'` hoặc backend trả orderStatus/COMPLETED */
@@ -342,16 +417,16 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
                 <span>Tạm tính</span>
                 <span>{fmtMoney(subtotal)}đ</span>
               </div>
+              {taxAmount > 0 && (
+                <div className="od-billing-row">
+                  <span>VAT (10%)</span>
+                  <span>+{fmtMoney(taxAmount)}đ</span>
+                </div>
+              )}
               <div className="od-billing-row">
                 <span>Phí vận chuyển</span>
                 <span>{deliveryFee > 0 ? `+${fmtMoney(deliveryFee)}đ` : 'Miễn phí'}</span>
               </div>
-              {taxAmount > 0 && (
-                <div className="od-billing-row">
-                  <span>Thuế</span>
-                  <span>+{fmtMoney(taxAmount)}đ</span>
-                </div>
-              )}
               {discountAmount > 0 && (
                 <div className="od-billing-row" style={{ color: '#16a34a' }}>
                   <span>Giảm giá</span>
@@ -444,6 +519,15 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
             )}
           </div>
           <div className="od-modal-footer-actions">
+            <button
+              type="button"
+              className="od-btn-invoice"
+              onClick={handleExportInvoicePdf}
+              disabled={!!loading || invoiceExporting}
+              title="Tải PDF từ server; nếu lỗi sẽ mở bản in nhanh"
+            >
+              <Printer size={18} /> {invoiceExporting ? 'Đang tải PDF…' : 'Xuất hóa đơn (PDF)'}
+            </button>
             <button type="button" className="od-btn-secondary" onClick={onClose}>
               Đóng
             </button>

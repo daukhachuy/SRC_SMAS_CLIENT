@@ -1043,6 +1043,58 @@
   max-width: 1080px;
 }
 
+/* Waiter payment modal: scrollable dish list, footer stays put */
+.modal-container.modal-payment {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-payment .modal-header {
+  flex-shrink: 0;
+}
+
+.modal-payment > .payment-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.modal-payment .payment-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.modal-payment .payment-left h4 {
+  flex-shrink: 0;
+}
+
+.modal-payment .payment-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-payment .payment-totals {
+  flex-shrink: 0;
+}
+
+.modal-payment .payment-right {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.modal-payment > .modal-footer {
+  flex-shrink: 0;
+}
+
 .modal-subtitle {
   margin: 4px 0 0;
   color: #7a6f66;
@@ -2586,6 +2638,21 @@
 
 .modal-footer.split {
   justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.payment-modal-footer {
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.payment-modal-footer .payment-invoice-btn {
+  flex: 0 0 auto;
+}
+
+.payment-modal-footer .payment-complete-btn {
+  flex: 1 1 260px;
+  min-width: min(100%, 240px);
 }
 
 .btn-danger-outline {
@@ -3081,6 +3148,12 @@
 
 .btn-add-outline:hover {
   background: rgba(255, 109, 31, 0.08);
+}
+
+.btn-add-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .modal-add-items {
@@ -3585,6 +3658,10 @@
     grid-template-columns: 1fr;
   }
 
+  .modal-payment .payment-left {
+    max-height: min(52vh, 520px);
+  }
+
   .order-detail-left,
   .payment-left {
     border-right: 0;
@@ -3727,6 +3804,13 @@
   .modal-footer.split,
   .modal-footer.end {
     justify-content: stretch;
+  }
+
+  .payment-modal-footer .payment-invoice-btn,
+  .payment-modal-footer .payment-complete-btn {
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .btn-danger-outline,
