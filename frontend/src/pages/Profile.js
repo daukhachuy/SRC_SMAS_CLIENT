@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/Profile.css';
-import { getProfile, updateProfile } from '../api/userApi';
+import { getProfile, updateProfile, changePassword } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { formatCurrency } from '../api/managerApi';
-import CustomerNoticeModal from '../components/CustomerNoticeModal';
 
 /** Strips legacy "|@lat,lng" suffix if present (old saved addresses). */
 function stripLegacyGpsSuffix(text) {
@@ -96,13 +95,10 @@ const Profile = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
-  /** Hiển thị ngày sinh dạng DD/MM/YYYY khi gõ (đồng bộ với userInfo.dob dạng ISO) */
   const [dobInput, setDobInput] = useState('');
   const [fieldErrors, setFieldErrors] = useState({ phone: '', dob: '' });
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
-  const [customerNotice, setCustomerNotice] = useState(null);
   const [newAddress, setNewAddress] = useState({
     street: '',
     district: '',
@@ -114,6 +110,10 @@ const Profile = () => {
   });
   const [provinceOptions, setProvinceOptions] = useState([]);
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -174,11 +174,10 @@ const Profile = () => {
             ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—';
           const statusRaw = (item.status ?? item.contractStatus ?? '').toLowerCase();
           const statusMap = {
-            pending:      { label: 'Chờ duyệt',       cls: 'status-pending' },
-            approved:     { label: 'Đã duyệt',        cls: 'status-confirmed' },
-            rejected:     { label: 'Đã từ chối',      cls: 'status-cancelled' },
-            active:       { label: 'Đang hoạt động',  cls: 'status-signed' },
-            completed:    { label: 'Hoàn thành',      cls: 'status-signed' },
+            pending:      { label: 'Chờ xác nhận',  cls: 'status-pending' },
+            confirmed:    { label: 'Đã xác nhận',    cls: 'status-confirmed' },
+            signed:       { label: 'Đã ký hợp đồng', cls: 'status-signed' },
+            deposit:      { label: 'Chờ đặt cọc',    cls: 'status-deposit' },
             cancelled:    { label: 'Đã hủy',          cls: 'status-cancelled' },
             cancel:       { label: 'Đã hủy',          cls: 'status-cancelled' },
           };
@@ -268,7 +267,8 @@ const Profile = () => {
       setFieldErrors((prev) => ({ ...prev, phone: 'Vui lòng nhập số điện thoại.' }));
       return;
     }
-    const dobFinal = parseDdMmYyyyToIso(dobInput) || userInfo.dob;
+    // Xử lý ngày sinh - lấy từ userInfo.dob (đã được xử lý bởi handleDobChange/handleDobBlur)
+    const dobFinal = userInfo.dob;
     if (!dobFinal) {
       const msg = 'Vui lòng nhập ngày sinh đúng định dạng DD/MM/YYYY.';
       setError(msg);
@@ -283,14 +283,14 @@ const Profile = () => {
       return;
     }
     const phone = userInfo.phone.startsWith('0') ? '+84' + userInfo.phone.slice(1) : userInfo.phone;
-    const defaultAddr = addresses.find(a => a.isDefault);
+    const defaultAddr = addresses.find((a) => a.isDefault);
     try {
       setIsSubmitting(true);
       await updateProfile({
         ...userInfo,
         dob: dobFinal,
         phone,
-        address: defaultAddr ? defaultAddr.address : userInfo.address
+        address: defaultAddr ? defaultAddr.address : userInfo.address,
       });
       setSuccessMessage('Cập nhật thông tin thành công!');
     } catch (err) {
@@ -302,30 +302,71 @@ const Profile = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
+    setPasswordError('');
+    setPasswordSuccess('');
     const { currentPassword, newPassword, confirmPassword } = passwordForm;
+
+    // Validation mật khẩu hiện tại
+    if (!currentPassword || currentPassword.trim() === '') {
+      setPasswordError('Vui lòng nhập mật khẩu hiện tại.');
+      return;
+    }
+    if (currentPassword.length < 6) {
+      setPasswordError('Mật khẩu hiện tại phải có ít nhất 6 ký tự.');
+      return;
+    }
+
+    // Validation mật khẩu mới
     if (!newPassword || newPassword.length < 8) {
-      setError('Mật khẩu mới phải dài ít nhất 8 ký tự.');
+      setPasswordError('Mật khẩu mới phải dài ít nhất 8 ký tự.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('Mật khẩu mới không được trùng với mật khẩu hiện tại.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Xác nhận mật khẩu không khớp.');
+      setPasswordError('Xác nhận mật khẩu không khớp.');
       return;
     }
+
     try {
-      setIsPasswordSubmitting(true);
-      await updateProfile({
-        ...userInfo,
-        oldPassword: currentPassword,
-        confirmPassword: newPassword
-      });
+      setChangingPassword(true);
+      const response = await changePassword(currentPassword, newPassword);
+      
+      // Kiem tra response tu backend
+      if (response && response.success === false) {
+        const msg = response.message || response.error || '';
+        if (msg.toLowerCase().includes('current') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('sai') || msg.toLowerCase().includes('incorrect')) {
+          setPasswordError('Mật khẩu hiện tại không đúng. Vui lòng thử lại.');
+          return;
+        }
+        setPasswordError(msg || 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+        return;
+      }
+      
+      // Thanh cong
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setSuccessMessage('Cập nhật mật khẩu thành công!');
+      setPasswordSuccess('Đổi mật khẩu thành công!');
+      setTimeout(() => setShowPasswordModal(false), 1500);
     } catch (err) {
-      setError(err.message || 'Cập nhật mật khẩu thất bại.');
+      // Parse error tu response
+      const errorData = err?.response?.data || {};
+      const errorMsg = errorData.message || err.message || '';
+      const status = err?.status || err?.response?.status;
+      
+      // Kiem tra cac truong hop loi cu the
+      if (status === 400 || errorMsg.toLowerCase().includes('current') || errorMsg.toLowerCase().includes('wrong') || errorMsg.toLowerCase().includes('sai') || errorMsg.toLowerCase().includes('incorrect') || errorMsg.toLowerCase().includes('không đúng') || errorMsg.toLowerCase().includes('password')) {
+        setPasswordError('Mật khẩu hiện tại không đúng. Vui lòng thử lại.');
+      } else if (status === 401) {
+        setPasswordError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      } else if (status === 403) {
+        setPasswordError('Bạn không có quyền thực hiện thao tác này.');
+      } else {
+        setPasswordError(errorMsg || 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+      }
     } finally {
-      setIsPasswordSubmitting(false);
+      setChangingPassword(false);
     }
   };
 
@@ -552,7 +593,7 @@ const Profile = () => {
       {/* 1. Thông tin cá nhân */}
       <section className="Profile-Section">
         <h2 className="Profile-Section-Title">
-          <i className="fa-solid fa-location-dot Profile-Section-Icon"></i>
+          <i className="fa-solid fa-user Profile-Section-Icon"></i>
           Thông tin cá nhân
         </h2>
         <form onSubmit={handleSaveProfile} className="Profile-Form-Block">
@@ -563,21 +604,71 @@ const Profile = () => {
             </div>
             <div className="Profile-Field">
               <label>Ngày sinh</label>
-              <div className="Profile-Input-With-Icon">
+              <div className="Profile-Date-Input-Wrap">
                 <input
                   type="text"
-                  inputMode="numeric"
-                  autoComplete="bday"
                   name="dob"
                   value={dobInput}
                   onChange={handleDobChange}
                   onBlur={handleDobBlur}
                   placeholder="DD/MM/YYYY"
                   maxLength={10}
-                  className={fieldErrors.dob ? 'Profile-Input-Error' : ''}
+                  className={`Profile-Date-Text-Input ${fieldErrors.dob ? 'Profile-Input-Error' : ''}`}
                   aria-invalid={!!fieldErrors.dob}
                 />
-                <i className="fa-regular fa-calendar Profile-Field-Icon"></i>
+                <button
+                  type="button"
+                  className="Profile-Date-Picker-Btn"
+                  onClick={() => {
+                    console.log('📅 Calendar button clicked');
+                    try {
+                      // Tạo input date tạm
+                      const input = document.createElement('input');
+                      input.type = 'date';
+                      input.style.position = 'absolute';
+                      input.style.left = '-9999px';
+                      input.style.top = '-9999px';
+                      input.style.opacity = '0';
+                      document.body.appendChild(input);
+
+                      console.log('📅 Picker created, focusing...');
+                      input.focus();
+
+                      // Timeout để đảm bảo focus đã được set
+                      setTimeout(() => {
+                        if (document.activeElement === input) {
+                          console.log('📅 Input focused, showing picker');
+                        } else {
+                          console.log('📅 Input not focused, trying click');
+                          input.click();
+                        }
+                      }, 100);
+
+                      input.addEventListener('change', (e) => {
+                        const val = e.target.value;
+                        console.log('📅 Date selected:', val);
+                        if (val) {
+                          setUserInfo((prev) => ({ ...prev, dob: val }));
+                          setDobInput(isoToDdMmYyyy(val));
+                        }
+                        setFieldErrors((prev) => ({ ...prev, dob: '' }));
+                        document.body.removeChild(input);
+                      });
+
+                      input.addEventListener('blur', () => {
+                        console.log('📅 Picker blurred');
+                        if (document.body.contains(input)) {
+                          document.body.removeChild(input);
+                        }
+                      });
+                    } catch (err) {
+                      console.error('📅 Error showing picker:', err);
+                    }
+                  }}
+                  title="Chọn ngày từ lịch"
+                >
+                  <i className="fa-regular fa-calendar"></i>
+                </button>
               </div>
               {fieldErrors.dob && <p className="Profile-Field-Error">{fieldErrors.dob}</p>}
             </div>
@@ -614,6 +705,11 @@ const Profile = () => {
             <div className="Profile-Field Profile-Field-Full">
               <label>Email</label>
               <input type="email" value={typeof userInfo.email === 'string' ? userInfo.email : (userInfo.email?.toString?.() || '')} readOnly className="Profile-Input-Readonly" />
+            </div>
+            <div className="Profile-Field-Compact">
+              <button type="button" className="Profile-Link-Edit" onClick={() => setShowPasswordModal(true)}>
+                <i className="fa-solid fa-key"></i> Đổi mật khẩu
+              </button>
             </div>
           </div>
           <div className="Profile-Form-Actions">
@@ -656,61 +752,6 @@ const Profile = () => {
             </div>
           ))}
         </div>
-      </section>
-
-
-      {/* 4. Đổi mật khẩu */}
-      <section className="Profile-Section">
-        <h2 className="Profile-Section-Title">
-          <i className="fa-solid fa-lock Profile-Section-Icon"></i>
-          Đổi mật khẩu
-        </h2>
-        <form onSubmit={handleChangePassword} className="Profile-Form-Block">
-          <div className="Profile-Password-Fields">
-            <div className="Profile-Field">
-              <label>Mật khẩu hiện tại</label>
-              <div className="Profile-Input-With-Icon">
-                <input
-                  type={showPass.current ? 'text' : 'password'}
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder="********"
-                />
-                <i className={`fa-solid ${showPass.current ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, current: !showPass.current })}></i>
-              </div>
-            </div>
-            <div className="Profile-Field">
-              <label>Mật khẩu mới</label>
-              <div className="Profile-Input-With-Icon">
-                <input
-                  type={showPass.new ? 'text' : 'password'}
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  placeholder="********"
-                />
-                <i className={`fa-solid ${showPass.new ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, new: !showPass.new })}></i>
-              </div>
-            </div>
-            <div className="Profile-Field">
-              <label>Xác nhận mật khẩu</label>
-              <div className="Profile-Input-With-Icon">
-                <input
-                  type={showPass.confirm ? 'text' : 'password'}
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  placeholder="********"
-                />
-                <i className={`fa-solid ${showPass.confirm ? 'fa-eye' : 'fa-eye-slash'} Profile-TogglePass`} onClick={() => setShowPass({ ...showPass, confirm: !showPass.confirm })}></i>
-              </div>
-            </div>
-          </div>
-          <p className="Profile-Password-Hint">Mật khẩu phải dài ít nhất 8 ký tự, bao gồm chữ cái và số.</p>
-          <div className="Profile-Form-Actions">
-            <button type="submit" className="Profile-Btn Primary" disabled={isPasswordSubmitting}>
-              {isPasswordSubmitting ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
-            </button>
-          </div>
-        </form>
       </section>
 
       {/* Modal Thêm địa chỉ mới - layout rộng cho máy tính */}
@@ -788,15 +829,15 @@ const Profile = () => {
                         className={`AddressModal-TypeBtn ${newAddress.addressType === 'Khác' ? 'active' : ''}`}
                         onClick={() => setNewAddress({ ...newAddress, addressType: 'Khác' })}
                       >
-                        <i className="fa-solid fa-plus"></i> Khác
+                        <i className="fa-solid fa-location-dot"></i> + Khác
                       </button>
                     </div>
                     <input
                       type="text"
+                      className="AddressModal-InputNoIcon"
                       placeholder="Tên gợi nhớ (Ví dụ: Nhà nội, Studio...)"
                       value={newAddress.memorableName}
                       onChange={(e) => setNewAddress({ ...newAddress, memorableName: e.target.value })}
-                      className="AddressModal-InputNoIcon"
                     />
                   </div>
                   <div className="AddressModal-Field">
@@ -805,15 +846,14 @@ const Profile = () => {
                       <i className="fa-solid fa-phone AddressModal-InputIcon"></i>
                       <input
                         type="text"
-                        placeholder="09xx xxx xxx"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="0912345678"
                         value={newAddress.phone}
-                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value.replace(/\D/g, '') })}
-                        maxLength={11}
+                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value.replace(/\D/g, '').slice(0, 11) })}
                       />
                     </div>
-                    <p className="AddressModal-Hint">
-                      Tài xế sẽ liên hệ số này khi giao hàng
-                    </p>
+                    <p className="AddressModal-Hint">Tài xế sẽ liên hệ số này khi giao hàng</p>
                   </div>
                   <label className="AddressModal-Checkbox">
                     <input
@@ -838,10 +878,53 @@ const Profile = () => {
         </div>
       )}
 
-      <CustomerNoticeModal
-        config={customerNotice}
-        onRequestClose={() => setCustomerNotice(null)}
-      />
+      {showPasswordModal && (
+        <div className="AddressModal-Overlay" onClick={() => setShowPasswordModal(false)}>
+          <div className="PasswordModal-Box" onClick={(e) => e.stopPropagation()}>
+            <div className="PasswordModal-Header">
+              <button type="button" className="AddressModal-Back" onClick={() => setShowPasswordModal(false)} aria-label="Đóng">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+              <h2 className="AddressModal-Title">Đổi mật khẩu</h2>
+              <div style={{ width: 40 }}></div>
+            </div>
+            <form onSubmit={handleChangePassword}>
+              <div className="PasswordModal-Body">
+                {passwordError && <p className="PasswordModal-Message PasswordModal-Error">{passwordError}</p>}
+                {passwordSuccess && <p className="PasswordModal-Message PasswordModal-Success">{passwordSuccess}</p>}
+                <div className="PasswordModal-Field">
+                  <label>Mật khẩu hiện tại</label>
+                  <div className="PasswordModal-InputWrap">
+                    <i className="fa-solid fa-lock"></i>
+                    <input type={showPass.current ? 'text' : 'password'} placeholder="Nhập mật khẩu hiện tại" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} required />
+                    <button type="button" className="PasswordModal-PassToggle" onClick={() => setShowPass({ ...showPass, current: !showPass.current })}><i className={`fa-solid ${showPass.current ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
+                  </div>
+                </div>
+                <div className="PasswordModal-Field">
+                  <label>Mật khẩu mới</label>
+                  <div className="PasswordModal-InputWrap">
+                    <i className="fa-solid fa-key"></i>
+                    <input type={showPass.new ? 'text' : 'password'} placeholder="Nhập mật khẩu mới" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} required />
+                    <button type="button" className="PasswordModal-PassToggle" onClick={() => setShowPass({ ...showPass, new: !showPass.new })}><i className={`fa-solid ${showPass.new ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
+                  </div>
+                </div>
+                <div className="PasswordModal-Field">
+                  <label>Xác nhận mật khẩu mới</label>
+                  <div className="PasswordModal-InputWrap">
+                    <i className="fa-solid fa-key"></i>
+                    <input type={showPass.confirm ? 'text' : 'password'} placeholder="Nhập lại mật khẩu mới" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} required />
+                    <button type="button" className="PasswordModal-PassToggle" onClick={() => setShowPass({ ...showPass, confirm: !showPass.confirm })}><i className={`fa-solid ${showPass.confirm ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
+                  </div>
+                </div>
+              </div>
+              <div className="PasswordModal-Footer">
+                <button type="button" className="PasswordModal-BtnCancel" onClick={() => setShowPasswordModal(false)}>Hủy</button>
+                <button type="submit" className="PasswordModal-BtnSave" disabled={changingPassword}>{changingPassword ? 'Đang xử lý...' : 'Xác nhận'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

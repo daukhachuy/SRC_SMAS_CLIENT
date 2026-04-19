@@ -99,6 +99,50 @@ const AboutPage = () => {
         </div>
       </section>
 
+      {/* TERMS OF SERVICE SECTION */}
+      <section className="terms-section">
+  <div className="terms-container">
+    <div className="terms-header">
+      <h2 className="terms-title">Điều Khoản Dịch Vụ</h2>
+      <p className="terms-subtitle">Các quy định chung để đảm bảo trải nghiệm tốt nhất cho quý khách</p>
+    </div>
+    
+    <div className="terms-content">
+      <div className="terms-item">
+        <h3>1. Thời Gian Buffet</h3>
+        <p>
+          Thời gian tối đa cho một suất Buffet là <strong>120 phút</strong>. 
+          Nhà hàng sẽ ngừng nhận gọi món trước 30 phút so với giờ đóng cửa để quý khách kịp hoàn tất bữa ăn.
+        </p>
+      </div>
+
+      <div className="terms-item">
+        <h3>2. Chính Sách Đặt Bàn</h3>
+        <p>
+          Quý khách vui lòng đặt bàn trước <strong>2 tiếng</strong>. Với đoàn khách trên 10 người hoặc nhu cầu tổ chức sự kiện, 
+          vui lòng liên hệ Hotline để được hỗ trợ sắp xếp khu vực riêng và xác nhận đặt cọc.
+        </p>
+      </div>
+
+      <div className="terms-item">
+        <h3>3. Giờ Hoạt Động</h3>
+        <p>
+          Mở cửa phục vụ từ <strong>{branches[0].hours}</strong> hàng ngày. 
+          Dịch vụ giao hàng tận nơi sẽ nhận đơn cuối cùng vào lúc 22:30 để đảm bảo chất lượng món ăn khi vận chuyển.
+        </p>
+      </div>
+
+      <div className="terms-item">
+        <h3>4. Thanh Toán & Thuế</h3>
+        <p>
+          Hỗ trợ đa dạng phương thức: Tiền mặt, Thẻ, Chuyển khoản. 
+          Lưu ý giá trên thực đơn chưa bao gồm VAT. Mọi khiếu nại về hóa đơn vui lòng phản hồi ngay tại quầy thu ngân.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
       {/* SERVICES SECTION */}
       <section className="services-section">
         <div className="services-container">

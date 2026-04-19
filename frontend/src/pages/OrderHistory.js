@@ -110,7 +110,7 @@ const OrderHistory = () => {
       }
       const orderData = Array.isArray(res) ? res : [];
 
-      const processedOrders = orderData
+          const processedOrders = orderData
         .map((order) => {
           const statusRaw = pickOrderStatusRaw(order);
           const effectiveStatus = normalizeOrderEffectiveStatus(statusRaw);
@@ -305,18 +305,6 @@ const OrderHistory = () => {
                       <span className="Grid-Label">ĐẶT NGÀY</span>
                       <br />
                       <span className="Grid-Value">{formattedDate}</span>
-                    </p>
-                  </div>
-                  <div className="Grid-Col">
-                    <p>
-                      <span className="Grid-Label">SỐ BÀN</span>
-                      <br />
-                      <span className="Grid-Value">{item.displayTable || '—'}</span>
-                    </p>
-                    <p>
-                      <span className="Grid-Label">SỰ KIỆN</span>
-                      <br />
-                      <span className="Grid-Value">{item.displayEvent || '—'}</span>
                     </p>
                   </div>
                 </div>
