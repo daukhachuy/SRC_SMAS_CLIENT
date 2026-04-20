@@ -69,6 +69,7 @@ const currentPeriod = () => {
 };
 
 const CHART_MONTH_OPTIONS = [3, 6, 12];
+const EMPTY_TX_FILTERS = { fromDate: '', toDate: '', orderCode: '', paymentMethod: '', paymentStatus: '' };
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -97,15 +98,26 @@ const AdminDashboard = () => {
   }, [period.month, period.year, revenueChartMonths, orderPeriod.month, orderPeriod.year]);
 
   // Transaction History state
-  const [txFilters, setTxFilters] = useState({ fromDate: '', toDate: '', orderCode: '', paymentMethod: '', paymentStatus: '' });
+  const [txFilterForm, setTxFilterForm] = useState(EMPTY_TX_FILTERS);
+  const [txFilters, setTxFilters] = useState(EMPTY_TX_FILTERS);
   const [txPage, setTxPage] = useState(1);
   const [txPageSize] = useState(10);
   const [txData, setTxData] = useState({ data: [], totalItems: 0, totalPages: 1 });
   const [txLoading, setTxLoading] = useState(false);
 
-  const handleTxSearch = () => setTxPage(1);
+  const handleTxSearch = () => {
+    setTxPage(1);
+    setTxFilters({
+      fromDate: txFilterForm.fromDate || '',
+      toDate: txFilterForm.toDate || '',
+      orderCode: String(txFilterForm.orderCode || '').trim(),
+      paymentMethod: txFilterForm.paymentMethod || '',
+      paymentStatus: txFilterForm.paymentStatus || '',
+    });
+  };
   const handleTxClear = () => {
-    setTxFilters({ fromDate: '', toDate: '', orderCode: '', paymentMethod: '', paymentStatus: '' });
+    setTxFilterForm(EMPTY_TX_FILTERS);
+    setTxFilters(EMPTY_TX_FILTERS);
     setTxPage(1);
   };
 
@@ -117,9 +129,28 @@ const AdminDashboard = () => {
       pageSize: txPageSize,
     })
       .then((r) => {
+        const rows = Array.isArray(r?.data) ? r.data : [];
+        const apiTotalItems = Number(r?.totalItems ?? rows.length);
+        const apiTotalPages = Math.max(1, Number(r?.totalPages ?? 1));
+
+        // Fallback: nếu BE không phân trang (trả full list), FE tự phân trang 10 dòng/trang.
+        const serverPagedLikely = rows.length <= txPageSize && apiTotalItems > txPageSize;
+        if (serverPagedLikely) {
+          setTxData({
+            data: rows,
+            totalItems: apiTotalItems,
+            totalPages: apiTotalPages,
+          });
+          return;
+        }
+
         const start = (txPage - 1) * txPageSize;
-        const slicedData = r.data.slice(start, start + txPageSize);
-        setTxData({ ...r, data: slicedData });
+        const pagedRows = rows.slice(start, start + txPageSize);
+        setTxData({
+          data: pagedRows,
+          totalItems: rows.length,
+          totalPages: Math.max(1, Math.ceil(rows.length / txPageSize)),
+        });
       })
       .catch(() => setTxData({ data: [], totalItems: 0, totalPages: 1 }))
       .finally(() => setTxLoading(false));
@@ -451,8 +482,8 @@ const AdminDashboard = () => {
               <input
                 type="date"
                 className="tx-input"
-                value={txFilters.fromDate}
-                onChange={(e) => setTxFilters((f) => ({ ...f, fromDate: e.target.value }))}
+                value={txFilterForm.fromDate}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, fromDate: e.target.value }))}
               />
             </label>
             <label className="tx-filter-label">
@@ -460,8 +491,8 @@ const AdminDashboard = () => {
               <input
                 type="date"
                 className="tx-input"
-                value={txFilters.toDate}
-                onChange={(e) => setTxFilters((f) => ({ ...f, toDate: e.target.value }))}
+                value={txFilterForm.toDate}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, toDate: e.target.value }))}
               />
             </label>
             <label className="tx-filter-label">
@@ -470,16 +501,16 @@ const AdminDashboard = () => {
                 type="text"
                 className="tx-input"
                 placeholder="VD: ORD-001"
-                value={txFilters.orderCode}
-                onChange={(e) => setTxFilters((f) => ({ ...f, orderCode: e.target.value }))}
+                value={txFilterForm.orderCode}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, orderCode: e.target.value }))}
               />
             </label>
             <label className="tx-filter-label">
               <span>Phương thức</span>
               <select
                 className="tx-input"
-                value={txFilters.paymentMethod}
-                onChange={(e) => setTxFilters((f) => ({ ...f, paymentMethod: e.target.value }))}
+                value={txFilterForm.paymentMethod}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, paymentMethod: e.target.value }))}
               >
                 <option value="">Tất cả</option>
                 <option value="Cash">Tiền mặt</option>
@@ -490,8 +521,8 @@ const AdminDashboard = () => {
               <span>Trạng thái</span>
               <select
                 className="tx-input"
-                value={txFilters.paymentStatus}
-                onChange={(e) => setTxFilters((f) => ({ ...f, paymentStatus: e.target.value }))}
+                value={txFilterForm.paymentStatus}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, paymentStatus: e.target.value }))}
               >
                 <option value="">Tất cả</option>
                 <option value="Paid">Đã thanh toán</option>

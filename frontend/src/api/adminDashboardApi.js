@@ -358,6 +358,7 @@ function normalizeTransactionHistory(raw) {
       const statusKey = normalizePaymentStatusKey(rawStatus);
       return {
         id: x.id ?? x.transactionId ?? x.paymentId ?? Math.random(),
+        paymentCode: x.paymentCode ?? x.code ?? '',
         paidAt: x.paidAt ?? x.paymentDate ?? x.createdAt ?? '',
         orderCode: x.orderCode ?? x.orderId ?? x.orderId ?? 'N/A',
         customerName: x.customerName ?? x.customer ?? x.userName ?? x.user ?? 'Khách lẻ',
