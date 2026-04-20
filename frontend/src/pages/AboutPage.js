@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { feedbackAPI } from '../api/feedbackApi';
 import '../styles/AboutPage.css';
 
 const AboutPage = () => {
   const navigate = useNavigate();
+  const [reviewCards, setReviewCards] = useState([
+    { id: 1, name: 'Lan Anh', text: '"Món cua sốt trứng muối rất đậm đà, nhân viên phục vụ 10 điểm."', avatar: 'https://i.pravatar.cc/100?u=lan-anh', rating: 5 },
+    { id: 2, name: 'Bích Ngọc', text: '"Lẩu hải sản vị thanh ngọt tự nhiên, gia đình tôi rất thích."', avatar: 'https://i.pravatar.cc/100?u=bich-ngoc', rating: 5 },
+    { id: 3, name: 'Hoàng Nam', text: '"View biển đẹp, đồ ăn ra nhanh và nóng hổi. Rất đáng tiền!"', avatar: 'https://i.pravatar.cc/100?u=hoang-nam', rating: 5 },
+    { id: 4, name: 'Thanh Tùng', text: '"Không gian đẹp, phục vụ chuyên nghiệp và cực kỳ thân thiện."', avatar: 'https://i.pravatar.cc/100?u=thanh-tung', rating: 5 }
+  ]);
 
   const services = [
     {
@@ -44,22 +51,67 @@ const AboutPage = () => {
     'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=600',
   ];
 
-  const reviews = [
-    {
-      id: 1,
-      name: 'Phương Uyên',
-      rating: 5,
-      comment: 'Dồ ăn ngon phục vụ nhiệt tình rất tốt để ghé thăm',
-      image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=300'
-    },
-  ];
+  useEffect(() => {
+    const API_ORIGIN = String(
+      process.env.REACT_APP_API_URL || 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api'
+    ).replace(/\/api\/?$/i, '');
 
-  const reviewCards = [
-    { id: 1, name: 'Lan Anh', text: '"Món cua sốt trứng muối rất đậm đà, nhân viên phục vụ 10 điểm."', avatar: 'https://i.pravatar.cc/100?u=lan-anh' },
-    { id: 2, name: 'Bích Ngọc', text: '"Lẩu hải sản vị thanh ngọt tự nhiên, gia đình tôi rất thích."', avatar: 'https://i.pravatar.cc/100?u=bich-ngoc' },
-    { id: 3, name: 'Hoàng Nam', text: '"View biển đẹp, đồ ăn ra nhanh và nóng hổi. Rất đáng tiền!"', avatar: 'https://i.pravatar.cc/100?u=hoang-nam' },
-    { id: 4, name: 'Thanh Tùng', text: '"Không gian đẹp, phục vụ chuyên nghiệp và cực kỳ thân thiện."', avatar: 'https://i.pravatar.cc/100?u=thanh-tung' }
-  ];
+    const toAvatarUrl = (fullname, rawAvatar) => {
+      const avatar = String(rawAvatar || '').trim();
+      if (avatar && avatar.toLowerCase() !== 'string') {
+        if (/^https?:\/\//i.test(avatar)) return avatar;
+        return `${API_ORIGIN}${avatar.startsWith('/') ? '' : '/'}${avatar}`;
+      }
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullname)}&background=fff3e8&color=e56600&bold=true`;
+    };
+
+    const loadFeedbacks = async () => {
+      try {
+        const rows = await feedbackAPI.getFeedbackLists();
+        const mapped = (Array.isArray(rows) ? rows : [])
+          .map((item, idx) => {
+            const fullname = String(item?.fullname || '').trim() || `Khách hàng ${idx + 1}`;
+            const rating = Math.max(1, Math.min(5, Number(item?.rating) || 0)) || 5;
+            const commentRaw = String(item?.comment || '').trim();
+            const comment = commentRaw || `Khách hàng đã đánh giá ${rating} sao cho trải nghiệm tại nhà hàng.`;
+            return {
+              id: Number(item?.feedbackId) || idx + 1,
+              name: fullname,
+              text: `"${comment}"`,
+              avatar: toAvatarUrl(fullname, item?.avatar),
+              rating,
+            };
+          })
+          .filter((x) => x.name && x.text);
+        if (mapped.length > 0) {
+          setReviewCards(mapped.slice(0, 8));
+        }
+      } catch (err) {
+        console.warn('About feedback load error:', err?.response?.data || err?.message);
+      }
+    };
+
+    loadFeedbacks();
+  }, []);
+
+  const reviewStats = useMemo(() => {
+    const total = reviewCards.length;
+    const avg = total > 0
+      ? reviewCards.reduce((sum, x) => sum + (Number(x.rating) || 0), 0) / total
+      : 4.9;
+    return {
+      avgText: avg.toFixed(1),
+      totalText: `${total.toLocaleString('vi-VN')}+ ĐÁNH GIÁ THỰC TẾ`,
+    };
+  }, [reviewCards]);
+
+  const getFeedbackStatusLabel = (rating) => {
+    const n = Number(rating) || 0;
+    if (n >= 5) return 'Thực khách hài lòng';
+    if (n >= 4) return 'Thực khách đánh giá tốt';
+    if (n >= 3) return 'Thực khách trải nghiệm';
+    return 'Thực khách góp ý';
+  };
 
   const branches = [
     {
@@ -195,9 +247,9 @@ const AboutPage = () => {
                 Khách hàng nói gì <br />
                 về chúng tôi?
               </h2>
-              <div className="about-big-rating">4.9</div>
+              <div className="about-big-rating">{reviewStats.avgText}</div>
               <div className="about-stars-row">★★★★★</div>
-              <p className="about-total-reviews">1,500+ ĐÁNH GIÁ THỰC TẾ</p>
+              <p className="about-total-reviews">{reviewStats.totalText}</p>
             </div>
 
             <div className="about-review-right">
@@ -208,7 +260,7 @@ const AboutPage = () => {
                     <img src={item.avatar} className="about-feedback-avatar" alt={item.name} />
                     <div>
                       <p className="about-feedback-name">{item.name}</p>
-                      <p className="about-feedback-status">Thực khách hài lòng</p>
+                      <p className="about-feedback-status">{getFeedbackStatusLabel(item.rating)}</p>
                     </div>
                   </div>
                 </article>

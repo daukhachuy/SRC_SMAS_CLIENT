@@ -1017,33 +1017,33 @@ const Services = () => {
   const faqItems = [
     {
       id: 1,
-      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
-      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+      question: 'Nhà hàng có nhận đặt tiệc tại nhà không?',
+      answer: 'Có. Chúng tôi cung cấp dịch vụ catering trọn gói tại nhà, bao gồm thực đơn, nhân sự phục vụ và set up theo yêu cầu.'
     },
     {
       id: 2,
-      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
-      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+      question: 'Tôi cần đặt bàn/sự kiện trước bao lâu?',
+      answer: 'Bạn nên đặt trước từ 1-3 ngày với bàn lẻ và 5-7 ngày với sự kiện để nhà hàng chuẩn bị tốt nhất.'
     },
     {
       id: 3,
-      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
-      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+      question: 'Nhà hàng có hỗ trợ trang trí sự kiện không?',
+      answer: 'Có. Chúng tôi hỗ trợ trang trí theo concept sinh nhật, tiệc công ty, hội nghị và các yêu cầu cá nhân hóa khác.'
     },
     {
       id: 4,
-      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
-      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+      question: 'Có thể thay đổi thực đơn theo ngân sách không?',
+      answer: 'Hoàn toàn được. Đội ngũ tư vấn sẽ đề xuất thực đơn phù hợp theo số lượng khách và mức ngân sách của bạn.'
     },
     {
       id: 5,
-      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
-      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+      question: 'Chính sách đặt cọc cho sự kiện như thế nào?',
+      answer: 'Với các đơn sự kiện, nhà hàng áp dụng đặt cọc theo hợp đồng. Tỷ lệ và thời hạn thanh toán sẽ hiển thị rõ khi xác nhận.'
     },
     {
       id: 6,
-      question: 'Nhà hàng có dịch vụ ăn uống tại nhà hay không?',
-      answer: 'Có, chúng tôi cung cấp dịch vụ catering trọn gói cho các buổi tiệc, sự kiện tại nhà với menu đa dạng và chất lượng cao.'
+      question: 'Tôi có thể hủy hoặc dời lịch đặt sự kiện không?',
+      answer: 'Có. Bạn có thể liên hệ sớm với nhà hàng để được hỗ trợ dời lịch hoặc hủy theo chính sách trong hợp đồng.'
     }
   ];
 

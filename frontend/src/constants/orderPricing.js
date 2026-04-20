@@ -6,8 +6,8 @@ export function roundOrderMoney(n) {
 }
 
 /**
- * VAT 10% trên tiền hàng sau giảm (subtotal − discount). Phí ship không tính thuế.
- * Tổng khớp giỏ Cart: grand ≈ subtotal + VAT + deliveryFee − discountAmount.
+ * VAT 10% trên tạm tính (subtotal) — không trừ giảm giá trước khi tính thuế. Phí ship không tính thuế.
+ * Tổng: grand ≈ subtotal + VAT + deliveryFee − discountAmount.
  * @param {{
  *   subtotal?: number,
  *   deliveryFee?: number,
@@ -35,17 +35,23 @@ export function resolveOrderVatAndGrandTotal(p = {}) {
       ? Number(apiTaxRaw)
       : NaN;
 
-  const vatOnGoods = roundOrderMoney(afterDiscount * ORDER_VAT_RATE);
+  /** VAT luôn theo tạm tính (tiền hàng trước giảm), không theo (subtotal − discount). */
+  const vatOnGoods = roundOrderMoney(sub * ORDER_VAT_RATE);
+  const computedGrandWithVat = roundOrderMoney(legacyNoVat + vatOnGoods);
 
   if (Number.isFinite(apiTaxParsed) && apiTaxParsed > 0) {
     const grand =
-      Number.isFinite(apiTotal) && apiTotal > 0 ? apiTotal : legacyNoVat + apiTaxParsed;
+      Number.isFinite(apiTotal) && apiTotal > 0
+        ? Math.abs(apiTotal - computedGrandWithVat) <= 2
+          ? apiTotal
+          : computedGrandWithVat
+        : computedGrandWithVat;
     return {
       subtotal: sub,
       afterDiscount,
       delivery,
       discount,
-      vat: roundOrderMoney(apiTaxParsed),
+      vat: vatOnGoods,
       grand: roundOrderMoney(grand),
     };
   }
