@@ -8,6 +8,7 @@ import {
   CheckCircle, Download, Edit3
 } from 'lucide-react';
 import '../../styles/ContractSigningPage.css';
+import { useManagerToast } from '../../context/ManagerToastContext';
 
 const DEFAULT_CREATE_TERMS = [
   'Bên B thanh toán đặt cọc theo tỷ lệ đã thỏa thuận trong vòng 24 giờ kể từ khi nhận hợp đồng.',
@@ -57,6 +58,7 @@ const createInitialContractData = () => ({
 });
 
 const ContractSigningPage = () => {
+  const { showToast } = useManagerToast();
   const { base, homePath } = useRoleSectionBasePath();
   const navigate = useNavigate();
   const { eventId } = useParams();
@@ -325,7 +327,7 @@ const ContractSigningPage = () => {
   const handleDownloadPDF = async () => {
     const code = String(contractData.contractId || '').trim();
     if (!code || code === '--') {
-      alert('Chưa có mã hợp đồng để tải PDF.');
+      showToast('Chưa có mã hợp đồng để tải PDF.', 'error');
       return;
     }
     setDownloadingPdf(true);
@@ -333,7 +335,7 @@ const ContractSigningPage = () => {
       await downloadContractPdf(code);
     } catch (e) {
       const msg = await getPdfErrorMessage(e);
-      alert(msg || 'Tải PDF hợp đồng thất bại.');
+      showToast(msg || 'Tải PDF hợp đồng thất bại.', 'error');
     } finally {
       setDownloadingPdf(false);
     }
@@ -342,7 +344,7 @@ const ContractSigningPage = () => {
   const handleSendToCustomerSign = () => {
     const doSend = async () => {
       if (!contractData.contractNumericId) {
-        alert('Không tìm thấy contractId để gửi ký.');
+        showToast('Không tìm thấy contractId để gửi ký.', 'error');
         return;
       }
 
@@ -361,10 +363,10 @@ const ContractSigningPage = () => {
           statusText: 'Đã gửi ký / Chờ khách ký',
         }));
 
-        alert(`${payload?.message || 'Đã gửi khách hàng ký thành công'}${sentTo}${deadline}`);
+        showToast(`${payload?.message || 'Đã gửi khách hàng ký thành công'}${sentTo}${deadline}`, 'success');
       } catch (err) {
         const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Gửi khách hàng ký thất bại.';
-        alert(msg);
+        showToast(msg, 'error');
       } finally {
         setSendingToCustomer(false);
       }
@@ -376,11 +378,11 @@ const ContractSigningPage = () => {
   const handleSendDepositRequest = () => {
     const doSend = async () => {
       if (!canShowDepositRequestButton) {
-        alert('Chỉ gửi yêu cầu đặt cọc sau khi đã gửi khách ký và khách đã ký xong.');
+        showToast('Chỉ gửi yêu cầu đặt cọc sau khi đã gửi khách ký và khách đã ký xong.', 'info');
         return;
       }
       if (!contractData.contractNumericId) {
-        alert('Không tìm thấy contractId để gửi yêu cầu đặt cọc.');
+        showToast('Không tìm thấy contractId để gửi yêu cầu đặt cọc.', 'error');
         return;
       }
 
@@ -391,7 +393,10 @@ const ContractSigningPage = () => {
         const checkoutUrl = payload?.checkoutUrl || '';
 
         if (!checkoutUrl) {
-          alert(payload?.message || 'Đã tạo yêu cầu đặt cọc nhưng không nhận được đường dẫn thanh toán.');
+          showToast(
+            payload?.message || 'Đã tạo yêu cầu đặt cọc nhưng không nhận được đường dẫn thanh toán.',
+            'info'
+          );
           return;
         }
 
@@ -421,10 +426,13 @@ const ContractSigningPage = () => {
           }
         }
 
-        alert(`${payload?.message || 'Đã tạo link đặt cọc thành công.'}\nLink thanh toán đã được sao chép.`);
+        showToast(
+          `${payload?.message || 'Đã tạo link đặt cọc thành công.'}\nLink thanh toán đã được sao chép.`,
+          'success'
+        );
       } catch (err) {
         const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Gửi yêu cầu đặt cọc thất bại.';
-        alert(msg);
+        showToast(msg, 'error');
       } finally {
         setSendingDepositRequest(false);
       }
@@ -447,7 +455,7 @@ const ContractSigningPage = () => {
       navigate(`${base}/reservations/${eventId}/contract?${params.toString()}`, { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Tạo hợp đồng thất bại.';
-      alert(msg);
+      showToast(msg, 'error');
     } finally {
       setCreatingContract(false);
     }

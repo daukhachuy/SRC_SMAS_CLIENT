@@ -1,0 +1,102 @@
+/* Toast khu Manager — dùng biến từ ManagerLayout.css :root */
+.mgr-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10050;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 14px 16px 14px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--manager-border, #e6dcd2);
+  background: var(--manager-surface, #ffffff);
+  color: var(--manager-text, #20130c);
+  box-shadow:
+    0 4px 6px rgba(32, 19, 12, 0.06),
+    0 18px 48px rgba(32, 19, 12, 0.14);
+  animation: mgr-toast-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mgr-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.mgr-toast--success {
+  border-color: #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 55%);
+}
+
+.mgr-toast--success .mgr-toast-icon {
+  color: #15803d;
+}
+
+.mgr-toast--error {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffffff 55%);
+}
+
+.mgr-toast--error .mgr-toast-icon {
+  color: #dc2626;
+}
+
+.mgr-toast--info {
+  border-color: #fed7aa;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 60%);
+}
+
+.mgr-toast--info .mgr-toast-icon {
+  color: var(--manager-primary, #ff7a21);
+}
+
+.mgr-toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+}
+
+.mgr-toast-text {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  font-weight: 600;
+  white-space: pre-line;
+}
+
+.mgr-toast-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--manager-muted, #7f6a5a);
+  cursor: pointer;
+  padding: 2px;
+  margin: -2px -4px -2px 0;
+  border-radius: 8px;
+  line-height: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.mgr-toast-close:hover {
+  color: var(--manager-text, #20130c);
+  background: rgba(32, 19, 12, 0.06);
+}
+
+@media (max-width: 640px) {
+  .mgr-toast {
+    top: auto;
+    bottom: 20px;
+    right: 16px;
+    left: 16px;
+    max-width: none;
+  }
+}

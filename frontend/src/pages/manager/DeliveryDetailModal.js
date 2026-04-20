@@ -19,6 +19,7 @@ import { orderAPI, getWorkingStaffToday } from '../../api/managerApi';
 import { resolveOrderVatAndGrandTotal } from '../../constants/orderPricing';
 import { printSalesInvoice } from '../../utils/orderInvoicePrint';
 import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
+import { useManagerToast } from '../../context/ManagerToastContext';
 import '../../styles/DeliveryDetailModal.css';
 
 const asArray = (payload) => {
@@ -89,6 +90,7 @@ const parseMoney = (v) => {
 };
 
 const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotify }) => {
+  const { showToast } = useManagerToast();
   const [selectedDriver, setSelectedDriver] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [orderDetail, setOrderDetail] = useState(null);
@@ -186,12 +188,13 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     setSelectedDriver(e.target.value);
   };
 
-  const notify = (message) => {
+  const notify = (message, type = 'info') => {
     if (typeof onNotify === 'function') {
       onNotify(message);
       return;
     }
-    alert(message);
+    const t = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+    showToast(message, t);
   };
 
   const handleCancelOrder = async () => {
@@ -200,13 +203,13 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
 
     const reason = cancelReason.trim();
     if (!reason) {
-      notify('Vui lòng nhập lý do hủy đơn hàng.');
+      notify('Vui lòng nhập lý do hủy đơn hàng.', 'error');
       return;
     }
 
     const orderCode = String(orderDetail?.orderCode || deliveryData?.code || delivery?.orderId || '').trim();
     if (!orderCode) {
-      notify('Không xác định được mã đơn hàng để hủy.');
+      notify('Không xác định được mã đơn hàng để hủy.', 'error');
       return;
     }
 
@@ -214,12 +217,12 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
       setSubmitting(true);
       const payload = { cancellationReason: reason };
       await orderAPI.deleteOrderDelivery(orderCode, payload);
-      notify('Hủy đơn giao hàng thành công.');
+      notify('Hủy đơn giao hàng thành công.', 'success');
       if (typeof onUpdated === 'function') onUpdated();
       onClose();
     } catch (e) {
       const message = extractApiErrorMessage(e, 'Không thể hủy đơn giao hàng. Vui lòng thử lại.');
-      notify(message);
+      notify(message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -227,7 +230,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
 
   const handleConfirmDelivery = async () => {
     if (!selectedDriver && !delivery.assignedDriver) {
-      notify('Vui lòng chọn nhân viên giao hàng');
+      notify('Vui lòng chọn nhân viên giao hàng', 'error');
       return;
     }
 
@@ -241,12 +244,12 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     const staffId = Number(staffIdValue);
 
     if (!orderCode) {
-      notify('Không xác định được mã đơn hàng để giao.');
+      notify('Không xác định được mã đơn hàng để giao.', 'error');
       return;
     }
 
     if (!Number.isFinite(staffId) || staffId <= 0) {
-      notify('Mã nhân viên giao hàng không hợp lệ.');
+      notify('Mã nhân viên giao hàng không hợp lệ.', 'error');
       return;
     }
 
@@ -254,12 +257,12 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
       setSubmitting(true);
       await orderAPI.chooseStaffDelivery(orderCode, staffId);
       await orderAPI.changeStatus(orderCode);
-      notify('Xác nhận giao hàng thành công.');
+      notify('Xác nhận giao hàng thành công.', 'success');
       if (typeof onUpdated === 'function') onUpdated();
       onClose();
     } catch (e) {
       const message = extractApiErrorMessage(e, 'Không thể xác nhận giao hàng. Vui lòng thử lại.');
-      notify(message);
+      notify(message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -276,7 +279,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
       } catch (e) {
         const msg = await getPdfErrorMessage(e);
         if (typeof onNotify === 'function') onNotify(`${msg} — mở bản in nhanh.`);
-        else window.alert(`${msg}\n\nMở bản in nhanh trên trình duyệt.`);
+        else showToast(`${msg}\n\nMở bản in nhanh trên trình duyệt.`, 'info');
       }
     }
     const lines = (delivery.menuItems || []).map((it) => {

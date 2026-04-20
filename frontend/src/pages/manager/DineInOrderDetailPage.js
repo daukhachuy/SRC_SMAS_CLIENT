@@ -13,6 +13,7 @@ import {
 import PaymentModal from '../../components/PaymentModal';
 import { orderAPI } from '../../api/managerApi';
 import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
+import { useManagerToast } from '../../context/ManagerToastContext';
 import '../../styles/DineInOrderDetailPage.css';
 
 const asArray = (value) => {
@@ -96,6 +97,7 @@ const findOrderInCollection = (rows, orderCode, orderId) => {
 };
 
 function DineInOrderDetailPage() {
+  const { showToast } = useManagerToast();
   const navigate = useNavigate();
   const { id } = useParams(); // Get order ID from URL
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -221,14 +223,14 @@ function DineInOrderDetailPage() {
   const handleInvoicePdf = async () => {
     const code = String(orderData?.code || orderData?.orderCode || '').trim();
     if (!code) {
-      window.alert('Không có mã đơn để tải PDF.');
+      showToast('Không có mã đơn để tải PDF.', 'error');
       return;
     }
     setInvoicePdfLoading(true);
     try {
       await downloadInvoicePdf(code);
     } catch (e) {
-      window.alert((await getPdfErrorMessage(e)) || 'Tải PDF thất bại.');
+      showToast((await getPdfErrorMessage(e)) || 'Tải PDF thất bại.', 'error');
     } finally {
       setInvoicePdfLoading(false);
     }

@@ -266,19 +266,51 @@ const Cart = () => {
       };
 
       const orderRes = await instance.post('/order/create/delivery', orderPayload);
+      const resBody = orderRes.data?.data ?? orderRes.data;
 
-      // Lấy orderId từ response (Cấu trúc: { success: true, orderId: 123, ... })
-      const orderId = orderRes.data.orderId || orderRes.data.id;
+      // Lấy orderId / orderCode từ response
+      const orderId = resBody?.orderId ?? orderRes.data.orderId ?? orderRes.data.id;
+      const orderCode =
+        resBody?.orderCode ??
+        resBody?.OrderCode ??
+        orderRes.data?.orderCode ??
+        '';
+
+      // Áp mã giảm giá lên đơn đã tạo — POST /order/{orderCode}/apply-discount/{discountCode}
+      let discountApplyWarning = '';
+      const codeToApply = (appliedDiscount?.code || discountCode || '').trim();
+      if (codeToApply && orderCode) {
+        try {
+          await discountAPI.applyDiscountToOrder(orderCode, codeToApply);
+        } catch (discErr) {
+          console.error('[Cart] apply-discount:', discErr);
+          discountApplyWarning =
+            discErr?.response?.data?.message ||
+            discErr?.response?.data?.Message ||
+            discErr?.message ||
+            'Không áp dụng được mã giảm giá trên đơn.';
+        }
+      } else if (codeToApply && !orderCode) {
+        console.warn('[Cart] Có mã giảm nhưng API tạo đơn không trả orderCode — bỏ qua apply-discount');
+      }
+
+      // Thanh toán online: cần đơn đã áp giảm đúng trước khi tạo link
+      if (paymentMethod !== 'Tiền Mặt' && discountApplyWarning) {
+        setPaymentError(discountApplyWarning);
+        setModalStep(2);
+        return;
+      }
 
       // BƯỚC 2: TẠO LINK THANH TOÁN NẾU KHÔNG PHẢI TIỀN MẶT
       if (paymentMethod === 'Tiền Mặt') {
+        const baseMsg =
+          orderRes.data.message ||
+          'Cảm ơn bạn! Đơn hàng đã được ghi nhận. Nhà hàng sẽ liên hệ sớm nhất có thể.';
         setCustomerNotice({
           kind: 'alert',
           title: 'Đặt hàng thành công',
-          message:
-            orderRes.data.message ||
-            'Cảm ơn bạn! Đơn hàng đã được ghi nhận. Nhà hàng sẽ liên hệ sớm nhất có thể.',
-          variant: 'success',
+          message: discountApplyWarning ? `${baseMsg}\n\nLưu ý: ${discountApplyWarning}` : baseMsg,
+          variant: discountApplyWarning ? 'warning' : 'success',
           confirmLabel: 'Xem đơn của tôi',
           afterClose: finishOrderSuccess,
         });
