@@ -69,4 +69,14 @@ export const discountAPI = {
     const { data } = await instance.delete(`/discount/${numId}`);
     return data;
   },
+
+  /** PATCH /api/discount/{id}/status — cập nhật trạng thái (Swagger) */
+  updateDiscountStatus: async (id, status) => {
+    const numId = Number(id);
+    if (!Number.isFinite(numId) || numId <= 0) {
+      throw new Error('ID mã giảm giá không hợp lệ');
+    }
+    const { data } = await instance.patch(`/discount/${numId}/status`, { status });
+    return data;
+  },
 };

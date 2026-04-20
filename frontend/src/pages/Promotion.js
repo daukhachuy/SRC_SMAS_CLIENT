@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X, Ticket, Copy, BookOpen, Utensils, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Header from '../components/Header';
@@ -11,6 +11,26 @@ const Promotion = () => {
     const comboRef = useRef(null);
     const discountRef = useRef(null);
 
+    // Enum values from API (phải khai báo TRƯỚC useState)
+    const DISCOUNT_TYPE = {
+        PERCENTAGE: "Percentage",
+        FIXED: "Fixed"
+    };
+
+    const APPLICABLE_FOR = {
+        ALL: "All",
+        DINE_IN: "DineIn",
+        TAKEAWAY: "Takeaway",
+        DELIVERY: "Delivery",
+        ORDER: "Order"
+    };
+
+    const STATUS = {
+        ACTIVE: "Active",
+        INACTIVE: "Inactive",
+        EXPIRED: "Expired"
+    };
+
     const [blogs, setBlogs] = useState([]);
     const [vouchers, setVouchers] = useState([]);
     const [combos, setCombos] = useState([]);
@@ -18,10 +38,49 @@ const Promotion = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [customerNotice, setCustomerNotice] = useState(null);
+    const [selectedApplicableFor, setSelectedApplicableFor] = useState(APPLICABLE_FOR.ALL);
 
     const API_BASE = "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api";
 
-    useEffect(() => {
+    const getApplicableForLabel = (value) => {
+        const labels = {
+            [APPLICABLE_FOR.ALL]: "Tất cả",
+            [APPLICABLE_FOR.DINE_IN]: "Tại bàn",
+            [APPLICABLE_FOR.TAKEAWAY]: "Mang đi",
+            [APPLICABLE_FOR.DELIVERY]: "Giao hàng",
+            [APPLICABLE_FOR.ORDER]: "Đơn hàng"
+        };
+        return labels[value] || value;
+    };
+
+    const getStatusBadge = (status) => {
+        const badges = {
+            [STATUS.ACTIVE]: { label: "Hoạt động", className: "status-active" },
+            [STATUS.INACTIVE]: { label: "Không hoạt động", className: "status-inactive" },
+            [STATUS.EXPIRED]: { label: "Hết hạn", className: "status-expired" }
+        };
+        return badges[status] || { label: status, className: "" };
+    };
+
+    const isVoucherValid = (voucher) => {
+        // Chỉ lọc theo trạng thái Active
+        return voucher.status === STATUS.ACTIVE;
+    };
+
+    const filterActiveVouchers = (vouchers) => {
+        return vouchers.filter(isVoucherValid);
+    };
+
+    // Lọc voucher hợp lệ (Active, filter theo selectedApplicableFor)
+    const activeVouchers = useMemo(() => {
+        return vouchers.filter(v => {
+            if (v.status !== STATUS.ACTIVE) return false;
+            if (selectedApplicableFor === APPLICABLE_FOR.ALL) return true;
+            return v.applicableFor === selectedApplicableFor;
+        });
+    }, [vouchers, selectedApplicableFor]);
+
+useEffect(() => {
         const fetchAllData = async () => {
             setLoading(true);
             try {
@@ -34,11 +93,10 @@ const Promotion = () => {
 
                 setBlogs(blogRes.data || []);
                 const discRaw = discountRes.data;
-                setVouchers(
-                  Array.isArray(discRaw)
-                    ? discRaw
-                    : discRaw?.data ?? discRaw?.items ?? []
-                );
+                const allVouchers = Array.isArray(discRaw)
+                  ? discRaw
+                  : discRaw?.data ?? discRaw?.items ?? [];
+                setVouchers(allVouchers); // Lọc Active được apply bằng useMemo
                 setCombos(comboRes.data || []);
                 setFoodDiscounts(foodDiscountRes.data || []);
             } catch (err) {
@@ -107,17 +165,57 @@ const Promotion = () => {
                             Xem tất cả
                         </button>
                     </div>
+                    {/* Filter Tabs */}
+                    <div className="Applicable-For-Filter">
+                        <button
+                            className={`Filter-Tab ${selectedApplicableFor === APPLICABLE_FOR.ALL ? 'active' : ''}`}
+                            onClick={() => setSelectedApplicableFor(APPLICABLE_FOR.ALL)}
+                        >
+                            Tất cả
+                        </button>
+                        <button
+                            className={`Filter-Tab ${selectedApplicableFor === APPLICABLE_FOR.ORDER ? 'active' : ''}`}
+                            onClick={() => setSelectedApplicableFor(APPLICABLE_FOR.ORDER)}
+                        >
+                            Đơn hàng
+                        </button>
+                        <button
+                            className={`Filter-Tab ${selectedApplicableFor === APPLICABLE_FOR.DINE_IN ? 'active' : ''}`}
+                            onClick={() => setSelectedApplicableFor(APPLICABLE_FOR.DINE_IN)}
+                        >
+                            Tại bàn
+                        </button>
+                        <button
+                            className={`Filter-Tab ${selectedApplicableFor === APPLICABLE_FOR.TAKEAWAY ? 'active' : ''}`}
+                            onClick={() => setSelectedApplicableFor(APPLICABLE_FOR.TAKEAWAY)}
+                        >
+                            Mang đi
+                        </button>
+                        <button
+                            className={`Filter-Tab ${selectedApplicableFor === APPLICABLE_FOR.DELIVERY ? 'active' : ''}`}
+                            onClick={() => setSelectedApplicableFor(APPLICABLE_FOR.DELIVERY)}
+                        >
+                            Giao hàng
+                        </button>
+                    </div>
                     <div className="Voucher-Grid-ImageStyle">
-                        {vouchers.slice(0, 3).map(v => (
+                        {activeVouchers.slice(0, 3).map(v => {
+                            return (
                             <div className="Voucher-Card-New" key={v.discountId}>
                                 <div className="V-Icon">🎁</div>
+                                <div className="V-Status-Badge">
+                                    <span className="V-Applicable">{getApplicableForLabel(v.applicableFor)}</span>
+                                </div>
                                 <h3>{v.description}</h3>
-                                <p>{v.discountType === "Percentage" ? `Giảm ${v.value}%` : `Giảm ${v.value?.toLocaleString()}đ`}</p>
+                                <p>{v.discountType === DISCOUNT_TYPE.PERCENTAGE ? `Giảm ${v.value}%` : `Giảm ${Number(v.value).toLocaleString()}đ`}</p>
                                 <div className="Voucher-Bottom">
                                     <span className="V-Code">{v.code}</span>
+                                    <br />
+                                    <span className="V-MinOrder">Tối thiểu {Number(v.minOrderAmount).toLocaleString()}đ</span>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </section>
 
@@ -130,21 +228,29 @@ const Promotion = () => {
                                 <button className="close-btn-minimal" onClick={() => setIsModalOpen(false)}><X size={24} /></button>
                             </div>
                             <div className="Modal-Body-Scroll">
-                                {vouchers.map(v => (
+                                {activeVouchers.map(v => {
+                                    const statusBadge = getStatusBadge(v.status);
+                                    return (
                                     <div className="Voucher-Item-Full" key={v.discountId}>
                                         <div className="V-Info">
-                                            <span className="V-Tag">{v.discountType === "Percentage" ? `-${v.value}%` : `-${v.value/1000}k`}</span>
+                                            <span className="V-Tag">{v.discountType === DISCOUNT_TYPE.PERCENTAGE ? `-${v.value}%` : `-${Number(v.value)/1000}k`}</span>
                                             <div className="V-Text">
                                                 <h4>{v.code}</h4>
                                                 <p>{v.description}</p>
-                                                <small>Hết hạn: {new Date(v.endDate).toLocaleDateString('vi-VN')}</small>
+                                                <div className="V-Meta">
+                                                    <span className={`V-Badge ${statusBadge.className}`}>{statusBadge.label}</span>
+                                                    <span className="V-Applicable">{getApplicableForLabel(v.applicableFor)}</span>
+                                                    <small>Hết hạn: {new Date(v.endDate).toLocaleDateString('vi-VN')}</small>
+                                                </div>
+                                                <small>Đơn tối thiểu: {Number(v.minOrderAmount).toLocaleString()}đ | Đã dùng: {v.usedCount}/{v.usageLimit}</small>
                                             </div>
                                         </div>
                                         <button className="copy-btn-modal" onClick={() => copyToClipboard(v.code)}>
                                             <Copy size={16} /> Sao chép
                                         </button>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
