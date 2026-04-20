@@ -971,21 +971,22 @@ const KitchenOrdersPage = () => {
                         <span className="kds-item-qty">{item.quantity}x</span>
                         <div>
                           <p className={`kds-item-name ${item.status === 'ready' ? 'kds-item-name--ready' : ''}`}>{item.name}</p>
+                          <div className="kds-item-timer-row">
+                            <TimerDisplay createdAt={itemCreatedAt} />
+                            <span className={`kds-status-badge ${getStatusBadgeClass(item.status)}`}>
+                              {item.status === 'ready'
+                                ? 'Sẵn sàng'
+                                : item.status === 'preparing' || item.status === 'cooking'
+                                  ? 'Đang nấu'
+                                  : 'Chờ nấu'}
+                            </span>
+                          </div>
                           {item.note && (
                             <p className="kds-item-note">{item.note}</p>
                           )}
                         </div>
                       </div>
                       <div className="kds-item-actions">
-                        {/* Timer riêng cho từng món */}
-                        <TimerDisplay createdAt={itemCreatedAt} />
-                        <span className={`kds-status-badge ${getStatusBadgeClass(item.status)}`}>
-                          {item.status === 'ready'
-                            ? 'Sẵn sàng'
-                            : item.status === 'preparing' || item.status === 'cooking'
-                              ? 'Đang nấu'
-                              : 'Chờ nấu'}
-                        </span>
                         <div className="kds-item-api-btns">
                           {item.status === 'pending' && (
                             <>

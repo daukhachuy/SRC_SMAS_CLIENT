@@ -595,6 +595,64 @@
   }
 }
 
+.manager-orders-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #e6d9ca;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.manager-orders-pagination-info {
+  font-size: 0.8125rem;
+  color: #8a6c56;
+}
+
+.manager-orders-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.manager-orders-page-btn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.375rem;
+  border: 1px solid #e6d9ca;
+  border-radius: 8px;
+  background: #fff;
+  color: #7d624f;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.manager-orders-page-btn:hover:not(:disabled) {
+  border-color: #ff7a21;
+  color: #ff7a21;
+  background: #fff8f5;
+}
+
+.manager-orders-page-btn.active {
+  background: #ff7a21;
+  border-color: #ff7a21;
+  color: #fff;
+}
+
+.manager-orders-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.manager-orders-ellipsis {
+  padding: 0 0.25rem;
+  color: #c9b5a0;
+  font-size: 0.8125rem;
+}
+
 @media (max-width: 860px) {
   .manager-stats-grid {
     grid-template-columns: 1fr;

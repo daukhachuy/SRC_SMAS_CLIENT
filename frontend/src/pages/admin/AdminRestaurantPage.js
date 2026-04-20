@@ -197,14 +197,18 @@ function getCreatedByUserId() {
   return null;
 }
 
-function deriveDiscountStatus(startDate, endDate) {
+function deriveDiscountStatus(startDate, endDate, apiStatus) {
+  // Ưu tiên status từ API
+  if (apiStatus && ['Active', 'Inactive', 'Expired'].includes(apiStatus)) {
+    return apiStatus;
+  }
   const end = new Date(endDate);
   const start = new Date(startDate);
   const now = new Date();
-  if (Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())) return 'running';
-  if (now > end) return 'expired';
-  if (now < start) return 'upcoming';
-  return 'running';
+  if (Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())) return 'Active';
+  if (now > end) return 'Expired';
+  if (now < start) return 'Inactive';
+  return 'Active';
 }
 
 const API_BASE_FOR_ASSETS = (process.env.REACT_APP_API_URL || 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api').replace(/\/$/, '');
@@ -396,20 +400,27 @@ const BLOG_DETAIL_KNOWN_KEYS = new Set([
 function mapApiDiscountToRow(d) {
   const dt = d.discountType;
   const isPct = dt === 'Percentage';
-  const isShip = String(d.applicableFor || '').toLowerCase() === 'shipping';
-  const typeLabel = isPct ? 'Phần trăm (%)' : isShip ? 'Vận chuyển' : 'Cố định (VNĐ)';
+  const isFixed = dt === 'Fixed';
+  const typeLabel = isPct ? 'Phần trăm (%)' : isFixed ? 'Cố định (VNĐ)' : '—';
   let valueDisplay;
   if (isPct) valueDisplay = `${d.value}% Giảm giá`;
-  else if (isShip) valueDisplay = 'Miễn phí vận chuyển';
-  else valueDisplay = `${Number(d.value).toLocaleString('vi-VN')}đ Giảm`;
+  else if (isFixed) valueDisplay = `${Number(d.value).toLocaleString('vi-VN')}đ Giảm`;
+  else valueDisplay = `${Number(d.value).toLocaleString('vi-VN')}đ`;
+  const applicableForLabel = {
+    All: 'Tất cả',
+    DineIn: 'Tại bàn',
+    Takeaway: 'Mang đi',
+    Delivery: 'Giao hàng',
+  }[d.applicableFor] || d.applicableFor || 'Tất cả';
   return {
     id: d.discountId,
     code: d.code,
     type: typeLabel,
     value: valueDisplay,
+    applicableFor: applicableForLabel,
     start: d.startDate ? new Date(d.startDate).toLocaleDateString('vi-VN') : '',
     end: d.endDate ? new Date(d.endDate).toLocaleDateString('vi-VN') : '',
-    status: deriveDiscountStatus(d.startDate, d.endDate),
+    status: deriveDiscountStatus(d.startDate, d.endDate, d.status),
     raw: d,
   };
 }
@@ -436,7 +447,7 @@ const AdminRestaurantPage = () => {
   const [blogDetailFetchId, setBlogDetailFetchId] = useState(null);
   const [codeForm, setCodeForm] = useState({
     code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '',
-    startDate: '', endDate: '', quantity: '',
+    startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active',
   });
   const [blogForm, setBlogForm] = useState(() => emptyBlogForm());
   const [blogSubmitting, setBlogSubmitting] = useState(false);
@@ -1019,18 +1030,17 @@ const AdminRestaurantPage = () => {
       startDate: codeForm.startDate,
       endDate: codeForm.endDate,
       usageLimit: parseInt(String(codeForm.quantity).replace(/\D/g, ''), 10) || 0,
-      applicableFor: codeForm.type === 'ship' ? 'Shipping' : 'Order',
-      status: 'Active',
+      applicableFor: codeForm.applicableFor,
+      status: codeForm.status,
       createdBy,
     };
   };
 
-  /** PUT /api/discount/{id} — theo DiscountUpdateDto (Swagger), không gửi code */
+  /** PUT /api/discount/{id} — theo DiscountUpdateDto */
   const buildDiscountUpdatePayload = (raw) => {
     const discountType = codeForm.type === 'percent' ? 'Percentage' : 'FixedAmount';
     const valueNum = parseMoneyInput(codeForm.value);
     const usedCount = Number(raw?.usedCount ?? raw?.used_count ?? 0);
-    const statusStr = (raw?.status && String(raw.status)) || 'Active';
     return {
       description: (codeForm.description || '').trim() || codeForm.code.trim(),
       discountType,
@@ -1040,8 +1050,8 @@ const AdminRestaurantPage = () => {
       startDate: codeForm.startDate,
       endDate: codeForm.endDate,
       usageLimit: parseInt(String(codeForm.quantity).replace(/\D/g, ''), 10) || 0,
-      applicableFor: codeForm.type === 'ship' ? 'Shipping' : 'Order',
-      status: statusStr,
+      applicableFor: codeForm.applicableFor,
+      status: codeForm.status,
       usedCount: Number.isFinite(usedCount) && usedCount >= 0 ? usedCount : 0,
     };
   };
@@ -1083,7 +1093,7 @@ const AdminRestaurantPage = () => {
       const payload = buildDiscountPayload();
       await discountAPI.createDiscount(payload);
       await loadDiscounts();
-    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
+    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
     setCodeModalOpen(false);
     } catch (err) {
       const msg =
@@ -1233,10 +1243,9 @@ const AdminRestaurantPage = () => {
   };
 
   const applyDiscountToForm = (d, codeRow) => {
-    const typeValue =
-      d.discountType === 'Percentage'
-        ? 'percent'
-        : (String(d.applicableFor || '').toLowerCase() === 'shipping' ? 'ship' : 'fixed');
+    const typeValue = d.discountType === 'Percentage' ? 'percent' : 'fixed';
+    const applicableForVal = d.applicableFor || 'All';
+    const statusVal = d.status || 'Active';
     setCodeForm({
       code: d.code || '',
       type: typeValue,
@@ -1247,6 +1256,8 @@ const AdminRestaurantPage = () => {
       startDate: d.startDate ? String(d.startDate).slice(0, 10) : '',
       endDate: d.endDate ? String(d.endDate).slice(0, 10) : '',
       quantity: d.usageLimit != null ? String(d.usageLimit) : '',
+      applicableFor: applicableForVal,
+      status: statusVal,
     });
     setEditingCode({ ...codeRow, raw: d });
     setCodeModalOpen(true);
@@ -1271,7 +1282,7 @@ const AdminRestaurantPage = () => {
       applyDiscountToForm(d, codeRow);
       return;
     }
-    const typeValue = codeRow.type === 'Phần trăm (%)' ? 'percent' : codeRow.type === 'Vận chuyển' ? 'ship' : 'fixed';
+    const typeValue = codeRow.type === 'Phần trăm (%)' ? 'percent' : 'fixed';
     setCodeForm({
       code: codeRow.code,
       type: typeValue,
@@ -1282,6 +1293,8 @@ const AdminRestaurantPage = () => {
       startDate: codeRow.start,
       endDate: codeRow.end,
       quantity: '',
+      applicableFor: 'All',
+      status: 'Active',
     });
     setEditingCode(codeRow);
     setCodeModalOpen(true);
@@ -1320,7 +1333,22 @@ const AdminRestaurantPage = () => {
     setCodeModalOpen(false);
     setEditingCode(null);
     setCodeSubmitError('');
-    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
+    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
+  };
+
+  const handleToggleDiscountStatus = async (row) => {
+    const id = row?.id;
+    if (id == null || !Number.isFinite(Number(id)) || Number(id) <= 0) return;
+    const newStatus = row.status === 'Active' ? 'Inactive' : 'Active';
+    const ok = window.confirm(`${newStatus === 'Active' ? 'Bật' : 'Tắt'} mã giảm giá "${row.code}"?`);
+    if (!ok) return;
+    try {
+      await discountAPI.updateDiscountStatus(id, newStatus);
+      await loadDiscounts();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái';
+      alert(msg);
+    }
   };
 
   const handleDeleteCode = async (row) => {
@@ -1474,7 +1502,7 @@ const AdminRestaurantPage = () => {
     }
   };
 
-  const statusLabel = (s) => ({ running: 'ĐANG CHẠY', upcoming: 'SẮP TỚI', expired: 'HẾT HẠN' }[s] || s);
+  const statusLabel = (s) => ({ Active: 'Hoạt động', Inactive: 'Không hoạt động', Expired: 'Hết hạn', running: 'ĐANG CHẠY', upcoming: 'SẮP TỚI', expired: 'HẾT HẠN' }[s] || s);
 
   const filteredCodes = codes.filter((row) => {
     const q = codeSearch.trim().toLowerCase();
@@ -1550,6 +1578,7 @@ const AdminRestaurantPage = () => {
                     <th>MÃ CODE</th>
                     <th>LOẠI GIẢM GIÁ</th>
                     <th>GIÁ TRỊ</th>
+                    <th>ÁP DỤNG CHO</th>
                     <th>BẮT ĐẦU</th>
                     <th>KẾT THÚC</th>
                     <th>TRẠNG THÁI</th>
@@ -1562,13 +1591,22 @@ const AdminRestaurantPage = () => {
                       <td className="rest-code">{row.code}</td>
                       <td>{row.type}</td>
                       <td>{row.value}</td>
+                      <td>{row.applicableFor}</td>
                       <td>{row.start}</td>
                       <td>{row.end}</td>
                       <td>
-                        <span className={`rest-badge rest-badge-${row.status}`}>{statusLabel(row.status)}</span>
+                        <span className={`rest-badge rest-badge-${row.status?.toLowerCase()}`}>{statusLabel(row.status)}</span>
                       </td>
                       <td>
-                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openCodeDetail(row)}><Eye size={16} /></button>
+                        <button
+                          type="button"
+                          className={`rest-icon-btn ${row.status === 'Active' ? 'rest-toggle-on' : 'rest-toggle-off'}`}
+                          aria-label={row.status === 'Active' ? 'Tắt' : 'Bật'}
+                          title={row.status === 'Active' ? 'Tắt hoạt động' : 'Bật hoạt động'}
+                          onClick={() => handleToggleDiscountStatus(row)}
+                        >
+                          {row.status === 'Active' ? <Eye size={16} /> : <Eye size={16} />}
+                        </button>
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditCode(row)}><Pencil size={16} /></button>
                         <button type="button" className="rest-icon-btn" aria-label="Xóa" onClick={() => handleDeleteCode(row)}><Trash2 size={16} /></button>
                       </td>
@@ -2436,7 +2474,23 @@ const AdminRestaurantPage = () => {
                 <select value={codeForm.type} onChange={(e) => setCodeForm((f) => ({ ...f, type: e.target.value }))}>
                   <option value="percent">Phần trăm %</option>
                   <option value="fixed">Cố định (VNĐ)</option>
-                  <option value="ship">Vận chuyển</option>
+                </select>
+              </div>
+              <div className="rest-form-group">
+                <label>Áp dụng cho <span className="rest-required">*</span></label>
+                <select value={codeForm.applicableFor} onChange={(e) => setCodeForm((f) => ({ ...f, applicableFor: e.target.value }))}>
+                  <option value="All">Tất cả</option>
+                  <option value="DineIn">Tại bàn (Dine-In)</option>
+                  <option value="Takeaway">Mang đi (Takeaway)</option>
+                  <option value="Delivery">Giao hàng (Delivery)</option>
+                </select>
+              </div>
+              <div className="rest-form-group">
+                <label>Trạng thái <span className="rest-required">*</span></label>
+                <select value={codeForm.status} onChange={(e) => setCodeForm((f) => ({ ...f, status: e.target.value }))}>
+                  <option value="Active">Hoạt động</option>
+                  <option value="Inactive">Không hoạt động</option>
+                  <option value="Expired">Hết hạn</option>
                 </select>
               </div>
               <div className="rest-form-group">
