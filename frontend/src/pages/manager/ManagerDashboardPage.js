@@ -1,88 +1,174 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { myOrderAPI } from '../../api/myOrderApi';
-import { fetchTransactionHistory } from '../../api/adminDashboardApi';
+import React, { useEffect, useState } from 'react';
+import api from '../../api/axiosInstance';
+import { orderAPI, staffAPI } from '../../api/managerApi';
+import { ArrowUpRight, ArrowDownRight, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from 'recharts';
 
-const PAGE_SIZE = 10;
-const EMPTY_TX_FILTERS = {
-  orderCode: '',
-  paymentMethod: '',
-  paymentStatus: '',
-  fromDate: '',
-  toDate: '',
+/**
+ * Hàm format tiền tệ VNĐ
+ */
+const formatCurrency = (amount) => {
+  if (!amount && amount !== 0) return '—';
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
+/**
+ * Hàm format ngày từ ISO string sang dd/mm/yyyy
+ */
+const formatDate = (isoString) => {
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
+/**
+ * Hàm format giờ từ ISO string sang HH:mm
+ */
+const formatTime = (isoString) => {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
+
+/**
+ * Lấy màu nền theo position
+ */
+const getPositionBg = (position) => {
+  if (!position) return '#f3f4f6';
+  const pos = position.toLowerCase();
+  if (pos.includes('manager') || pos.includes('quản lý')) return '#dbeafe';
+  if (pos.includes('chef') || pos.includes('bếp') || pos.includes('kitchen')) return '#fed7aa';
+  if (pos.includes('cash') || pos.includes('thu ngân')) return '#d1fae5';
+  if (pos.includes('waiter') || pos.includes('phục vụ')) return '#e0e7ff';
+  return '#f3f4f6';
+};
+
+/**
+ * Lấy màu chữ theo position
+ */
+const getPositionColor = (position) => {
+  if (!position) return '#6b7280';
+  const pos = position.toLowerCase();
+  if (pos.includes('manager') || pos.includes('quản lý')) return '#1d4ed8';
+  if (pos.includes('chef') || pos.includes('bếp') || pos.includes('kitchen')) return '#c2410c';
+  if (pos.includes('cash') || pos.includes('thu ngân')) return '#047857';
+  if (pos.includes('waiter') || pos.includes('phục vụ')) return '#4338ca';
+  return '#6b7280';
 };
 
 const ManagerDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [stats, setStats] = useState([]);
-  const [allOrders, setAllOrders] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [ordersPage, setOrdersPage] = useState(1);
-  const [transactionsPage, setTransactionsPage] = useState(1);
-  const [transactionsTotalItems, setTransactionsTotalItems] = useState(0);
-  const [transactionsTotalPages, setTransactionsTotalPages] = useState(1);
-  const [txFilterForm, setTxFilterForm] = useState(EMPTY_TX_FILTERS);
-  const [txFilters, setTxFilters] = useState(EMPTY_TX_FILTERS);
   const [error, setError] = useState('');
+
+  // State cho API doanh thu 7 ngày
+  const [revenueData, setRevenueData] = useState([]);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [revenueLoading, setRevenueLoading] = useState(true);
+  const [revenueError, setRevenueError] = useState('');
+
+  // State cho API đơn mới nhất
+  const [newestOrders, setNewestOrders] = useState([]);
+  const [newestOrdersLoading, setNewestOrdersLoading] = useState(true);
+  const [newestOrdersError, setNewestOrdersError] = useState('');
+
+  // Gọi API đếm số bàn còn trống (khai báo trước để dùng trong fetchAll)
+  const [emptyTableCount, setEmptyTableCount] = useState(null);
+  const [emptyTableLoading, setEmptyTableLoading] = useState(true);
+
+  // State cho danh sách nhân viên hôm nay
+  const [staffList, setStaffList] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(true);
+  const [staffError, setStaffError] = useState('');
+
+  useEffect(() => {
+    const fetchEmptyTables = async () => {
+      setEmptyTableLoading(true);
+      try {
+        const res = await api.get('/table/empty');
+        const raw = res?.data ?? res;
+        let total = 0;
+        if (raw?.total != null) {
+          total = Number(raw.total) || 0;
+        } else {
+          const timeSlots = Array.isArray(raw?.timeSlots) ? raw.timeSlots : [];
+          total = timeSlots.reduce((sum, slot) => sum + (Number(slot?.total) || 0), 0);
+        }
+        setEmptyTableCount(Number.isFinite(total) && total >= 0 ? total : 0);
+      } catch (err) {
+        setEmptyTableCount(0);
+      } finally {
+        setEmptyTableLoading(false);
+      }
+    };
+    fetchEmptyTables();
+  }, []);
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
       setError('');
       try {
-        const [statsRes, orders] = await Promise.allSettled([
-          fetch(`${process.env.REACT_APP_API_URL || 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api'}/Dashboard/stats`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`,
-              'Content-Type': 'application/json',
-            },
-          }).then((r) => r.json()),
-          myOrderAPI.getOrders('All', ['Pending', 'Confirmed', 'Processing', 'Completed', 'Cancelled']),
+        const [ordersRes, revenueRes] = await Promise.allSettled([
+          orderAPI.getToday(),
+          orderAPI.getRevenueSevenDays(),
         ]);
 
-        // Stats
-        const statsData = statsRes.status === 'fulfilled' ? statsRes.value : null;
-        if (statsData) {
-          const inner = statsData?.data ?? statsData;
-          const todayRevenue = Number(inner?.todayRevenue ?? inner?.today_revenue ?? 0);
-          const todayOrders = Number(inner?.todayOrders ?? inner?.today_orders ?? inner?.totalOrdersToday ?? 0);
-          const emptyTables = Number(inner?.emptyTables ?? inner?.empty_tables ?? 0);
-          const totalTables = Number(inner?.totalTables ?? inner?.total_tables ?? 40);
-          setStats([
-            {
-              title: 'Số đơn hôm nay',
-              value: todayOrders > 0 ? todayOrders.toLocaleString('vi-VN') : '—',
-              delta: inner?.ordersDelta != null ? `${inner.ordersDelta > 0 ? '+' : ''}${inner.ordersDelta}%` : '—',
-              trend: inner?.ordersDelta >= 0 ? 'up' : 'down',
-            },
-            {
-              title: 'Doanh thu ngày',
-              value: todayRevenue > 0
-                ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(todayRevenue)
-                : '—',
-              delta: inner?.revenueDelta != null ? `${inner.revenueDelta > 0 ? '+' : ''}${inner.revenueDelta}%` : '—',
-              trend: inner?.revenueDelta >= 0 ? 'up' : 'down',
-            },
-            {
-              title: 'Bàn còn trống',
-              value: `${emptyTables} / ${totalTables}`,
-              delta: inner?.tablesDelta || 'Đúng tiến độ',
-              trend: 'flat',
-            },
-          ]);
-        } else {
-          setStats([
-            { title: 'Số đơn hôm nay', value: '—', delta: '—', trend: 'flat' },
-            { title: 'Doanh thu ngày', value: '—', delta: '—', trend: 'flat' },
-            { title: 'Bàn còn trống', value: '— / —', delta: '—', trend: 'flat' },
-          ]);
+        // Lấy tổng đơn hôm nay từ /order/orders-today → { total: number }
+        let todayOrders = 0;
+        if (ordersRes.status === 'fulfilled') {
+          const raw = ordersRes.value?.data ?? ordersRes.value;
+          todayOrders = Number(raw?.total ?? raw?.totalOrdersToday ?? raw?.todayOrders ?? 0);
         }
 
-        // Orders
-        const ordersRaw = orders.status === 'fulfilled' ? (orders.value ?? []) : [];
-        setAllOrders(ordersRaw);
-        setOrdersPage(1);
+        // Lấy doanh thu ngày từ /order/revenue-previous-seven-days
+        let todayRevenue = 0;
+        if (revenueRes.status === 'fulfilled') {
+          const raw = revenueRes.value?.data ?? revenueRes.value;
+          const days = raw?.days ?? [];
+          const todayEntry = days.find(d => d.isToday);
+          todayRevenue = todayEntry ? (Number(todayEntry.revenue) || 0) : (Number(raw?.revenueToday ?? raw?.todayRevenue) || 0);
+        }
+
+        setStats([
+          {
+            title: 'Tổng đơn hôm nay',
+            value: todayOrders > 0 ? todayOrders.toLocaleString('vi-VN') : '0 đơn',
+            delta: '—',
+            trend: 'flat',
+          },
+          {
+            title: 'Doanh thu ngày',
+            value: formatCurrency(todayRevenue),
+            delta: '—',
+            trend: 'flat',
+          },
+          {
+            title: 'Bàn còn trống',
+            value: emptyTableLoading ? '…' : (emptyTableCount != null ? emptyTableCount.toString() : '—'),
+            delta: '—',
+            trend: 'flat',
+          },
+        ]);
       } catch (err) {
         console.error('Dashboard error:', err);
         setError('Không tải được dữ liệu dashboard.');
@@ -92,81 +178,88 @@ const ManagerDashboardPage = () => {
     };
 
     fetchAll();
-  }, []);
+  }, [emptyTableCount, emptyTableLoading]);
 
+  // Gọi API doanh thu 7 ngày
   useEffect(() => {
-    const fetchTransactions = async () => {
-      setLoadingTransactions(true);
+    const fetchRevenue = async () => {
+      setRevenueLoading(true);
+      setRevenueError('');
       try {
-        // Lấy nhiều bản ghi để FE tự phân trang ổn định (phòng trường hợp BE bỏ qua page/pageSize).
-        const toIsoDate = (value, endOfDay = false) => {
-          if (!value) return undefined;
-          const d = new Date(value);
-          if (Number.isNaN(d.getTime())) return undefined;
-          if (endOfDay) d.setHours(23, 59, 59, 999);
-          else d.setHours(0, 0, 0, 0);
-          return d.toISOString();
-        };
-
-        const res = await fetchTransactionHistory({
-          page: 1,
-          pageSize: 1000,
-          orderCode: txFilters.orderCode || undefined,
-          paymentMethod: txFilters.paymentMethod || undefined,
-          paymentStatus: txFilters.paymentStatus || undefined,
-          fromDate: toIsoDate(txFilters.fromDate, false),
-          toDate: toIsoDate(txFilters.toDate, true),
-        });
-        const rows = Array.isArray(res?.data) ? res.data : [];
-        setTransactions(rows);
-        setTransactionsTotalItems(rows.length);
-        setTransactionsTotalPages(Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
+        const response = await orderAPI.getRevenueSevenDays();
+        const raw = response?.data ?? response;
+        setRevenueData(raw.days ?? []);
+        setTotalRevenue(raw.totalRevenue ?? 0);
       } catch (err) {
-        console.error('Transaction history error:', err);
-        setTransactions([]);
-        setTransactionsTotalItems(0);
-        setTransactionsTotalPages(1);
+        console.warn('Revenue API error:', err.message);
+        setRevenueError('Không tải được dữ liệu doanh thu.');
       } finally {
-        setLoadingTransactions(false);
+        setRevenueLoading(false);
       }
     };
 
-    fetchTransactions();
-  }, [txFilters]);
+    fetchRevenue();
+  }, []);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(allOrders.length / PAGE_SIZE)), [allOrders.length]);
-  const pagedOrders = useMemo(
-    () => allOrders.slice((ordersPage - 1) * PAGE_SIZE, ordersPage * PAGE_SIZE),
-    [allOrders, ordersPage]
-  );
-  const visibleTransactions = useMemo(() => {
-    if (!Array.isArray(transactions)) return [];
-    const start = (transactionsPage - 1) * PAGE_SIZE;
-    return transactions.slice(start, start + PAGE_SIZE);
-  }, [transactions, transactionsPage]);
+  // Gọi API đơn mới nhất (4 đơn)
+  useEffect(() => {
+    const fetchNewestOrders = async () => {
+      setNewestOrdersLoading(true);
+      setNewestOrdersError('');
+      try {
+        const response = await orderAPI.getFourNewest();
+        setNewestOrders(response.data || []);
+      } catch (err) {
+        console.warn('Newest orders API error:', err.message);
+        setNewestOrdersError('Không tải được đơn mới nhất.');
+        setNewestOrders([]);
+      } finally {
+        setNewestOrdersLoading(false);
+      }
+    };
 
-  const handleApplyTxFilters = (e) => {
-    e.preventDefault();
-    setTransactionsPage(1);
-    setTxFilters({
-      orderCode: String(txFilterForm.orderCode || '').trim(),
-      paymentMethod: txFilterForm.paymentMethod || '',
-      paymentStatus: txFilterForm.paymentStatus || '',
-      fromDate: txFilterForm.fromDate || '',
-      toDate: txFilterForm.toDate || '',
+    fetchNewestOrders();
+  }, []);
+
+  // Gọi API lấy danh sách nhân viên hôm nay
+  useEffect(() => {
+    const fetchStaffToday = async () => {
+      setStaffLoading(true);
+      setStaffError('');
+      try {
+        const response = await staffAPI.getStaffsToday();
+        const raw = response?.data ?? response;
+        // API trả về mảng trực tiếp hoặc { data: [...] }
+        const list = Array.isArray(raw) ? raw : (raw?.data ?? raw ?? []);
+        setStaffList(list);
+      } catch (err) {
+        console.warn('Staff today API error:', err.message);
+        setStaffError('Không tải được dữ liệu nhân viên.');
+        setStaffList([]);
+      } finally {
+        setStaffLoading(false);
+      }
+    };
+
+    fetchStaffToday();
+  }, []);
+
+  // Cập nhật stats khi emptyTableCount thay đổi
+  useEffect(() => {
+    setStats((prevStats) => {
+      if (!prevStats.length) return prevStats;
+      return prevStats.map((stat) =>
+        stat.title === 'Bàn còn trống'
+          ? { ...stat, value: emptyTableLoading ? '…' : (emptyTableCount != null ? emptyTableCount.toString() : '—') }
+          : stat
+      );
     });
-  };
-
-  const handleResetTxFilters = () => {
-    setTransactionsPage(1);
-    setTxFilterForm(EMPTY_TX_FILTERS);
-    setTxFilters(EMPTY_TX_FILTERS);
-  };
+  }, [emptyTableCount, emptyTableLoading]);
 
   const getStatusPill = (s) => {
     const str = (s || '').toLowerCase();
     if (str.includes('chuẩn bị') || str.includes('cooking') || str.includes('đang')) return 'cooking';
-    if (str.includes('hủy') || str.includes('cancelled') || str.includes('cancel')) return 'cancelled';
+    if (str.includes('hủy') || str.includes('cancelled')) return 'cancelled';
     if (str.includes('xong') || str.includes('done') || str.includes('hoàn thành') || str.includes('completed')) return 'done';
     return 'pending';
   };
@@ -215,31 +308,100 @@ const ManagerDashboardPage = () => {
       </div>
 
       <div className="manager-two-col">
-        {/* Revenue chart placeholder */}
+        {/* Revenue chart + table */}
         <article className="manager-card">
           <div className="manager-card-head">
             <h2>Doanh thu 7 ngày</h2>
-            <span>Biểu đồ mô phỏng</span>
+            {totalRevenue > 0 && (
+              <span style={{ color: '#059669', fontWeight: 600 }}>
+                Tổng: {formatCurrency(totalRevenue)}
+              </span>
+            )}
           </div>
-          <div className="manager-chart">
-            {[72, 64, 81, 93, 58, 100, 76].map((v, idx) => (
-              <div key={`bar-${idx}`} className="manager-chart-col">
-                <div style={{ height: `${v}%` }} className="manager-chart-bar" />
-                <small>{['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][idx]}</small>
+
+          {/* Loading state */}
+          {revenueLoading && (
+            <div style={{ padding: '1rem', textAlign: 'center', color: '#9ca3af' }}>
+              <RefreshCw size={20} className="spin" /> Đang tải dữ liệu...
+            </div>
+          )}
+
+          {/* Error state */}
+          {revenueError && (
+            <div style={{ padding: '0.75rem', background: '#fee2e2', color: '#dc2626', borderRadius: '0.5rem', fontSize: '0.875rem', marginBottom: '1rem' }}>
+              <AlertCircle size={16} style={{ display: 'inline', marginRight: 6 }} />
+              {revenueError}
+            </div>
+          )}
+
+          {/* Bảng doanh thu */}
+          {!revenueLoading && !revenueError && (
+            <>
+              <div className="manager-chart" style={{ height: 320, minHeight: 320 }}>
+                <ResponsiveContainer width="100%" height="100%" debounce={500}>
+                  <BarChart
+                    data={revenueData}
+                    margin={{ top: 20, right: 20, left: 10, bottom: 0 }}
+                    barSize={40}
+                  >
+                    <XAxis
+                      dataKey="dayLabel"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: '#6b7280', fontWeight: 500 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#9ca3af' }}
+                      tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `${(val / 1000).toFixed(0)}K` : val}
+                      domain={[0, 'dataMax']}
+                      width={45}
+                    />
+                    <Tooltip
+                      formatter={(value) => [formatCurrency(value), 'Doanh thu']}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          const d = payload[0].payload;
+                          return `${d.dayLabel} — ${formatDate(d.date)}`;
+                        }
+                        return label;
+                      }}
+                      contentStyle={{
+                        background: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 8,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        fontSize: 13,
+                      }}
+                      cursor={{ fill: '#f3f4f6' }}
+                    />
+                    <ReferenceLine y={0} stroke="#e5e7eb" />
+                    <Bar dataKey="revenue" radius={[8, 8, 0, 0]} animationDuration={800}>
+                      {revenueData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={Number(entry.revenue) > 0 ? '#f97316' : '#e5e7eb'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+
+            </>
+          )}
         </article>
 
-        {/* Orders with pagination */}
+        {/* Đơn mới nhất */}
         <article className="manager-card">
           <div className="manager-card-head">
             <h2>Đơn mới nhất</h2>
             <a href="/manager/orders">Xem tất cả</a>
           </div>
           <div className="manager-list">
-            {loading && allOrders.length === 0
-              ? [0, 1, 2, 3, 4, 5].map((i) => (
+            {newestOrdersLoading
+              ? [0, 1, 2].map((i) => (
                   <div key={i} className="manager-list-item" style={{ opacity: 0.5 }}>
                     <div style={{ width: 36, height: 36, background: '#e5e7eb', borderRadius: 6 }} />
                     <div style={{ flex: 1 }}>
@@ -248,86 +410,46 @@ const ManagerDashboardPage = () => {
                     </div>
                   </div>
                 ))
-              : pagedOrders.length === 0
-                ? <div style={{ padding: '1rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.875rem' }}>Không có đơn hàng.</div>
-                : pagedOrders.map((order, idx) => (
-                    <div key={`${order.orderId ?? order.id ?? idx}`} className="manager-list-item">
-                      <div className="manager-table-code">
-                        {order.tableName ?? order.tableNumber ?? order.tableCode ?? order.table ?? '#'}
+              : newestOrdersError
+                ? <div style={{ padding: '1rem', textAlign: 'center', color: '#dc2626', fontSize: '0.875rem' }}>{newestOrdersError}</div>
+                : newestOrders.length === 0
+                  ? <div style={{ padding: '1rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.875rem' }}>Không có đơn hàng.</div>
+                  : newestOrders.slice(0, 3).map((order, idx) => (
+                      <div key={`${order.orderId ?? order.id ?? idx}`} className="manager-list-item">
+                        <div className="manager-table-code">
+                          {order.tableName ?? order.tableNumber ?? order.tableCode ?? order.table ?? '#'}
+                        </div>
+                        <div>
+                          {order.orderCode && <span style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap' }}>{order.orderCode}</span>}
+                          <strong>{order.items?.[0]?.name ?? order.itemName ?? order.item ?? order.productName ?? '—'}</strong>
+                          <p>
+                            {order.createdAt
+                              ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                              : '--:--'}
+                            {' — '}
+                            {order.orderType ?? order.type ?? 'Tại bàn'}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>
+                          {order.totalAmount != null
+                            ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalAmount)
+                            : order.total != null
+                              ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.total)
+                              : '0 đ'}
+                        </div>
+                        <span className={`manager-pill ${getStatusPill(order.status ?? order.orderStatus)}`}>
+                          {order.status ?? order.orderStatus ?? 'Chờ xử lý'}
+                        </span>
                       </div>
-                      <div>
-                        <strong>{order.items?.[0]?.name ?? order.itemName ?? order.item ?? order.productName ?? '—'}</strong>
-                        <p>
-                          {order.createdAt
-                            ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                            : '--:--'}
-                          {' — '}
-                          {order.orderType ?? order.type ?? 'Tại bàn'}
-                        </p>
-                      </div>
-                      <span className={`manager-pill ${getStatusPill(order.status ?? order.orderStatus)}`}>
-                        {order.status ?? order.orderStatus ?? 'Chờ xử lý'}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="manager-orders-pagination">
-              <span className="manager-orders-pagination-info">
-                {allOrders.length > 0
-                  ? `${(ordersPage - 1) * PAGE_SIZE + 1}–${Math.min(ordersPage * PAGE_SIZE, allOrders.length)} / ${allOrders.length}`
-                  : ''}
-              </span>
-              <div className="manager-orders-pagination-controls">
-                <button
-                  type="button"
-                  className="manager-orders-page-btn"
-                  disabled={ordersPage <= 1}
-                  onClick={() => setOrdersPage((p) => p - 1)}
-                >
-                  ‹
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - ordersPage) <= 2)
-                  .reduce((acc, p, i, arr) => {
-                    if (i > 0 && arr[i - 1] !== p - 1) acc.push('…');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((p, i) =>
-                    p === '…' ? (
-                      <span key={`e-${i}`} className="manager-orders-ellipsis">…</span>
-                    ) : (
-                      <button
-                        key={p}
-                        type="button"
-                        className={`manager-orders-page-btn${ordersPage === p ? ' active' : ''}`}
-                        onClick={() => setOrdersPage(p)}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                <button
-                  type="button"
-                  className="manager-orders-page-btn"
-                  disabled={ordersPage >= totalPages}
-                  onClick={() => setOrdersPage((p) => p + 1)}
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          )}
         </article>
       </div>
-
       {/* Transaction history */}
       <article className="manager-card">
         <div className="manager-card-head">
-          <h2>Lịch sử giao dịch</h2>
+          <h2>Trạng thái nhân viên</h2>
+          <span>{staffList.length > 0 ? `${staffList.length} nhân viên` : ''}</span>
         </div>
         <form onSubmit={handleApplyTxFilters} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto auto', gap: 8, marginBottom: 10 }}>
           <input
@@ -379,50 +501,72 @@ const ManagerDashboardPage = () => {
           <table className="manager-table">
             <thead>
               <tr>
-                <th>Mã đơn</th>
-                <th>Khách hàng</th>
-                <th>Phương thức</th>
-                <th>Trạng thái</th>
-                <th>Số tiền</th>
-                <th>Thời gian</th>
+                <th>Nhân viên</th>
+                <th>Vai trò</th>
+                <th>Giờ vào</th>
+                <th>Ca Làm</th>
+                <th>Giờ Ra</th>
               </tr>
             </thead>
             <tbody>
-              {loadingTransactions && visibleTransactions.length === 0 ? (
+              {staffLoading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '1rem' }}>
-                    Đang tải lịch sử giao dịch...
+                  <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '1rem' }}>
+                    Đang tải...
                   </td>
                 </tr>
-              ) : visibleTransactions.length === 0 ? (
+              ) : staffError ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '1rem' }}>
-                    Chưa có dữ liệu giao dịch
+                  <td colSpan={5} style={{ textAlign: 'center', color: '#dc2626', padding: '1rem' }}>
+                    {staffError}
+                  </td>
+                </tr>
+              ) : staffList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '1rem' }}>
+                    Chưa có dữ liệu nhân viên
                   </td>
                 </tr>
               ) : (
-                visibleTransactions.map((tx) => (
-                  <tr key={tx.id}>
-                    <td>{tx.orderCode || '—'}</td>
-                    <td>{tx.customerName || 'Khách lẻ'}</td>
-                    <td>{tx.paymentMethodDisplay || tx.paymentMethod || '—'}</td>
+                staffList.map((staff, idx) => (
+                  <tr key={staff.userId ?? staff.id ?? staff.staffId ?? idx}>
                     <td>
-                      <span className={`manager-pill ${getPaymentStatusPill(tx.paymentStatus || tx.statusLabel)}`}>
-                        {tx.statusLabel || tx.paymentStatus || '—'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          background: '#f97316',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          flexShrink: 0
+                        }}>
+                          {(staff.fullname || staff.name || 'NV').charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 500 }}>
+                          {staff.fullname || staff.name || '—'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        background: getPositionBg(staff.position),
+                        color: getPositionColor(staff.position)
+                      }}>
+                        {staff.position || '—'}
                       </span>
                     </td>
-                    <td>{tx.amountDisplay || '—'}</td>
-                    <td>
-                      {tx.paidAt
-                        ? new Date(tx.paidAt).toLocaleString('vi-VN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
-                        : '—'}
-                    </td>
+                    <td>{formatTime(staff.checkInTime) || '—'}</td>
+                    <td>{staff.shiftName || '—'}</td>
+                    <td>{formatTime(staff.checkOutTime) || '—'}</td>
                   </tr>
                 ))
               )}

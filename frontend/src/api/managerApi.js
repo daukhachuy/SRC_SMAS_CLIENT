@@ -34,6 +34,8 @@ export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
 
   getWorkingToday: () => instance.get('/Staff/working-today'),
 
+  getStaffsToday: () => instance.get('/Staff/manager/staffs-today'),
+
   getSumWorkshiftThisMonth: () => instance.get('/Staff/sum-workshift-thismonth'),
 
   getSumTimeworkThisMonth: () => instance.get('/Staff/sum-timework-thismonth'),

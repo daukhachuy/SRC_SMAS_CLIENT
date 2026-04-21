@@ -99,11 +99,64 @@
 }
 
 .manager-chart {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 10px;
-  align-items: end;
-  min-height: 240px;
+  height: 360px;
+  min-height: 320px;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.manager-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.manager-chart-total {
+  color: #ff7a21;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.manager-chart-bar-empty {
+  background: #f0e8df;
+}
+
+.manager-chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.manager-chart-table thead th {
+  text-align: left;
+  padding: 0.5rem 0;
+  color: #8a6d57;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e6d9ca;
+}
+
+.manager-chart-table tbody td {
+  padding: 0.625rem 0;
+  color: #6d4f38;
+  border-bottom: 1px solid #f0e8df;
+}
+
+.manager-chart-table tbody td:last-child {
+  text-align: right;
+}
+
+.manager-chart-table tbody td.revenue-positive {
+  color: #ff7a21;
+  font-weight: 700;
+}
+
+.manager-chart-table tbody td.revenue-zero {
+  color: #c9b5a0;
 }
 
 .manager-chart-col {
@@ -577,24 +630,6 @@
   margin: 0;
 }
 
-@media (max-width: 1080px) {
-  .manager-two-col {
-    grid-template-columns: 1fr;
-  }
-
-  .orders-grid-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .event-modal-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .event-modal-content {
-    padding: 24px;
-  }
-}
-
 .manager-orders-pagination {
   display: flex;
   align-items: center;
@@ -651,6 +686,24 @@
   padding: 0 0.25rem;
   color: #c9b5a0;
   font-size: 0.8125rem;
+}
+
+@media (max-width: 1080px) {
+  .manager-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-grid-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .event-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .event-modal-content {
+    padding: 24px;
+  }
 }
 
 @media (max-width: 860px) {

@@ -383,8 +383,8 @@ function ManagerLayoutInner() {
         <div className="manager-brand">
           <div className="manager-brand-icon">F</div>
           <div>
-            <h2>Nhà Hàng FPT</h2>
-            <p>Hệ thống quản trị</p>
+            <h2>Nhà Hàng SMAS</h2>
+            <p>Hệ thống quản lý</p>
           </div>
         </div>
 
