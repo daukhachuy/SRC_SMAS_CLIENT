@@ -39,7 +39,8 @@ import {
   getComboLists,
   getBuffetLists,
   updateFoodStatus,
-  updateBuffetStatus
+  updateBuffetStatus,
+  patchComboStatus
 } from '../../api/foodApi';
 
 const FIXED_MENU_IMG = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
@@ -223,12 +224,19 @@ const ManagerInventoryPage = () => {
   const [menuCatalogError, setMenuCatalogError] = useState(null);
   const [foodTogglingId, setFoodTogglingId] = useState(null);
   const [buffetTogglingId, setBuffetTogglingId] = useState(null);
+  const [comboTogglingId, setComboTogglingId] = useState(null);
   /** Optimistic UI: foodId → isAvailable (chờ API; lỗi thì xóa key để revert) */
   const [foodAvailOverride, setFoodAvailOverride] = useState({});
   /** Optimistic UI: buffetId → isAvailable (tách khỏi food để trùng id) */
   const [buffetAvailOverride, setBuffetAvailOverride] = useState({});
+  /** Optimistic UI: comboId → isAvailable */
+  const [comboAvailOverride, setComboAvailOverride] = useState({});
   const [menuPage, setMenuPage] = useState(1);
   const MENU_PAGE_SIZE = 6;
+  const PAGE_SIZE = 5;
+  const [matPage, setMatPage] = useState(1);
+  const [batchPage, setBatchPage] = useState(1);
+  const [logPage, setLogPage] = useState(1);
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
   /** Mặc định «Tất cả» — tắt món → API → món biến mất (lọc bỏ sold-out khi default selling) */
   const [menuStatusFilter, setMenuStatusFilter] = useState('all');
@@ -352,7 +360,14 @@ const ManagerInventoryPage = () => {
     });
   }, [catalogFoods, foodAvailOverride]);
 
-  const catalogCombosEffective = useMemo(() => catalogCombos, [catalogCombos]);
+  const catalogCombosEffective = useMemo(() => {
+    return catalogCombos.map((c) => {
+      const key = Number.isFinite(Number(c.id)) ? Number(c.id) : c.id;
+      const o = comboAvailOverride[key];
+      if (o === undefined) return c;
+      return { ...c, available: o, state: o ? 'active' : 'sold-out', isAvailable: o };
+    });
+  }, [catalogCombos, comboAvailOverride]);
 
   const catalogBuffetsEffective = useMemo(() => {
     return catalogBuffets.map((b) => {
@@ -412,6 +427,29 @@ const ManagerInventoryPage = () => {
       setMenuCatalogError(err.message || 'Không thể cập nhật trạng thái buffet');
     } finally {
       setBuffetTogglingId(null);
+    }
+  };
+
+  const handleComboToggle = async (row) => {
+    if (row.kind !== 'combo' || row.id == null) return;
+    const id = Number(row.id);
+    if (!Number.isFinite(id)) return;
+    const nextAvailable = !row.available;
+    setComboAvailOverride((prev) => ({ ...prev, [id]: nextAvailable }));
+    setComboTogglingId(id);
+    setMenuCatalogError(null);
+    try {
+      await patchComboStatus(id, nextAvailable);
+      await fetchMenuCatalog();
+    } catch (err) {
+      setComboAvailOverride((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      setMenuCatalogError(err.message || 'Không thể cập nhật trạng thái combo');
+    } finally {
+      setComboTogglingId(null);
     }
   };
 
@@ -833,6 +871,39 @@ const ManagerInventoryPage = () => {
   /** Chỉ 2 log mới nhất cho sidebar "Nhật ký Kho gần đây" */
   const recentLogs = useMemo(() => filteredLogs.slice(0, 2), [filteredLogs]);
 
+  // Reset page when search changes
+  useEffect(() => {
+    setMatPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setBatchPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setLogPage(1);
+  }, [searchQuery]);
+
+  // Clamp page when filtered list shrinks
+  useEffect(() => {
+    setMatPage(p => Math.min(p, Math.max(1, Math.ceil(filteredMaterials.length / PAGE_SIZE) || 1)));
+  }, [filteredMaterials.length]);
+
+  useEffect(() => {
+    setBatchPage(p => Math.min(p, Math.max(1, Math.ceil(filteredBatches.length / PAGE_SIZE) || 1)));
+  }, [filteredBatches.length]);
+
+  useEffect(() => {
+    setLogPage(p => Math.min(p, Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE) || 1)));
+  }, [filteredLogs.length]);
+
+  // Reset page when switching tabs
+  useEffect(() => {
+    setMatPage(1);
+    setBatchPage(1);
+    setLogPage(1);
+  }, [activeTab]);
+
   const filteredModalItems = useMemo(() => {
     let list =
       menuModalTab === 'menu'
@@ -912,99 +983,154 @@ const ManagerInventoryPage = () => {
         ? 'Tìm gói buffet...'
         : 'Tìm tên món ăn...';
 
-  const renderMaterialsTable = () => (
-    <div className="inventory-table-wrap">
-      <table className="inventory-table">
-        <thead>
-          <tr>
-            <th>Nguyên liệu</th>
-            <th className="text-center">Đơn vị</th>
-            <th>Tồn kho hiện tại</th>
-            <th className="text-right">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredMaterials.map((item) => {
-            const pct = Math.round((item.current / item.max) * 100);
-            return (
-              <tr key={item.id} className={item.level === 'danger' ? 'row-danger' : ''}>
+  const renderMaterialsTable = () => {
+    const totalPages = Math.max(1, Math.ceil(filteredMaterials.length / PAGE_SIZE) || 1);
+    const pageItems = filteredMaterials.slice((matPage - 1) * PAGE_SIZE, matPage * PAGE_SIZE);
+    return (
+    <>
+      <div className="inventory-table-wrap">
+        <table className="inventory-table">
+          <thead>
+            <tr>
+              <th>Nguyên liệu</th>
+              <th className="text-center">Đơn vị</th>
+              <th>Tồn kho hiện tại</th>
+              <th className="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+          {pageItems.length === 0 ? (
+            <tr>
+              <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có nguyên liệu nào</td>
+            </tr>
+          ) : (
+            pageItems.map((item, idx) => {
+              const pct = Math.round((item.current / item.max) * 100);
+              return (
+                <tr key={`mat-${item.id}-${idx}`} className={item.level === 'danger' ? 'row-danger' : ''}>
+                  <td>
+                    <div className={`cell-title ${item.level === 'danger' ? 'text-danger' : ''}`}>{item.name}</div>
+                    <div className="cell-subtitle">Mã: {item.id}</div>
+                  </td>
+                  <td className="text-center">{item.unit}</td>
+                  <td>
+                    <div className="stock-line">
+                      <span className={item.level === 'danger' ? 'danger-text' : ''}>
+                        {item.current} / {item.max} {item.unit}
+                      </span>
+                      <span className={`stock-alert ${item.level === 'danger' ? 'danger-text' : ''}`}>
+                        {item.level === 'danger' ? 'Dưới mức cảnh báo' : `Cảnh báo: ${item.alert}${item.unit}`}
+                      </span>
+                    </div>
+                    <div className="stock-progress">
+                      <span className={`stock-progress-fill ${item.level === 'danger' ? 'danger' : ''}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </td>
+                  <td className="text-right">
+                    <button className="icon-btn">
+                      <Edit size={16} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+          </tbody>
+        </table>
+      </div>
+      <div className="table-footer">
+        <span>
+          {filteredMaterials.length === 0
+            ? 'Không có nguyên liệu nào'
+            : `Hiển thị ${(matPage - 1) * PAGE_SIZE + 1}–${Math.min(matPage * PAGE_SIZE, filteredMaterials.length)} trên ${filteredMaterials.length} nguyên liệu`}
+        </span>
+        <div className="page-row">
+          <button className="page-btn" disabled={matPage <= 1} onClick={() => setMatPage(p => Math.max(1, p - 1))}>Trước</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button key={n} className={`page-btn ${matPage === n ? 'active' : ''}`} onClick={() => setMatPage(n)}>{n}</button>
+          ))}
+          <button className="page-btn" disabled={matPage >= totalPages} onClick={() => setMatPage(p => Math.min(totalPages, p + 1))}>Sau</button>
+        </div>
+      </div>
+    </>
+    );
+  };
+
+  const renderBatchesTable = () => {
+    const totalPages = Math.max(1, Math.ceil(filteredBatches.length / PAGE_SIZE) || 1);
+    const pageItems = filteredBatches.slice((batchPage - 1) * PAGE_SIZE, batchPage * PAGE_SIZE);
+    return (
+    <>
+      <div className="inventory-table-wrap">
+        <table className="inventory-table">
+          <thead>
+            <tr>
+              <th>Mã lô (BatchCode)</th>
+              <th>Nguyên liệu</th>
+              <th>Ngày hết hạn</th>
+              <th>Trạng thái</th>
+              <th className="text-right">Thao tác kho</th>
+            </tr>
+          </thead>
+          <tbody>
+          {pageItems.length === 0 ? (
+            <tr>
+              <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có lô hàng nào</td>
+            </tr>
+          ) : (
+            pageItems.map((item, idx) => (
+              <tr key={`batch-${item.batchCode}-${idx}`}>
+                <td className="mono">{item.batchCode}</td>
                 <td>
-                  <div className={`cell-title ${item.level === 'danger' ? 'text-danger' : ''}`}>{item.name}</div>
-                  <div className="cell-subtitle">Mã: {item.id}</div>
+                  <div className="cell-title">{item.material}</div>
+                  <div className="cell-subtitle">{item.stockText}</div>
                 </td>
-                <td className="text-center">{item.unit}</td>
+                <td>{item.expiryDate}</td>
                 <td>
-                  <div className="stock-line">
-                    <span className={item.level === 'danger' ? 'danger-text' : ''}>
-                      {item.current} / {item.max} {item.unit}
-                    </span>
-                    <span className={`stock-alert ${item.level === 'danger' ? 'danger-text' : ''}`}>
-                      {item.level === 'danger' ? 'Dưới mức cảnh báo' : `Cảnh báo: ${item.alert}${item.unit}`}
-                    </span>
-                  </div>
-                  <div className="stock-progress">
-                    <span className={`stock-progress-fill ${item.level === 'danger' ? 'danger' : ''}`} style={{ width: `${pct}%` }} />
-                  </div>
+                  <span className={`status-badge ${item.status === 'valid' ? 'valid' : 'expiring'}`}>
+                    {item.status === 'valid' ? 'Còn hạn' : 'Sắp hết hạn'}
+                  </span>
                 </td>
                 <td className="text-right">
-                  <button className="icon-btn">
-                    <Edit size={16} />
-                  </button>
+                  <div className="action-inline">
+                    <button className="action-btn export" onClick={() => openExportModal(item)}>
+                      <ArrowUpToLine size={14} />
+                      Xuất chế biến
+                    </button>
+                    <button className="action-btn restore" onClick={() => openReturnModal(item)}>
+                      <RotateCcw size={14} />
+                      Hoàn kho
+                    </button>
+                  </div>
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderBatchesTable = () => (
-    <div className="inventory-table-wrap">
-      <table className="inventory-table">
-        <thead>
-          <tr>
-            <th>Mã lô (BatchCode)</th>
-            <th>Nguyên liệu</th>
-            <th>Ngày hết hạn</th>
-            <th>Trạng thái</th>
-            <th className="text-right">Thao tác kho</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredBatches.map((item) => (
-            <tr key={item.batchCode}>
-              <td className="mono">{item.batchCode}</td>
-              <td>
-                <div className="cell-title">{item.material}</div>
-                <div className="cell-subtitle">{item.stockText}</div>
-              </td>
-              <td>{item.expiryDate}</td>
-              <td>
-                <span className={`status-badge ${item.status === 'valid' ? 'valid' : 'expiring'}`}>
-                  {item.status === 'valid' ? 'Còn hạn' : 'Sắp hết hạn'}
-                </span>
-              </td>
-              <td className="text-right">
-                <div className="action-inline">
-                  <button className="action-btn export" onClick={() => openExportModal(item)}>
-                    <ArrowUpToLine size={14} />
-                    Xuất chế biến
-                  </button>
-                  <button className="action-btn restore" onClick={() => openReturnModal(item)}>
-                    <RotateCcw size={14} />
-                    Hoàn kho
-                  </button>
-                </div>
-              </td>
-            </tr>
+            ))
+          )}
+          </tbody>
+        </table>
+      </div>
+      <div className="table-footer">
+        <span>
+          {filteredBatches.length === 0
+            ? 'Không có lô hàng nào'
+            : `Hiển thị ${(batchPage - 1) * PAGE_SIZE + 1}–${Math.min(batchPage * PAGE_SIZE, filteredBatches.length)} trên ${filteredBatches.length} lô hàng`}
+        </span>
+        <div className="page-row">
+          <button className="page-btn" disabled={batchPage <= 1} onClick={() => setBatchPage(p => Math.max(1, p - 1))}>Trước</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button key={n} className={`page-btn ${batchPage === n ? 'active' : ''}`} onClick={() => setBatchPage(n)}>{n}</button>
           ))}
-        </tbody>
-      </table>
-    </div>
-  );
+          <button className="page-btn" disabled={batchPage >= totalPages} onClick={() => setBatchPage(p => Math.min(totalPages, p + 1))}>Sau</button>
+        </div>
+      </div>
+    </>
+    );
+  };
 
-  const renderLogsTable = () => (
+  const renderLogsTable = () => {
+    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE) || 1);
+    const pageItems = filteredLogs.slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE);
+    return (
     <>
       <div className="inventory-table-wrap">
         <table className="inventory-table logs">
@@ -1020,7 +1146,12 @@ const ManagerInventoryPage = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredLogs.map((log, idx) => (
+          {pageItems.length === 0 ? (
+            <tr>
+              <td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có nhật ký nào</td>
+            </tr>
+          ) : (
+            pageItems.map((log, idx) => (
               <tr key={log.id != null ? `log-${log.id}` : `log-${idx}-${log.time}`}>
                 <td>
                   <div className="cell-title">{log.date}</div>
@@ -1042,22 +1173,29 @@ const ManagerInventoryPage = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+            ))
+          )}
           </tbody>
         </table>
       </div>
 
       <div className="table-footer">
-        <span>Hiển thị 4 trên 150 bản ghi</span>
+        <span>
+          {filteredLogs.length === 0
+            ? 'Không có nhật ký nào'
+            : `Hiển thị ${(logPage - 1) * PAGE_SIZE + 1}–${Math.min(logPage * PAGE_SIZE, filteredLogs.length)} trên ${filteredLogs.length} bản ghi`}
+        </span>
         <div className="page-row">
-          <button className="page-btn" disabled>Trước</button>
-          <button className="page-btn active">1</button>
-          <button className="page-btn">2</button>
-          <button className="page-btn">Sau</button>
+          <button className="page-btn" disabled={logPage <= 1} onClick={() => setLogPage(p => Math.max(1, p - 1))}>Trước</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button key={n} className={`page-btn ${logPage === n ? 'active' : ''}`} onClick={() => setLogPage(n)}>{n}</button>
+          ))}
+          <button className="page-btn" disabled={logPage >= totalPages} onClick={() => setLogPage(p => Math.min(totalPages, p + 1))}>Sau</button>
         </div>
       </div>
     </>
-  );
+    );
+  };
 
   return (
     <div className="inventory-page">
@@ -1101,19 +1239,19 @@ const ManagerInventoryPage = () => {
             <div className="inventory-tabs">
               <button
                 className={`tab-btn ${activeTab === 'materials' ? 'active' : ''}`}
-                onClick={() => setActiveTab('materials')}
+                onClick={() => { setActiveTab('materials'); setMatPage(1); }}
               >
                 Nguyên liệu
               </button>
               <button
                 className={`tab-btn ${activeTab === 'batches' ? 'active' : ''}`}
-                onClick={() => setActiveTab('batches')}
+                onClick={() => { setActiveTab('batches'); setBatchPage(1); }}
               >
                 Lô hàng tồn kho
               </button>
               <button
                 className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-                onClick={() => setActiveTab('history')}
+                onClick={() => { setActiveTab('history'); setLogPage(1); }}
               >
                 Lịch sử Nhập/Xuất
               </button>
@@ -1632,17 +1770,26 @@ const ManagerInventoryPage = () => {
                               </div>
                             ) : (
                               <div className="toggle-wrap menu-card-toggle-inner">
-                                <div
-                                  className="menu-switch-btn menu-switch-readonly"
-                                  role="presentation"
-                                  aria-hidden
+                                <button
+                                  type="button"
+                                  className="menu-switch-btn"
+                                  role="switch"
+                                  aria-checked={item.state !== 'sold-out'}
+                                  title={item.state === 'sold-out' ? 'Bật bán' : 'Tắt bán'}
+                                  disabled={comboTogglingId === item.id}
+                                  onClick={() => handleComboToggle(item)}
                                 >
-                                  <span className={`toggle-track ${item.state !== 'sold-out' ? 'is-on' : ''}`} />
+                                  <span
+                                    className={`toggle-track ${item.state !== 'sold-out' ? 'is-on' : ''} ${comboTogglingId === item.id ? 'is-loading' : ''}`}
+                                  >
+                                    {comboTogglingId === item.id && (
+                                      <Loader2 size={13} className="spin" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', color: '#fff', zIndex: 1 }} />
+                                    )}
+                                  </span>
                                   <span className={`toggle-label ${item.state === 'sold-out' ? 'off' : 'on'}`}>
                                     {item.state === 'sold-out' ? 'HẾT HÀNG' : 'ĐANG BÁN'}
                                   </span>
-                                </div>
-                                <span className="menu-toggle-hint">Chỉ món lẻ / buffet đổi tại đây</span>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1720,7 +1867,7 @@ const ManagerInventoryPage = () => {
       )}
 
       <footer className="inventory-footer">
-        <p>© 2024 Quản Lý Nhà Hàng Việt. Cập nhật: 10:45 AM</p>
+        
         <div>
           <a href="#support">Hỗ trợ</a>
           <a href="#docs">Tài liệu hệ thống</a>

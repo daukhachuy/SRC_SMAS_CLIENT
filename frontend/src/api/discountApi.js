@@ -61,7 +61,7 @@ export const discountAPI = {
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new Error('ID mã giảm giá không hợp lệ');
     }
-    const { data } = await instance.patch(`/discount/${numId}/status`, { status });
+    const { data } = await instance.patch(`/discount/${numId}/status?status=${encodeURIComponent(status)}`);
     return data;
   },
 };

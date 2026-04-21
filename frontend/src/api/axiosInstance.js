@@ -56,6 +56,7 @@ instance.interceptors.response.use(
     const isContractSignRequest = requestUrl.includes('/contract/sign');
     
     console.error(`[API Error] Status: ${status}, Message: ${message}`);
+    console.error('[API Error] Full response data:', JSON.stringify(error.response?.data, null, 2));
 
     // Handle 401 - Unauthorized
     if (status === 401) {

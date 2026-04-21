@@ -29,6 +29,7 @@ import {
 } from '../../api/managerApi';
 import '../../styles/ManagerPages.css';
 import '../../styles/ManagerReservationsPage.css';
+import TableCheckModal from '../../components/TableCheckModal';
 
 const ManagerReservationsPage = () => {
   const { base } = useRoleSectionBasePath();
@@ -55,6 +56,11 @@ const ManagerReservationsPage = () => {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [processingCode, setProcessingCode] = useState('');
+
+  // Modal Kiểm Tra Bàn
+  const [tableCheckModal, setTableCheckModal] = useState(false);
+  const [tableCheckDate, setTableCheckDate] = useState(new Date().toISOString().split('T')[0]);
+  const [tableCheckShift, setTableCheckShift] = useState('Tất cả');
 
   // Hàm mở modal xác nhận duyệt sự kiện
   const openReviewModal = (eventId) => {
@@ -515,6 +521,15 @@ const ManagerReservationsPage = () => {
                 className="search-input"
               />
             </div>
+            <button
+              type="button"
+              className="btn-create-event"
+              style={{ background: '#006590', display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => setTableCheckModal(true)}
+            >
+              <span style={{ fontSize: 18 }}>📅</span>
+              Kiểm Tra Bàn
+            </button>
             {activeTab !== 'regular' && (
               <button className="btn-create-event" type="button">
                 <Plus size={20} />
@@ -951,9 +966,20 @@ const ManagerReservationsPage = () => {
 
         <div className="table-footer">
           <p className="pagination-info">
-            {activeTab === 'regular'
-              ? `Hiển thị ${filteredRegularBookings.length} trên ${totalTodayBookings} lượt đặt bàn`
-              : `Hiển thị ${filteredEvents.length} trong số ${eventsData.length} sự kiện`}
+            {(() => {
+              const totalFiltered = activeTab === 'regular' ? filteredRegularBookings.length : filteredEvents.length;
+              const itemsPerPage = 10;
+              const start = totalFiltered === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+              const end = Math.min(currentPage * itemsPerPage, totalFiltered);
+              if (activeTab === 'regular') {
+                return totalFiltered === 0
+                  ? 'Không có lượt đặt bàn nào'
+                  : `Hiển thị ${start}-${end} trên ${totalFiltered} lượt đặt bàn`;
+              }
+              return totalFiltered === 0
+                ? 'Không có sự kiện nào'
+                : `Hiển thị ${start}-${end} trên ${totalFiltered} sự kiện`;
+            })()}
           </p>
           <div className="pagination-controls">
             <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)} type="button">
@@ -1032,6 +1058,16 @@ const ManagerReservationsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Kiểm Tra Bàn */}
+      <TableCheckModal
+        isOpen={tableCheckModal}
+        onClose={() => setTableCheckModal(false)}
+        selectedDate={tableCheckDate}
+        onDateChange={setTableCheckDate}
+        selectedShift={tableCheckShift}
+        onShiftChange={setTableCheckShift}
+      />
     </div>
   );
 };

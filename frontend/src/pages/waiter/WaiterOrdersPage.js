@@ -19,7 +19,8 @@ import {
   Users,
   Utensils,
   Printer,
-  X
+  X,
+  ClipboardList,
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
 import { orderAPI } from '../../api/managerApi';
@@ -43,6 +44,7 @@ import { ORDER_VAT_RATE, resolveOrderVatAndGrandTotal, roundOrderMoney } from '.
 import { printSalesInvoice } from '../../utils/orderInvoicePrint';
 import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import TableQRCode from '../../components/TableQRCode';
+import TableCheckModal from '../../components/TableCheckModal';
 
 // Helper: formatCurrency
 const formatCurrency = (value) => {
@@ -1184,6 +1186,11 @@ const mapApiOrderToWaiter = (order) => {
     mergedTableIds: []
   });
   const hasSelectedTable = Boolean(tableSelection.mainTableId);
+
+  // State cho Modal Kiểm Tra Bàn
+  const [tableCheckModal, setTableCheckModal] = useState(false);
+  const [tableCheckDate, setTableCheckDate] = useState(new Date().toISOString().split('T')[0]);
+  const [tableCheckShift, setTableCheckShift] = useState('Tất cả');
 
   // Danh sách bàn thực tế từ API
   const [tables, setTables] = useState([]);
@@ -2930,7 +2937,15 @@ const mapApiOrderToWaiter = (order) => {
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowTablePickerModal(false)}>
                 <ArrowLeft size={16} />
-                Quay lại
+                Quản lý bàn
+              </button>
+              <button
+                className="btn-add-outline"
+                onClick={() => setTableCheckModal(true)}
+                title="Kiểm tra tình trạng bàn"
+              >
+                <ClipboardList size={16} />
+                Kiểm Tra Bàn
               </button>
               <button
                 className="btn-continue"
@@ -2950,6 +2965,16 @@ const mapApiOrderToWaiter = (order) => {
           </div>
         </div>
       )}
+
+      {/* Modal Kiểm Tra Bàn */}
+      <TableCheckModal
+        isOpen={tableCheckModal}
+        onClose={() => setTableCheckModal(false)}
+        selectedDate={tableCheckDate}
+        onDateChange={setTableCheckDate}
+        selectedShift={tableCheckShift}
+        onShiftChange={setTableCheckShift}
+      />
 
       {showOrderDetailModal && selectedOrder && (
         <div className="modal-overlay" onClick={closeOrderDetailModal}>
