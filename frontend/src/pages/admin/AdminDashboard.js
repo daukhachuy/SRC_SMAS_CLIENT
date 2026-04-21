@@ -102,7 +102,7 @@ const AdminDashboard = () => {
   const [txFilters, setTxFilters] = useState(EMPTY_TX_FILTERS);
   const [txPage, setTxPage] = useState(1);
   const [txPageSize] = useState(10);
-  const [txData, setTxData] = useState({ data: [], totalItems: 0, totalPages: 1 });
+  const [txData, setTxData] = useState({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false });
   const [txLoading, setTxLoading] = useState(false);
 
   const handleTxSearch = () => {
@@ -132,14 +132,17 @@ const AdminDashboard = () => {
         const rows = Array.isArray(r?.data) ? r.data : [];
         const apiTotalItems = Number(r?.totalItems ?? rows.length);
         const apiTotalPages = Math.max(1, Number(r?.totalPages ?? 1));
+        const hasNext = r?.hasNextPage ?? (r?.page < r?.totalPages);
+        const hasPrev = r?.hasPreviousPage ?? (r?.page > 1);
 
-        // Fallback: nếu BE không phân trang (trả full list), FE tự phân trang 10 dòng/trang.
         const serverPagedLikely = rows.length <= txPageSize && apiTotalItems > txPageSize;
         if (serverPagedLikely) {
           setTxData({
             data: rows,
             totalItems: apiTotalItems,
             totalPages: apiTotalPages,
+            hasNextPage: hasNext,
+            hasPreviousPage: hasPrev,
           });
           return;
         }
@@ -150,9 +153,11 @@ const AdminDashboard = () => {
           data: pagedRows,
           totalItems: rows.length,
           totalPages: Math.max(1, Math.ceil(rows.length / txPageSize)),
+          hasNextPage: rows.length > start + txPageSize,
+          hasPreviousPage: txPage > 1,
         });
       })
-      .catch(() => setTxData({ data: [], totalItems: 0, totalPages: 1 }))
+      .catch(() => setTxData({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false }))
       .finally(() => setTxLoading(false));
   }, [txFilters, txPage, txPageSize]);
 

@@ -337,18 +337,22 @@ export async function fetchTransactionHistory({ fromDate, toDate, orderCode, pay
 
 function normalizeTransactionHistory(raw) {
   const r = raw?.data ?? raw?.Data ?? raw ?? {};
-  const list = Array.isArray(r.data)
-    ? r.data
-    : Array.isArray(r.items)
-      ? r.items
+
+  // Backend mới: { items: [...], totalCount, page, pageSize, totalPages, hasNextPage, hasPreviousPage }
+  const list = Array.isArray(r.items)
+    ? r.items
+    : Array.isArray(r.data)
+      ? r.data
       : Array.isArray(r.$values)
         ? r.$values
         : Array.isArray(r)
           ? r
           : [];
 
-  const totalItems = Number(r.totalItems ?? r.totalItems ?? r.total ?? r.count ?? list.length);
+  const totalItems = Number(r.totalCount ?? r.totalItems ?? r.total ?? r.count ?? list.length);
   const totalPages = Number(r.totalPages ?? Math.ceil(totalItems / (r.pageSize ?? 10)));
+  const hasNextPage = r.hasNextPage ?? (r.page < r.totalPages);
+  const hasPreviousPage = r.hasPreviousPage ?? (r.page > 1);
 
   return {
     data: list.map((x) => {
@@ -373,6 +377,8 @@ function normalizeTransactionHistory(raw) {
     }),
     totalItems,
     totalPages,
+    hasNextPage,
+    hasPreviousPage,
     page: Number(r.page ?? 1),
     pageSize: Number(r.pageSize ?? 10),
   };

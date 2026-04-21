@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axiosInstance';
 import { orderAPI, staffAPI } from '../../api/managerApi';
+import { fetchTransactionHistory } from '../../api/adminDashboardApi';
+import '../../styles/AdminDashboard.css';
 import { ArrowUpRight, ArrowDownRight, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   BarChart,
@@ -74,11 +76,26 @@ const getPositionColor = (position) => {
   return '#6b7280';
 };
 
+const EMPTY_TX_FILTERS = {
+  orderCode: '',
+  paymentMethod: '',
+  paymentStatus: '',
+  fromDate: '',
+  toDate: '',
+};
+
 const ManagerDashboardPage = () => {
   const [loading, setLoading] = useState(true);
-  const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [stats, setStats] = useState([]);
   const [error, setError] = useState('');
+
+  // Transaction History state
+  const [txFilterForm, setTxFilterForm] = useState(EMPTY_TX_FILTERS);
+  const [txFilters, setTxFilters] = useState(EMPTY_TX_FILTERS);
+  const [txPage, setTxPage] = useState(1);
+  const [txPageSize] = useState(5);
+  const [txData, setTxData] = useState({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false });
+  const [txLoading, setTxLoading] = useState(false);
 
   // State cho API doanh thu 7 ngày
   const [revenueData, setRevenueData] = useState([]);
@@ -243,6 +260,63 @@ const ManagerDashboardPage = () => {
 
     fetchStaffToday();
   }, []);
+
+  // Transaction History handlers
+  const handleTxSearch = () => {
+    setTxPage(1);
+    setTxFilters({
+      fromDate: txFilterForm.fromDate || '',
+      toDate: txFilterForm.toDate || '',
+      orderCode: String(txFilterForm.orderCode || '').trim(),
+      paymentMethod: txFilterForm.paymentMethod || '',
+      paymentStatus: txFilterForm.paymentStatus || '',
+    });
+  };
+  const handleTxClear = () => {
+    setTxFilterForm(EMPTY_TX_FILTERS);
+    setTxFilters(EMPTY_TX_FILTERS);
+    setTxPage(1);
+  };
+
+  useEffect(() => {
+    setTxLoading(true);
+    fetchTransactionHistory({
+      ...txFilters,
+      page: txPage,
+      pageSize: txPageSize,
+    })
+      .then((r) => {
+        const rows = Array.isArray(r?.data) ? r.data : [];
+        const apiTotalItems = Number(r?.totalItems ?? rows.length);
+        const apiTotalPages = Math.max(1, Number(r?.totalPages ?? 1));
+        const hasNext = r?.hasNextPage ?? (r?.page < r?.totalPages);
+        const hasPrev = r?.hasPreviousPage ?? (r?.page > 1);
+
+        const serverPagedLikely = rows.length <= txPageSize && apiTotalItems > txPageSize;
+        if (serverPagedLikely) {
+          setTxData({
+            data: rows,
+            totalItems: apiTotalItems,
+            totalPages: apiTotalPages,
+            hasNextPage: hasNext,
+            hasPreviousPage: hasPrev,
+          });
+          return;
+        }
+
+        const start = (txPage - 1) * txPageSize;
+        const pagedRows = rows.slice(start, start + txPageSize);
+        setTxData({
+          data: pagedRows,
+          totalItems: rows.length,
+          totalPages: Math.max(1, Math.ceil(rows.length / txPageSize)),
+          hasNextPage: rows.length > start + txPageSize,
+          hasPreviousPage: txPage > 1,
+        });
+      })
+      .catch(() => setTxData({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false }))
+      .finally(() => setTxLoading(false));
+  }, [txFilters, txPage, txPageSize]);
 
   // Cập nhật stats khi emptyTableCount thay đổi
   useEffect(() => {
@@ -445,58 +519,12 @@ const ManagerDashboardPage = () => {
           </div>
         </article>
       </div>
-      {/* Transaction history */}
+      {/* Staff table */}
       <article className="manager-card">
         <div className="manager-card-head">
           <h2>Trạng thái nhân viên</h2>
           <span>{staffList.length > 0 ? `${staffList.length} nhân viên` : ''}</span>
         </div>
-        <form onSubmit={handleApplyTxFilters} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto auto', gap: 8, marginBottom: 10 }}>
-          <input
-            type="text"
-            placeholder="Tìm theo mã đơn..."
-            value={txFilterForm.orderCode}
-            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, orderCode: e.target.value }))}
-            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 10px' }}
-          />
-          <select
-            value={txFilterForm.paymentMethod}
-            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, paymentMethod: e.target.value }))}
-            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 8px' }}
-          >
-            <option value="">Phương thức</option>
-            <option value="Cash">Tiền mặt</option>
-            <option value="PayOS">PayOS</option>
-          </select>
-          <select
-            value={txFilterForm.paymentStatus}
-            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, paymentStatus: e.target.value }))}
-            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 8px' }}
-          >
-            <option value="">Trạng thái</option>
-            <option value="Paid">Paid</option>
-            <option value="Pending">Pending</option>
-            <option value="Failed">Failed</option>
-          </select>
-          <input
-            type="date"
-            value={txFilterForm.fromDate}
-            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, fromDate: e.target.value }))}
-            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 10px' }}
-          />
-          <input
-            type="date"
-            value={txFilterForm.toDate}
-            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, toDate: e.target.value }))}
-            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 10px' }}
-          />
-          <button type="submit" className="manager-orders-page-btn" style={{ minWidth: 82 }}>
-            Tìm kiếm
-          </button>
-          <button type="button" className="manager-orders-page-btn" onClick={handleResetTxFilters} style={{ minWidth: 74 }}>
-            Xóa lọc
-          </button>
-        </form>
         <div className="manager-table-wrap">
           <table className="manager-table">
             <thead>
@@ -573,24 +601,146 @@ const ManagerDashboardPage = () => {
             </tbody>
           </table>
         </div>
-        {transactionsTotalPages > 1 && (
+      </article>
+
+      {/* Transaction History */}
+      <article className="manager-card">
+        <div className="manager-card-head">
+          <h2>Lịch sử giao dịch</h2>
+        </div>
+
+        {/* Filter Bar */}
+        <div className="tx-filter-bar">
+          <div className="tx-filter-row">
+            <label className="tx-filter-label">
+              <span>Mã đơn</span>
+              <input
+                type="text"
+                className="tx-input"
+                placeholder="VD: ORD-001"
+                value={txFilterForm.orderCode}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, orderCode: e.target.value }))}
+              />
+            </label>
+            <label className="tx-filter-label">
+              <span>Phương thức</span>
+              <select
+                className="tx-input"
+                value={txFilterForm.paymentMethod}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, paymentMethod: e.target.value }))}
+              >
+                <option value="">Tất cả</option>
+                <option value="Cash">Tiền mặt</option>
+                <option value="PayOS">PayOS</option>
+              </select>
+            </label>
+            <label className="tx-filter-label">
+              <span>Trạng thái</span>
+              <select
+                className="tx-input"
+                value={txFilterForm.paymentStatus}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, paymentStatus: e.target.value }))}
+              >
+                <option value="">Tất cả</option>
+                <option value="Paid">Đã thanh toán</option>
+                <option value="Pending">Chờ thanh toán</option>
+                <option value="Failed">Thất bại</option>
+                <option value="Cancelled">Đã hủy</option>
+              </select>
+            </label>
+            <label className="tx-filter-label">
+              <span>Từ ngày</span>
+              <input
+                type="date"
+                className="tx-input"
+                value={txFilterForm.fromDate}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, fromDate: e.target.value }))}
+              />
+            </label>
+            <label className="tx-filter-label">
+              <span>Đến ngày</span>
+              <input
+                type="date"
+                className="tx-input"
+                value={txFilterForm.toDate}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, toDate: e.target.value }))}
+              />
+            </label>
+          </div>
+          <div className="tx-filter-actions">
+            <button type="button" className="manager-orders-page-btn" onClick={handleTxSearch}>
+              Tìm kiếm
+            </button>
+            <button type="button" className="manager-orders-page-btn" onClick={handleTxClear}>
+              Xóa lọc
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="manager-table-wrap">
+          {txLoading ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>Đang tải...</div>
+          ) : txData.data.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>Không có giao dịch nào.</div>
+          ) : (
+            <table className="manager-table">
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Mã đơn</th>
+                  <th>Khách hàng</th>
+                  <th>Số tiền</th>
+                  <th>Phương thức</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txData.data.map((row) => (
+                  <tr key={row.id}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {row.paidAt
+                        ? new Date(row.paidAt).toLocaleString('vi-VN', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })
+                        : '—'}
+                    </td>
+                    <td style={{ fontWeight: 600, color: '#111827' }}>{row.orderCode}</td>
+                    <td>{row.customerName}</td>
+                    <td style={{ color: '#059669', fontWeight: 700 }}>
+                      {row.amountDisplay}
+                    </td>
+                    <td>{row.paymentMethodDisplay}</td>
+                    <td>
+                      <span className={`manager-pill ${row.statusKey}`}>
+                        {row.statusLabel}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {txData.totalPages > 1 && (
           <div className="manager-orders-pagination" style={{ marginTop: '0.75rem' }}>
             <span className="manager-orders-pagination-info">
-              {transactionsTotalItems > 0
-                ? `${(transactionsPage - 1) * PAGE_SIZE + 1}–${Math.min(transactionsPage * PAGE_SIZE, transactionsTotalItems)} / ${transactionsTotalItems}`
-                : ''}
+              Hiển thị {(txPage - 1) * txPageSize + 1}–{Math.min(txPage * txPageSize, txData.totalItems)} / {txData.totalItems.toLocaleString('vi-VN')} giao dịch
             </span>
             <div className="manager-orders-pagination-controls">
               <button
                 type="button"
                 className="manager-orders-page-btn"
-                disabled={transactionsPage <= 1}
-                onClick={() => setTransactionsPage((p) => p - 1)}
+                disabled={txPage <= 1}
+                onClick={() => setTxPage((p) => p - 1)}
               >
                 ‹
               </button>
-              {Array.from({ length: transactionsTotalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === transactionsTotalPages || Math.abs(p - transactionsPage) <= 2)
+              {Array.from({ length: txData.totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === txData.totalPages || Math.abs(p - txPage) <= 2)
                 .reduce((acc, p, i, arr) => {
                   if (i > 0 && arr[i - 1] !== p - 1) acc.push('…');
                   acc.push(p);
@@ -598,13 +748,13 @@ const ManagerDashboardPage = () => {
                 }, [])
                 .map((p, i) =>
                   p === '…' ? (
-                    <span key={`tx-e-${i}`} className="manager-orders-ellipsis">…</span>
+                    <span key={`ellipsis-${i}`} style={{ padding: '0 4px' }}>…</span>
                   ) : (
                     <button
-                      key={`tx-${p}`}
+                      key={p}
                       type="button"
-                      className={`manager-orders-page-btn${transactionsPage === p ? ' active' : ''}`}
-                      onClick={() => setTransactionsPage(p)}
+                      className={`manager-orders-page-btn${txPage === p ? ' active' : ''}`}
+                      onClick={() => setTxPage(p)}
                     >
                       {p}
                     </button>
@@ -613,8 +763,8 @@ const ManagerDashboardPage = () => {
               <button
                 type="button"
                 className="manager-orders-page-btn"
-                disabled={transactionsPage >= transactionsTotalPages}
-                onClick={() => setTransactionsPage((p) => p + 1)}
+                disabled={txPage >= txData.totalPages}
+                onClick={() => setTxPage((p) => p + 1)}
               >
                 ›
               </button>
