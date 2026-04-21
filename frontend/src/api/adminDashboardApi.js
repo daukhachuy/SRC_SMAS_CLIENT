@@ -141,12 +141,15 @@ export function normalizeSummary(raw) {
 /**
  * Chuẩn hóa GET /api/admin/dashboard/revenue-chart
  * Swagger: data là mảng [{ month, revenue, cost }] (có thể PascalCase)
+ * Backend thực tế: { success: true, data: { data: [...] } }
  */
 export function normalizeRevenueChart(raw) {
   const empty = () => ({ labels: [], revenues: [], costs: [] });
   if (raw == null) return empty();
 
-  const d = raw?.data ?? raw?.Data ?? raw;
+  // raw = { success: true, data: { data: [...] } } → lấy raw.data.data
+  const inner = raw?.data ?? raw?.Data ?? raw;
+  const d = inner?.data ?? inner?.Data ?? inner;
 
   if (raw.success === true && (d == null || (Array.isArray(d) && d.length === 0))) {
     return empty();
@@ -317,6 +320,111 @@ export async function fetchOrderStructure(opts = {}) {
 export async function fetchWarehouseTransactions() {
   const j = await authGet('/admin/dashboard/warehouse-transactions');
   return normalizeWarehouseTransactions(j);
+}
+
+export async function fetchTransactionHistory({ fromDate, toDate, orderCode, paymentMethod, paymentStatus, page = 1, pageSize = 10 } = {}) {
+  const params = {};
+  if (fromDate) params.FromDate = fromDate;
+  if (toDate) params.ToDate = toDate;
+  if (orderCode) params.OrderCode = orderCode;
+  if (paymentMethod) params.PaymentMethod = paymentMethod;
+  if (paymentStatus) params.PaymentStatus = paymentStatus;
+  if (page) params.page = page;
+  if (pageSize) params.pageSize = pageSize;
+  const j = await authGet('/payment/transaction-history', params);
+  return normalizeTransactionHistory(j);
+}
+
+function normalizeTransactionHistory(raw) {
+  const r = raw?.data ?? raw?.Data ?? raw ?? {};
+
+  // Backend mới: { items: [...], totalCount, page, pageSize, totalPages, hasNextPage, hasPreviousPage }
+  const list = Array.isArray(r.items)
+    ? r.items
+    : Array.isArray(r.data)
+      ? r.data
+      : Array.isArray(r.$values)
+        ? r.$values
+        : Array.isArray(r)
+          ? r
+          : [];
+
+  const totalItems = Number(r.totalCount ?? r.totalItems ?? r.total ?? r.count ?? list.length);
+  const totalPages = Number(r.totalPages ?? Math.ceil(totalItems / (r.pageSize ?? 10)));
+  const hasNextPage = r.hasNextPage ?? (r.page < r.totalPages);
+  const hasPreviousPage = r.hasPreviousPage ?? (r.page > 1);
+
+  return {
+    data: list.map((x) => {
+      const amt = Number(x.amount ?? x.totalAmount ?? x.total ?? 0);
+      const rawStatus = x.paymentStatus ?? x.status ?? '';
+      const rawMethod = x.paymentMethod ?? x.method ?? '';
+      const statusKey = normalizePaymentStatusKey(rawStatus);
+      return {
+        id: x.id ?? x.transactionId ?? x.paymentId ?? Math.random(),
+        paymentCode: x.paymentCode ?? x.code ?? '',
+        paidAt: x.paidAt ?? x.paymentDate ?? x.createdAt ?? '',
+        orderCode: x.orderCode ?? x.orderId ?? x.orderId ?? 'N/A',
+        customerName: x.customerName ?? x.customer ?? x.userName ?? x.user ?? 'Khách lẻ',
+        amount: amt,
+        amountDisplay: formatVndDisplay(amt),
+        paymentMethod: rawMethod,
+        paymentMethodDisplay: normalizePaymentMethod(rawMethod),
+        paymentStatus: rawStatus,
+        statusKey,
+        statusLabel: normalizePaymentStatusLabel(rawStatus),
+      };
+    }),
+    totalItems,
+    totalPages,
+    hasNextPage,
+    hasPreviousPage,
+    page: Number(r.page ?? 1),
+    pageSize: Number(r.pageSize ?? 10),
+  };
+}
+
+const PAYMENT_METHOD_LABELS = {
+  cash: 'Tiền mặt',
+  payos: 'PayOS',
+  vnpay: 'VNPay',
+  momo: 'MoMo',
+  Zalopay: 'ZaloPay',
+  bank: 'Chuyển khoản',
+  qr: 'QR Code',
+};
+
+function normalizePaymentMethod(v) {
+  if (!v) return '—';
+  const k = String(v).toLowerCase().replace(/[\s_-]/g, '');
+  return PAYMENT_METHOD_LABELS[k] || v;
+}
+
+const PAYMENT_STATUS_MAP = {
+  paid: { key: 'paid', label: 'Đã thanh toán' },
+  success: { key: 'paid', label: 'Đã thanh toán' },
+  completed: { key: 'paid', label: 'Hoàn thành' },
+  done: { key: 'paid', label: 'Đã thanh toán' },
+  pending: { key: 'pending', label: 'Chờ thanh toán' },
+  waiting: { key: 'pending', label: 'Chờ thanh toán' },
+  processing: { key: 'pending', label: 'Đang xử lý' },
+  failed: { key: 'failed', label: 'Thất bại' },
+  cancelled: { key: 'cancelled', label: 'Đã hủy' },
+  cancel: { key: 'cancelled', label: 'Đã hủy' },
+  refund: { key: 'refund', label: 'Hoàn tiền' },
+  refunded: { key: 'refund', label: 'Đã hoàn tiền' },
+};
+
+function normalizePaymentStatusKey(s) {
+  if (!s) return 'pending';
+  const k = String(s).toLowerCase().replace(/[\s_-]/g, '');
+  return PAYMENT_STATUS_MAP[k]?.key ?? 'pending';
+}
+
+function normalizePaymentStatusLabel(s) {
+  if (!s) return 'Chờ thanh toán';
+  const k = String(s).toLowerCase().replace(/[\s_-]/g, '');
+  return PAYMENT_STATUS_MAP[k]?.label ?? s;
 }
 
 /** GET /api/admin/dashboard/menu-analysis — phân tích món lẻ / menu */

@@ -188,8 +188,13 @@ function getCreatedByUserId() {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       const u = JSON.parse(userStr);
-      const id = Number(u.userId ?? u.id);
-      return Number.isFinite(id) && id > 0 ? id : null;
+      // Ưu tiên lấy UUID từ các trường khác nhau
+      const uuid = u.userId ?? u.id ?? u.uuid;
+      if (uuid && typeof uuid === 'string' && uuid.includes('-')) {
+        return uuid; // UUID string
+      }
+      const numId = Number(uuid);
+      return Number.isFinite(numId) && numId > 0 ? numId : null;
     }
   } catch (_) {
     /* ignore */
@@ -197,14 +202,18 @@ function getCreatedByUserId() {
   return null;
 }
 
-function deriveDiscountStatus(startDate, endDate) {
+function deriveDiscountStatus(startDate, endDate, apiStatus) {
+  // Ưu tiên status từ API
+  if (apiStatus && ['Active', 'Inactive', 'Expired'].includes(apiStatus)) {
+    return apiStatus;
+  }
   const end = new Date(endDate);
   const start = new Date(startDate);
   const now = new Date();
-  if (Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())) return 'running';
-  if (now > end) return 'expired';
-  if (now < start) return 'upcoming';
-  return 'running';
+  if (Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())) return 'Active';
+  if (now > end) return 'Expired';
+  if (now < start) return 'Inactive';
+  return 'Active';
 }
 
 const API_BASE_FOR_ASSETS = (process.env.REACT_APP_API_URL || 'https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api').replace(/\/$/, '');
@@ -396,20 +405,27 @@ const BLOG_DETAIL_KNOWN_KEYS = new Set([
 function mapApiDiscountToRow(d) {
   const dt = d.discountType;
   const isPct = dt === 'Percentage';
-  const isShip = String(d.applicableFor || '').toLowerCase() === 'shipping';
-  const typeLabel = isPct ? 'Phần trăm (%)' : isShip ? 'Vận chuyển' : 'Cố định (VNĐ)';
+  const isFixed = dt === 'Fixed';
+  const typeLabel = isPct ? 'Phần trăm (%)' : isFixed ? 'Cố định (VNĐ)' : '—';
   let valueDisplay;
   if (isPct) valueDisplay = `${d.value}% Giảm giá`;
-  else if (isShip) valueDisplay = 'Miễn phí vận chuyển';
-  else valueDisplay = `${Number(d.value).toLocaleString('vi-VN')}đ Giảm`;
+  else if (isFixed) valueDisplay = `${Number(d.value).toLocaleString('vi-VN')}đ Giảm`;
+  else valueDisplay = `${Number(d.value).toLocaleString('vi-VN')}đ`;
+  const applicableForLabel = {
+    All: 'Tất cả',
+    DineIn: 'Tại bàn',
+    Takeaway: 'Mang đi',
+    Delivery: 'Giao hàng',
+  }[d.applicableFor] || d.applicableFor || 'Tất cả';
   return {
     id: d.discountId,
     code: d.code,
     type: typeLabel,
     value: valueDisplay,
+    applicableFor: applicableForLabel,
     start: d.startDate ? new Date(d.startDate).toLocaleDateString('vi-VN') : '',
     end: d.endDate ? new Date(d.endDate).toLocaleDateString('vi-VN') : '',
-    status: deriveDiscountStatus(d.startDate, d.endDate),
+    status: d.status || 'Active',
     raw: d,
   };
 }
@@ -417,6 +433,8 @@ function mapApiDiscountToRow(d) {
 const AdminRestaurantPage = () => {
   const [tab, setTab] = useState('codes');
   const [codeSearch, setCodeSearch] = useState('');
+  const [codePage, setCodePage] = useState(1);
+  const CODE_PAGE_SIZE = 5;
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [blogModalOpen, setBlogModalOpen] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
@@ -436,7 +454,7 @@ const AdminRestaurantPage = () => {
   const [blogDetailFetchId, setBlogDetailFetchId] = useState(null);
   const [codeForm, setCodeForm] = useState({
     code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '',
-    startDate: '', endDate: '', quantity: '',
+    startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active',
   });
   const [blogForm, setBlogForm] = useState(() => emptyBlogForm());
   const [blogSubmitting, setBlogSubmitting] = useState(false);
@@ -1003,12 +1021,59 @@ const AdminRestaurantPage = () => {
   };
 
   const buildDiscountPayload = () => {
-    const createdBy = getCreatedByUserId();
-    if (!createdBy) {
-      throw new Error('Vui lòng đăng nhập để tạo mã giảm giá');
-    }
-    const discountType = codeForm.type === 'percent' ? 'Percentage' : 'FixedAmount';
+    const formatDateForApi = (dateStr) => {
+      if (!dateStr) return null;
+      return dateStr;
+    };
+    const discountType = codeForm.type === 'percent' ? 'Percentage' : 'Fixed';
     const valueNum = parseMoneyInput(codeForm.value);
+    if (!valueNum || valueNum <= 0) {
+      throw new Error('Giá trị giảm phải lớn hơn 0');
+    }
+    if (discountType === 'Percentage' && valueNum > 100) {
+      throw new Error('Giá trị phần trăm giảm giá không được vượt quá 100%');
+    }
+    // Map frontend value to backend enum
+    const applicableForMap = {
+      'All': 'All',
+      'DineIn': 'DineIn',
+      'Takeaway': 'Takeaway',
+      'Delivery': 'Delivery',
+    };
+    const applicableFor = applicableForMap[codeForm.applicableFor] || 'All';
+    return {
+      code: codeForm.code.trim().toUpperCase(),
+      description: (codeForm.description || '').trim() || codeForm.code.trim(),
+      discountType,
+      value: valueNum,
+      minOrderAmount: parseMoneyInput(codeForm.minOrder),
+      maxDiscountAmount: parseMoneyInput(codeForm.maxDiscount),
+      startDate: formatDateForApi(codeForm.startDate),
+      endDate: formatDateForApi(codeForm.endDate),
+      usageLimit: parseInt(String(codeForm.quantity).replace(/\D/g, ''), 10) || 0,
+      applicableFor,
+      status: codeForm.status,
+    };
+  };
+
+  /** PUT /api/discount/{id} — theo DiscountUpdateDto */
+  const buildDiscountUpdatePayload = (raw) => {
+    const discountType = codeForm.type === 'percent' ? 'Percentage' : 'Fixed';
+    const valueNum = parseMoneyInput(codeForm.value);
+    if (!valueNum || valueNum <= 0) {
+      throw new Error('Giá trị giảm phải lớn hơn 0');
+    }
+    if (discountType === 'Percentage' && valueNum > 100) {
+      throw new Error('Giá trị phần trăm giảm giá không được vượt quá 100%');
+    }
+    const usedCount = Number(raw?.usedCount ?? raw?.used_count ?? 0);
+    const applicableForMap = {
+      'All': 'All',
+      'DineIn': 'DineIn',
+      'Takeaway': 'Takeaway',
+      'Delivery': 'Delivery',
+    };
+    const applicableFor = applicableForMap[codeForm.applicableFor] || 'All';
     return {
       code: codeForm.code.trim().toUpperCase(),
       description: (codeForm.description || '').trim() || codeForm.code.trim(),
@@ -1019,29 +1084,8 @@ const AdminRestaurantPage = () => {
       startDate: codeForm.startDate,
       endDate: codeForm.endDate,
       usageLimit: parseInt(String(codeForm.quantity).replace(/\D/g, ''), 10) || 0,
-      applicableFor: codeForm.type === 'ship' ? 'Shipping' : 'Order',
-      status: 'Active',
-      createdBy,
-    };
-  };
-
-  /** PUT /api/discount/{id} — theo DiscountUpdateDto (Swagger), không gửi code */
-  const buildDiscountUpdatePayload = (raw) => {
-    const discountType = codeForm.type === 'percent' ? 'Percentage' : 'FixedAmount';
-    const valueNum = parseMoneyInput(codeForm.value);
-    const usedCount = Number(raw?.usedCount ?? raw?.used_count ?? 0);
-    const statusStr = (raw?.status && String(raw.status)) || 'Active';
-    return {
-      description: (codeForm.description || '').trim() || codeForm.code.trim(),
-      discountType,
-      value: valueNum,
-      minOrderAmount: parseMoneyInput(codeForm.minOrder),
-      maxDiscountAmount: parseMoneyInput(codeForm.maxDiscount),
-      startDate: codeForm.startDate,
-      endDate: codeForm.endDate,
-      usageLimit: parseInt(String(codeForm.quantity).replace(/\D/g, ''), 10) || 0,
-      applicableFor: codeForm.type === 'ship' ? 'Shipping' : 'Order',
-      status: statusStr,
+      applicableFor,
+      status: codeForm.status,
       usedCount: Number.isFinite(usedCount) && usedCount >= 0 ? usedCount : 0,
     };
   };
@@ -1060,10 +1104,12 @@ const AdminRestaurantPage = () => {
       try {
         const raw = editingCode.raw || {};
         const payload = buildDiscountUpdatePayload(raw);
+        console.debug('[DEBUG] Discount update payload:', JSON.stringify(payload, null, 2));
         await discountAPI.updateDiscount(discountId, payload);
         await loadDiscounts();
-      setEditingCode(null);
-        setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
+        setCodePage(1);
+        setEditingCode(null);
+        setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
         setCodeModalOpen(false);
       } catch (err) {
         const msg =
@@ -1081,15 +1127,18 @@ const AdminRestaurantPage = () => {
     setCodeSubmitting(true);
     try {
       const payload = buildDiscountPayload();
+      console.log('[DEBUG] Discount payload:', JSON.stringify(payload, null, 2));
       await discountAPI.createDiscount(payload);
       await loadDiscounts();
-    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
-    setCodeModalOpen(false);
+      setCodePage(1);
+      setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
+      setCodeModalOpen(false);
     } catch (err) {
       const msg =
         (typeof err.message === 'string' && err.message) ||
         err.response?.data?.message ||
         err.response?.data?.title ||
+        JSON.stringify(err.response?.data) ||
         'Không tạo được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.';
       setCodeSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
     } finally {
@@ -1233,10 +1282,9 @@ const AdminRestaurantPage = () => {
   };
 
   const applyDiscountToForm = (d, codeRow) => {
-    const typeValue =
-      d.discountType === 'Percentage'
-        ? 'percent'
-        : (String(d.applicableFor || '').toLowerCase() === 'shipping' ? 'ship' : 'fixed');
+    const typeValue = d.discountType === 'Percentage' ? 'percent' : 'fixed';
+    const applicableForVal = d.applicableFor || 'All';
+    const statusVal = d.status || 'Active';
     setCodeForm({
       code: d.code || '',
       type: typeValue,
@@ -1247,6 +1295,8 @@ const AdminRestaurantPage = () => {
       startDate: d.startDate ? String(d.startDate).slice(0, 10) : '',
       endDate: d.endDate ? String(d.endDate).slice(0, 10) : '',
       quantity: d.usageLimit != null ? String(d.usageLimit) : '',
+      applicableFor: applicableForVal,
+      status: statusVal,
     });
     setEditingCode({ ...codeRow, raw: d });
     setCodeModalOpen(true);
@@ -1271,7 +1321,7 @@ const AdminRestaurantPage = () => {
       applyDiscountToForm(d, codeRow);
       return;
     }
-    const typeValue = codeRow.type === 'Phần trăm (%)' ? 'percent' : codeRow.type === 'Vận chuyển' ? 'ship' : 'fixed';
+    const typeValue = codeRow.type === 'Phần trăm (%)' ? 'percent' : 'fixed';
     setCodeForm({
       code: codeRow.code,
       type: typeValue,
@@ -1282,6 +1332,8 @@ const AdminRestaurantPage = () => {
       startDate: codeRow.start,
       endDate: codeRow.end,
       quantity: '',
+      applicableFor: 'All',
+      status: 'Active',
     });
     setEditingCode(codeRow);
     setCodeModalOpen(true);
@@ -1320,7 +1372,22 @@ const AdminRestaurantPage = () => {
     setCodeModalOpen(false);
     setEditingCode(null);
     setCodeSubmitError('');
-    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' });
+    setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
+  };
+
+  const handleToggleDiscountStatus = async (row) => {
+    const id = row?.id;
+    if (id == null || !Number.isFinite(Number(id)) || Number(id) <= 0) return;
+    const newStatus = row.status === 'Active' ? 'Inactive' : 'Active';
+    const ok = window.confirm(`${newStatus === 'Active' ? 'Bật' : 'Tắt'} mã giảm giá "${row.code}"?`);
+    if (!ok) return;
+    try {
+      await discountAPI.updateDiscountStatus(id, newStatus);
+      await loadDiscounts();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái';
+      alert(msg);
+    }
   };
 
   const handleDeleteCode = async (row) => {
@@ -1474,13 +1541,17 @@ const AdminRestaurantPage = () => {
     }
   };
 
-  const statusLabel = (s) => ({ running: 'ĐANG CHẠY', upcoming: 'SẮP TỚI', expired: 'HẾT HẠN' }[s] || s);
+  const statusLabel = (s) => ({ Active: 'Hoạt động', Inactive: 'Không hoạt động', Expired: 'Hết hạn', running: 'ĐANG CHẠY', upcoming: 'SẮP TỚI', expired: 'HẾT HẠN' }[s] || s);
 
   const filteredCodes = codes.filter((row) => {
     const q = codeSearch.trim().toLowerCase();
     if (!q) return true;
     return String(row.code || '').toLowerCase().includes(q);
   });
+
+  const totalCodePages = Math.max(1, Math.ceil(filteredCodes.length / CODE_PAGE_SIZE));
+  const currentCodePage = Math.min(codePage, totalCodePages);
+  const pagedCodes = filteredCodes.slice((currentCodePage - 1) * CODE_PAGE_SIZE, currentCodePage * CODE_PAGE_SIZE);
 
   const feedbackSummary = useMemo(() => computeFeedbackSummary(filteredFeedback), [filteredFeedback]);
 
@@ -1497,7 +1568,7 @@ const AdminRestaurantPage = () => {
       </header>
 
       <div className="rest-tabs">
-        <button type="button" className={`rest-tab ${tab === 'codes' ? 'active' : ''}`} onClick={() => setTab('codes')}>
+        <button type="button" className={`rest-tab ${tab === 'codes' ? 'active' : ''}`} onClick={() => { setTab('codes'); setCodePage(1); }}>
           Mã giảm giá
         </button>
         <button type="button" className={`rest-tab ${tab === 'blog' ? 'active' : ''}`} onClick={() => setTab('blog')}>
@@ -1524,7 +1595,7 @@ const AdminRestaurantPage = () => {
                 className="rest-search"
                 placeholder="Tìm theo mã code..."
                 value={codeSearch}
-                onChange={(e) => setCodeSearch(e.target.value)}
+                onChange={(e) => { setCodeSearch(e.target.value); setCodePage(1); }}
               />
             </div>
             <button type="button" className="rest-btn-primary" onClick={() => { setEditingCode(null); setCodeSubmitError(''); setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' }); setCodeModalOpen(true); }}>
@@ -1550,6 +1621,7 @@ const AdminRestaurantPage = () => {
                     <th>MÃ CODE</th>
                     <th>LOẠI GIẢM GIÁ</th>
                     <th>GIÁ TRỊ</th>
+                    <th>ÁP DỤNG CHO</th>
                     <th>BẮT ĐẦU</th>
                     <th>KẾT THÚC</th>
                     <th>TRẠNG THÁI</th>
@@ -1557,18 +1629,29 @@ const AdminRestaurantPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCodes.map((row) => (
+                  {pagedCodes.map((row) => (
                     <tr key={row.id}>
                       <td className="rest-code">{row.code}</td>
                       <td>{row.type}</td>
                       <td>{row.value}</td>
+                      <td>{row.applicableFor}</td>
                       <td>{row.start}</td>
                       <td>{row.end}</td>
                       <td>
-                        <span className={`rest-badge rest-badge-${row.status}`}>{statusLabel(row.status)}</span>
+                        <button
+                          type="button"
+                          className={`rest-toggle ${row.status === 'Active' ? 'active' : ''}`}
+                          role="switch"
+                          aria-checked={row.status === 'Active'}
+                          aria-label={row.status === 'Active' ? 'Đang hoạt động – nhấn để tắt' : 'Không hoạt động – nhấn để bật'}
+                          title={row.status === 'Active' ? 'Tắt hoạt động' : 'Bật hoạt động'}
+                          onClick={() => handleToggleDiscountStatus(row)}
+                          disabled={row.status === 'Expired'}
+                        >
+                          <span className="rest-toggle-slider" />
+                        </button>
                       </td>
                       <td>
-                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openCodeDetail(row)}><Eye size={16} /></button>
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditCode(row)}><Pencil size={16} /></button>
                         <button type="button" className="rest-icon-btn" aria-label="Xóa" onClick={() => handleDeleteCode(row)}><Trash2 size={16} /></button>
                       </td>
@@ -1578,13 +1661,13 @@ const AdminRestaurantPage = () => {
               </table>
             </div>
             <div className="rest-pagination">
-              <span>Hiển thị {filteredCodes.length ? `1-${filteredCodes.length}` : '0'} trong {codes.length} mã</span>
+              <span>Hiển thị {pagedCodes.length ? `${(currentCodePage - 1) * CODE_PAGE_SIZE + 1}–${Math.min(currentCodePage * CODE_PAGE_SIZE, filteredCodes.length)}` : '0'} trong {filteredCodes.length} mã</span>
               <div className="rest-pagination-btns">
-                <button type="button" className="rest-page-btn">&lt;</button>
-                <button type="button" className="rest-page-btn active">1</button>
-                <button type="button" className="rest-page-btn">2</button>
-                <button type="button" className="rest-page-btn">3</button>
-                <button type="button" className="rest-page-btn">&gt;</button>
+                <button type="button" className="rest-page-btn" disabled={currentCodePage <= 1} onClick={() => setCodePage(p => p - 1)}>&lt;</button>
+                {Array.from({ length: totalCodePages }, (_, i) => i + 1).map((pageNum) => (
+                  <button type="button" key={pageNum} className={`rest-page-btn ${currentCodePage === pageNum ? 'active' : ''}`} onClick={() => setCodePage(pageNum)}>{pageNum}</button>
+                ))}
+                <button type="button" className="rest-page-btn" disabled={currentCodePage >= totalCodePages} onClick={() => setCodePage(p => p + 1)}>&gt;</button>
               </div>
             </div>
           </div>
@@ -2436,7 +2519,23 @@ const AdminRestaurantPage = () => {
                 <select value={codeForm.type} onChange={(e) => setCodeForm((f) => ({ ...f, type: e.target.value }))}>
                   <option value="percent">Phần trăm %</option>
                   <option value="fixed">Cố định (VNĐ)</option>
-                  <option value="ship">Vận chuyển</option>
+                </select>
+              </div>
+              <div className="rest-form-group">
+                <label>Áp dụng cho <span className="rest-required">*</span></label>
+                <select value={codeForm.applicableFor} onChange={(e) => setCodeForm((f) => ({ ...f, applicableFor: e.target.value }))}>
+                  <option value="All">Tất cả</option>
+                  <option value="DineIn">Tại bàn (Dine-In)</option>
+                  <option value="Takeaway">Mang đi (Takeaway)</option>
+                  <option value="Delivery">Giao hàng (Delivery)</option>
+                </select>
+              </div>
+              <div className="rest-form-group">
+                <label>Trạng thái <span className="rest-required">*</span></label>
+                <select value={codeForm.status} onChange={(e) => setCodeForm((f) => ({ ...f, status: e.target.value }))}>
+                  <option value="Active">Hoạt động</option>
+                  <option value="Inactive">Không hoạt động</option>
+                  <option value="Expired">Hết hạn</option>
                 </select>
               </div>
               <div className="rest-form-group">

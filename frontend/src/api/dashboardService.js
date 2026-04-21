@@ -8,10 +8,10 @@ const getAuthHeader = () => {
 };
 
 // Lấy thống kê tổng quan (Số đơn, doanh thu, bàn trống)
-export const getStats = () => axios.get(`${API_URL}/Dashboard/stats`, { headers: getAuthHeader() });
+export const getStats = () => axios.get(`${API_URL}/dashboard/stats`, { headers: getAuthHeader() });
 
 // Lấy danh sách đơn hàng thực tế
-export const getRecentOrders = () => axios.get(`${API_URL}/Order`, { headers: getAuthHeader() });
+export const getRecentOrders = () => axios.get(`${API_URL}/order`, { headers: getAuthHeader() });
 
 // Lấy trạng thái nhân viên thực tế
 export const getStaffStatus = () => axios.get(`${API_URL}/User`, { headers: getAuthHeader() });

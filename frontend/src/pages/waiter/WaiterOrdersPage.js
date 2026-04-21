@@ -19,7 +19,8 @@ import {
   Users,
   Utensils,
   Printer,
-  X
+  X,
+  ClipboardList,
 } from 'lucide-react';
 import '../../styles/WaiterPages.css';
 import { orderAPI } from '../../api/managerApi';
@@ -36,6 +37,7 @@ import { patchOrderItemServed } from '../../api/orderItemApi';
 import { createHubConnection, KITCHEN_HUB } from '../../realtime/signalrClient';
 import { apiCancelItem } from '../../api/kitchenOrderApi';
 import { createRemainingPaymentQr, payOrderCash } from '../../api/paymentService';
+import { discountAPI } from '../../api/discountApi';
 import { getWaiterTables } from '../../api/waiterApiTable';
 import { initTableSession } from '../../api/tableSessionApi';
 import { getProfile } from '../../api/userApi';
@@ -43,6 +45,7 @@ import { ORDER_VAT_RATE, resolveOrderVatAndGrandTotal, roundOrderMoney } from '.
 import { printSalesInvoice } from '../../utils/orderInvoicePrint';
 import { downloadInvoicePdf, getPdfErrorMessage } from '../../api/pdfExportApi';
 import TableQRCode from '../../components/TableQRCode';
+import TableCheckModal from '../../components/TableCheckModal';
 
 // Helper: formatCurrency
 const formatCurrency = (value) => {
@@ -112,6 +115,19 @@ const resolveOrderCode = (order) =>
   String(order?.orderCode || order?.id || order?.code || '')
     .replace(/^#/, '')
     .trim();
+
+const resolveOrderDiscountCode = (order) =>
+  String(
+    order?.discountCode ||
+    order?.voucherCode ||
+    order?.couponCode ||
+    order?.promotionCode ||
+    order?.appliedDiscountCode ||
+    order?.discount?.code ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
 
 const mapOrderStatus = (status) => {
   const s = normalizeStatus(status);
@@ -531,6 +547,7 @@ const mapApiOrderToWaiter = (order) => {
     deliveryFee: Number(order?.deliveryPrice || order?.deliveryFee || 0),
     // Theo yêu cầu nghiệp vụ: đơn giao hàng không áp dụng mã giảm giá.
     discount: isDelivery ? 0 : Number(order?.discountAmount || order?.discount || 0),
+    discountCode: resolveOrderDiscountCode(order),
     totalAmount,
   };
 };
@@ -638,6 +655,11 @@ const mapApiOrderToWaiter = (order) => {
   const [menuSearch, setMenuSearch] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState('');
+  const [voucherApplyError, setVoucherApplyError] = useState('');
+  const [voucherApplyMessage, setVoucherApplyMessage] = useState('');
+  const [voucherAppliedDiscountAmount, setVoucherAppliedDiscountAmount] = useState(0);
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [receivedMoney, setReceivedMoney] = useState('');
   const [activePaymentMethod, setActivePaymentMethod] = useState('cash');
   const [isPaying, setIsPaying] = useState(false);
@@ -1185,6 +1207,11 @@ const mapApiOrderToWaiter = (order) => {
   });
   const hasSelectedTable = Boolean(tableSelection.mainTableId);
 
+  // State cho Modal Kiểm Tra Bàn
+  const [tableCheckModal, setTableCheckModal] = useState(false);
+  const [tableCheckDate, setTableCheckDate] = useState(new Date().toISOString().split('T')[0]);
+  const [tableCheckShift, setTableCheckShift] = useState('Tất cả');
+
   // Danh sách bàn thực tế từ API
   const [tables, setTables] = useState([]);
 
@@ -1335,11 +1362,19 @@ const mapApiOrderToWaiter = (order) => {
     };
   }, [fetchWaiterOrders, refreshSelectedOrderDetail, selectedOrder, showOrderDetailModal]);
 
+  const activePaymentOrderCode = resolveOrderCode(selectedOrder);
   useEffect(() => {
-    if (!showPaymentModal || !selectedOrder) return;
-    setVoucherCode('');
+    if (!showPaymentModal || !activePaymentOrderCode) return;
+    const backendDiscountCode = resolveOrderDiscountCode(selectedOrder);
+    const savedVoucherByOrder = sessionStorage.getItem(`waiter:voucher:${activePaymentOrderCode}`) || '';
+    const restoredVoucher = (backendDiscountCode || savedVoucherByOrder || '').trim().toUpperCase();
+    setVoucherCode(restoredVoucher);
+    setAppliedVoucherCode(restoredVoucher);
+    setVoucherApplyError('');
+    setVoucherApplyMessage('');
+    setVoucherAppliedDiscountAmount(0);
     setReceivedMoney('');
-  }, [showPaymentModal, selectedOrder]);
+  }, [showPaymentModal, activePaymentOrderCode, selectedOrder]);
 
   useEffect(() => {
     if (!buffetFoodIdSet.size) return;
@@ -1370,15 +1405,35 @@ const mapApiOrderToWaiter = (order) => {
     return itemsSubtotal > 0 ? itemsSubtotal : Math.max(0, backendSubtotal);
   };
 
+  const resolveOrderDiscountDisplay = (order, subtotalValue) => {
+    const explicitDiscount = Number(order?.discount ?? order?.discountAmount ?? 0);
+    if (Number.isFinite(explicitDiscount) && explicitDiscount > 0) {
+      return explicitDiscount;
+    }
+
+    const subtotal = Math.max(0, Number(subtotalValue) || 0);
+    const delivery = Math.max(0, Number(order?.deliveryFee || 0) || 0);
+    const apiTotal = Number(order?.totalAmount ?? order?.total ?? NaN);
+    if (!Number.isFinite(apiTotal) || apiTotal <= 0) return 0;
+
+    const vatOnSubtotal = roundOrderMoney(subtotal * ORDER_VAT_RATE);
+    const inferredDiscount = roundOrderMoney(subtotal + vatOnSubtotal + delivery - apiTotal);
+    return inferredDiscount > 0 ? inferredDiscount : 0;
+  };
+
 
   const getOrderBilling = (order) =>
-    resolveOrderVatAndGrandTotal({
-      subtotal: calculateOrderSubtotal(order),
+    (() => {
+      const subtotal = calculateOrderSubtotal(order);
+      const discountAmount = resolveOrderDiscountDisplay(order, subtotal);
+      return resolveOrderVatAndGrandTotal({
+      subtotal,
       deliveryFee: Number(order?.deliveryFee || 0) || 0,
-      discountAmount: Number(order?.discount ?? order?.discountAmount ?? 0) || 0,
+      discountAmount,
       apiTotalAmount: order?.totalAmount,
       apiTaxAmount: order?.taxAmount ?? order?.vatAmount,
     });
+    })();
 
   const calculateOrderTotal = (order) => getOrderBilling(order).grand;
 
@@ -1434,6 +1489,18 @@ const mapApiOrderToWaiter = (order) => {
   const receivedMoneyValue = Number(receivedMoney || 0);
   const hasReceivedMoney = receivedMoney.trim() !== '';
   const isCashAmountValid = hasReceivedMoney && receivedMoneyValue > 0;
+  const normalizedVoucherCode = voucherCode.trim().toUpperCase();
+  const normalizedAppliedVoucherCode = appliedVoucherCode.trim().toUpperCase();
+  const isVoucherMatchedWithAppliedCode =
+    normalizedVoucherCode !== '' && normalizedVoucherCode === normalizedAppliedVoucherCode;
+  const currentResolvedDiscount = resolveOrderDiscountDisplay(
+    selectedOrder,
+    calculateOrderSubtotal(selectedOrder)
+  );
+  const discountDisplayValue =
+    isVoucherMatchedWithAppliedCode && Number(voucherAppliedDiscountAmount) > 0
+      ? Number(voucherAppliedDiscountAmount)
+      : currentResolvedDiscount;
   const remainingAfterCash = hasReceivedMoney
     ? Math.max(0, paymentTotal - receivedMoneyValue)
     : paymentTotal;
@@ -1914,6 +1981,103 @@ const mapApiOrderToWaiter = (order) => {
       setIsPaying(false);
     }
   };
+
+  const handleApplyVoucher = async () => {
+    if (!selectedOrder) return;
+    const code = voucherCode.trim();
+    if (!code) {
+      setVoucherApplyError('Vui lòng nhập mã voucher.');
+      return;
+    }
+
+    const orderCode = resolveOrderCode(selectedOrder);
+    if (!orderCode) {
+      setVoucherApplyError('Không xác định được mã đơn để áp voucher.');
+      return;
+    }
+
+    const extractBackendMessage = (payload) => {
+      if (typeof payload === 'string' && payload.trim()) return payload.trim();
+      if (typeof payload?.message === 'string' && payload.message.trim()) return payload.message.trim();
+      if (typeof payload?.Message === 'string' && payload.Message.trim()) return payload.Message.trim();
+      if (typeof payload?.title === 'string' && payload.title.trim()) return payload.title.trim();
+      if (typeof payload?.data?.message === 'string' && payload.data.message.trim()) return payload.data.message.trim();
+      if (typeof payload?.data?.Message === 'string' && payload.data.Message.trim()) return payload.data.Message.trim();
+      return '';
+    };
+    const extractBackendDiscountAmount = (payload) => {
+      const candidates = [
+        payload?.discountAmount,
+        payload?.DiscountAmount,
+        payload?.amount,
+        payload?.Amount,
+        payload?.data?.discountAmount,
+        payload?.data?.DiscountAmount,
+        payload?.data?.amount,
+        payload?.data?.Amount,
+      ];
+      for (const raw of candidates) {
+        const num = Number(raw);
+        if (Number.isFinite(num) && num > 0) return num;
+      }
+      const msg = extractBackendMessage(payload);
+      const m = msg.match(/giam\s+([0-9.,]+)/i) || msg.match(/giảm\s+([0-9.,]+)/i);
+      if (m?.[1]) {
+        const parsed = Number(String(m[1]).replace(/,/g, '').replace(/[^\d.]/g, ''));
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      }
+      return 0;
+    };
+
+    try {
+      setIsApplyingVoucher(true);
+      setVoucherApplyError('');
+      setVoucherApplyMessage('');
+      setVoucherAppliedDiscountAmount(0);
+      const applyRes = await discountAPI.applyDiscountToOrder(orderCode, code);
+      const normalizedAppliedCode = code.toUpperCase();
+      sessionStorage.setItem(`waiter:voucher:${orderCode}`, normalizedAppliedCode);
+      setVoucherCode(normalizedAppliedCode);
+      setAppliedVoucherCode(normalizedAppliedCode);
+      const successMessage = extractBackendMessage(applyRes);
+      const backendDiscountAmount = extractBackendDiscountAmount(applyRes);
+      setVoucherAppliedDiscountAmount(backendDiscountAmount);
+      setVoucherApplyMessage(successMessage || 'Áp dụng voucher thành công.');
+      await refreshSelectedOrderDetail(orderCode);
+      void fetchWaiterOrders({ silent: true });
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.Message ||
+        err?.response?.data?.title ||
+        err?.message ||
+        'Không áp dụng được voucher.';
+      setAppliedVoucherCode('');
+      setVoucherApplyMessage('');
+      setVoucherAppliedDiscountAmount(0);
+      setVoucherApplyError(String(msg));
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showPaymentModal || !activePaymentOrderCode) return undefined;
+    if (!voucherCode.trim()) return undefined;
+
+    const pollingId = window.setInterval(() => {
+      if (isApplyingVoucher) return;
+      void refreshSelectedOrderDetail(activePaymentOrderCode);
+    }, 1500);
+
+    return () => window.clearInterval(pollingId);
+  }, [
+    showPaymentModal,
+    activePaymentOrderCode,
+    voucherCode,
+    isApplyingVoucher,
+    refreshSelectedOrderDetail,
+  ]);
 
   // Hoàn tác: Đóng tất cả modal khi quay lại
   const closeCreateFlow = () => {
@@ -2930,7 +3094,15 @@ const mapApiOrderToWaiter = (order) => {
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowTablePickerModal(false)}>
                 <ArrowLeft size={16} />
-                Quay lại
+                Quản lý bàn
+              </button>
+              <button
+                className="btn-add-outline"
+                onClick={() => setTableCheckModal(true)}
+                title="Kiểm tra tình trạng bàn"
+              >
+                <ClipboardList size={16} />
+                Kiểm Tra Bàn
               </button>
               <button
                 className="btn-continue"
@@ -2950,6 +3122,16 @@ const mapApiOrderToWaiter = (order) => {
           </div>
         </div>
       )}
+
+      {/* Modal Kiểm Tra Bàn */}
+      <TableCheckModal
+        isOpen={tableCheckModal}
+        onClose={() => setTableCheckModal(false)}
+        selectedDate={tableCheckDate}
+        onDateChange={setTableCheckDate}
+        selectedShift={tableCheckShift}
+        onShiftChange={setTableCheckShift}
+      />
 
       {showOrderDetailModal && selectedOrder && (
         <div className="modal-overlay" onClick={closeOrderDetailModal}>
@@ -3137,10 +3319,10 @@ const mapApiOrderToWaiter = (order) => {
                     <strong>{formatCurrency(selectedOrder.deliveryFee || 0)}</strong>
                   </div>
                 )}
-                {(selectedOrder?.discount || 0) > 0 && (
+                {resolveOrderDiscountDisplay(selectedOrder, calculateOrderSubtotal(selectedOrder)) > 0 && (
                   <div>
                     <span>Giảm giá</span>
-                    <strong>-{formatCurrency(selectedOrder.discount || 0)}</strong>
+                    <strong>-{formatCurrency(resolveOrderDiscountDisplay(selectedOrder, calculateOrderSubtotal(selectedOrder)))}</strong>
                   </div>
                 )}
                 <div className="grand-total">
@@ -3362,6 +3544,13 @@ const mapApiOrderToWaiter = (order) => {
                       <strong>{formatCurrency(calculateOrderVat(selectedOrder))}</strong>
                     </div>
                   )}
+                  {isVoucherMatchedWithAppliedCode &&
+                    discountDisplayValue > 0 && (
+                    <div>
+                      <span>Giảm giá:</span>
+                      <strong>-{formatCurrency(discountDisplayValue)}</strong>
+                    </div>
+                  )}
                   <div className="grand-total-box">
                     <span>Tổng cộng:</span>
                     <strong>{formatCurrency(calculateOrderTotal(selectedOrder))}</strong>
@@ -3378,13 +3567,31 @@ const mapApiOrderToWaiter = (order) => {
                       <input
                         type="text"
                         value={voucherCode}
-                        onChange={(e) => setVoucherCode(e.target.value)}
+                        onChange={(e) => {
+                          setVoucherCode(e.target.value);
+                          setVoucherApplyError('');
+                          setVoucherApplyMessage('');
+                        }}
                       />
-                      <button type="button">Áp dụng</button>
+                      <button
+                        type="button"
+                        onClick={handleApplyVoucher}
+                        disabled={isApplyingVoucher || !voucherCode.trim()}
+                      >
+                        {isApplyingVoucher ? 'Đang áp...' : 'Áp dụng'}
+                      </button>
                     </div>
-                    {voucherCode.trim() ? (
+                    {voucherApplyError ? (
+                      <p className="voucher-ok" style={{ color: '#d4380d' }}>
+                        {voucherApplyError}
+                      </p>
+                    ) : voucherApplyMessage ? (
                       <p className="voucher-ok">
-                        <CheckCircle2 size={14} /> Đã nhập mã {voucherCode}
+                        <CheckCircle2 size={14} /> {voucherApplyMessage}
+                      </p>
+                    ) : appliedVoucherCode ? (
+                      <p className="voucher-ok">
+                        <CheckCircle2 size={14} /> {appliedVoucherCode}
                       </p>
                     ) : (
                       <p className="voucher-ok">Chưa áp dụng voucher</p>

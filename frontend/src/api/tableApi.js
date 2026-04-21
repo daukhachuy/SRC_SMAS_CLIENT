@@ -199,3 +199,17 @@ export async function updateTable(id, form) {
 export async function deleteTable(id) {
   await instance.delete(`/table/${id}`);
 }
+
+/**
+ * GET /api/table/availability
+ * @param {string} date - Ngày format YYYY-MM-DD
+ * @param {string} timeSlot - TimeSlot: "Sáng", "Trưa", "Chiều", "Tối", hoặc "Tất cả"
+ */
+export async function getTableAvailability(date, timeSlot = 'Tất cả') {
+  const params = { date };
+  if (timeSlot && timeSlot !== 'Tất cả') {
+    params.timeSlot = timeSlot;
+  }
+  const { data } = await instance.get('/table/availability', { params });
+  return data;
+}

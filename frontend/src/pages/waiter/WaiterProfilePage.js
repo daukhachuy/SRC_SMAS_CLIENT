@@ -111,8 +111,8 @@ const WaiterProfilePage = () => {
     bankName: '',
   });
 
-  const cloudName = 'dgjkqvbhm';
-  const uploadPreset = 'unsigned_preset';
+  const cloudName = 'dmzuier4p';
+  const uploadPreset = 'ml_default';
 
   const handleAvatarUpload = useCallback(async (e) => {
     const file = e.target.files[0];
@@ -156,9 +156,15 @@ const WaiterProfilePage = () => {
           address: pick(p, ['address'], '---'),
           email: pick(p, ['email'], '---'),
           role: pick(p, ['position', 'role'], 'Phục vụ/Bếp'),
-          avatarUrl: pick(p, ['avatarUrl', 'avatar', 'imageUrl'], ''),
+          avatarUrl: pick(p, ['avatarUrl', 'avatar', 'imageUrl', 'image'], ''),
           dob: pick(p, ['dob', 'dateOfBirth'], ''),
-          gender: pick(p, ['gender'], ''),
+          gender: (() => {
+            const g = pick(p, ['gender'], '');
+            if (g === 'Male') return 'Nam';
+            if (g === 'Female') return 'Nữ';
+            if (g === 'Other') return 'Khác';
+            return g;
+          })(),
           bankName: pick(p, ['bankName'], ''),
           bankAccountNumber: pick(p, ['bankAccountNumber'], ''),
         };
@@ -246,10 +252,10 @@ const WaiterProfilePage = () => {
         fullname: editForm.fullname || null,
         phone: editForm.phone || null,
         email: editForm.email || null,
-        gender: editForm.gender || null,
+        gender: editForm.gender === 'Nam' ? 'Male' : (editForm.gender === 'Nữ' ? 'Female' : editForm.gender) || null,
         dob: editForm.dob || null,
         address: editForm.address || null,
-        avatar: editForm.avatarUrl || null, // Đổi thành avatar để backend nhận đúng
+        avatarUrl: editForm.avatarUrl || null,
         bankAccountNumber: editForm.bankAccountNumber || null,
         bankName: editForm.bankName || null,
       });
@@ -455,10 +461,6 @@ const WaiterProfilePage = () => {
                         <textarea rows={2} value={editForm.address} onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}></textarea>
                       </label>
 
-                      <label className="full-row">
-                        <span>Avatar URL</span>
-                        <input value={editForm.avatarUrl} onChange={(e) => setEditForm((p) => ({ ...p, avatarUrl: e.target.value }))} />
-                      </label>
                     </div>
                   </section>
 

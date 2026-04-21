@@ -23,6 +23,35 @@ const AuthPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const translateAuthMessage = (rawMessage) => {
+    const text = String(rawMessage || '').trim();
+    if (!text) return '';
+    const normalized = text.toLowerCase();
+
+    if (normalized.includes('network') || normalized.includes('failed to fetch')) {
+      return 'Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.';
+    }
+    if (normalized.includes('unauthorized') || normalized.includes('forbidden')) {
+      return 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.';
+    }
+    if (normalized.includes('invalid credentials') || normalized.includes('wrong password')) {
+      return 'Email hoặc mật khẩu không chính xác.';
+    }
+    if (normalized.includes('user not found') || normalized.includes('email not found')) {
+      return 'Email không tồn tại trong hệ thống.';
+    }
+    if (normalized.includes('google login failed')) {
+      return 'Đăng nhập Google thất bại. Vui lòng thử lại.';
+    }
+    if (normalized.includes('token') && normalized.includes('google')) {
+      return 'Không nhận được dữ liệu đăng nhập từ Google. Vui lòng thử lại.';
+    }
+    if (normalized.includes('server error') || normalized.includes('internal server error')) {
+      return 'Máy chủ đang bận. Vui lòng thử lại sau ít phút.';
+    }
+    return text;
+  };
+
   useEffect(() => {
     // Ensure Google shows account chooser instead of silently reusing last account
     if (window.google?.accounts?.id?.disableAutoSelect) {
@@ -51,7 +80,7 @@ const AuthPage = () => {
     const authMessage = stateMessage || queryMessage;
 
     if (authMessage) {
-      setError(authMessage);
+      setError(translateAuthMessage(authMessage));
     }
   }, [location.pathname, location.search, location.state]);
 
@@ -61,7 +90,8 @@ const AuthPage = () => {
   const parseError = (err) => {
     const status = err?.status;
     const msgCode = err?.code || err?.error;
-    const backendMessage = err?.message?.toLowerCase();
+    const backendMessageRaw = String(err?.message || '').trim();
+    const backendMessage = backendMessageRaw.toLowerCase();
 
     if (msgCode === 'MSG_001') return 'Email không tồn tại.';
     if (msgCode === 'MSG_002') return 'Mật khẩu không chính xác.';
@@ -71,14 +101,14 @@ const AuthPage = () => {
       return 'Tài khoản Google chưa đăng ký. Vui lòng chọn Đăng ký bằng Google trước.';
     }
 
-    if (status === 400) return backendMessage || 'Dữ liệu không hợp lệ.';
+    if (status === 400) return translateAuthMessage(backendMessageRaw) || 'Thông tin đăng nhập không hợp lệ.';
     if (status === 401) return 'Email hoặc mật khẩu không chính xác.';
     if (status === 500) return 'Lỗi máy chủ. Vui lòng thử lại sau.';
 
     if (err?.message?.includes('Network'))
       return 'Lỗi kết nối. Vui lòng kiểm tra internet.';
 
-    return 'Đăng nhập thất bại. Vui lòng thử lại.';
+    return translateAuthMessage(backendMessageRaw) || 'Đăng nhập thất bại. Vui lòng thử lại.';
   };
 
   const getPostLoginPath = (role) => {
@@ -188,7 +218,7 @@ const AuthPage = () => {
         localStorage.removeItem('savedEmail');
       }
 
-      setSuccess('Đăng nhập Google thành công!');
+      setSuccess('Đăng nhập Google thành công! Đang chuyển hướng...');
 
       const userRole = response?.user?.role;
       const redirectPath = getPostLoginPath(userRole);
@@ -206,7 +236,7 @@ const AuthPage = () => {
   };
 
   const handleGoogleLoginError = () => {
-    setError('Đăng nhập Google thất bại. Nếu chưa có tài khoản, hãy dùng Đăng ký bằng Google trước.');
+    setError('Đăng nhập Google thất bại. Nếu chưa có tài khoản, vui lòng chọn Đăng ký bằng Google trước.');
   };
 
   // ==========================

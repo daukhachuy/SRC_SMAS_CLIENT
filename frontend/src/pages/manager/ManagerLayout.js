@@ -10,9 +10,11 @@ import { mapNotificationToUI, notificationAPI } from '../../api/managerApi';
 import { conversationApi } from '../../api/conversationApi';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
+import { ManagerToastProvider, useManagerToast } from '../../context/ManagerToastContext';
 
-const ManagerLayout = () => {
+function ManagerLayoutInner() {
   const navigate = useNavigate();
+  const { showToast } = useManagerToast();
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
@@ -106,7 +108,7 @@ const ManagerLayout = () => {
       setFormData({ ...formData, avatar: imageUrl });
     } catch (error) {
       console.error("Lỗi upload avatar:", error);
-      alert("Không thể tải ảnh lên. Hãy kiểm tra lại kết nối!");
+      showToast('Không thể tải ảnh lên. Hãy kiểm tra lại kết nối!', 'error');
     }
   };
 
@@ -381,8 +383,8 @@ const ManagerLayout = () => {
         <div className="manager-brand">
           <div className="manager-brand-icon">F</div>
           <div>
-            <h2>Nhà Hàng FPT</h2>
-            <p>Hệ thống quản trị</p>
+            <h2>Nhà Hàng SMAS</h2>
+            <p>Hệ thống quản lý</p>
           </div>
         </div>
 
@@ -625,6 +627,12 @@ const ManagerLayout = () => {
       )}
     </div>
   );
-};
+}
 
-export default ManagerLayout;
+export default function ManagerLayout() {
+  return (
+    <ManagerToastProvider>
+      <ManagerLayoutInner />
+    </ManagerToastProvider>
+  );
+}

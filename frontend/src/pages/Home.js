@@ -8,6 +8,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 import { isAuthenticated } from '../api/authApi';
+import { feedbackAPI } from '../api/feedbackApi';
 
 // Pool ảnh món ăn đa dạng cho design
 const FOOD_IMAGES = [
@@ -21,7 +22,7 @@ const FOOD_IMAGES = [
   'https://images.unsplash.com/photo-1567337710282-00832b415979?w=600&q=80', // shrimp
 ];
 
-const REVIEWS_DATA = [
+const REVIEWS_FALLBACK = [
   { id: 1, initials: 'MA', name: 'Nguyễn Minh Anh', role: 'Reviewer Ẩm Thực', text: '"Không gian quán cực kỳ chill và thoáng đãng. Nhân viên phục vụ rất chuyên nghiệp và chu đáo."', stars: 5 },
   { id: 2, initials: 'VH', name: 'Trần Văn Hùng', role: 'Doanh Nhân', text: '"Đã đến đây nhiều lần cho buổi tiệc công ty. Đồ ăn ổn định, decor sang trọng, rất đáng tiền."', stars: 4 },
   { id: 3, initials: 'TL', name: 'Lê Thùy Linh', role: 'Khách Hàng Thân Thiết', text: '"Mình rất thích các món hải sản ở đây. Tươi ngon và chế biến tinh tế. Chắc chắn sẽ quay lại."', stars: 5 },
@@ -53,8 +54,11 @@ export const COMBOS_DATA = [
 const Home = () => {
   const navigate = useNavigate();
   const [bestSellers, setBestSellers] = useState([]);
+  const [isBestSellersLoading, setIsBestSellersLoading] = useState(true);
+  const [reviews, setReviews] = useState(REVIEWS_FALLBACK);
   const [hotStart, setHotStart] = useState(0);
   const [discounts, setDiscounts] = useState([]);
+  const [isDiscountsLoading, setIsDiscountsLoading] = useState(true);
   const [dealStart, setDealStart] = useState(0);
   const [dealVisibleCount, setDealVisibleCount] = useState(4);
   const [bookingDate, setBookingDate] = useState('');
@@ -64,6 +68,52 @@ const Home = () => {
   const [showAuthRequired, setShowAuthRequired] = useState(false);
 
   useEffect(() => {
+    const toInitials = (fullname) => {
+      const name = String(fullname || '').trim();
+      if (!name) return 'KH';
+      const parts = name.split(/\s+/).filter(Boolean);
+      const picked = (parts.length >= 2 ? [parts[parts.length - 2], parts[parts.length - 1]] : [parts[0]])
+        .map((x) => String(x || '').charAt(0).toUpperCase())
+        .join('');
+      return picked || 'KH';
+    };
+
+    const normalizeFeedbackRole = (rating) => {
+      const num = Number(rating) || 0;
+      if (num >= 5) return 'Khách Hàng Thân Thiết';
+      if (num >= 4) return 'Khách Hàng Đánh Giá Tốt';
+      if (num >= 3) return 'Khách Hàng';
+      return 'Khách Hàng Đã Trải Nghiệm';
+    };
+
+    const loadFeedbacks = async () => {
+      try {
+        const rows = await feedbackAPI.getFeedbackLists();
+        const mapped = (Array.isArray(rows) ? rows : [])
+          .map((item, idx) => {
+            const fullname = String(item?.fullname || '').trim() || `Khách hàng ${idx + 1}`;
+            const rating = Math.max(1, Math.min(5, Number(item?.rating) || 0)) || 5;
+            const rawComment = String(item?.comment || '').trim();
+            const comment = rawComment || `Khách hàng đã đánh giá ${rating} sao cho dịch vụ của nhà hàng.`;
+            return {
+              id: Number(item?.feedbackId) || idx + 1,
+              initials: toInitials(fullname),
+              name: fullname,
+              role: normalizeFeedbackRole(rating),
+              text: `"${comment}"`,
+              stars: rating,
+            };
+          })
+          .filter((x) => x.name && x.text);
+
+        if (mapped.length > 0) {
+          setReviews(mapped);
+        }
+      } catch (err) {
+        console.warn('Feedback list error:', err?.response?.data || err?.message);
+      }
+    };
+
     axios.get('https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/food/best-sellers?top=8')
       .then(res => {
         const mapped = res.data.map(item => ({
@@ -78,11 +128,15 @@ const Home = () => {
         setBestSellers(mapped);
         BEST_SELLERS_DATA = mapped;
       })
-      .catch(err => console.error('Best sellers error:', err));
+      .catch(err => console.error('Best sellers error:', err))
+      .finally(() => setIsBestSellersLoading(false));
 
     axios.get('https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/food/discount')
       .then(res => setDiscounts(res.data))
-      .catch(err => console.error('Discounts error:', err));
+      .catch(err => console.error('Discounts error:', err))
+      .finally(() => setIsDiscountsLoading(false));
+
+    loadFeedbacks();
   }, []);
 
   useEffect(() => {
@@ -135,25 +189,40 @@ const Home = () => {
     navigate('/services');
   };
 
-  const reviewColumnA = [...REVIEWS_DATA, ...REVIEWS_DATA, ...REVIEWS_DATA];
-  const reviewColumnB = [...REVIEWS_DATA].reverse();
+  const effectiveReviews = reviews.length > 0 ? reviews : REVIEWS_FALLBACK;
+  const reviewColumnA = [...effectiveReviews, ...effectiveReviews, ...effectiveReviews];
+  const reviewColumnB = [...effectiveReviews].reverse();
   const reviewColumnBLoop = [...reviewColumnB, ...reviewColumnB, ...reviewColumnB];
+  const reviewsAvg = effectiveReviews.length > 0
+    ? (effectiveReviews.reduce((sum, x) => sum + (Number(x.stars) || 0), 0) / effectiveReviews.length)
+    : 4.9;
+  const reviewsAvgText = Number(reviewsAvg).toFixed(1);
+  const reviewsCountText = `${effectiveReviews.length.toLocaleString('vi-VN')}+ ĐÁNH GIÁ THỰC TẾ`;
   const HOT_VISIBLE_COUNT = 4;
   const canSlideHot = bestSellers.length > HOT_VISIBLE_COUNT;
 
-  const hotDishes = bestSellers.length > 0
+  const hotDishes = isBestSellersLoading
+    ? Array.from({ length: HOT_VISIBLE_COUNT }, (_, offset) => ({
+        item: null,
+        rank: offset + 1,
+        slot: offset,
+        isLoading: true,
+      }))
+    : bestSellers.length > 0
     ? Array.from({ length: Math.min(HOT_VISIBLE_COUNT, bestSellers.length) }, (_, offset) => {
         const index = (hotStart + offset) % bestSellers.length;
         return {
           item: bestSellers[index],
           rank: index + 1,
           slot: offset,
+          isLoading: false,
         };
       })
     : Array.from({ length: HOT_VISIBLE_COUNT }, (_, offset) => ({
         item: null,
         rank: offset + 1,
         slot: offset,
+        isLoading: false,
       }));
 
   const hotNext = () => {
@@ -166,8 +235,10 @@ const Home = () => {
     setHotStart(prev => (prev - HOT_VISIBLE_COUNT + bestSellers.length) % bestSellers.length);
   };
 
-  const canSlideDeals = discounts.length > dealVisibleCount;
-  const visibleDeals = discounts.length > 0
+  const canSlideDeals = !isDiscountsLoading && discounts.length > dealVisibleCount;
+  const visibleDeals = isDiscountsLoading
+    ? Array.from({ length: dealVisibleCount }, (_, idx) => ({ id: `deal-skeleton-${idx}`, __loading: true }))
+    : discounts.length > 0
     ? Array.from({ length: Math.min(dealVisibleCount, discounts.length) }, (_, offset) => {
         const index = (dealStart + offset) % discounts.length;
         return discounts[index];
@@ -255,7 +326,7 @@ const Home = () => {
               <ChevronLeft size={24} />
             </button>
             <div className="h-grid-4">
-            {hotDishes.map(({ item, rank, slot }) => (
+            {hotDishes.map(({ item, rank, slot, isLoading }) => (
               <div key={item ? item.id : `empty-${slot}`} className="h-dish-card">
                 <div className="h-dish-img-wrap">
                   <img
@@ -275,14 +346,31 @@ const Home = () => {
                   )}
                 </div>
                 <div className="h-dish-body">
-                  <h4 className="h-dish-name">{item ? item.name : <span className="h-skeleton" />}</h4>
-                  <p className="h-dish-desc">{item ? item.desc : ''}</p>
+                  <h4 className="h-dish-name">
+                    {item
+                      ? item.name
+                      : <span className="h-skeleton" style={{ width: '70%' }} />}
+                  </h4>
+                  <p className="h-dish-desc">
+                    {item
+                      ? item.desc
+                      : (
+                        <>
+                          <span className="h-skeleton" style={{ width: '100%' }} />
+                          <span className="h-skeleton" style={{ width: '82%', marginTop: 6 }} />
+                        </>
+                      )}
+                  </p>
                   <div className="h-dish-footer">
                     <div>
-                      <span className="h-dish-price">{item ? (typeof item.price === 'number' ? item.price.toLocaleString() + 'đ' : item.price) : ''}</span>
+                      <span className="h-dish-price">
+                        {item
+                          ? (typeof item.price === 'number' ? item.price.toLocaleString() + 'đ' : item.price)
+                          : (isLoading ? <span className="h-skeleton" style={{ width: 84 }} /> : '')}
+                      </span>
                       {item?.oldPrice && <span className="h-dish-old">{item.oldPrice.toLocaleString()}đ</span>}
                     </div>
-                    <button className="h-add-btn" onClick={() => item && handleAddToCart(item)} aria-label="Thêm vào giỏ">
+                    <button className="h-add-btn" onClick={() => item && handleAddToCart(item)} aria-label="Thêm vào giỏ" disabled={!item}>
                       <ShoppingCart size={16} />
                     </button>
                   </div>
@@ -298,7 +386,7 @@ const Home = () => {
       </section>
 
       {/* ── DEALS / GIẢM GIÁ ── */}
-      {discounts.length > 0 && (
+      {(isDiscountsLoading || discounts.length > 0) && (
         <section className="h-section h-section-light h-deals-section">
           <div className="h-section-inner">
             <div className="h-section-head">
@@ -325,6 +413,31 @@ const Home = () => {
 
               <div className="h-grid-4 h-deals-grid">
               {visibleDeals.map((item) => {
+                if (item.__loading) {
+                  return (
+                    <div key={item.id} className="h-deal-card">
+                      <div className="h-deal-img-wrap">
+                        <img src={FIXED_PRODUCT_IMAGE} alt="" className="h-deal-img" loading="lazy" />
+                      </div>
+                      <div className="h-deal-body">
+                        <h4 className="h-deal-name"><span className="h-skeleton" style={{ width: '72%' }} /></h4>
+                        <p className="h-deal-desc">
+                          <span className="h-skeleton" style={{ width: '100%' }} />
+                          <span className="h-skeleton" style={{ width: '78%', marginTop: 6 }} />
+                        </p>
+                        <div className="h-deal-footer">
+                          <div className="h-deal-prices">
+                            <span className="h-deal-old"><span className="h-skeleton" style={{ width: 70 }} /></span>
+                            <span className="h-deal-new"><span className="h-skeleton" style={{ width: 92 }} /></span>
+                          </div>
+                          <button className="h-add-btn" aria-label="Đang tải ưu đãi" disabled>
+                            <ShoppingCart size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 const pct = item.price > 0
                   ? Math.round(((item.price - item.promotionalPrice) / item.price) * 100)
                   : 0;
@@ -470,9 +583,9 @@ const Home = () => {
           <div className="h-reviews-left">
             <div className="h-review-quote-mark">❞</div>
             <h2 className="h-reviews-title">Khách hàng nói gì<br />về chúng tôi?</h2>
-            <div className="h-reviews-score">4.9</div>
+            <div className="h-reviews-score">{reviewsAvgText}</div>
             <div className="h-reviews-stars">★★★★★</div>
-            <p className="h-reviews-count">1,500+ ĐÁNH GIÁ THỰC TẾ</p>
+            <p className="h-reviews-count">{reviewsCountText}</p>
           </div>
 
           <div className="h-reviews-right" aria-label="Đánh giá khách hàng tự động cuộn">

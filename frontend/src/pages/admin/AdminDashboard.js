@@ -12,7 +12,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Chart, Line, Doughnut } from 'react-chartjs-2';
-import { fetchAdminDashboardAll, ORDER_STRUCTURE_LABELS } from '../../api/adminDashboardApi';
+import { fetchAdminDashboardAll, fetchTransactionHistory, ORDER_STRUCTURE_LABELS } from '../../api/adminDashboardApi';
 import '../../styles/AdminDashboard.css';
 
 ChartJS.register(
@@ -69,6 +69,7 @@ const currentPeriod = () => {
 };
 
 const CHART_MONTH_OPTIONS = [3, 6, 12];
+const EMPTY_TX_FILTERS = { fromDate: '', toDate: '', orderCode: '', paymentMethod: '', paymentStatus: '' };
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -76,15 +77,6 @@ const AdminDashboard = () => {
   const [period, setPeriod] = useState(currentPeriod);
   const [revenueChartMonths, setRevenueChartMonths] = useState(6);
   const [orderPeriod, setOrderPeriod] = useState({ month: currentPeriod().month, year: currentPeriod().year });
-  const [summaryOffset, setSummaryOffset] = useState(0);
-  const summaryTotal = 4; // doanh thu, chi phí, hợp đồng, khách hàng
-
-  const handleSummaryNext = () => {
-    setSummaryOffset((o) => (o + 1) % summaryTotal);
-  };
-  const handleSummaryPrev = () => {
-    setSummaryOffset((o) => (o - 1 + summaryTotal) % summaryTotal);
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +96,70 @@ const AdminDashboard = () => {
       cancelled = true;
     };
   }, [period.month, period.year, revenueChartMonths, orderPeriod.month, orderPeriod.year]);
+
+  // Transaction History state
+  const [txFilterForm, setTxFilterForm] = useState(EMPTY_TX_FILTERS);
+  const [txFilters, setTxFilters] = useState(EMPTY_TX_FILTERS);
+  const [txPage, setTxPage] = useState(1);
+  const [txPageSize] = useState(10);
+  const [txData, setTxData] = useState({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false });
+  const [txLoading, setTxLoading] = useState(false);
+
+  const handleTxSearch = () => {
+    setTxPage(1);
+    setTxFilters({
+      fromDate: txFilterForm.fromDate || '',
+      toDate: txFilterForm.toDate || '',
+      orderCode: String(txFilterForm.orderCode || '').trim(),
+      paymentMethod: txFilterForm.paymentMethod || '',
+      paymentStatus: txFilterForm.paymentStatus || '',
+    });
+  };
+  const handleTxClear = () => {
+    setTxFilterForm(EMPTY_TX_FILTERS);
+    setTxFilters(EMPTY_TX_FILTERS);
+    setTxPage(1);
+  };
+
+  useEffect(() => {
+    setTxLoading(true);
+    fetchTransactionHistory({
+      ...txFilters,
+      page: txPage,
+      pageSize: txPageSize,
+    })
+      .then((r) => {
+        const rows = Array.isArray(r?.data) ? r.data : [];
+        const apiTotalItems = Number(r?.totalItems ?? rows.length);
+        const apiTotalPages = Math.max(1, Number(r?.totalPages ?? 1));
+        const hasNext = r?.hasNextPage ?? (r?.page < r?.totalPages);
+        const hasPrev = r?.hasPreviousPage ?? (r?.page > 1);
+
+        const serverPagedLikely = rows.length <= txPageSize && apiTotalItems > txPageSize;
+        if (serverPagedLikely) {
+          setTxData({
+            data: rows,
+            totalItems: apiTotalItems,
+            totalPages: apiTotalPages,
+            hasNextPage: hasNext,
+            hasPreviousPage: hasPrev,
+          });
+          return;
+        }
+
+        const start = (txPage - 1) * txPageSize;
+        const pagedRows = rows.slice(start, start + txPageSize);
+        setTxData({
+          data: pagedRows,
+          totalItems: rows.length,
+          totalPages: Math.max(1, Math.ceil(rows.length / txPageSize)),
+          hasNextPage: rows.length > start + txPageSize,
+          hasPreviousPage: txPage > 1,
+        });
+      })
+      .catch(() => setTxData({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false }))
+      .finally(() => setTxLoading(false));
+  }, [txFilters, txPage, txPageSize]);
 
   const summary = bundle?.summary;
   const revenue = bundle?.revenue;
@@ -258,79 +314,39 @@ const AdminDashboard = () => {
       </header>
 
       <section className="summary-row" aria-label="Chỉ số tổng quan">
-        <button
-          type="button"
-          className="summary-nav summary-nav--prev"
-          onClick={handleSummaryPrev}
-          aria-label="Trước"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-
         <div className="summary-viewport">
-          <div
-            className="summary-track"
-            style={{
-              transform: `translateX(calc(-${summaryOffset} * ((100cqi - 2 * var(--summary-gap)) / 3.08 + var(--summary-gap))))`,
-            }}
-          >
-            {/* 8 cards: 4 + 4 lặp — mỗi bước next dịch 1 thẻ + gap (đồng bộ CSS .summary-card) */}
-            {[...Array(8)].map((_, i) => {
-              const idx = i % summaryTotal;
-              const cards = [
-                {
-                  label: 'Tổng doanh thu',
-                  value: summary?.totalRevenueDisplay ?? '—',
-                  spark: summary && (
-                    <Line key={`sp-rev-${i}`} data={sparkData(summary.revenueSparkline)} options={sparkOptions} />
-                  ),
-                },
-                {
-                  label: 'Chi phí nhập kho',
-                  value: summary?.warehouseCostsDisplay ?? '—',
-                  spark: summary && (
-                    <Line key={`sp-cost-${i}`} data={sparkData(summary.costsSparkline)} options={sparkOptions} />
-                  ),
-                },
-                {
-                  label: 'Hợp đồng mới',
-                  value: formatSummaryCount(summary?.newContracts),
-                  spark: summary && (
-                    <Line key={`sp-ctr-${i}`} data={sparkData(summary.contractsSparkline)} options={sparkOptions} />
-                  ),
-                },
-                {
-                  label: 'Khách hàng mới',
-                  value: formatSummaryCount(summary?.newCustomers),
-                  spark: summary && (
-                    <Line key={`sp-cus-${i}`} data={sparkData(summary.customersSparkline)} options={sparkOptions} />
-                  ),
-                },
-              ];
-              const c = cards[idx];
-              return (
-                <div key={i} className="summary-card">
-                  <span className="stat-card-title">{c.label}</span>
-                  <p className="stat-card-value">{c.value}</p>
-                  <div className="stat-card-sparkline">{c.spark}</div>
-                </div>
-              );
-            })}
+          <div className="summary-track">
+            {[
+              {
+                label: 'Tổng doanh thu',
+                value: summary?.totalRevenueDisplay ?? '—',
+                spark: summary && (
+                  <Line key="sp-rev" data={sparkData(summary.revenueSparkline)} options={sparkOptions} />
+                ),
+              },
+              {
+                label: 'Hợp đồng mới',
+                value: formatSummaryCount(summary?.newContracts),
+                spark: summary && (
+                  <Line key="sp-ctr" data={sparkData(summary.contractsSparkline)} options={sparkOptions} />
+                ),
+              },
+              {
+                label: 'Khách hàng mới',
+                value: formatSummaryCount(summary?.newCustomers),
+                spark: summary && (
+                  <Line key="sp-cus" data={sparkData(summary.customersSparkline)} options={sparkOptions} />
+                ),
+              },
+            ].map((c, i) => (
+              <div key={i} className="summary-card">
+                <span className="stat-card-title">{c.label}</span>
+                <p className="stat-card-value">{c.value}</p>
+                <div className="stat-card-sparkline">{c.spark}</div>
+              </div>
+            ))}
           </div>
         </div>
-
-        <button
-          type="button"
-          className="summary-nav summary-nav--next"
-          onClick={handleSummaryNext}
-          aria-label="Sau"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
       </section>
 
       <section className="charts-row">
@@ -454,6 +470,187 @@ const AdminDashboard = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* ── Transaction History ─────────────────────────── */}
+      <section className="table-card" style={{ marginTop: '2rem' }}>
+        <div className="table-card-header">
+          <h3>Lịch sử giao dịch thanh toán</h3>
+        </div>
+
+        {/* Filter Bar */}
+        <div className="tx-filter-bar">
+          <div className="tx-filter-row">
+            <label className="tx-filter-label">
+              <span>Từ ngày</span>
+              <input
+                type="date"
+                className="tx-input"
+                value={txFilterForm.fromDate}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, fromDate: e.target.value }))}
+              />
+            </label>
+            <label className="tx-filter-label">
+              <span>Đến ngày</span>
+              <input
+                type="date"
+                className="tx-input"
+                value={txFilterForm.toDate}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, toDate: e.target.value }))}
+              />
+            </label>
+            <label className="tx-filter-label">
+              <span>Mã đơn</span>
+              <input
+                type="text"
+                className="tx-input"
+                placeholder="VD: ORD-001"
+                value={txFilterForm.orderCode}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, orderCode: e.target.value }))}
+              />
+            </label>
+            <label className="tx-filter-label">
+              <span>Phương thức</span>
+              <select
+                className="tx-input"
+                value={txFilterForm.paymentMethod}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, paymentMethod: e.target.value }))}
+              >
+                <option value="">Tất cả</option>
+                <option value="Cash">Tiền mặt</option>
+                <option value="PayOS">PayOS</option>
+              </select>
+            </label>
+            <label className="tx-filter-label">
+              <span>Trạng thái</span>
+              <select
+                className="tx-input"
+                value={txFilterForm.paymentStatus}
+                onChange={(e) => setTxFilterForm((f) => ({ ...f, paymentStatus: e.target.value }))}
+              >
+                <option value="">Tất cả</option>
+                <option value="Paid">Đã thanh toán</option>
+                <option value="Pending">Chờ thanh toán</option>
+                <option value="Failed">Thất bại</option>
+                <option value="Cancelled">Đã hủy</option>
+              </select>
+            </label>
+          </div>
+          <div className="tx-filter-actions">
+            <button type="button" className="tx-btn tx-btn--search" onClick={handleTxSearch}>
+              Tìm kiếm
+            </button>
+            <button type="button" className="tx-btn tx-btn--clear" onClick={handleTxClear}>
+              Xóa lọc
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="table-wrapper">
+          {txLoading ? (
+            <div className="tx-loading">
+              <div className="tx-spinner" />
+              <span>Đang tải lịch sử giao dịch…</span>
+            </div>
+          ) : txData.data.length === 0 ? (
+            <div className="tx-empty">
+              <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p>Không có giao dịch nào phù hợp.</p>
+            </div>
+          ) : (
+            <>
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Mã đơn</th>
+                    <th>Khách hàng</th>
+                    <th>Số tiền</th>
+                    <th>Phương thức</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {txData.data.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {row.paidAt
+                          ? new Date(row.paidAt).toLocaleString('vi-VN', {
+                              day: '2-digit', month: '2-digit', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit',
+                            })
+                          : '—'}
+                      </td>
+                      <td style={{ fontWeight: 600, color: '#111827' }}>{row.orderCode}</td>
+                      <td>{row.customerName}</td>
+                      <td className="amount" style={{ color: '#059669', fontWeight: 700 }}>
+                        {row.amountDisplay}
+                      </td>
+                      <td>{row.paymentMethodDisplay}</td>
+                      <td>
+                        <span className={`tx-status-badge tx-status-${row.statusKey}`}>
+                          {row.statusLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {txData.totalPages > 1 && (
+                <div className="tx-pagination">
+                  <span className="tx-pagination-info">
+                    Hiển thị {(txPage - 1) * txPageSize + 1}–{Math.min(txPage * txPageSize, txData.totalItems)} / {txData.totalItems.toLocaleString('vi-VN')} giao dịch
+                  </span>
+                  <div className="tx-pagination-controls">
+                    <button
+                      type="button"
+                      className="tx-page-btn"
+                      disabled={txPage <= 1}
+                      onClick={() => setTxPage((p) => p - 1)}
+                    >
+                      ‹
+                    </button>
+                    {Array.from({ length: txData.totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === txData.totalPages || Math.abs(p - txPage) <= 2)
+                      .reduce((acc, p, i, arr) => {
+                        if (i > 0 && arr[i - 1] !== p - 1) acc.push('…');
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((p, i) =>
+                        p === '…' ? (
+                          <span key={`ellipsis-${i}`} className="tx-page-ellipsis">…</span>
+                        ) : (
+                          <button
+                            key={p}
+                            type="button"
+                            className={`tx-page-btn${txPage === p ? ' active' : ''}`}
+                            onClick={() => setTxPage(p)}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+                    <button
+                      type="button"
+                      className="tx-page-btn"
+                      disabled={txPage >= txData.totalPages}
+                      onClick={() => setTxPage((p) => p + 1)}
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
     </div>

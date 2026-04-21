@@ -149,13 +149,13 @@
 }
 
 .manager-chat-avatar-wrap {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   background: #dde9fb;
   color: #1e40af;
   font-weight: 800;
-  font-size: 12px;
+  font-size: 11px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -163,8 +163,9 @@
 }
 
 .manager-chat-avatar-wrap.lg {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
 }
 
 .manager-chat-avatar {
@@ -183,6 +184,10 @@
   font-size: 13px;
   color: #0f172a;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
 .manager-chat-conversation-meta small {
@@ -233,6 +238,10 @@
   margin: 0;
   font-size: 15px;
   color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
 }
 
 .manager-chat-header p {
