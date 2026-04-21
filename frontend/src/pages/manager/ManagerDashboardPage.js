@@ -76,6 +76,7 @@ const getPositionColor = (position) => {
 
 const ManagerDashboardPage = () => {
   const [loading, setLoading] = useState(true);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [stats, setStats] = useState([]);
   const [error, setError] = useState('');
 
@@ -263,6 +264,14 @@ const ManagerDashboardPage = () => {
     return 'pending';
   };
 
+  const getPaymentStatusPill = (s) => {
+    const str = String(s || '').toLowerCase();
+    if (str.includes('paid') || str.includes('thành công') || str.includes('success')) return 'done';
+    if (str.includes('pending') || str.includes('đang')) return 'pending';
+    if (str.includes('failed') || str.includes('cancel') || str.includes('hủy')) return 'cancelled';
+    return 'pending';
+  };
+
   return (
     <div className="manager-page-grid">
       <div className="manager-page-header">
@@ -436,13 +445,58 @@ const ManagerDashboardPage = () => {
           </div>
         </article>
       </div>
-
-      {/* Staff table */}
+      {/* Transaction history */}
       <article className="manager-card">
         <div className="manager-card-head">
           <h2>Trạng thái nhân viên</h2>
           <span>{staffList.length > 0 ? `${staffList.length} nhân viên` : ''}</span>
         </div>
+        <form onSubmit={handleApplyTxFilters} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto auto', gap: 8, marginBottom: 10 }}>
+          <input
+            type="text"
+            placeholder="Tìm theo mã đơn..."
+            value={txFilterForm.orderCode}
+            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, orderCode: e.target.value }))}
+            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 10px' }}
+          />
+          <select
+            value={txFilterForm.paymentMethod}
+            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, paymentMethod: e.target.value }))}
+            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 8px' }}
+          >
+            <option value="">Phương thức</option>
+            <option value="Cash">Tiền mặt</option>
+            <option value="PayOS">PayOS</option>
+          </select>
+          <select
+            value={txFilterForm.paymentStatus}
+            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, paymentStatus: e.target.value }))}
+            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 8px' }}
+          >
+            <option value="">Trạng thái</option>
+            <option value="Paid">Paid</option>
+            <option value="Pending">Pending</option>
+            <option value="Failed">Failed</option>
+          </select>
+          <input
+            type="date"
+            value={txFilterForm.fromDate}
+            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, fromDate: e.target.value }))}
+            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 10px' }}
+          />
+          <input
+            type="date"
+            value={txFilterForm.toDate}
+            onChange={(e) => setTxFilterForm((prev) => ({ ...prev, toDate: e.target.value }))}
+            style={{ height: 34, border: '1px solid #e5e7eb', borderRadius: 8, padding: '0 10px' }}
+          />
+          <button type="submit" className="manager-orders-page-btn" style={{ minWidth: 82 }}>
+            Tìm kiếm
+          </button>
+          <button type="button" className="manager-orders-page-btn" onClick={handleResetTxFilters} style={{ minWidth: 74 }}>
+            Xóa lọc
+          </button>
+        </form>
         <div className="manager-table-wrap">
           <table className="manager-table">
             <thead>
@@ -519,6 +573,54 @@ const ManagerDashboardPage = () => {
             </tbody>
           </table>
         </div>
+        {transactionsTotalPages > 1 && (
+          <div className="manager-orders-pagination" style={{ marginTop: '0.75rem' }}>
+            <span className="manager-orders-pagination-info">
+              {transactionsTotalItems > 0
+                ? `${(transactionsPage - 1) * PAGE_SIZE + 1}–${Math.min(transactionsPage * PAGE_SIZE, transactionsTotalItems)} / ${transactionsTotalItems}`
+                : ''}
+            </span>
+            <div className="manager-orders-pagination-controls">
+              <button
+                type="button"
+                className="manager-orders-page-btn"
+                disabled={transactionsPage <= 1}
+                onClick={() => setTransactionsPage((p) => p - 1)}
+              >
+                ‹
+              </button>
+              {Array.from({ length: transactionsTotalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === transactionsTotalPages || Math.abs(p - transactionsPage) <= 2)
+                .reduce((acc, p, i, arr) => {
+                  if (i > 0 && arr[i - 1] !== p - 1) acc.push('…');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === '…' ? (
+                    <span key={`tx-e-${i}`} className="manager-orders-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={`tx-${p}`}
+                      type="button"
+                      className={`manager-orders-page-btn${transactionsPage === p ? ' active' : ''}`}
+                      onClick={() => setTransactionsPage(p)}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                type="button"
+                className="manager-orders-page-btn"
+                disabled={transactionsPage >= transactionsTotalPages}
+                onClick={() => setTransactionsPage((p) => p + 1)}
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        )}
       </article>
     </div>
   );

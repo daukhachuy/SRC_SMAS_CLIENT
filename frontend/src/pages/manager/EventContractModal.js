@@ -5,9 +5,11 @@ import {
   Download 
 } from 'lucide-react';
 import { downloadContractPdf, getPdfErrorMessage } from '../../api/pdfExportApi';
+import { useManagerToast } from '../../context/ManagerToastContext';
 import '../../styles/EventContractModal.css';
 
 const EventContractModal = ({ isOpen, onClose, contractData }) => {
+  const { showToast } = useManagerToast();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   if (!isOpen) return null;
 
@@ -61,7 +63,7 @@ const EventContractModal = ({ isOpen, onClose, contractData }) => {
   const handleDownloadPDF = async () => {
     const code = String(contract.contractNumber || contract.contractId || '').trim();
     if (!code) {
-      alert('Chưa có mã hợp đồng để tải PDF.');
+      showToast('Chưa có mã hợp đồng để tải PDF.', 'error');
       return;
     }
     setDownloadingPdf(true);
@@ -69,7 +71,7 @@ const EventContractModal = ({ isOpen, onClose, contractData }) => {
       await downloadContractPdf(code);
     } catch (e) {
       const msg = await getPdfErrorMessage(e);
-      alert(msg || 'Tải PDF thất bại.');
+      showToast(msg || 'Tải PDF thất bại.', 'error');
     } finally {
       setDownloadingPdf(false);
     }

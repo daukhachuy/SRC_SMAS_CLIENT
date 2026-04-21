@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../styles/Profile.css';
 import { getProfile, updateProfile, changePassword } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
@@ -70,6 +70,7 @@ function isValidVietnamPhone(digits) {
 }
 
 const Profile = () => {
+  const dobPickerRef = useRef(null);
   const [userInfo, setUserInfo] = useState({
     fullname: '',
     gender: 'Nam',
@@ -240,6 +241,29 @@ const Profile = () => {
       setFieldErrors((prev) => ({ ...prev, dob: '' }));
       setUserInfo((prev) => ({ ...prev, dob: iso }));
       setDobInput(isoToDdMmYyyy(iso));
+    }
+  };
+
+  const handleDobPickerChange = (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    setUserInfo((prev) => ({ ...prev, dob: val }));
+    setDobInput(isoToDdMmYyyy(val));
+    setFieldErrors((prev) => ({ ...prev, dob: '' }));
+  };
+
+  const handleOpenDobPicker = () => {
+    const picker = dobPickerRef.current;
+    if (!picker) return;
+    picker.value = userInfo.dob || '';
+    try {
+      if (typeof picker.showPicker === 'function') {
+        picker.showPicker();
+      } else {
+        picker.click();
+      }
+    } catch (err) {
+      picker.click();
     }
   };
 
@@ -619,56 +643,26 @@ const Profile = () => {
                 <button
                   type="button"
                   className="Profile-Date-Picker-Btn"
-                  onClick={() => {
-                    console.log('📅 Calendar button clicked');
-                    try {
-                      // Tạo input date tạm
-                      const input = document.createElement('input');
-                      input.type = 'date';
-                      input.style.position = 'absolute';
-                      input.style.left = '-9999px';
-                      input.style.top = '-9999px';
-                      input.style.opacity = '0';
-                      document.body.appendChild(input);
-
-                      console.log('📅 Picker created, focusing...');
-                      input.focus();
-
-                      // Timeout để đảm bảo focus đã được set
-                      setTimeout(() => {
-                        if (document.activeElement === input) {
-                          console.log('📅 Input focused, showing picker');
-                        } else {
-                          console.log('📅 Input not focused, trying click');
-                          input.click();
-                        }
-                      }, 100);
-
-                      input.addEventListener('change', (e) => {
-                        const val = e.target.value;
-                        console.log('📅 Date selected:', val);
-                        if (val) {
-                          setUserInfo((prev) => ({ ...prev, dob: val }));
-                          setDobInput(isoToDdMmYyyy(val));
-                        }
-                        setFieldErrors((prev) => ({ ...prev, dob: '' }));
-                        document.body.removeChild(input);
-                      });
-
-                      input.addEventListener('blur', () => {
-                        console.log('📅 Picker blurred');
-                        if (document.body.contains(input)) {
-                          document.body.removeChild(input);
-                        }
-                      });
-                    } catch (err) {
-                      console.error('📅 Error showing picker:', err);
-                    }
-                  }}
+                  onClick={handleOpenDobPicker}
                   title="Chọn ngày từ lịch"
                 >
                   <i className="fa-regular fa-calendar"></i>
                 </button>
+                <input
+                  ref={dobPickerRef}
+                  type="date"
+                  value={userInfo.dob || ''}
+                  onChange={handleDobPickerChange}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    width: 0,
+                    height: 0,
+                    opacity: 0,
+                    pointerEvents: 'none',
+                  }}
+                />
               </div>
               {fieldErrors.dob && <p className="Profile-Field-Error">{fieldErrors.dob}</p>}
             </div>

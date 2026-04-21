@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { getBuffetDetail, getBuffetLists, getComboLists, resolveFoodImageUrl } from '../api/foodApi';
@@ -13,7 +13,6 @@ import {
   getOrderItemsByCode,
   getOrderSessionMenu,
 } from '../api/orderApi';
-import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
 import '../styles/MenuPage.css';
 
 const MENU_TABS = ['Food', 'Combo', 'Buffet'];
@@ -398,6 +397,11 @@ const GuesQRorder = () => {
   const [orderedItemsError, setOrderedItemsError] = useState('');
   const [orderedItems, setOrderedItems] = useState([]);
   const [currentOrderCode, setCurrentOrderCode] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const notificationTimersRef = useRef(new Map());
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  );
 
   const tableCode = searchParams.get('tableCode') || localStorage.getItem('tableCode') || '04';
   const tableName = searchParams.get('tableName') || localStorage.getItem('tableName') || '';
@@ -410,6 +414,43 @@ const GuesQRorder = () => {
 
   const formatCurrency = (value) =>
     `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+  const removeNotification = (id) => {
+    const timerId = notificationTimersRef.current.get(id);
+    if (timerId) {
+      window.clearTimeout(timerId);
+      notificationTimersRef.current.delete(id);
+    }
+    setNotifications((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const pushNotification = (message, type = 'success') => {
+    const trimmed = String(message || '').trim();
+    if (!trimmed) return;
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const timeoutMs = type === 'success' ? 3200 : 4400;
+    setNotifications((prev) => [...prev, { id, message: trimmed, type, timeoutMs }]);
+    const timeoutId = window.setTimeout(() => {
+      removeNotification(id);
+    }, timeoutMs);
+    notificationTimersRef.current.set(id, timeoutId);
+  };
+
+  useEffect(() => {
+    return () => {
+      notificationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      notificationTimersRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -692,16 +733,34 @@ const GuesQRorder = () => {
   }, [orderBuffetFoods, selectedBuffetMenu]);
 
   const addToCart = (food) => {
+    const activeLockedBuffetId = Number(lockedBuffetId || 0);
+    const incomingBuffetId = Number(food?.buffetId || 0);
+    const existingBuffet = cart.find((item) => item.itemType === 'Buffet');
+
+    if (food.itemType === 'Buffet') {
+      if (activeLockedBuffetId > 0 && incomingBuffetId !== activeLockedBuffetId) {
+        pushNotification('Đơn này đã khóa theo một loại buffet khác. Bạn chỉ có thể thêm đúng loại buffet đó.', 'warning');
+        return;
+      }
+
+      if (existingBuffet && existingBuffet.cartKey !== food.cartKey) {
+        pushNotification('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.', 'warning');
+        return;
+      }
+
+      const draft = buffetDraftQty[food.cartKey] || { adult: 1, child: 0 };
+      const adultQty = Math.max(0, Number(draft.adult) || 0);
+      const childQty = Math.max(0, Number(draft.child) || 0);
+      if (adultQty + childQty <= 0) {
+        pushNotification('Vui lòng chọn ít nhất 1 suất (người lớn hoặc trẻ em).', 'warning');
+        return;
+      }
+    }
+
     setCart((prev) => {
       if (food.itemType === 'Buffet') {
-        if (Number(lockedBuffetId || 0) > 0 && Number(food.buffetId || 0) !== Number(lockedBuffetId || 0)) {
-          alert('Đơn này đã khóa theo một loại buffet khác. Bạn chỉ có thể thêm đúng loại buffet đó.');
-          return prev;
-        }
-
         const existingBuffet = prev.find((item) => item.itemType === 'Buffet');
         if (existingBuffet && existingBuffet.cartKey !== food.cartKey) {
-          alert('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.');
           return prev;
         }
 
@@ -709,7 +768,6 @@ const GuesQRorder = () => {
         const adultQty = Math.max(0, Number(draft.adult) || 0);
         const childQty = Math.max(0, Number(draft.child) || 0);
         if (adultQty + childQty <= 0) {
-          alert('Vui lòng chọn ít nhất 1 suất (người lớn hoặc trẻ em).');
           return prev;
         }
 
@@ -750,6 +808,18 @@ const GuesQRorder = () => {
     if (food.itemType === 'Buffet' && Number(food.buffetId || 0) > 0) {
       setLockedBuffetId(Number(food.buffetId));
     }
+
+    if (food.itemType === 'Buffet') {
+      const draft = buffetDraftQty[food.cartKey] || { adult: 1, child: 0 };
+      const adultQty = Math.max(0, Number(draft.adult) || 0);
+      const childQty = Math.max(0, Number(draft.child) || 0);
+      pushNotification(
+        `Đã thêm ${food.name} vào giỏ (${adultQty} suất người lớn${childQty > 0 ? `, ${childQty} suất trẻ em` : ''}).`,
+        'success'
+      );
+      return;
+    }
+    pushNotification(`Đã thêm ${food.name} vào giỏ.`, 'success');
   };
 
   const updateBuffetDraftQty = (cartKey, field, delta) => {
@@ -828,6 +898,7 @@ const GuesQRorder = () => {
         },
       ];
     });
+    pushNotification(`Đã thêm ${name} (trong gói buffet) vào giỏ.`, 'success');
   };
 
   const toGuestOrderItemPayload = (item) => {
@@ -1032,9 +1103,8 @@ const GuesQRorder = () => {
       return sum + Number(item.price || 0) * Number(item.quantity || 0);
     }, 0);
 
-  const subtotal = sumCartLines(cart);
-  const vatCart = roundOrderMoney(subtotal * ORDER_VAT_RATE);
-  const total = subtotal + vatCart;
+  // Giá món trên menu đã gồm VAT — không cộng thêm thuế ở sidebar.
+  const total = sumCartLines(cart);
 
   const getOrderedItemQuantity = (item) =>
     Number(item?.quantity || 0) + Number(item?.quantityBufferChildent || 0);
@@ -1062,9 +1132,6 @@ const GuesQRorder = () => {
     );
   }, [orderedItems]);
 
-  const orderedVatAmount = roundOrderMoney(orderedItemsSummary.totalAmount * ORDER_VAT_RATE);
-  const orderedGrandWithVat = orderedItemsSummary.totalAmount + orderedVatAmount;
-
   useEffect(() => {
     if (tableCode) {
       localStorage.setItem('tableCode', String(tableCode));
@@ -1085,13 +1152,13 @@ const GuesQRorder = () => {
     };
 
     if (cart.length === 0) {
-      alert('Vui lòng chọn món trước khi gọi nhân viên.');
+      pushNotification('Vui lòng chọn món trước khi gọi nhân viên.', 'warning');
       return;
     }
 
     const tableId = resolveTableId();
     if (!Number.isFinite(tableId) || tableId <= 0) {
-      alert('Không xác định được bàn để gọi món.');
+      pushNotification('Không xác định được bàn để gọi món.', 'error');
       return;
     }
 
@@ -1121,22 +1188,21 @@ const GuesQRorder = () => {
           sessionStorage.setItem('pendingOrderId', String(currentOrderId));
         }
         setCart([]);
-        alert('Đã thêm món vào đơn hiện tại thành công. Nhân viên sẽ xác nhận đơn của bạn.');
+        pushNotification('Đã thêm món vào đơn hiện tại. Nhân viên sẽ xác nhận trong giây lát.', 'success');
         return;
       }
 
-      const subPreVat = sumCartLines(cart);
-      const vatSend = roundOrderMoney(subPreVat * ORDER_VAT_RATE);
+      const subInclusive = sumCartLines(cart);
       const payload = {
         orderType: 'DineIn',
         tableIds: [tableId],
         numberOfGuests: 1,
         note: `QR order at table ${tableCode}`,
         orderItems: cart.map(toGuestOrderItemPayload),
-        taxAmount: vatSend,
-        vatAmount: vatSend,
-        totalAmount: subPreVat + vatSend,
-        TotalAmount: subPreVat + vatSend,
+        taxAmount: 0,
+        vatAmount: 0,
+        totalAmount: subInclusive,
+        TotalAmount: subInclusive,
       };
       const created = await createGuestOrder(payload);
       const { orderId: createdOrderId, orderCode: createdOrderCode } = extractOrderMeta(created);
@@ -1148,9 +1214,9 @@ const GuesQRorder = () => {
         sessionStorage.setItem('pendingOrderCode', String(createdOrderCode));
       }
       setCart([]);
-      alert('Đã gửi gọi món thành công. Nhân viên sẽ xác nhận đơn của bạn.');
+      pushNotification('Gửi gọi món thành công. Nhân viên sẽ xác nhận đơn của bạn.', 'success');
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Không thể gửi gọi món.');
+      pushNotification(err?.response?.data?.message || err?.message || 'Không thể gửi gọi món.', 'error');
     } finally {
       setIsPlacingOrder(false);
     }
@@ -1165,18 +1231,19 @@ const GuesQRorder = () => {
           zIndex: 20,
           background: '#fff',
           borderBottom: '1px solid #eceff3',
-          padding: '12px 24px',
+          padding: isMobileView ? '10px 12px' : '12px 24px',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: isMobileView ? 'flex-start' : 'center',
           justifyContent: 'space-between',
-          gap: 16,
+          gap: isMobileView ? 10 : 16,
+          flexWrap: isMobileView ? 'wrap' : 'nowrap',
         }}
       >
-        <div style={{ fontSize: 32, fontWeight: 900, color: '#ff7a21', letterSpacing: 0.2 }}>
-          NHÀ HÀNG FPT
+        <div style={{ fontSize: isMobileView ? 26 : 32, fontWeight: 900, color: '#ff7a21', letterSpacing: 0.2 }}>
+          NHÀ HÀNG SMAS
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobileView ? 14 : 24, order: isMobileView ? 3 : 0, width: isMobileView ? '100%' : 'auto' }}>
           {MENU_TABS.map((tab) => {
             const active = activeMenuType === tab;
             return (
@@ -1191,6 +1258,7 @@ const GuesQRorder = () => {
                   background: 'transparent',
                   color: active ? '#ff7a21' : '#4b5563',
                   fontWeight: active ? 800 : 700,
+                  fontSize: isMobileView ? 14 : 15,
                   cursor: 'pointer',
                   borderBottom: active ? '2px solid #ff7a21' : '2px solid transparent',
                   paddingBottom: 2,
@@ -1202,7 +1270,7 @@ const GuesQRorder = () => {
           })}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, order: isMobileView ? 2 : 0 }}>
           <button
             type="button"
             onClick={handleOpenOrderedItems}
@@ -1210,7 +1278,7 @@ const GuesQRorder = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              padding: '8px 14px',
+              padding: isMobileView ? '7px 12px' : '8px 14px',
               borderRadius: 999,
               background: '#fff7f1',
               color: '#b45309',
@@ -1221,22 +1289,22 @@ const GuesQRorder = () => {
             }}
             title={`Đơn hàng của ${tableLabel}`}
           >
-            <ShoppingCart size={14} />
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 0.2 }}>
+            <ShoppingCart size={isMobileView ? 13 : 14} />
+            <span style={{ fontSize: isMobileView ? 11 : 12, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 0.2 }}>
               Bạn đang ở
             </span>
-            <span style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>{tableLabel}</span>
+            <span style={{ fontSize: isMobileView ? 16 : 18, fontWeight: 900, color: '#111827' }}>{tableLabel}</span>
           </button>
         </div>
       </div>
 
-      <div className="menu-page-container" style={{display: 'flex', gap: 32, paddingTop: 24}}>
+      <div className="menu-page-container" style={{display: 'flex', flexDirection: isMobileView ? 'column' : 'row', gap: isMobileView ? 16 : 32, paddingTop: isMobileView ? 14 : 24}}>
         {/* Cột trái: Danh sách món ăn */}
-        <div style={{flex: 2}}>
-          <h1 className="menu-title" style={{fontSize: 36, fontWeight: 800, marginBottom: 8}}>
-            {activeMenuType === 'Food' ? 'Món lẻ (Food)' : activeMenuType === 'Combo' ? 'Combo' : 'Buffet'}
+        <div style={{flex: 2, minWidth: 0}}>
+          <h1 className="menu-title" style={{fontSize: isMobileView ? 30 : 36, fontWeight: 800, marginBottom: 8}}>
+            {activeMenuType === 'Food' ? 'Món lẻ ' : activeMenuType === 'Combo' ? 'Combo' : 'Buffet'}
           </h1>
-          <p className="menu-desc" style={{color: '#6d7680', marginBottom: 24}}>Khám phá tinh hoa ẩm thực Pháp giữa lòng Sài Gòn</p>
+          <p className="menu-desc" style={{color: '#6d7680', marginBottom: isMobileView ? 16 : 24}}>Khám phá tinh hoa ẩm thực </p>
           {activeMenuType === 'Food' && (
             <div style={{ marginBottom: 24 }}>
               <div
@@ -1277,7 +1345,7 @@ const GuesQRorder = () => {
               </div>
             </div>
           )}
-          <div style={{marginBottom: 24, position: 'relative', maxWidth: 320}}>
+          <div style={{marginBottom: 24, position: 'relative', maxWidth: isMobileView ? '100%' : 320}}>
             <input
               className="menu-search-input"
               placeholder="Tìm kiếm món ăn..."
@@ -1295,12 +1363,12 @@ const GuesQRorder = () => {
           {activeMenuType === 'Buffet' && ((showOrderBuffetFoods && selectedBuffetFoodsForView.length > 0) || (selectedBuffetId > 0 && selectedBuffetMenu)) ? (
             <div>
               <div style={{ marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#374151' }}>MÓN TRONG GÓI BUFFET ĐÃ CHỌN</h3>
+                <h3 style={{ margin: 0, fontSize: isMobileView ? 18 : 22, fontWeight: 900, color: '#374151' }}>MÓN TRONG GÓI BUFFET ĐÃ CHỌN</h3>
                 <p style={{ margin: '6px 0 0', color: '#6b7280', fontWeight: 700 }}>
                   Gói đã chọn: {selectedBuffetMenu?.name || '--'}
                 </p>
               </div>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, minmax(320px, 1fr))', gap: 16}}>
+              <div style={{display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : 'repeat(2, minmax(320px, 1fr))', gap: 16}}>
                 {selectedBuffetFoodsForView.map((food) => (
                   <div
                     key={`buffet-food-${food.foodId}`}
@@ -1321,7 +1389,7 @@ const GuesQRorder = () => {
               </div>
             </div>
           ) : (
-          <div style={{display: 'grid', gridTemplateColumns: activeMenuType === 'Buffet' ? 'repeat(2, minmax(320px, 1fr))' : 'repeat(3, 1fr)', gap: 24}}>
+          <div style={{display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : (activeMenuType === 'Buffet' ? 'repeat(2, minmax(320px, 1fr))' : 'repeat(3, 1fr)'), gap: isMobileView ? 16 : 24}}>
             {filteredFoods.map((food) => {
               const isBuffetCard = activeMenuType === 'Buffet';
               const draftAdult = Number(buffetDraftQty[food.cartKey]?.adult ?? 1);
@@ -1329,7 +1397,7 @@ const GuesQRorder = () => {
               return (
               <div key={food.cartKey || `${food.itemType || 'Food'}-${food.id}`} className="menu-card" style={{background: '#fff', borderRadius: 20, boxShadow: '0 10px 28px rgba(15,23,42,0.08)', padding: isBuffetCard ? 18 : 16, position: 'relative', border: isBuffetCard ? '1px solid #ffd7b8' : '1px solid #eef2f7', display: 'flex', flexDirection: 'column', height: '100%'}}>
                 {food.tag && <div style={{position: 'absolute', top: 12, left: 12, background: '#FF7A21', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 8px', zIndex: 2}}>{food.tag}</div>}
-                <img src={food.img} alt={food.name} style={{width: '100%', height: 160, objectFit: 'cover', borderRadius: 12, marginBottom: 12}} />
+                <img src={food.img} alt={food.name} style={{width: '100%', height: isMobileView ? 180 : 160, objectFit: 'cover', borderRadius: 12, marginBottom: 12}} />
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
                   <span style={{fontWeight: 700, fontSize: 16}}>{food.name}</span>
                   <span style={{color: '#FF7A21', fontWeight: 700}}>{formatCurrency(food.itemType === 'Buffet' ? (food.buffetPriceAdult || food.price) : food.price)}</span>
@@ -1421,20 +1489,20 @@ const GuesQRorder = () => {
           )}
         </div>
         {/* Cột phải: Sidebar giỏ hàng */}
-        <div style={{flex: 1, background: '#fff', borderRadius: 16, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', padding: 24, minWidth: 340, maxWidth: 380, height: 'fit-content'}}>
-          <div style={{fontWeight: 800, fontSize: 20, marginBottom: 8}}>Đơn hàng của bạn</div>
-          <div style={{color: '#888', fontSize: 13, marginBottom: 18}}>{tableLabel} • NHÀ HÀNG FPT</div>
+        <div style={{flex: 1, background: '#fff', borderRadius: 16, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', padding: isMobileView ? 16 : 24, minWidth: isMobileView ? 0 : 340, maxWidth: isMobileView ? '100%' : 380, width: isMobileView ? '100%' : 'auto', height: 'fit-content'}}>
+          <div style={{fontWeight: 800, fontSize: isMobileView ? 18 : 20, marginBottom: 8}}>Đơn hàng của bạn</div>
+          <div style={{color: '#888', fontSize: 13, marginBottom: 18}}>{tableLabel} • nhà hàng smas</div>
           <div style={{marginBottom: 18}}>
             {cart.length === 0 && <p style={{ color: '#94a3b8' }}>Chưa có món trong giỏ</p>}
             {cart.map((item) => (
-              <div key={item.cartKey || item.id} style={{display: 'flex', alignItems: 'center', marginBottom: 12}}>
+              <div key={item.cartKey || item.id} style={{display: 'flex', alignItems: isMobileView ? 'flex-start' : 'center', marginBottom: 12}}>
                 <img src={item.img} alt={item.name} style={{width: 48, height: 48, borderRadius: 8, marginRight: 12}} />
                 <div style={{flex: 1}}>
                   <div style={{fontWeight: 700, fontSize: 15}}>{item.name}</div>
                   <div style={{color: '#FF7A21', fontWeight: 700, fontSize: 13}}>{formatCurrency(item.price)}</div>
                   {item.itemType === 'Buffet' && (
                     <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: isMobileView ? 'column' : 'row', alignItems: isMobileView ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 8 }}>
                         <span>Suất Người Lớn (trên 1m3): {formatCurrency(item.price)}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button onClick={() => updateQty(item.cartKey || String(item.id), -1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>-</button>
@@ -1442,7 +1510,7 @@ const GuesQRorder = () => {
                           <button onClick={() => updateQty(item.cartKey || String(item.id), 1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>+</button>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
+                      <div style={{ display: 'flex', flexDirection: isMobileView ? 'column' : 'row', alignItems: isMobileView ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
                         <span>Suất Trẻ Em (1m - 1m3): {formatCurrency(Number(item.childrenPrice || 0))}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <button onClick={() => updateBuffetChildQty(item.cartKey || String(item.id), -1)} style={{width: 20, height: 20, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 14, cursor: 'pointer'}}>-</button>
@@ -1454,7 +1522,7 @@ const GuesQRorder = () => {
                   )}
                 </div>
                 {item.itemType !== 'Buffet' && (
-                  <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 6, marginTop: isMobileView ? 8 : 0}}>
                     <button onClick={() => updateQty(item.cartKey || String(item.id), -1)} style={{width: 24, height: 24, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 16, cursor: 'pointer'}}>-</button>
                     <span style={{fontWeight: 700, fontSize: 15}}>{item.quantity}</span>
                     <button onClick={() => updateQty(item.cartKey || String(item.id), 1)} style={{width: 24, height: 24, borderRadius: 6, border: '1px solid #eee', background: '#fff', color: '#FF7A21', fontWeight: 700, fontSize: 16, cursor: 'pointer'}}>+</button>
@@ -1463,17 +1531,9 @@ const GuesQRorder = () => {
               </div>
             ))}
           </div>
-          {/* Tổng kết */}
+          {/* Tổng kết — giá món đã gồm VAT */}
           <div style={{borderTop: '1px dashed #eee', paddingTop: 16, marginBottom: 12}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#888', marginBottom: 6}}>
-              <span>Tạm tính</span>
-              <span style={{fontWeight: 700, color: '#222'}}>{formatCurrency(subtotal)}</span>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#888', marginBottom: 6}}>
-              <span>VAT (10%)</span>
-              <span style={{fontWeight: 700, color: '#222'}}>+{formatCurrency(vatCart)}</span>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end'}}>
               <span style={{fontWeight: 800, fontSize: 18}}>Tổng cộng</span>
               <span style={{fontWeight: 900, fontSize: 28, color: '#FF7A21'}}>{formatCurrency(total)}</span>
             </div>
@@ -1526,12 +1586,12 @@ const GuesQRorder = () => {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: '100%',
-              maxWidth: 640,
-              maxHeight: '82vh',
+              maxWidth: isMobileView ? '100%' : 640,
+              maxHeight: isMobileView ? '90vh' : '82vh',
               overflow: 'auto',
               background: '#fff',
               borderRadius: 16,
-              padding: 20,
+              padding: isMobileView ? 14 : 20,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -1621,22 +1681,132 @@ const GuesQRorder = () => {
                 <div style={{ color: '#374151', fontWeight: 700 }}>
                   Tổng số món: {orderedItemsSummary.totalQty}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  <div style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
-                    Tạm tính: {formatCurrency(orderedItemsSummary.totalAmount)}
-                  </div>
-                  <div style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
-                    VAT (10%): +{formatCurrency(orderedVatAmount)}
-                  </div>
-                  <div style={{ color: '#ea580c', fontWeight: 900, fontSize: 18 }}>
-                    Tổng cộng: {formatCurrency(orderedGrandWithVat)}
-                  </div>
+                <div style={{ color: '#ea580c', fontWeight: 900, fontSize: 18 }}>
+                  Tổng cộng: {formatCurrency(orderedItemsSummary.totalAmount)}
                 </div>
               </div>
             ) : null}
           </div>
         </div>
       ) : null}
+
+      {notifications.length > 0 ? (
+        <div
+          style={{
+            position: 'fixed',
+            top: isMobileView ? 74 : 86,
+            right: isMobileView ? 10 : 18,
+            left: isMobileView ? 10 : 'auto',
+            zIndex: 130,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            width: isMobileView ? 'auto' : 'min(92vw, 390px)',
+          }}
+        >
+          {notifications.map((item) => {
+            const isSuccess = item.type === 'success';
+            const isWarning = item.type === 'warning';
+            const accent = isSuccess ? '#16a34a' : (isWarning ? '#ca8a04' : '#dc2626');
+            const bg = isSuccess ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf3 100%)' : (isWarning ? 'linear-gradient(135deg, #fffef5 0%, #fffbeb 100%)' : 'linear-gradient(135deg, #fff5f5 0%, #fef2f2 100%)');
+            const icon = isSuccess ? '✅' : (isWarning ? '⚠️' : '❗');
+            const title = isSuccess ? 'Thao tác thành công' : (isWarning ? 'Lưu ý' : 'Có lỗi xảy ra');
+            return (
+              <div
+                key={item.id}
+                className="guest-toast-card"
+                style={{
+                  display: 'flex',
+                  alignItems: 'stretch',
+                  gap: 0,
+                  borderRadius: 14,
+                  border: `1px solid ${accent}2e`,
+                  background: bg,
+                  boxShadow: '0 14px 34px rgba(15,23,42,0.18)',
+                  backdropFilter: 'blur(6px)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ width: 5, background: `linear-gradient(180deg, ${accent} 0%, ${accent}aa 100%)` }} />
+                <div style={{ flex: 1, padding: '11px 12px 9px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                    {!isSuccess ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
+                        <span style={{ color: accent, fontWeight: 800, fontSize: 12, letterSpacing: 0.2, textTransform: 'uppercase' }}>
+                          {title}
+                        </span>
+                      </div>
+                    ) : <div />}
+                    <button
+                      type="button"
+                      onClick={() => removeNotification(item.id)}
+                      style={{
+                        border: 'none',
+                        background: '#ffffff80',
+                        color: '#6b7280',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        lineHeight: 1,
+                        width: 22,
+                        height: 22,
+                        borderRadius: 999,
+                        fontWeight: 700,
+                      }}
+                      aria-label="Đóng thông báo"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ marginTop: isSuccess ? 0 : 5, color: '#1f2937', fontWeight: 600, lineHeight: 1.38, paddingRight: 2 }}>
+                    {item.message}
+                  </div>
+                  <div style={{ marginTop: 8, height: 3, borderRadius: 999, background: '#ffffff9e', overflow: 'hidden' }}>
+                    <div
+                      className="guest-toast-progress"
+                      style={{
+                        height: '100%',
+                        width: '100%',
+                        background: accent,
+                        transformOrigin: 'left center',
+                        animationDuration: `${item.timeoutMs || 3200}ms`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      <style>{`
+        .guest-toast-card {
+          animation: guestToastIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .guest-toast-progress {
+          animation-name: guestToastProgress;
+          animation-timing-function: linear;
+          animation-fill-mode: forwards;
+        }
+        @keyframes guestToastIn {
+          from {
+            opacity: 0;
+            transform: translateY(-8px) translateX(10px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) translateX(0) scale(1);
+          }
+        }
+        @keyframes guestToastProgress {
+          from {
+            transform: scaleX(1);
+          }
+          to {
+            transform: scaleX(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };

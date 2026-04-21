@@ -141,6 +141,7 @@ const OrderHistory = () => {
             displayPhone,
             displayGuests: order.numberOfGuests,
             isEventBookingOrder,
+            isDeliveryOrder: isDeliveryOrder(order),
             displayTable,
             displayEvent: order.eventName || order.note || '—',
             displayTotal: order.totalAmount,
@@ -292,15 +293,17 @@ const OrderHistory = () => {
                     </p>
                   </div>
                   <div className="Grid-Col">
-                    <p>
-                      <span className="Grid-Label">{item.isEventBookingOrder ? 'SỐ BÀN' : 'SỐ NGƯỜI'}</span>
-                      <br />
-                      <span className="Grid-Value">
-                        {item.displayGuests != null
-                          ? `${item.displayGuests} ${item.isEventBookingOrder ? 'bàn' : 'người'}`
-                          : '—'}
-                      </span>
-                    </p>
+                    {!item.isDeliveryOrder && (
+                      <p>
+                        <span className="Grid-Label">{item.isEventBookingOrder ? 'SỐ BÀN' : 'SỐ NGƯỜI'}</span>
+                        <br />
+                        <span className="Grid-Value">
+                          {item.displayGuests != null
+                            ? `${item.displayGuests} ${item.isEventBookingOrder ? 'bàn' : 'người'}`
+                            : '—'}
+                        </span>
+                      </p>
+                    )}
                     <p>
                       <span className="Grid-Label">ĐẶT NGÀY</span>
                       <br />

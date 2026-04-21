@@ -81,6 +81,7 @@ const MenuPage = () => {
         const mapped = foodArray.map((item) => ({
           id: item.foodId,
           name: item.name,
+          description: item.description || item.note || '',
           price: item.price,
           oldPrice: item.promotionalPrice,
           image: item.image,
@@ -179,7 +180,11 @@ const MenuPage = () => {
   const filteredItems = menuItems.filter((item) => {
     const keyword = searchTerm.trim().toLowerCase();
     if (!keyword) return true;
-    return item.name.toLowerCase().includes(keyword) || item.categoryName.toLowerCase().includes(keyword);
+    return (
+      item.name.toLowerCase().includes(keyword) ||
+      item.categoryName.toLowerCase().includes(keyword) ||
+      String(item.description || '').toLowerCase().includes(keyword)
+    );
   });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -387,7 +392,9 @@ const MenuPage = () => {
                               </div>
                               <span className="chef-price">{item.price.toLocaleString()}đ</span>
                             </div>
-                            <p className="chef-desc">{item.categoryName} được yêu thích bởi thực khách trong tuần này.</p>
+                            <p className="chef-desc">
+                              {item.description || `${item.categoryName} được yêu thích bởi thực khách trong tuần này.`}
+                            </p>
                             <button
                               type="button"
                               className="chef-cart-btn"
@@ -430,6 +437,7 @@ const MenuPage = () => {
                         </div>
 
                         <h4 className="menu-item-name">{item.name}</h4>
+                        <p className="menu-item-desc">{item.description || 'Món ăn đặc sắc được chế biến bởi đầu bếp SMAS.'}</p>
 
                         <div className="menu-item-footer">
                           <div className="menu-item-prices">

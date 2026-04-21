@@ -33,7 +33,7 @@ function handleApiError(error) {
   const message =
     error.response?.data?.message ||
     error.message ||
-    'Unexpected error occurred';
+    'Đã xảy ra lỗi không mong muốn.';
 
   const code = error.response?.data?.msgCode || null;
 
@@ -109,7 +109,7 @@ export async function googleLogin(token) {
         response: {
           status: 401,
           data: {
-            message: 'Google login failed',
+            message: 'Đăng nhập Google thất bại.',
           },
         },
       };

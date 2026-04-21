@@ -47,11 +47,43 @@ export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
 
   createWorkStaff: (payload) => instance.post('/Staff/workshift', payload),
 
-  updateWorkStaff: (workStaffId, payload) =>
-    instance.put(`/Staff/${workStaffId}`, payload),
+  /**
+   * PUT /api/Staff/{workStaffId} — cập nhật ca nhân viên (Swagger: replaceUserId int; 0 = không thay).
+   * Không gửi field null/undefined để tránh lỗi deserialize phía .NET.
+   */
+  updateWorkStaff: (workStaffId, rawPayload = {}) => {
+    const id = Number(workStaffId);
+    if (!Number.isFinite(id) || id <= 0) {
+      return Promise.reject(new Error('workStaffId không hợp lệ'));
+    }
+    const p = rawPayload && typeof rawPayload === 'object' ? rawPayload : {};
+    const body = {};
+    const rid = p.replaceUserId;
+    if (rid != null && rid !== '' && Number(rid) > 0) {
+      body.replaceUserId = Number(rid);
+    } else {
+      body.replaceUserId = 0;
+    }
+    if (p.checkInTime) body.checkInTime = p.checkInTime;
+    if (p.checkOutTime) body.checkOutTime = p.checkOutTime;
+    if (typeof p.isWorking === 'boolean') body.isWorking = p.isWorking;
+    if (p.note != null && String(p.note).trim() !== '') body.note = String(p.note).trim();
+    if (p.shiftId != null && p.shiftId !== '' && Number(p.shiftId) > 0) {
+      body.shiftId = Number(p.shiftId);
+    }
+    if (p.workDay != null && String(p.workDay).trim() !== '') {
+      body.workDay = String(p.workDay).trim().slice(0, 10);
+    }
+    return instance.put(`/Staff/${id}`, body);
+  },
 
-  deleteWorkStaff: (workStaffId) =>
-    instance.delete(`/Staff/${workStaffId}`),
+  deleteWorkStaff: (workStaffId) => {
+    const id = Number(workStaffId);
+    if (!Number.isFinite(id) || id <= 0) {
+      return Promise.reject(new Error('workStaffId không hợp lệ'));
+    }
+    return instance.delete(`/Staff/${id}`);
+  },
 
   // Lịch sử ca làm việc của nhân viên
   getStaffWorkHistory: (staffId, query = {}) => {

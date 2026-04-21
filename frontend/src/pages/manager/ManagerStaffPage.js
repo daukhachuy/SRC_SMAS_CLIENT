@@ -130,6 +130,27 @@
     return 'morning';
   }
 
+  /** yyyy-mm-dd theo giờ local — tránh lệch ngày khi dùng toISOString() (UTC). */
+  function toLocalDateKey(input) {
+    if (input == null || input === '') return '';
+    const s = String(input).trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+  }
+
+  function workStaffMapKey(userId, shiftId, workDayYmd) {
+    const uid = userId != null && userId !== '' ? String(userId) : '';
+    const sid = shiftId != null && shiftId !== '' ? String(shiftId) : '';
+    const day = toLocalDateKey(workDayYmd);
+    return `${uid}|${sid}|${day}`;
+  }
+
   function roleMatch(employeeRole, selectedDepartment) {
     if (employeeRole === 'Quản lý') return false;
     if (selectedDepartment === 'all') return true;
@@ -242,37 +263,55 @@
       const scheduleItemsMap = weekKitchenRes.status === 'fulfilled' ? unwrapResponse(weekKitchenRes.value) : [];
       const workStaffIdMap = new Map();
       scheduleItemsMap.forEach((raw) => {
-        // key: userId|shiftId|workDay
-        const key = `${raw.userId || raw.id}|${raw.shiftId}|${(raw.workDate || raw.workDay || '').slice(0,10)}`;
-        workStaffIdMap.set(key, raw.workStaffId ?? raw.idWorkStaff ?? raw.workId ?? null);
+        const wid = raw.workStaffId ?? raw.idWorkStaff ?? raw.workId ?? null;
+        if (wid == null || wid === '') return;
+        const sid = raw.shiftId ?? raw.shiftID;
+        const day = toLocalDateKey(raw.workDate || raw.workDay || '');
+        if (!day || sid == null || sid === '') return;
+        const idCandidates = [raw.userId, raw.id, raw.staffId, raw.userID, raw.staffUserId]
+          .filter((x) => x != null && x !== '')
+          .map((x) => String(x));
+        const uniq = [...new Set(idCandidates)];
+        uniq.forEach((uid) => {
+          workStaffIdMap.set(workStaffMapKey(uid, sid, day), wid);
+        });
       });
 
       (nextSevenData?.shifts || []).forEach((shift, shiftIdx) => {
         const shiftKey = getShiftKey(shift);
         if (!SHIFT_KEYS.includes(shiftKey)) return;
         shift.days.forEach((day, dayIdx) => {
-          const workDayStr = (day.workDay || '').slice(0, 10);
-          const dayIndex = weekDates.findIndex((d) => d.key.slice(0, 10) === workDayStr);
+          const workDayStr = toLocalDateKey(day.workDay || '');
+          const dayIndex = weekDates.findIndex((d) => d.key.slice(0, 10) === workDayStr || d.key === workDayStr);
           if (dayIndex < 0) return;
           day.staffs.forEach((staff, staffIdx) => {
-                        // Tìm workStaffId từ map
-            // Tìm workStaffId từ map
-            const key = `${staff.userId}|${shift.shiftId}|${workDayStr}`;
-            const workStaffId = workStaffIdMap.get(key);
-            if (!employeeIds.has(staff.userId)) {
+            const staffUid = staff.userId ?? staff.id ?? staff.userID ?? staff.staffId;
+            if (staffUid == null || staffUid === '') return;
+            // BE next-seven-days đã trả workStaffId trên từng staff — ưu tiên, không chỉ dựa schedule-week-kitchen-waiter
+            let workStaffId = staff.workStaffId ?? staff.idWorkStaff ?? staff.workId ?? null;
+            if (workStaffId == null || workStaffId === '') {
+              const key = workStaffMapKey(staffUid, shift.shiftId, workDayStr);
+              workStaffId = workStaffIdMap.get(key);
+              if (workStaffId == null && staff.userId != null && staff.id != null && String(staff.userId) !== String(staff.id)) {
+                workStaffId = workStaffIdMap.get(workStaffMapKey(staff.id, shift.shiftId, workDayStr))
+                  ?? workStaffIdMap.get(workStaffMapKey(staff.userId, shift.shiftId, workDayStr));
+              }
+            }
+            if (!employeeIds.has(staffUid)) {
               employeePool.push({
-                id: staff.userId,
+                id: staffUid,
                 name: staff.fullName,
                 avatar: staff.avatarUrl,
                 role: staff.position,
                 workStaffId: workStaffId || null,
               });
-              employeeIds.add(staff.userId);
+              employeeIds.add(staffUid);
             }
-            if (!byDay[shiftKey][dayIndex].includes(staff.userId)) {
-              byDay[shiftKey][dayIndex].push(staff.userId);
+            if (!byDay[shiftKey][dayIndex].includes(staffUid)) {
+              byDay[shiftKey][dayIndex].push(staffUid);
             }
-            workStaffMapByCell[`${shiftKey}-${dayIndex}-${String(staff.userId)}`] = workStaffId ?? null;
+            const cellKey = `${shiftKey}-${dayIndex}-${String(staffUid)}`;
+            workStaffMapByCell[cellKey] = workStaffId ?? workStaffMapByCell[cellKey] ?? null;
           });
         });
       });
@@ -288,8 +327,8 @@
           employeeIds.add(staff.id);
         }
         const workDate = raw?.workDate || raw?.workDay || staff.workDate;
-        const dateKey = workDate ? new Date(workDate).toISOString().split('T')[0] : null;
-        const dayIndex = weekDates.findIndex((d) => d.key === dateKey);
+        const dateKey = toLocalDateKey(workDate);
+        const dayIndex = weekDates.findIndex((d) => d.key === dateKey || d.key.slice(0, 10) === dateKey);
         console.log(`[DEBUG][fetchSchedule] [weekKitchenRes] idx=${idx}, staffId=${staff.id}, workDate=${workDate}, dateKey=${dateKey}, dayIndex=${dayIndex}`);
         if (dayIndex < 0) return;
         const shiftKey = inferShiftKey(raw);
@@ -297,7 +336,10 @@
         if (!byDay[shiftKey][dayIndex].includes(staff.id)) {
           byDay[shiftKey][dayIndex].push(staff.id);
         }
-        workStaffMapByCell[`${shiftKey}-${dayIndex}-${String(staff.id)}`] = raw?.workStaffId ?? raw?.idWorkStaff ?? raw?.workId ?? null;
+        const cellKey = `${shiftKey}-${dayIndex}-${String(staff.id)}`;
+        const widRaw = raw?.workStaffId ?? raw?.idWorkStaff ?? raw?.workId ?? null;
+        workStaffMapByCell[cellKey] =
+          widRaw != null && widRaw !== '' ? widRaw : (workStaffMapByCell[cellKey] ?? null);
       });
 
       // DEBUG LOG: Kết quả mapping ca làm
@@ -1104,7 +1146,8 @@
 
             {!canMutate && (
               <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: '#fff7ed', color: '#9a3412' }}>
-                Chưa có mã ca làm việc nên chỉ xem được thông tin nhân viên.
+                Chưa có mã ca làm việc từ server cho ô lịch này, nên không gọi được API cập nhật và các nút Cập nhật/Xóa bị tắt.
+                Hãy tải lại trang sau khi dữ liệu lịch đã có mã ca, hoặc dùng &quot;Tạo ca làm việc&quot; nếu ca chưa được gán trên hệ thống.
               </div>
             )}
 
