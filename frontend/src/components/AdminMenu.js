@@ -88,7 +88,7 @@ const AdminMenu = () => {
       <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="admin-brand">
           <div className="admin-brand-icon">R</div>
-          <span className="admin-brand-text">RESTO ADMIN</span>
+          <span className="admin-brand-text">SMAS ADMIN</span>
         </div>
 
         <nav className="admin-nav">

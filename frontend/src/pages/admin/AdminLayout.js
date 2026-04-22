@@ -14,9 +14,12 @@ import {
   UserCircle,
   Pencil,
   User,
-  Sparkles
+  Sparkles,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import NotificationDropdown from '../../components/NotificationDropdown';
+import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../../api/notificationApi';
 import '../../styles/AdminLayout.css';
 
 const navItems = [
@@ -44,6 +47,9 @@ const AdminLayout = () => {
     address: '123 Đường Lê Lợi, Quận 1, TP. Hồ Chí Minh',
   });
   const [adminProfileOpen, setAdminProfileOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [adminScreenError, setAdminScreenError] = useState('');
   const [adminProfileForm, setAdminProfileForm] = useState({
     fullname: '',
     email: '',
@@ -60,6 +66,43 @@ const AdminLayout = () => {
     if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
     return words.map(w => w[0]).join('').toUpperCase();
   };
+
+  const getNotificationId = (item, idx = 0) => {
+    const id = item?.id ?? item?.notificationId ?? item?.notificationID ?? item?.Id ?? item?.NotificationId;
+    return id != null ? String(id) : `admin-fallback-${idx}`;
+  };
+
+  const timeAgoVi = (value) => {
+    if (!value) return 'Vừa xong';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    const diffMs = Date.now() - d.getTime();
+    const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+    if (diffMin < 1) return 'Vừa xong';
+    if (diffMin < 60) return `${diffMin} phút trước`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour} giờ trước`;
+    const diffDay = Math.floor(diffHour / 24);
+    return `${diffDay} ngày trước`;
+  };
+
+  const mapNotificationType = (type) => {
+    const t = String(type || '').toLowerCase();
+    if (t.includes('warn') || t.includes('error')) return 'warning';
+    if (t.includes('book')) return 'booking';
+    if (t.includes('promo') || t.includes('discount')) return 'promotion';
+    if (t.includes('order')) return 'order';
+    return 'system';
+  };
+
+  const mapNotificationItem = (item, idx) => ({
+    id: getNotificationId(item, idx),
+    type: mapNotificationType(item?.type || item?.notificationType),
+    title: item?.title || item?.subject || item?.message || `Thông báo #${idx + 1}`,
+    message: item?.message || item?.content || item?.description || 'Bạn có thông báo mới.',
+    time: timeAgoVi(item?.createdAt || item?.time || item?.sentAt),
+    isRead: Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false),
+  });
 
   useEffect(() => {
     // Không bắt buộc đăng nhập - lấy từ localStorage nếu có
@@ -101,6 +144,48 @@ const AdminLayout = () => {
     }
   }, [adminProfileOpen, userInfo.fullname, userInfo.email, userInfo.phone, userInfo.gender, userInfo.address]);
 
+  useEffect(() => {
+    if (!adminScreenError) return;
+    const timer = setTimeout(() => setAdminScreenError(''), 3500);
+    return () => clearTimeout(timer);
+  }, [adminScreenError]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const [allPayload, unreadPayload] = await Promise.all([
+          getAllNotifications(),
+          getUnreadNotifications(),
+        ]);
+
+        const allRows = normalizeNotificationList(allPayload);
+        const unreadRows = normalizeNotificationList(unreadPayload);
+        const unreadIds = new Set(
+          unreadRows.map((item, idx) => getNotificationId(item, idx)).filter(Boolean)
+        );
+
+        const mapped = allRows.map((item, idx) => {
+          const row = mapNotificationItem(item, idx);
+          const rowId = getNotificationId(item, idx);
+          return { ...row, isRead: unreadIds.has(rowId) ? false : row.isRead };
+        });
+
+        if (mounted) setNotifications(mapped);
+      } catch (error) {
+        console.error('Load admin notifications failed:', error);
+        setAdminScreenError('Không tải được thông báo. Vui lòng thử lại.');
+        if (mounted) setNotifications([]);
+      }
+    };
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleSaveAdminProfile = (e) => {
     e.preventDefault();
     setUserInfo((prev) => ({
@@ -120,8 +205,16 @@ const AdminLayout = () => {
     navigate('/auth');
   };
 
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+
   return (
     <div className="admin-shell">
+      {adminScreenError && (
+        <div className="admin-screen-error" role="alert">
+          {adminScreenError}
+        </div>
+      )}
+
       <button
         className="admin-menu-btn"
         onClick={() => setMenuOpen((prev) => !prev)}
@@ -135,7 +228,7 @@ const AdminLayout = () => {
       <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="admin-brand">
           <div className="admin-brand-icon">R</div>
-          <span className="admin-brand-text">RESTO ADMIN</span>
+          <span className="admin-brand-text">SMAS ADMIN</span>
         </div>
 
         <nav className="admin-nav">
@@ -182,6 +275,25 @@ const AdminLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      <button
+        type="button"
+        className="admin-floating-notification"
+        onClick={() => setNotificationOpen((v) => !v)}
+        aria-label="Thông báo"
+      >
+        <Bell size={20} />
+        {unreadNotificationCount > 0 && (
+          <span className="admin-notification-badge">{unreadNotificationCount}</span>
+        )}
+      </button>
+
+      <NotificationDropdown
+        isOpen={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+        notifications={notifications}
+        onNotificationsChange={setNotifications}
+      />
 
       {adminProfileOpen && (
         <div className="admin-profile-overlay" onClick={() => setAdminProfileOpen(false)}>
