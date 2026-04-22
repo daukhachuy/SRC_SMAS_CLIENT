@@ -63,7 +63,14 @@ const uniqueById = (list) => {
 
 const extractApiErrorMessage = (error, fallback) => {
   const data = error?.response?.data;
+  const status = Number(error?.response?.status || 0);
+  if (typeof data === 'string' && data.trim()) return data.trim();
   if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  if (typeof data?.Message === 'string' && data.Message.trim()) return data.Message;
+  if (typeof data?.detail === 'string' && data.detail.trim()) return data.detail;
+  if (typeof data?.error === 'string' && data.error.trim()) return data.error;
+  if (typeof data?.data?.message === 'string' && data.data.message.trim()) return data.data.message;
+  if (typeof data?.data?.Message === 'string' && data.data.Message.trim()) return data.data.Message;
   if (typeof data?.title === 'string' && data.title.trim()) return data.title;
 
   const errors = data?.errors;
@@ -75,7 +82,18 @@ const extractApiErrorMessage = (error, fallback) => {
     if (firstError) return firstError;
   }
 
-  if (typeof error?.message === 'string' && error.message.trim()) return error.message;
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    const raw = error.message.trim();
+    if (/request failed with status code/i.test(raw)) {
+      if (status === 400) return 'Yêu cầu không hợp lệ. Vui lòng kiểm tra trạng thái đơn trước khi thao tác.';
+      if (status === 401 || status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+      if (status === 404) return 'Không tìm thấy API hoặc dữ liệu cần thao tác.';
+      if (status === 405) return 'API không hỗ trợ phương thức gọi hiện tại.';
+      if (status >= 500) return 'Hệ thống đang bận, vui lòng thử lại sau.';
+      return fallback;
+    }
+    return raw;
+  }
   return fallback;
 };
 

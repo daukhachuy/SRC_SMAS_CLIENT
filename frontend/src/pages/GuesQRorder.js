@@ -1123,6 +1123,10 @@ const GuesQRorder = () => {
   const orderedItemsSummary = useMemo(() => {
     return orderedItems.reduce(
       (acc, item) => {
+        // Không tính món đã hủy vào tổng số món / tổng tiền.
+        if (String(item?.dishStatus || '').toLowerCase() === 'cancelled') {
+          return acc;
+        }
         // Tổng số món = số dòng món (không cộng dồn theo quantity).
         acc.totalQty += 1;
         acc.totalAmount += getOrderedItemLineAmount(item);
