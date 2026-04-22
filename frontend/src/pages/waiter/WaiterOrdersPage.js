@@ -19,6 +19,7 @@ import {
   Users,
   Utensils,
   Printer,
+  QrCode,
   X,
   ClipboardList,
 } from 'lucide-react';
@@ -2048,12 +2049,23 @@ const mapApiOrderToWaiter = (order) => {
       await refreshSelectedOrderDetail(orderCode);
       void fetchWaiterOrders({ silent: true });
     } catch (err) {
-      const msg =
+      const statusCode = Number(err?.response?.status || 0);
+      const rawMsg =
         err?.response?.data?.message ||
         err?.response?.data?.Message ||
         err?.response?.data?.title ||
         err?.message ||
-        'Không áp dụng được voucher.';
+        '';
+      let msg = String(rawMsg || '').trim();
+      // Không hiển thị lỗi Axios tiếng Anh cho người dùng.
+      if (!msg || /request failed with status code/i.test(msg)) {
+        if (statusCode === 404) msg = 'Không tìm thấy mã voucher này.';
+        else if (statusCode === 400) msg = 'Mã voucher không hợp lệ hoặc không áp dụng được cho đơn này.';
+        else if (statusCode === 409) msg = 'Voucher này đã được sử dụng hoặc không còn hiệu lực.';
+        else if (statusCode === 401 || statusCode === 403) msg = 'Bạn không có quyền áp dụng voucher.';
+        else if (statusCode >= 500) msg = 'Hệ thống đang bận, vui lòng thử lại sau.';
+        else msg = 'Không áp dụng được voucher.';
+      }
       setAppliedVoucherCode('');
       setVoucherApplyMessage('');
       setVoucherAppliedDiscountAmount(0);
@@ -3631,8 +3643,7 @@ const mapApiOrderToWaiter = (order) => {
                       className={activePaymentMethod === 'qr' ? 'active' : ''}
                       onClick={() => setActivePaymentMethod('qr')}
                     >
-                      {/* QRCode icon cho thanh toán, không phải QR nhỏ bàn */}
-                      QR Code
+                      <QrCode size={18} /> QR Code
                     </button>
                   </div>
                 </div>

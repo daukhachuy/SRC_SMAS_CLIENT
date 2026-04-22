@@ -495,6 +495,21 @@ export async function getAllStaffSchedule() {
         console.log('[contractAPI] getPaymentsByContractId response:', res.status, res.data);
         return res;
       }),
+
+    // GET /api/contract/by-code/{contractCode}/payments
+    getPaymentsByCode: (contractCode) => instance.get(`/contract/by-code/${encodeURIComponent(contractCode)}/payments`)
+      .then(res => {
+        console.log('[contractAPI] getPaymentsByCode response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/contract/by-code/{contractCode}/final-payment/confirm
+    confirmFinalPaymentByCode: (contractCode, payload = {}) =>
+      instance.post(`/contract/by-code/${encodeURIComponent(contractCode)}/final-payment/confirm`, payload)
+        .then(res => {
+          console.log('[contractAPI] confirmFinalPaymentByCode response:', res.status, res.data);
+          return res;
+        }),
   };
 
   export const contractTokenAPI = {
