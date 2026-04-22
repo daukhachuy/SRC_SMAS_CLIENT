@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { myOrderAPI } from '../api/myOrderApi';
-import { printEventBookingInvoice } from '../utils/orderInvoicePrint';
-import { downloadContractPdf, downloadInvoicePdf, getPdfErrorMessage } from '../api/pdfExportApi';
+import { downloadContractPdf, getPdfErrorMessage } from '../api/pdfExportApi';
 
 const EVENT_TYPE_MAP = {
   1: { name: 'Tiệc Cưới', color: '#f43f5e' },
@@ -267,61 +266,6 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
   const computedPreVat = menuFeeAllTables + servicesFeeTotal;
   const paymentDisplay = getEventPaymentDisplay(ev, computedPreVat);
 
-  const printEventInvoiceClient = () => {
-    const menuLines = (menuItems || []).map((item) => {
-      const line = Number(pick(item, ['subtotal', 'Subtotal', 'lineTotal', 'LineTotal'], NaN));
-      const price = Number(pick(item, ['price', 'unitPrice', 'UnitPrice', 'totalPrice', 'amount'], 0));
-      const qty = Number(pick(item, ['quantity', 'qty', 'count'], 1));
-      const amount = Number.isFinite(line) && line >= 0 ? line : price * qty;
-      return {
-        name: pick(item, ['name', 'foodName', 'dishName'], 'Món'),
-        qty,
-        amount,
-      };
-    });
-    const serviceLines = (services || []).map((svc) => {
-      const line = Number(pick(svc, ['subtotal', 'Subtotal', 'lineTotal', 'total', 'Total'], NaN));
-      const p = Number(pick(svc, ['unitPrice', 'price', 'Price', 'amount'], 0));
-      const q = Number(pick(svc, ['quantity', 'qty'], 1));
-      const amount = Number.isFinite(line) && line >= 0 ? line : p * q;
-      return { name: pick(svc, ['name', 'serviceName', 'title'], 'Dịch vụ'), amount };
-    });
-    printEventBookingInvoice({
-      bookingCode,
-      eventTypeName,
-      dateTime: `${eventDate} ${eventTime}`.trim(),
-      tables: String(numberOfTables || ''),
-      buyerName: customerName,
-      buyerPhone: phone,
-      buyerEmail: email,
-      menuLines,
-      serviceLines,
-      subtotal: paymentDisplay.subtotal,
-      vat: paymentDisplay.vat,
-      grandTotal: paymentDisplay.grand != null ? paymentDisplay.grand : 0,
-      note,
-    });
-  };
-
-  const handlePrintEventInvoice = async () => {
-    const invKey = String(bookingCode || '').replace(/^#/, '').trim();
-    setPdfExporting(true);
-    try {
-      if (invKey) {
-        try {
-          await downloadInvoicePdf(invKey);
-          return;
-        } catch (e1) {
-          const msg = await getPdfErrorMessage(e1);
-          console.warn('[pdf-export/invoice booking]', msg);
-        }
-      }
-      printEventInvoiceClient();
-    } finally {
-      setPdfExporting(false);
-    }
-  };
-
   const handleDownloadEventContractPdf = async () => {
     const cc = String(contractCode || '').trim();
     if (!cc) {
@@ -552,19 +496,6 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
               <i className="fa-solid fa-file-pdf" /> PDF hợp đồng
             </button>
           ) : null}
-          <button
-            type="button"
-            className="event-modal-btn"
-            disabled={pdfExporting}
-            onClick={handlePrintEventInvoice}
-            style={{
-              background: '#fff7ed',
-              color: '#c2410c',
-              border: '1px solid rgba(236, 91, 19, 0.45)',
-            }}
-          >
-            <i className="fa-solid fa-print" /> {pdfExporting ? 'Đang xử lý…' : 'Xuất hóa đơn (PDF)'}
-          </button>
           <button className="event-modal-btn event-modal-btn-close" onClick={onClose}>
             <i className="fa-solid fa-arrow-left"></i> Đóng
           </button>

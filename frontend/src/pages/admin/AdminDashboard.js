@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Chart as ChartJS,
+  BarController,
   CategoryScale,
   LinearScale,
   BarElement,
@@ -16,6 +17,7 @@ import { fetchAdminDashboardAll, fetchTransactionHistory, ORDER_STRUCTURE_LABELS
 import '../../styles/AdminDashboard.css';
 
 ChartJS.register(
+  BarController,
   CategoryScale,
   LinearScale,
   BarElement,

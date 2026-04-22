@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Bell } from 'lucide-react';
 import AdminMenuCategory from './AdminMenuCategory';
 import AdminMenuFood from './AdminMenuFood';
 import AdminMenuCombo from './AdminMenuCombo';
@@ -22,11 +21,6 @@ const AdminMenuManagement = () => {
     <div className="admin-menu-management">
       <header className="menu-management-header">
         <h1 className="menu-management-title">Quản lý Thực đơn</h1>
-        <div className="menu-management-header-actions">
-          <button type="button" className="menu-icon-btn menu-btn-icon-only" aria-label="Thông báo">
-            <Bell size={20} />
-          </button>
-        </div>
       </header>
 
       <div className="menu-management-tabs">
