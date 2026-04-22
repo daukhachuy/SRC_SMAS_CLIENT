@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Users, Plus, Pencil, Trash2, Search, RefreshCw } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import {
   getTables,
   createTable,
@@ -11,16 +11,23 @@ import {
 import '../../styles/AdminTableMap.css';
 
 const TABLE_TYPES = [
+  { value: 'standard', label: 'Tiêu chuẩn' },
   { value: 'indoor', label: 'Trong nhà' },
   { value: 'outdoor', label: 'Sân vườn' },
   { value: 'vip', label: 'VIP' },
-  { value: 'none', label: 'None' },
+  { value: 'none', label: 'Khác' },
+];
+
+const TABLE_TYPE_FORM_OPTIONS = [
+  { value: 'outdoor', label: 'Ngoài trời' },
+  { value: 'vip', label: 'VIP' },
+  { value: 'standard', label: 'Tiêu chuẩn' },
 ];
 
 /** Form khớp Swagger POST /api/table: tableName, tableType, numberOfPeople */
 const emptyForm = () => ({
   name: '',
-  tableType: '',
+  tableType: 'standard',
   maxGuests: 4,
 });
 
@@ -34,14 +41,20 @@ const tableTypeLabel = (table) => {
   return raw != null && String(raw).trim() !== '' ? String(raw) : '—';
 };
 
+const normalizeTableTypeForForm = (rawType) => {
+  const v = String(rawType ?? '').trim().toLowerCase();
+  if (!v || v === 'indoor' || v === 'none' || v === 'standard') return 'standard';
+  if (v === 'vip') return 'vip';
+  if (v === 'outdoor') return 'outdoor';
+  return 'standard';
+};
+
 const AdminTableMap = () => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('in-use');
-  /** GET /api/table?tableType=… (Swagger) — không còn lọc theo area ở client */
-  const [regionTableType, setRegionTableType] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,14 +66,11 @@ const AdminTableMap = () => {
   const loadTables = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const baseParams =
-      regionTableType === 'all' ? {} : { tableType: regionTableType };
-
     const applyInUseFilter = (list) =>
       (Array.isArray(list) ? list : []).filter(isBusy);
 
     try {
-      const list = await getTables(baseParams);
+      const list = await getTables();
       const rows = Array.isArray(list) ? list : [];
       if (activeTab === 'in-use') {
         setTables(applyInUseFilter(rows));
@@ -73,7 +83,7 @@ const AdminTableMap = () => {
     } finally {
       setLoading(false);
     }
-  }, [regionTableType, activeTab]);
+  }, [activeTab]);
 
   useEffect(() => {
     loadTables();
@@ -81,7 +91,7 @@ const AdminTableMap = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, regionTableType, typeFilter, activeTab]);
+  }, [searchQuery, typeFilter, activeTab]);
 
   const filteredTables = useMemo(() => {
     return tables.filter((t) => {
@@ -133,7 +143,7 @@ const AdminTableMap = () => {
     setEditingTable(table);
     setForm({
       name: table.name,
-      tableType: String(table.tableType ?? '').trim(),
+      tableType: normalizeTableTypeForForm(table.tableType),
       maxGuests: table.maxGuests ?? table.capacity ?? 4,
     });
   };
@@ -184,7 +194,7 @@ const AdminTableMap = () => {
     }
   };
 
-  const displayNameShort = (name) => String(name || '').replace(/^Bàn\s*/i, '');
+  const displayNameShort = (name) => String(name || '').replace(/^(Bàn|Table)\s*/i, '');
 
   return (
     <div className="admin-tablemap">
@@ -204,22 +214,11 @@ const AdminTableMap = () => {
       )}
 
       <header className="tablemap-header">
-        <div>
+        <div className="tablemap-heading">
           <h1 className="tablemap-title">Sơ đồ bàn</h1>
-          <p className="tablemap-subtitle">Quản lý vị trí và tình trạng bàn (API /table)</p>
+          <p className="tablemap-subtitle">Quản lý vị trí và tình trạng bàn </p>
         </div>
         <div className="tablemap-actions">
-          <button
-            type="button"
-            className="tablemap-select"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-            onClick={() => loadTables()}
-            disabled={loading}
-            title="Tải lại"
-          >
-            <RefreshCw size={16} className={loading ? 'spin' : ''} />
-            Làm mới
-          </button>
           <div className="tablemap-search-wrap">
             <Search size={18} className="tablemap-search-icon" />
             <input
@@ -230,18 +229,6 @@ const AdminTableMap = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <select
-            className="tablemap-select"
-            value={regionTableType}
-            onChange={(e) => setRegionTableType(e.target.value)}
-          >
-            <option value="all">Tất cả các khu vực</option>
-            {TABLE_TYPES.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
           <select className="tablemap-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="all">Tất cả loại bàn</option>
             <option value="normal">Bàn thường</option>
@@ -416,7 +403,7 @@ const AdminTableMap = () => {
             </h2>
             <form onSubmit={handleSaveTable} className="tablemap-modal-form">
               <div className="tablemap-form-group">
-                <label>Tên bàn (tableName)</label>
+                <label>Tên bàn</label>
                 <input
                   type="text"
                   value={form.name}
@@ -426,18 +413,21 @@ const AdminTableMap = () => {
                 />
               </div>
               <div className="tablemap-form-group">
-                <label>Loại bàn (tableType)</label>
-                <input
-                  type="text"
+                <label>Loại bàn</label>
+                <select
                   value={form.tableType}
                   onChange={(e) => setForm((f) => ({ ...f, tableType: e.target.value }))}
-                  placeholder="VD: vip, indoor, outdoor — tự nhập theo API"
                   required
-                  autoComplete="off"
-                />
+                >
+                  {TABLE_TYPE_FORM_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="tablemap-form-group">
-                <label>Số người tối đa (numberOfPeople)</label>
+                <label>Số người tối đa</label>
                 <div className="tablemap-input-with-icon">
                   <Users size={18} className="tablemap-input-icon" />
                   <input

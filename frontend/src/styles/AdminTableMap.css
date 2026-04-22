@@ -7,18 +7,27 @@
 
 .tablemap-header {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.tablemap-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  text-align: left;
 }
 
 .tablemap-title {
-  font-size: 1.5rem;
+  font-size: 2.1rem;
   font-weight: 700;
   color: #111827;
   margin: 0;
+  line-height: 1.2;
 }
 
 .tablemap-subtitle {
@@ -30,13 +39,22 @@
 .tablemap-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  padding: 0.5rem;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  width: auto;
+  max-width: none;
 }
 
 .tablemap-select {
   font-size: 0.875rem;
-  padding: 0.5rem 0.75rem;
+  height: 2.5rem;
+  padding: 0 0.75rem;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
   background: #fff;
@@ -59,12 +77,13 @@
 
 .tablemap-search {
   font-size: 0.875rem;
-  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  height: 2.5rem;
+  padding: 0 0.75rem 0 2.5rem;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
   background: #fff;
   color: #374151;
-  min-width: 200px;
+  min-width: 260px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -82,7 +101,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  height: 2.5rem;
+  padding: 0 1rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: #fff;
@@ -103,6 +123,7 @@
   gap: 0;
   border-bottom: 1px solid #e5e7eb;
   margin-bottom: 1.5rem;
+  margin-top: 0.25rem;
 }
 
 .tablemap-tab {
@@ -352,8 +373,19 @@
     align-items: stretch;
   }
 
+  .tablemap-heading {
+    align-items: center;
+    text-align: center;
+  }
+
   .tablemap-actions {
     flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    max-width: none;
   }
 
   .tablemap-search-wrap {
@@ -366,6 +398,11 @@
 
   .tablemap-select {
     min-width: 100%;
+  }
+
+  .tablemap-add-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .tablemap-cards {

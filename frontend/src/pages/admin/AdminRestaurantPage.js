@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Pencil, X, Eye, Bell, Trash2, User, Share2, FileImage } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Search, Plus, Pencil, X, Eye, Trash2, User, Share2, FileImage } from 'lucide-react';
 import { discountAPI } from '../../api/discountApi';
 import { blogAPI } from '../../api/blogApi';
 import { feedbackAPI } from '../../api/feedbackApi';
@@ -247,6 +247,15 @@ function formatBlogDateTime(iso) {
   return d.toLocaleString('vi-VN');
 }
 
+function formatBlogStatusVi(status) {
+  const s = String(status || '').trim().toLowerCase();
+  if (!s) return '—';
+  if (s === 'published') return 'Đã xuất bản';
+  if (s === 'draft') return 'Bản nháp';
+  if (s === 'archived') return 'Lưu trữ';
+  return String(status);
+}
+
 function toDatetimeLocalValue(d) {
   const x = d instanceof Date && !Number.isNaN(d.getTime()) ? d : new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -443,7 +452,9 @@ const AdminRestaurantPage = () => {
   const [codesLoading, setCodesLoading] = useState(true);
   const [codesLoadError, setCodesLoadError] = useState('');
   const [codeSubmitError, setCodeSubmitError] = useState('');
+  const [codeFieldErrors, setCodeFieldErrors] = useState({});
   const [codeSubmitting, setCodeSubmitting] = useState(false);
+  const codeErrorRef = useRef(null);
   const [posts, setPosts] = useState([]);
   const [blogsLoading, setBlogsLoading] = useState(false);
   const [blogsLoadError, setBlogsLoadError] = useState('');
@@ -1020,6 +1031,67 @@ const AdminRestaurantPage = () => {
     }
   };
 
+  const extractApiErrorMessage = (err, fallback) => {
+    const data = err?.response?.data;
+    if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim();
+    if (typeof data?.title === 'string' && data.title.trim()) return data.title.trim();
+    if (data?.errors && typeof data.errors === 'object') {
+      const firstFieldError = Object.values(data.errors)
+        .flat()
+        .find((x) => typeof x === 'string' && x.trim());
+      if (firstFieldError) return firstFieldError.trim();
+    }
+    if (typeof err?.message === 'string' && err.message.trim()) return err.message.trim();
+    return fallback;
+  };
+
+  const scrollToCodeError = useCallback(() => {
+    if (codeErrorRef.current) {
+      codeErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!codeModalOpen) return;
+    if (!codeSubmitError && !Object.keys(codeFieldErrors).length) return;
+    const timer = window.setTimeout(() => scrollToCodeError(), 20);
+    return () => window.clearTimeout(timer);
+  }, [codeModalOpen, codeSubmitError, codeFieldErrors, scrollToCodeError]);
+
+  const setCodeFieldValue = (field, value) => {
+    setCodeForm((f) => ({ ...f, [field]: value }));
+    setCodeFieldErrors((prev) => {
+      if (!prev[field] && !(field === 'startDate' || field === 'endDate') && !prev.dateRange) return prev;
+      const next = { ...prev };
+      delete next[field];
+      if (field === 'startDate' || field === 'endDate') delete next.dateRange;
+      return next;
+    });
+  };
+
+  const validateCodeForm = () => {
+    const errs = {};
+    const code = String(codeForm.code || '').trim();
+    const valueNum = parseMoneyInput(codeForm.value);
+    const quantityRaw = String(codeForm.quantity || '').trim();
+    const quantityNum = quantityRaw ? Number(quantityRaw) : 0;
+
+    if (!code) errs.code = 'Vui lòng nhập mã code.';
+    if (!valueNum || valueNum <= 0) errs.value = 'Giá trị giảm phải lớn hơn 0.';
+    if (codeForm.type === 'percent' && valueNum > 100) {
+      errs.value = 'Giá trị phần trăm giảm giá không được vượt quá 100%.';
+    }
+    if (!codeForm.startDate) errs.startDate = 'Vui lòng chọn ngày bắt đầu.';
+    if (!codeForm.endDate) errs.endDate = 'Vui lòng chọn ngày kết thúc.';
+    if (codeForm.startDate && codeForm.endDate && codeForm.endDate < codeForm.startDate) {
+      errs.dateRange = 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.';
+    }
+    if (quantityRaw && (!Number.isFinite(quantityNum) || quantityNum < 0)) {
+      errs.quantity = 'Số lượng mã phải là số không âm.';
+    }
+    return errs;
+  };
+
   const buildDiscountPayload = () => {
     const formatDateForApi = (dateStr) => {
       if (!dateStr) return null;
@@ -1052,7 +1124,8 @@ const AdminRestaurantPage = () => {
       endDate: formatDateForApi(codeForm.endDate),
       usageLimit: parseInt(String(codeForm.quantity).replace(/\D/g, ''), 10) || 0,
       applicableFor,
-      status: codeForm.status,
+      // Yêu cầu nghiệp vụ: khi tạo mới luôn ở trạng thái Hoạt động
+      status: 'Active',
     };
   };
 
@@ -1093,6 +1166,14 @@ const AdminRestaurantPage = () => {
   const handleSubmitCode = async (e) => {
     e.preventDefault();
     setCodeSubmitError('');
+    setCodeFieldErrors({});
+
+    const validationErrors = validateCodeForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setCodeFieldErrors(validationErrors);
+      setCodeSubmitError('Vui lòng kiểm tra lại các trường bắt buộc.');
+      return;
+    }
 
     if (editingCode) {
       const discountId = editingCode.id;
@@ -1109,14 +1190,14 @@ const AdminRestaurantPage = () => {
         await loadDiscounts();
         setCodePage(1);
         setEditingCode(null);
+        setCodeFieldErrors({});
         setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
         setCodeModalOpen(false);
       } catch (err) {
-        const msg =
-          (typeof err.message === 'string' && err.message) ||
-          err.response?.data?.message ||
-          err.response?.data?.title ||
-          'Không cập nhật được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.';
+        const msg = extractApiErrorMessage(err, 'Không cập nhật được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.');
+        if (/mã|code/i.test(msg)) {
+          setCodeFieldErrors((prev) => ({ ...prev, code: msg }));
+        }
         setCodeSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
       } finally {
         setCodeSubmitting(false);
@@ -1131,15 +1212,14 @@ const AdminRestaurantPage = () => {
       await discountAPI.createDiscount(payload);
       await loadDiscounts();
       setCodePage(1);
+      setCodeFieldErrors({});
       setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
       setCodeModalOpen(false);
     } catch (err) {
-      const msg =
-        (typeof err.message === 'string' && err.message) ||
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        JSON.stringify(err.response?.data) ||
-        'Không tạo được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.';
+      const msg = extractApiErrorMessage(err, 'Không tạo được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.');
+      if (/mã|code/i.test(msg)) {
+        setCodeFieldErrors((prev) => ({ ...prev, code: msg }));
+      }
       setCodeSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
     } finally {
       setCodeSubmitting(false);
@@ -1304,6 +1384,7 @@ const AdminRestaurantPage = () => {
 
   const openEditCode = async (codeRow) => {
     setCodeSubmitError('');
+    setCodeFieldErrors({});
     let d = codeRow.raw;
     if (codeRow.id != null) {
       try {
@@ -1372,6 +1453,7 @@ const AdminRestaurantPage = () => {
     setCodeModalOpen(false);
     setEditingCode(null);
     setCodeSubmitError('');
+    setCodeFieldErrors({});
     setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
   };
 
@@ -1562,9 +1644,6 @@ const AdminRestaurantPage = () => {
           <h1 className="rest-title">Quản lý Nhà hàng</h1>
           <p className="rest-subtitle">Xem và cập nhật thông tin vận hành của bạn</p>
         </div>
-        <button type="button" className="rest-bell-btn" aria-label="Thông báo">
-          <Bell size={20} />
-        </button>
       </header>
 
       <div className="rest-tabs">
@@ -1598,7 +1677,7 @@ const AdminRestaurantPage = () => {
                 onChange={(e) => { setCodeSearch(e.target.value); setCodePage(1); }}
               />
             </div>
-            <button type="button" className="rest-btn-primary" onClick={() => { setEditingCode(null); setCodeSubmitError(''); setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '' }); setCodeModalOpen(true); }}>
+            <button type="button" className="rest-btn-primary" onClick={() => { setEditingCode(null); setCodeSubmitError(''); setCodeFieldErrors({}); setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' }); setCodeModalOpen(true); }}>
               <Plus size={18} />
               Thêm mã mới
             </button>
@@ -1738,7 +1817,7 @@ const AdminRestaurantPage = () => {
                           onClick={() => handleToggleBlogStatus(row)}
                           disabled={blogStatusPatchingId === row.id}
                           aria-label={row.on ? 'Chuyển sang nháp' : 'Xuất bản'}
-                          title={row.on ? 'Đang đăng — nhấn để ẩn (Draft)' : 'Nháp — nhấn để đăng (Published)'}
+                          title={row.on ? 'Đã xuất bản — nhấn để chuyển về bản nháp' : 'Bản nháp — nhấn để xuất bản'}
                         >
                           <span className="rest-toggle-slider" />
                         </button>
@@ -2104,7 +2183,6 @@ const AdminRestaurantPage = () => {
                     <th>ID</th>
                     <th>HÌNH ẢNH</th>
                     <th>TÊN SỰ KIỆN</th>
-                    <th>GIÁ</th>
                     <th>ĐƠN VỊ</th>
                     <th>MÔ TẢ</th>
                     <th>TRẠNG THÁI</th>
@@ -2125,7 +2203,6 @@ const AdminRestaurantPage = () => {
                         </div>
                       </td>
                       <td className="rest-title-cell">{row.title}</td>
-                      <td>{row.price}</td>
                       <td>
                         {row.eventType && row.eventType !== '—' ? (
                           <span className="rest-badge rest-badge-running">{row.eventType}</span>
@@ -2158,21 +2235,12 @@ const AdminRestaurantPage = () => {
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditEvent(row)} disabled={!!eventDeletingId || eventToggleBusyId === row.id}>
                           <Pencil size={16} />
                         </button>
-                        <button
-                          type="button"
-                          className="rest-icon-btn"
-                          aria-label="Xóa"
-                          onClick={() => handleDeleteEvent(row)}
-                          disabled={eventDeletingId === row.id || eventToggleBusyId === row.id}
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </td>
                     </tr>
                   ))}
                   {!eventsLoading && !eventsError && filteredEvents.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
                         {eventsSearch ? 'Không tìm thấy sự kiện phù hợp.' : 'Chưa có sự kiện nào.'}
                       </td>
                     </tr>
@@ -2483,7 +2551,7 @@ const AdminRestaurantPage = () => {
                     onChange={(e) => setServiceForm((f) => ({ ...f, isAvailable: e.target.checked }))}
                     style={{ marginRight: 8 }}
                   />
-                  Đang kinh doanh (isAvailable)
+                  Đang kinh doanh
                 </label>
               </div>
               <div className="rest-modal-actions">
@@ -2506,24 +2574,25 @@ const AdminRestaurantPage = () => {
             </div>
             <form onSubmit={handleSubmitCode} className="rest-modal-form">
               {codeSubmitError && (
-                <p style={{ color: '#c0392b', marginBottom: 12, fontSize: 14 }} role="alert">
+                <p ref={codeErrorRef} style={{ color: '#c0392b', marginBottom: 12, fontSize: 14, background: '#fdeaea', border: '1px solid #f5c2c0', borderRadius: 8, padding: '8px 10px' }} role="alert">
                   {codeSubmitError}
                 </p>
               )}
               <div className="rest-form-group">
                 <label>Mã Code <span className="rest-required">*</span></label>
-                <input type="text" placeholder="VD: LUNCH2023" value={codeForm.code} onChange={(e) => setCodeForm((f) => ({ ...f, code: e.target.value }))} required readOnly={!!editingCode} title={editingCode ? 'Mã code không đổi qua API cập nhật' : undefined} style={editingCode ? { opacity: 0.85 } : undefined} />
+                <input type="text" placeholder="VD: LUNCH2023" value={codeForm.code} onChange={(e) => setCodeFieldValue('code', e.target.value)} readOnly={!!editingCode} title={editingCode ? 'Mã code không đổi qua API cập nhật' : undefined} style={editingCode ? { opacity: 0.85 } : undefined} />
+                {codeFieldErrors.code && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 6 }}>{codeFieldErrors.code}</p>}
               </div>
               <div className="rest-form-group">
                 <label>Loại giảm giá <span className="rest-required">*</span></label>
-                <select value={codeForm.type} onChange={(e) => setCodeForm((f) => ({ ...f, type: e.target.value }))}>
+                <select value={codeForm.type} onChange={(e) => setCodeFieldValue('type', e.target.value)}>
                   <option value="percent">Phần trăm %</option>
                   <option value="fixed">Cố định (VNĐ)</option>
                 </select>
               </div>
               <div className="rest-form-group">
                 <label>Áp dụng cho <span className="rest-required">*</span></label>
-                <select value={codeForm.applicableFor} onChange={(e) => setCodeForm((f) => ({ ...f, applicableFor: e.target.value }))}>
+                <select value={codeForm.applicableFor} onChange={(e) => setCodeFieldValue('applicableFor', e.target.value)}>
                   <option value="All">Tất cả</option>
                   <option value="DineIn">Tại bàn (Dine-In)</option>
                   <option value="Takeaway">Mang đi (Takeaway)</option>
@@ -2532,7 +2601,11 @@ const AdminRestaurantPage = () => {
               </div>
               <div className="rest-form-group">
                 <label>Trạng thái <span className="rest-required">*</span></label>
-                <select value={codeForm.status} onChange={(e) => setCodeForm((f) => ({ ...f, status: e.target.value }))}>
+                <select
+                  value={codeForm.status}
+                  onChange={(e) => setCodeFieldValue('status', e.target.value)}
+                  disabled={!editingCode}
+                >
                   <option value="Active">Hoạt động</option>
                   <option value="Inactive">Không hoạt động</option>
                   <option value="Expired">Hết hạn</option>
@@ -2540,27 +2613,28 @@ const AdminRestaurantPage = () => {
               </div>
               <div className="rest-form-group">
                 <label>Miêu tả</label>
-                <textarea placeholder="Nhập mô tả ngắn cho chương trình giảm giá..." value={codeForm.description} onChange={(e) => setCodeForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
+                <textarea placeholder="Nhập mô tả ngắn cho chương trình giảm giá..." value={codeForm.description} onChange={(e) => setCodeFieldValue('description', e.target.value)} rows={2} />
               </div>
               <div className="rest-form-group">
                 <label>Giá trị giảm <span className="rest-required">*</span></label>
                 <div className="rest-form-suffix">
-                  <input type="text" placeholder="VD: 20" value={codeForm.value} onChange={(e) => setCodeForm((f) => ({ ...f, value: e.target.value }))} />
-                  <span className="rest-suffix">VND</span>
+                  <input type="text" placeholder="VD: 20" value={codeForm.value} onChange={(e) => setCodeFieldValue('value', e.target.value)} />
+                  <span className="rest-suffix">{codeForm.type === 'percent' ? '%' : 'VND'}</span>
                 </div>
+                {codeFieldErrors.value && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 6 }}>{codeFieldErrors.value}</p>}
               </div>
               <div className="rest-form-row2">
                 <div className="rest-form-group">
                   <label>Đơn tối thiểu</label>
                   <div className="rest-form-suffix">
-                    <input type="text" value={codeForm.minOrder} onChange={(e) => setCodeForm((f) => ({ ...f, minOrder: e.target.value }))} />
+                    <input type="text" value={codeForm.minOrder} onChange={(e) => setCodeFieldValue('minOrder', e.target.value)} />
                     <span className="rest-suffix">VND</span>
                   </div>
                 </div>
                 <div className="rest-form-group">
                   <label>Giảm tối đa</label>
                   <div className="rest-form-suffix">
-                    <input type="text" value={codeForm.maxDiscount} onChange={(e) => setCodeForm((f) => ({ ...f, maxDiscount: e.target.value }))} />
+                    <input type="text" value={codeForm.maxDiscount} onChange={(e) => setCodeFieldValue('maxDiscount', e.target.value)} />
                     <span className="rest-suffix">VND</span>
                   </div>
                 </div>
@@ -2568,16 +2642,22 @@ const AdminRestaurantPage = () => {
               <div className="rest-form-row2">
                 <div className="rest-form-group">
                   <label>Ngày bắt đầu <span className="rest-required">*</span></label>
-                  <input type="date" value={codeForm.startDate} onChange={(e) => setCodeForm((f) => ({ ...f, startDate: e.target.value }))} required />
+                  <input type="date" value={codeForm.startDate} onChange={(e) => setCodeFieldValue('startDate', e.target.value)} />
+                  {codeFieldErrors.startDate && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 6 }}>{codeFieldErrors.startDate}</p>}
                 </div>
                 <div className="rest-form-group">
                   <label>Ngày kết thúc <span className="rest-required">*</span></label>
-                  <input type="date" value={codeForm.endDate} onChange={(e) => setCodeForm((f) => ({ ...f, endDate: e.target.value }))} required />
+                  <input type="date" value={codeForm.endDate} onChange={(e) => setCodeFieldValue('endDate', e.target.value)} />
+                  {codeFieldErrors.endDate && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 6 }}>{codeFieldErrors.endDate}</p>}
                 </div>
               </div>
+              {codeFieldErrors.dateRange && (
+                <p style={{ color: '#c0392b', fontSize: 13, marginTop: -4, marginBottom: 6 }}>{codeFieldErrors.dateRange}</p>
+              )}
               <div className="rest-form-group">
                 <label>Số lượng mã</label>
-                <input type="text" placeholder="Số lượng tối đa" value={codeForm.quantity} onChange={(e) => setCodeForm((f) => ({ ...f, quantity: e.target.value }))} />
+                <input type="text" placeholder="Số lượng tối đa" value={codeForm.quantity} onChange={(e) => setCodeFieldValue('quantity', e.target.value)} />
+                {codeFieldErrors.quantity && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 6 }}>{codeFieldErrors.quantity}</p>}
               </div>
               <div className="rest-modal-actions">
                 <button type="button" className="rest-modal-btn rest-modal-cancel" onClick={closeCodeModal} disabled={codeSubmitting}>Hủy</button>
@@ -2679,21 +2759,23 @@ const AdminRestaurantPage = () => {
               <div className="rest-form-group">
                   <label>Trạng thái</label>
                   <select value={blogForm.status} onChange={(e) => setBlogForm((f) => ({ ...f, status: e.target.value }))}>
-                    <option value="Published">Published</option>
-                    <option value="Draft">Draft</option>
+                    <option value="Published">Đã xuất bản</option>
+                    <option value="Draft">Bản nháp</option>
                   </select>
               </div>
-              <div className="rest-form-group">
-                  <label>Ngày giờ xuất bản</label>
-                  <input
-                    type="datetime-local"
-                    value={blogForm.publishedAt}
-                    onChange={(e) => setBlogForm((f) => ({ ...f, publishedAt: e.target.value }))}
-                  />
-                  <small style={{ display: 'block', marginTop: 6, color: '#6b7280', fontSize: 12 }}>
-                    API không chấp nhận thời điểm trong quá khứ — khi lưu sẽ tự điều chỉnh về thời điểm hiện tại nếu cần.
-                  </small>
-                </div>
+              {!editingBlog && (
+                <div className="rest-form-group">
+                    <label>Ngày giờ xuất bản</label>
+                    <input
+                      type="datetime-local"
+                      value={blogForm.publishedAt}
+                      onChange={(e) => setBlogForm((f) => ({ ...f, publishedAt: e.target.value }))}
+                    />
+                    <small style={{ display: 'block', marginTop: 6, color: '#6b7280', fontSize: 12 }}>
+                      API không chấp nhận thời điểm trong quá khứ — khi lưu sẽ tự điều chỉnh về thời điểm hiện tại nếu cần.
+                    </small>
+                  </div>
+              )}
               </div>
               <div className="rest-modal-actions">
                 <button type="button" className="rest-modal-btn rest-modal-cancel" onClick={closeBlogModal} disabled={blogSubmitting}>Hủy</button>
@@ -2738,7 +2820,8 @@ const AdminRestaurantPage = () => {
             {!blogDetailLoading && !blogDetailError && blogDetail && (() => {
               const imagePath = pickBlogImagePath(blogDetail);
               const coverUrl = resolveBlogImageUrl(imagePath);
-              const statusStr = blogDetail.status != null && blogDetail.status !== '' ? String(blogDetail.status) : '—';
+              const statusRaw = blogDetail.status != null && blogDetail.status !== '' ? String(blogDetail.status) : '—';
+              const statusDisplay = formatBlogStatusVi(statusRaw);
               const isPublished = String(blogDetail.status || '').toLowerCase() === 'published';
               const viewsStr = blogDetail.viewCount != null
                 ? Number(blogDetail.viewCount).toLocaleString('vi-VN')
@@ -2755,8 +2838,8 @@ const AdminRestaurantPage = () => {
                     <div className="rest-blog-detail-visual-gradient" aria-hidden />
                     <div className="rest-blog-detail-visual-inner">
                       <div className="rest-blog-detail-tags">
-                        <span>BLOG</span>
-                        {statusStr !== '—' ? <span>{statusStr}</span> : null}
+                        <span>BÀI VIẾT</span>
+                        {statusDisplay !== '—' ? <span>{statusDisplay}</span> : null}
                       </div>
                       <h2 className="rest-blog-detail-visual-title">{blogDetail.title || '—'}</h2>
                     </div>
@@ -2769,7 +2852,7 @@ const AdminRestaurantPage = () => {
                       <p className="rest-blog-detail-kicker">Mã bài viết</p>
                       <p className="rest-blog-detail-id">
                         #
-                        {blogDetail.blogId != null ? `BLOG-${blogDetail.blogId}` : '—'}
+                        {blogDetail.blogId != null ? `BAI-VIET-${blogDetail.blogId}` : '—'}
                       </p>
                       <div className="rest-blog-detail-meta-row">
                         <div className="rest-blog-detail-meta-item">
@@ -2783,7 +2866,7 @@ const AdminRestaurantPage = () => {
                           <span className={`rest-blog-detail-status-dot${isPublished ? ' rest-blog-detail-status-dot--live' : ''}`} aria-hidden />
                           <div className="rest-blog-detail-meta-text">
                             <span className="rest-blog-detail-meta-label">Trạng thái</span>
-                            <span className="rest-blog-detail-meta-value">{statusStr}</span>
+                            <span className="rest-blog-detail-meta-value">{statusDisplay}</span>
                           </div>
                         </div>
                         <div className="rest-blog-detail-meta-item">
@@ -2796,7 +2879,7 @@ const AdminRestaurantPage = () => {
                       </div>
                       <div className="rest-blog-detail-submeta">
                         <span>Xuất bản: {formatBlogDateTime(blogDetail.publishedAt)}</span>
-                        {blogDetail.authorId != null ? <span>Author ID: {blogDetail.authorId}</span> : null}
+                        {blogDetail.authorId != null ? <span>Mã tác giả: {blogDetail.authorId}</span> : null}
                         {imagePath ? (
                           <span className="rest-blog-detail-submeta-path" title={imagePath}>
                             Ảnh: {imagePath}
