@@ -57,7 +57,7 @@ export function normalizeTableRow(raw) {
     ) || 0;
   const note = raw.note ?? raw.Note ?? '';
   const isVip = tableType === 'vip' || !!raw.isVip;
-  const isActive = raw.isActive !== false && raw.IsActive !== false;
+  const isActive = raw.isActive === true || raw.IsActive === true;
 
   return {
     id,
@@ -194,6 +194,17 @@ export async function updateTable(id, form) {
   assertEnvelopeSuccess(data);
   const row = pickTableEntityFromResponse(data);
   return normalizeTableRow(row) || row;
+}
+
+/**
+ * PATCH /api/table/{id}/active — Toggle active status của bàn
+ * @param {number|string} id
+ * @param {boolean} isActive
+ */
+export async function toggleTableStatus(id, isActive) {
+  const { data } = await instance.patch(`/table/${id}/active`, { isActive });
+  assertEnvelopeSuccess(data);
+  return data;
 }
 
 export async function deleteTable(id) {
