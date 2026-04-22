@@ -1232,6 +1232,8 @@ const mapApiOrderToWaiter = (order) => {
             code: t.code || t.tableCode || t.id,
             seats: t.seats || t.capacity || t.chairs || 4,
             status: t.status || 'empty',
+            type: t.type || t.tableType || t.table_type || '',
+            tableType: t.tableType || t.type || t.table_type || '',
           }))
         : [];
       setTables(mapped);
@@ -3017,6 +3019,9 @@ const mapApiOrderToWaiter = (order) => {
               <div className="legend-item">
                 <span className="legend-box selected" /> Đang được chọn
               </div>
+              <div className="legend-item">
+                <span className="legend-box event" /> Bàn sự kiện
+              </div>
             </div>
 
             <div className="table-picker-body">
@@ -3027,13 +3032,24 @@ const mapApiOrderToWaiter = (order) => {
                   const isSelected = isMain || isMerged;
                   // Chuẩn hóa trạng thái bàn
                   const status = String(table.status || '').trim().toUpperCase();
+                  const tableTypeRaw = String(table.type || table.tableType || '').trim().toLowerCase();
+                  const isEventType =
+                    tableTypeRaw === 'event' ||
+                    tableTypeRaw === 'even' ||
+                    tableTypeRaw.includes('sự kiện') ||
+                    tableTypeRaw.includes('su kien') ||
+                    status === 'EVENT' ||
+                    status === 'EVEN';
+                  const tableTypeLabel = isEventType ? 'Sự kiện' : (table.type || table.tableType || '-');
                   const isAvailable = status === 'AVAILABLE';
                   const isOpen = status === 'OPEN';
                   const isOccupied = isOpen || status === 'OCCUPIED';
                   // Phân loại màu sắc
                   let tableClass = 'table-empty';
                   if (isOccupied) tableClass = 'table-occupied';
+                  else if (isSelected && isEventType) tableClass = 'table-event-selected';
                   else if (isSelected) tableClass = 'table-selected';
+                  else if (isEventType) tableClass = 'table-event';
                   // Disable nếu không phải AVAILABLE
                   const disabled = !isAvailable;
                   return (
@@ -3060,9 +3076,10 @@ const mapApiOrderToWaiter = (order) => {
                     >
                       {isMain && <span className="table-badge main">Chính</span>}
                       {isMerged && <span className="table-badge merged">Ghép</span>}
+                      {isEventType && <span className="table-badge event">Sự kiện</span>}
                       <strong>{table.name || table.id}</strong>
                       <span>{table.seats} ghế</span>
-                      <span style={{fontSize:'12px',color:'#888'}}>{table.type}</span>
+                      <span style={{fontSize:'12px',color:'#888'}}>{tableTypeLabel}</span>
                       <span style={{fontSize:'12px',color:'#888'}}>{status === 'AVAILABLE' ? 'Bàn trống' : status === 'OPEN' ? 'Đang có khách' : status}</span>
                     </button>
                   );

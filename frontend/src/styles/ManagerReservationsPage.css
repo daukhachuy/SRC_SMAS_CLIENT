@@ -10,7 +10,6 @@
   background: #fff8f1;
   min-height: 100vh;
 }
-  font-size: 0.875rem; /* Thu nhỏ cột mã đặt chỗ và căn giữa, chữ nhỏ hơn */
 .regular-table th:first-child, .regular-table td:first-child {
   width: 110px;
   min-width: 90px;
@@ -224,6 +223,118 @@
   font-size: 0.8rem;
   color: #718096;
   margin: 0;
+}
+
+.upcoming-mini-list-wrap {
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.upcoming-mini-toggle {
+  width: 100%;
+  border: 1px solid #fb923c;
+  background: linear-gradient(135deg, #ff7a1a 0%, #ff9a3d 100%);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.79rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  box-shadow: 0 6px 14px rgba(255, 109, 31, 0.25);
+  transition: all 0.18s ease;
+}
+
+.upcoming-mini-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(255, 109, 31, 0.32);
+}
+
+.upcoming-mini-toggle:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px rgba(255, 109, 31, 0.24);
+}
+
+.upcoming-mini-toggle:focus-visible {
+  outline: 3px solid rgba(255, 109, 31, 0.25);
+  outline-offset: 2px;
+}
+
+.upcoming-mini-toggle.is-open {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+  box-shadow: none;
+}
+
+.upcoming-mini-toggle.is-open .upcoming-mini-toggle-arrow {
+  transform: rotate(90deg);
+}
+
+.upcoming-mini-toggle-arrow {
+  transition: transform 0.2s ease;
+}
+
+.upcoming-mini-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  z-index: 20;
+  overflow: hidden;
+}
+
+.upcoming-mini-item {
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.upcoming-mini-item:hover {
+  background: #f8fafc;
+}
+
+.upcoming-mini-code {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.upcoming-mini-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.upcoming-mini-time {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.upcoming-mini-status {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #166534;
+  background: #dcfce7;
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
 }
 
 /* =========================================

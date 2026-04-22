@@ -378,6 +378,13 @@ export async function getAllStaffSchedule() {
   ];
 
   export const eventBookingAPI = {
+    // GET /api/book-event/get-bookevent
+    getBookEvent: () => instance.get('/book-event/get-bookevent')
+      .then(res => {
+        console.log('[eventBookingAPI] getBookEvent response:', res.status, res.data);
+        return res;
+      }),
+
     // GET /api/book-event/active
     getActive: () => instance.get('/book-event/active')
       .then(res => {
@@ -403,6 +410,34 @@ export async function getAllStaffSchedule() {
     getDetailById: (bookEventId) => instance.get(`/book-event/${bookEventId}/detail`)
       .then(res => {
         console.log('[eventBookingAPI] getDetailById response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/book-event/{id}/check-in
+    checkIn: (bookEventId, payload) => instance.post(`/book-event/${bookEventId}/check-in`, payload)
+      .then(res => {
+        console.log('[eventBookingAPI] checkIn response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/book-event/{id}/check-out
+    checkOut: (bookEventId) => instance.post(`/book-event/${bookEventId}/check-out`)
+      .then(res => {
+        console.log('[eventBookingAPI] checkOut response:', res.status, res.data);
+        return res;
+      }),
+
+    // GET /api/book-event/in-progress
+    getInProgress: () => instance.get('/book-event/in-progress')
+      .then(res => {
+        console.log('[eventBookingAPI] getInProgress response:', res.status, res.data);
+        return res;
+      }),
+
+    // GET /api/book-event/awaiting-final-payment
+    getAwaitingFinalPayment: () => instance.get('/book-event/awaiting-final-payment')
+      .then(res => {
+        console.log('[eventBookingAPI] getAwaitingFinalPayment response:', res.status, res.data);
         return res;
       }),
 
@@ -451,6 +486,13 @@ export async function getAllStaffSchedule() {
     sendDepositRequest: (contractId) => instance.post(`/contract/${contractId}/deposit`)
       .then(res => {
         console.log('[contractAPI] sendDepositRequest response:', res.status, res.data);
+        return res;
+      }),
+
+    // GET /api/contract/{contractId}/payments
+    getPaymentsByContractId: (contractId) => instance.get(`/contract/${contractId}/payments`)
+      .then(res => {
+        console.log('[contractAPI] getPaymentsByContractId response:', res.status, res.data);
         return res;
       }),
   };
@@ -616,13 +658,20 @@ export async function getAllStaffSchedule() {
     // Debug log raw item
     console.log('[mapEventToUI] Input item:', item);
 
-    const statusRaw = normalizeStatus(pick(item, ['contractStatus', 'status', 'bookingStatus'], 'pending'));
+  const statusSource = {
+    bookEventStatus: pick(item, ['bookEventStatus', 'eventStatus', 'status', 'bookingStatus'], ''),
+    contractStatus: pick(item, ['contractStatus'], item?.contract?.status || ''),
+  };
+  // Ưu tiên trạng thái vận hành BookEvent trước, fallback sang trạng thái Contract.
+  const statusRaw = normalizeStatus(pick(statusSource, ['bookEventStatus', 'contractStatus'], 'pending'));
     const statusMap = {
       // BookEvent statuses
       pending: { status: 'nosigned', statusText: 'Chờ duyệt' },
       approved: { status: 'unsigned', statusText: 'Đã duyệt' },
       rejected: { status: 'rejected', statusText: 'Từ chối' },
       active: { status: 'signed', statusText: 'Đang diễn ra' },
+    inprogress: { status: 'signed', statusText: 'Đang diễn ra' },
+    awaitingfinalpayment: { status: 'awaitingfinalpayment', statusText: 'Chờ tất toán' },
       cancelled: { status: 'cancelled', statusText: 'Đã hủy' },
       canceled: { status: 'cancelled', statusText: 'Đã hủy' },
       cancel: { status: 'cancelled', statusText: 'Đã hủy' },
@@ -635,7 +684,7 @@ export async function getAllStaffSchedule() {
       deposited: { status: 'deposit', statusText: 'Đã đặt cọc' },
       deposit: { status: 'deposit', statusText: 'Đã đặt cọc' },
     };
-    const normalized = statusMap[statusRaw] || { status: 'nosigned', statusText: 'Chưa có hợp đồng' };
+  const normalized = statusMap[statusRaw] || { status: 'nosigned', statusText: 'Chưa có hợp đồng' };
 
     // Lấy thông tin khách hàng - thử nhiều field
     const customerName = pick(item, [

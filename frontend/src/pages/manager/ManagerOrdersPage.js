@@ -7,6 +7,7 @@ import {
   Bike,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   History,
@@ -18,7 +19,14 @@ import {
 } from 'lucide-react';
 import EventDetailModal from './EventDetailModal';
 import DeliveryDetailModal from './DeliveryDetailModal';
-import { orderAPI, mapOrderToUI, mapStatus, mapOrderTypeLabel, formatCurrency } from '../../api/managerApi';
+import {
+  orderAPI,
+  eventBookingAPI,
+  mapOrderToUI,
+  mapStatus,
+  mapOrderTypeLabel,
+  formatCurrency,
+} from '../../api/managerApi';
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -32,6 +40,72 @@ const TAB_FILTER = {
 };
 
 const PAGE_SIZE = 12;
+const EVENT_FALLBACK_IMAGE = 'https://images.pexels.com/photos/587741/pexels-photo-587741.jpeg?auto=compress&w=800&q=80';
+
+const unwrapList = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  const data = payload?.data ?? payload?.items ?? payload?.orders ?? [];
+  return Array.isArray(data) ? data : [];
+};
+
+const mapBookEventOrderToUI = (item, group = 'in-progress') => {
+  const eventId = Number(item?.bookEventId ?? item?.id ?? 0);
+  const toValidCount = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const tableCount =
+    toValidCount(item?.numberOfTable) ??
+    toValidCount(item?.numberOfTables) ??
+    toValidCount(item?.tables) ??
+    toValidCount(item?.numberOfGuests) ??
+    toValidCount(item?.guestCount) ??
+    toValidCount(item?.eventInfo?.numberOfTable) ??
+    toValidCount(item?.eventInfo?.numberOfTables) ??
+    toValidCount(item?.eventInfo?.tables) ??
+    toValidCount(item?.eventInfo?.numberOfGuests);
+  const tableCountLabel = tableCount != null ? `${tableCount} bàn` : '-- bàn';
+  const titleEvent = String(item?.titleEvent || item?.eventTitle || item?.eventName || 'Sự kiện').trim();
+  const code = String(item?.bookingCode || (eventId > 0 ? `#${eventId}` : '---')).trim();
+  const dateRaw = String(item?.reservationDate || '').trim();
+  const timeRaw = String(item?.reservationTime || '').trim();
+  const dateTime = [dateRaw, timeRaw].filter(Boolean).join(' ');
+  const statusText = group === 'awaiting-final-payment' ? 'Chờ tất toán' : 'Đang diễn ra';
+  const statusClass = group === 'awaiting-final-payment' ? 'pending' : 'confirmed';
+  const toValidMoney = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const outstandingAmount = toValidMoney(
+    item?.outstandingAmount ?? item?.remainingAmount ?? item?.remainAmount ?? item?.amountDue
+  );
+  const totalAmount = toValidMoney(
+    item?.totalAmount ?? item?.grandTotal ?? item?.contractTotal ?? item?.estimatedRevenue ?? item?.total
+  );
+  const paidAmount = toValidMoney(item?.paidAmount ?? item?.paidTotal);
+  const displayAmount =
+    (group === 'awaiting-final-payment' ? outstandingAmount : null) ??
+    totalAmount ??
+    outstandingAmount ??
+    paidAmount;
+
+  return {
+    id: eventId || code,
+    eventId,
+    code,
+    mode: 'Sự kiện',
+    icon: 'event',
+    title: `${titleEvent} • ${tableCountLabel}`,
+    status: statusText,
+    statusClass,
+    items: dateTime ? `Giờ đặt: ${dateTime}` : tableCountLabel,
+    amount: displayAmount != null ? formatCurrency(displayAmount) : '--',
+    image: EVENT_FALLBACK_IMAGE,
+    raw: item,
+    source: 'book-event',
+    eventGroup: group,
+  };
+};
 
 const ModeIcon = ({ mode }) => {
   if (mode === 'delivery') return <Bike size={14} />;
@@ -71,6 +145,8 @@ const ManagerOrdersPage = () => {
   const [selectedDelivery,     setSelectedDelivery]     = useState(null);
   const [isDeliveryModalOpen,  setIsDeliveryModalOpen]  = useState(false);
   const [uiNotice,             setUiNotice]             = useState('');
+  const [eventGroupCounts,     setEventGroupCounts]     = useState({ inProgress: 0, awaitingFinalPayment: 0 });
+  const [eventPanelsOpen,      setEventPanelsOpen]      = useState({ inProgress: true, awaitingFinalPayment: false });
 
   useEffect(() => {
     if (!uiNotice) return;
@@ -88,17 +164,38 @@ const ManagerOrdersPage = () => {
       console.log('🔑 Token present:', !!token);
 
       // Gọi song song, dùng allSettled để history lỗi không ảnh hưởng active
-      const [activeResult, histResult] = await Promise.allSettled([
+      const [activeResult, histResult, inProgressResult, awaitingFinalPaymentResult] = await Promise.allSettled([
         orderAPI.getActive(),
         orderAPI.getHistory(),
+        eventBookingAPI.getInProgress(),
+        eventBookingAPI.getAwaitingFinalPayment(),
       ]);
 
       // Xử lý active orders
       if (activeResult.status === 'fulfilled') {
         const d = activeResult.value.data;
-        const rawActive = Array.isArray(d) ? d : d?.data ?? d?.items ?? d?.orders ?? [];
+        const rawActive = unwrapList(d);
         console.log('📦 Active orders:', rawActive.length);
-        setActiveOrders(rawActive.map(mapOrderToUI));
+        const mappedActive = rawActive.map(mapOrderToUI);
+        const nonEventActive = mappedActive.filter((o) => o.icon !== 'event');
+
+        const inProgressRaw = inProgressResult.status === 'fulfilled'
+          ? unwrapList(inProgressResult.value.data)
+          : [];
+        const awaitingFinalPaymentRaw = awaitingFinalPaymentResult.status === 'fulfilled'
+          ? unwrapList(awaitingFinalPaymentResult.value.data)
+          : [];
+
+        const inProgressEvents = inProgressRaw.map((item) => mapBookEventOrderToUI(item, 'in-progress'));
+        const awaitingFinalPaymentEvents = awaitingFinalPaymentRaw.map((item) =>
+          mapBookEventOrderToUI(item, 'awaiting-final-payment')
+        );
+
+        setEventGroupCounts({
+          inProgress: inProgressEvents.length,
+          awaitingFinalPayment: awaitingFinalPaymentEvents.length,
+        });
+        setActiveOrders([...inProgressEvents, ...awaitingFinalPaymentEvents, ...nonEventActive]);
       } else {
         const s = activeResult.reason?.response?.status;
         const m = activeResult.reason?.response?.data?.message || activeResult.reason?.message;
@@ -128,6 +225,16 @@ const ManagerOrdersPage = () => {
         console.warn('⚠️ History endpoint không khả dụng (có thể do phân quyền):', histResult.reason?.response?.status);
         setHistoryOrders([]);
       }
+
+      if (inProgressResult.status === 'rejected') {
+        console.warn('⚠️ Không tải được API /book-event/in-progress:', inProgressResult.reason?.response?.status);
+      }
+      if (awaitingFinalPaymentResult.status === 'rejected') {
+        console.warn(
+          '⚠️ Không tải được API /book-event/awaiting-final-payment:',
+          awaitingFinalPaymentResult.reason?.response?.status
+        );
+      }
     } catch (err) {
       const status = err.response?.status;
       const msg    = err.response?.data?.message || err.response?.data?.title || err.message;
@@ -140,6 +247,14 @@ const ManagerOrdersPage = () => {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    if (activeTab !== 'event') return;
+    setEventPanelsOpen((prev) => ({
+      inProgress: prev.inProgress || prev.awaitingFinalPayment ? prev.inProgress : true,
+      awaitingFinalPayment: prev.awaitingFinalPayment,
+    }));
+  }, [activeTab]);
 
   // ── filter by tab ────────────────────────
   const tabFiltered =
@@ -166,6 +281,11 @@ const ManagerOrdersPage = () => {
       )
     : tabFiltered;
 
+  const eventInProgressOrders = displayed.filter((o) => o.icon === 'event' && o.eventGroup !== 'awaiting-final-payment');
+  const eventAwaitingFinalPaymentOrders = displayed.filter(
+    (o) => o.icon === 'event' && o.eventGroup === 'awaiting-final-payment'
+  );
+
   // ── pagination ─────────────────────────
   const totalPages  = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
   const pagedOrders = displayed.slice(
@@ -174,9 +294,21 @@ const ManagerOrdersPage = () => {
   );
 
   const handleTabClick = (key) => { setActiveTab(key); setCurrentPage(1); };
+  const toggleEventPanel = (key) => {
+    setEventPanelsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // ── card click ────────────────────────
   const handleCardClick = (order) => {
+    if (order.source === 'book-event') {
+      const id = Number(order.eventId || order.id);
+      if (Number.isFinite(id) && id > 0) {
+        navigate(`${base}/reservations/${id}`);
+      } else {
+        setUiNotice('Không tìm thấy mã sự kiện để mở chi tiết.');
+      }
+      return;
+    }
     if (order.icon === 'event') {
       setSelectedEvent(order);
       setIsModalOpen(true);
@@ -203,6 +335,45 @@ const ManagerOrdersPage = () => {
   });
 
   const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|không/i.test(uiNotice);
+
+  const renderOrderCard = (order) => (
+    <article
+      className="order-item-card"
+      key={order.id ?? order.code}
+      onClick={() => handleCardClick(order)}
+      style={{ cursor: 'pointer' }}
+    >
+      <div className="order-item-top">
+        <div>
+          <p className="order-item-meta">
+            <ModeIcon mode={order.icon} />
+            <span>{order.code} • {order.mode}</span>
+          </p>
+          <h3>{order.title}</h3>
+        </div>
+        <span className={`orders-state ${order.statusClass}`}>{order.status}</span>
+      </div>
+
+      <div
+        className="order-item-image"
+        style={{ backgroundImage: `url(${order.image})` }}
+      >
+        <div className="order-item-overlay">
+          <span>{order.items}</span>
+        </div>
+      </div>
+
+      <div className="order-item-bottom">
+        <strong>{order.amount}</strong>
+        <button
+          aria-label={`Tác vụ ${order.code}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+      </div>
+    </article>
+  );
 
   // ─────────────────────────────────────────
   return (
@@ -272,13 +443,15 @@ const ManagerOrdersPage = () => {
 
       {/* ACTIVE SECTION */}
       <section className="manager-card orders-active-section">
-        <div className="orders-section-head">
-          <div>
-            <h2>Đơn hàng đang hoạt động</h2>
-            <p>Hiển thị {displayed.length} đơn mới nhất theo trạng thái vận hành.</p>
+        {activeTab !== 'event' && (
+          <div className="orders-section-head">
+            <div>
+              <h2>Đơn hàng đang hoạt động</h2>
+              <p>Hiển thị {displayed.length} đơn mới nhất theo trạng thái vận hành.</p>
+            </div>
+            <span className="orders-count">{displayed.length} đơn</span>
           </div>
-          <span className="orders-count">{displayed.length} đơn</span>
-        </div>
+        )}
 
         {error && (
           <div style={{
@@ -299,62 +472,91 @@ const ManagerOrdersPage = () => {
           </div>
         )}
 
-        <div className="orders-grid-cards">
-          {loading
-            ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-            : pagedOrders.length === 0
-              ? (
-                <div style={{
-                  gridColumn: '1/-1', textAlign: 'center',
-                  padding: '48px 0', color: '#aaa',
-                }}>
-                  <UtensilsCrossed size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-                  <p>Không có đơn hàng {searchText ? 'khớp tìm kiếm' : 'đang hoạt động'}.</p>
+        {loading ? (
+          <div className="orders-grid-cards">
+            {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : activeTab === 'event' ? (
+          <div className="orders-event-groups">
+            <section className="orders-event-group">
+              <button
+                type="button"
+                className="orders-event-group-toggle"
+                onClick={() => toggleEventPanel('inProgress')}
+                aria-expanded={eventPanelsOpen.inProgress}
+              >
+                <div className="orders-event-group-title">
+                  <h3>Sự kiện đang diễn ra</h3>
+                  <p>Danh sách sự kiện đã check-in và đang phục vụ.</p>
                 </div>
-              )
-              : pagedOrders.map((order) => (
-                <article
-                  className="order-item-card"
-                  key={order.id ?? order.code}
-                  onClick={() => handleCardClick(order)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="order-item-top">
-                    <div>
-                      <p className="order-item-meta">
-                        <ModeIcon mode={order.icon} />
-                        <span>{order.code} • {order.mode}</span>
-                      </p>
-                      <h3>{order.title}</h3>
+                <div className="orders-event-group-right">
+                  <span className="orders-count">{eventInProgressOrders.length} đơn</span>
+                  <ChevronDown size={18} className={`orders-event-chevron ${eventPanelsOpen.inProgress ? 'open' : ''}`} />
+                </div>
+              </button>
+              {eventPanelsOpen.inProgress && (
+                <div className="orders-event-grid">
+                  {eventInProgressOrders.length === 0 ? (
+                    <div className="orders-event-empty">
+                      Không có sự kiện đang diễn ra.
                     </div>
-                    <span className={`orders-state ${order.statusClass}`}>{order.status}</span>
-                  </div>
+                  ) : (
+                    eventInProgressOrders.map(renderOrderCard)
+                  )}
+                </div>
+              )}
+            </section>
 
-                  <div
-                    className="order-item-image"
-                    style={{ backgroundImage: `url(${order.image})` }}
-                  >
-                    <div className="order-item-overlay">
-                      <span>{order.items}</span>
+            <section className="orders-event-group">
+              <button
+                type="button"
+                className="orders-event-group-toggle"
+                onClick={() => toggleEventPanel('awaitingFinalPayment')}
+                aria-expanded={eventPanelsOpen.awaitingFinalPayment}
+              >
+                <div className="orders-event-group-title">
+                  <h3>Sự kiện chờ tất toán</h3>
+                  <p>Sự kiện đã checkout và đang chờ xác nhận thanh toán cuối.</p>
+                </div>
+                <div className="orders-event-group-right">
+                  <span className="orders-count">{eventAwaitingFinalPaymentOrders.length} đơn</span>
+                  <ChevronDown
+                    size={18}
+                    className={`orders-event-chevron ${eventPanelsOpen.awaitingFinalPayment ? 'open' : ''}`}
+                  />
+                </div>
+              </button>
+              {eventPanelsOpen.awaitingFinalPayment && (
+                <div className="orders-event-grid">
+                  {eventAwaitingFinalPaymentOrders.length === 0 ? (
+                    <div className="orders-event-empty">
+                      Không có sự kiện chờ tất toán.
                     </div>
-                  </div>
-
-                  <div className="order-item-bottom">
-                    <strong>{order.amount}</strong>
-                    <button
-                      aria-label={`Tác vụ ${order.code}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal size={18} />
-                    </button>
-                  </div>
-                </article>
-              ))
-          }
-        </div>
+                  ) : (
+                    eventAwaitingFinalPaymentOrders.map(renderOrderCard)
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
+        ) : (
+          <div className="orders-grid-cards">
+            {pagedOrders.length === 0 ? (
+              <div style={{
+                gridColumn: '1/-1', textAlign: 'center',
+                padding: '48px 0', color: '#aaa',
+              }}>
+                <UtensilsCrossed size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+                <p>Không có đơn hàng {searchText ? 'khớp tìm kiếm' : 'đang hoạt động'}.</p>
+              </div>
+            ) : (
+              pagedOrders.map(renderOrderCard)
+            )}
+          </div>
+        )}
 
         {/* PAGINATION */}
-        {!loading && displayed.length > PAGE_SIZE && (
+        {!loading && activeTab !== 'event' && displayed.length > PAGE_SIZE && (
           <div className="orders-pagination">
             <p>
               Hiển thị{' '}

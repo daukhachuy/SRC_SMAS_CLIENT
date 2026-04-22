@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
 import {
   AlertCircle,
@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Eye,
   FileText,
   Info,
   Plus,
@@ -34,6 +33,7 @@ import TableCheckModal from '../../components/TableCheckModal';
 const ManagerReservationsPage = () => {
   const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [eventStatusFilter, setEventStatusFilter] = useState('all');
   // Modal state cho xác nhận duyệt sự kiện
   const [reviewModal, setReviewModal] = useState({ open: false, eventId: null, loading: false, error: '', decision: 'Approved', note: '' });
@@ -48,6 +48,10 @@ const ManagerReservationsPage = () => {
   const [pendingBookings, setPendingBookings] = useState(0);
   const [activeTables, setActiveTables] = useState(0);
   const [pendingContracts, setPendingContracts] = useState(0);
+  const [projectedActiveRevenue, setProjectedActiveRevenue] = useState(0);
+  const [upcomingBookEvents, setUpcomingBookEvents] = useState([]);
+  const [upcomingDropdownOpen, setUpcomingDropdownOpen] = useState(false);
+  const upcomingDropdownRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -61,6 +65,7 @@ const ManagerReservationsPage = () => {
   const [tableCheckModal, setTableCheckModal] = useState(false);
   const [tableCheckDate, setTableCheckDate] = useState(new Date().toISOString().split('T')[0]);
   const [tableCheckShift, setTableCheckShift] = useState('Tất cả');
+  const [autoOpenedTableCheck, setAutoOpenedTableCheck] = useState(false);
 
   // Hàm mở modal xác nhận duyệt sự kiện
   const openReviewModal = (eventId) => {
@@ -183,7 +188,8 @@ const ManagerReservationsPage = () => {
   const loadEventsData = useCallback(async () => {
     setLoading(true);
     try {
-      const [activeRes, upcomingRes, ascRes, historyRes, pendingContractRes] = await Promise.allSettled([
+      const [bookEventRes, activeRes, upcomingRes, ascRes, historyRes, pendingContractRes] = await Promise.allSettled([
+        eventBookingAPI.getBookEvent(),
         eventBookingAPI.getActive(),
         eventBookingAPI.getUpcomingEvents(),
         eventBookingAPI.getAllAscCreatedAt(),
@@ -197,6 +203,7 @@ const ManagerReservationsPage = () => {
       console.log('[Manager] book-event/asc-created-at:', ascRes);
       console.log('[Manager] book-event/history:', historyRes);
       console.log('[Manager] contract/number-need-signed:', pendingContractRes);
+      console.log('[Manager] book-event/get-bookevent:', bookEventRes);
 
       const extractArray = (payload, sourceName = 'unknown') => {
         if (Array.isArray(payload)) return payload;
@@ -213,6 +220,24 @@ const ManagerReservationsPage = () => {
       };
 
       const merged = [];
+      if (bookEventRes.status === 'fulfilled') {
+        const raw = bookEventRes.value?.data;
+        const rows = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+            ? raw
+            : [];
+        const sortedUpcoming = [...rows].sort((a, b) => {
+          const da = new Date(`${a?.reservationDate || ''}T${a?.reservationTime || '00:00:00'}`).getTime() || 0;
+          const db = new Date(`${b?.reservationDate || ''}T${b?.reservationTime || '00:00:00'}`).getTime() || 0;
+          return da - db;
+        });
+        setUpcomingBookEvents(sortedUpcoming);
+      } else {
+        console.warn('[Manager] book-event/get-bookevent failed:', bookEventRes.reason);
+        setUpcomingBookEvents([]);
+      }
+
       const pushIfArray = (result, sourceName = 'unknown') => {
         if (result.status !== 'fulfilled') {
           console.warn(`[Manager] ${sourceName} failed:`, result.reason);
@@ -246,17 +271,51 @@ const ManagerReservationsPage = () => {
       console.log('[Manager] Mapped events:', mappedEvents);
       setEventsData(mappedEvents);
 
+      const activeRows = activeRes.status === 'fulfilled'
+        ? extractArray(activeRes.value.data, 'book-event/active')
+        : [];
+      const activeRevenue = activeRows
+        .map(mapEventToUI)
+        .reduce((sum, event) => sum + (Number(event?.revenue) || 0), 0);
+      setProjectedActiveRevenue(activeRevenue);
+
       if (pendingContractRes.status === 'fulfilled') {
-        const data = pendingContractRes.value.data;
-        const count = typeof data === 'number' ? data : data?.count ?? data?.total ?? data?.value ?? 0;
-        setPendingContracts(Number(count) || 0);
+        const data = pendingContractRes.value?.data;
+        const parseCount = (input) => {
+          const candidates = [
+            input,
+            input?.data,
+            input?.result,
+            input?.count,
+            input?.total,
+            input?.value,
+            input?.numberNeedSigned,
+            input?.pendingContracts,
+            input?.pendingCount,
+            input?.data?.count,
+            input?.data?.total,
+            input?.data?.value,
+            input?.data?.numberNeedSigned,
+          ];
+          for (const candidate of candidates) {
+            const n = Number(candidate);
+            if (Number.isFinite(n) && n >= 0) return n;
+          }
+          return null;
+        };
+        const fromApi = parseCount(data);
+        const fallbackFromMappedEvents = mappedEvents.filter((event) => event.status === 'unsigned').length;
+        setPendingContracts(fromApi ?? fallbackFromMappedEvents);
       } else {
-        setPendingContracts(0);
+        const fallbackFromMappedEvents = mappedEvents.filter((event) => event.status === 'unsigned').length;
+        setPendingContracts(fallbackFromMappedEvents);
       }
     } catch (err) {
       console.error('Lỗi tải dữ liệu sự kiện:', err);
       setEventsData([]);
       setPendingContracts(0);
+      setProjectedActiveRevenue(0);
+      setUpcomingBookEvents([]);
     } finally {
       setLoading(false);
     }
@@ -266,6 +325,34 @@ const ManagerReservationsPage = () => {
     loadReservationData();
     loadEventsData();
   }, [loadReservationData, loadEventsData]);
+
+  useEffect(() => {
+    if (autoOpenedTableCheck) return;
+    const shouldOpen = searchParams.get('openTableCheck') === '1';
+    if (!shouldOpen) return;
+    const fromEventId = searchParams.get('eventId');
+    const fromBookingCode = searchParams.get('bookingCode');
+    setActiveTab('events');
+    setTableCheckModal(true);
+    setAutoOpenedTableCheck(true);
+    if (fromEventId || fromBookingCode) {
+      setUiNotice(
+        `Vui lòng kiểm tra/chọn bàn phục vụ cho sự kiện ${fromBookingCode || `#${fromEventId}`}.`
+      );
+    }
+  }, [searchParams, autoOpenedTableCheck]);
+
+  useEffect(() => {
+    if (!upcomingDropdownOpen) return undefined;
+    const handleClickOutside = (event) => {
+      if (!upcomingDropdownRef.current) return;
+      if (!upcomingDropdownRef.current.contains(event.target)) {
+        setUpcomingDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [upcomingDropdownOpen]);
 
   /** Chỉ cho hủy trước khi khách nhận bàn (đã xác nhận vẫn hủy được; seated/dining thì không). */
   const canCancelRegularBooking = (booking) =>
@@ -344,7 +431,14 @@ const ManagerReservationsPage = () => {
     let filtered = eventsData;
     if (eventStatusFilter !== 'all') {
       filtered = filtered.filter((event) => {
-        if (eventStatusFilter === 'signed') return event.status === 'signed' || event.status === 'deposit' || event.status === 'completed';
+        if (eventStatusFilter === 'signed') {
+          return (
+            event.status === 'signed' ||
+            event.status === 'deposit' ||
+            event.status === 'completed' ||
+            event.status === 'awaitingfinalpayment'
+          );
+        }
         if (eventStatusFilter === 'pending') return event.status === 'unsigned';
         if (eventStatusFilter === 'nosigned') return !event.status || event.status === 'nosigned' || event.statusText?.toLowerCase().includes('chưa có hợp đồng');
         if (eventStatusFilter === 'cancelled') return event.status === 'cancelled' || event.status === 'rejected';
@@ -360,9 +454,54 @@ const ManagerReservationsPage = () => {
     ));
   }, [searchQuery, eventsData, eventStatusFilter]);
 
-  const upcomingEvents = eventsData.length;
+  const ITEMS_PER_PAGE = 10;
+  const activeList = activeTab === 'regular' ? filteredRegularBookings : filteredEvents;
+  const totalPages = Math.max(1, Math.ceil(activeList.length / ITEMS_PER_PAGE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const pagedRegularBookings = filteredRegularBookings.slice(
+    (currentPageSafe - 1) * ITEMS_PER_PAGE,
+    currentPageSafe * ITEMS_PER_PAGE
+  );
+  const pagedEvents = filteredEvents.slice(
+    (currentPageSafe - 1) * ITEMS_PER_PAGE,
+    currentPageSafe * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, statusFilter, eventStatusFilter]);
+
+  const upcomingEvents = upcomingBookEvents.length;
   const urgentCount = pendingContracts;
-  const totalRevenue = eventsData.reduce((sum, e) => sum + (Number(e.revenue) || 0), 0);
+  const totalRevenue = projectedActiveRevenue;
+  const nextUpcomingEventId = upcomingBookEvents[0]?.bookEventId;
+  const recentUpcomingEvents = useMemo(() => upcomingBookEvents.slice(0, 5), [upcomingBookEvents]);
+
+  const formatUpcomingEventDateTime = (event) => {
+    const dateRaw = String(event?.reservationDate || '').trim();
+    const timeRaw = String(event?.reservationTime || '').trim();
+    if (!dateRaw && !timeRaw) return 'Chưa có lịch';
+    if (!dateRaw) return timeRaw;
+    const dt = new Date(`${dateRaw}T${timeRaw || '00:00:00'}`);
+    if (Number.isNaN(dt.getTime())) return `${dateRaw} ${timeRaw}`.trim();
+    const dateText = dt.toLocaleDateString('vi-VN');
+    const timeText = dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return `${timeText} • ${dateText}`;
+  };
+
+  const formatUpcomingStatusVi = (rawStatus) => {
+    const key = String(rawStatus || '').trim().toLowerCase();
+    const map = {
+      active: 'Đang diễn ra',
+      awaitingfinalpayment: 'Chờ tất toán',
+      completed: 'Đã hoàn tất',
+      cancelled: 'Đã hủy',
+      canceled: 'Đã hủy',
+      approved: 'Đã duyệt',
+      pending: 'Chờ duyệt',
+    };
+    return map[key] || (rawStatus ? String(rawStatus) : 'Chưa rõ');
+  };
 
   const getEventTypeColor = (color) => {
     const colors = {
@@ -412,6 +551,11 @@ const ManagerReservationsPage = () => {
         bgColor: 'bg-violet-100',
         textColor: 'text-violet-700',
         icon: <CheckCircle size={14} />,
+      },
+      awaitingfinalpayment: {
+        bgColor: 'bg-orange-100',
+        textColor: 'text-orange-700',
+        icon: <Clock3 size={14} />,
       },
       cancelled: {
         bgColor: 'bg-slate-100',
@@ -530,12 +674,6 @@ const ManagerReservationsPage = () => {
               <span style={{ fontSize: 18 }}>📅</span>
               Kiểm Tra Bàn
             </button>
-            {activeTab !== 'regular' && (
-              <button className="btn-create-event" type="button">
-                <Plus size={20} />
-                Tạo sự kiện mới
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -583,7 +721,59 @@ const ManagerReservationsPage = () => {
               <Calendar className="stat-icon text-primary" size={24} />
             </div>
             <p className="stat-value">{upcomingEvents}</p>
-            <p className="stat-change positive">Dữ liệu realtime</p>
+            <p className="stat-change positive">
+              {nextUpcomingEventId ? `Mã sự kiện: ${upcomingBookEvents[0]?.bookingCode || nextUpcomingEventId}` : 'Chưa có dữ liệu'}
+            </p>
+            {nextUpcomingEventId && (
+              <p className="stat-info">
+                {upcomingBookEvents[0]?.titleEvent || 'Sự kiện'} • {Number(upcomingBookEvents[0]?.numberOfTable || 0)} bàn
+              </p>
+            )}
+            {nextUpcomingEventId ? (
+              <div className="upcoming-mini-list-wrap" ref={upcomingDropdownRef}>
+                <button
+                  type="button"
+                  className={`upcoming-mini-toggle ${upcomingDropdownOpen ? 'is-open' : ''}`}
+                  onClick={() => setUpcomingDropdownOpen((prev) => !prev)}
+                  title={upcomingDropdownOpen ? 'Ẩn danh sách sự kiện gần nhất' : 'Bấm để xem danh sách sự kiện gần nhất'}
+                >
+                  <span>
+                    {upcomingDropdownOpen
+                      ? 'Ẩn danh sách sự kiện'
+                      : `Xem ${recentUpcomingEvents.length} sự kiện gần nhất`}
+                  </span>
+                  <ChevronRight size={15} className="upcoming-mini-toggle-arrow" />
+                </button>
+                {upcomingDropdownOpen && (
+                  <div className="upcoming-mini-dropdown">
+                    {recentUpcomingEvents.map((event) => {
+                      const detailId = event?.bookEventId;
+                      if (!detailId) return null;
+                      return (
+                        <button
+                          key={detailId}
+                          type="button"
+                          className="upcoming-mini-item"
+                          onClick={() => {
+                            setUpcomingDropdownOpen(false);
+                            navigate(`${base}/reservations/${detailId}`);
+                          }}
+                        >
+                          <span className="upcoming-mini-code">{event?.bookingCode || `Sự kiện #${detailId}`}</span>
+                          <span className="upcoming-mini-title">
+                            {event?.titleEvent || 'Sự kiện'} • {Number(event?.numberOfTable || 0)} bàn
+                          </span>
+                          <span className="upcoming-mini-time">{formatUpcomingEventDateTime(event)}</span>
+                          <span className="upcoming-mini-status">{formatUpcomingStatusVi(event?.status)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="stat-info">Chưa có sự kiện để hiển thị</p>
+            )}
           </div>
 
           <div className="stat-card">
@@ -729,9 +919,7 @@ const ManagerReservationsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredRegularBookings
-                  .slice((currentPage - 1) * 10, currentPage * 10)
-                  .map((booking) => {
+                {pagedRegularBookings.map((booking) => {
                     const regularStatus = getRegularStatusConfig(booking.status);
                     const isProcessing = processingCode === booking.reservationCode;
                     return (
@@ -820,7 +1008,7 @@ const ManagerReservationsPage = () => {
                     </td>
                   </tr>
                 )}
-                {filteredEvents.map((event) => {
+                {pagedEvents.map((event) => {
                   const statusConfig = getStatusConfig(event.status);
                   const eventCode = event.bookingCode || event.raw?.bookingCode || event.raw?.eventCode || 'N/A';
                   const detailId = event.bookEventId || event.raw?.bookEventId || event.id || event.eventId;
@@ -873,7 +1061,7 @@ const ManagerReservationsPage = () => {
                             type="button"
                             disabled={!detailId}
                           >
-                            <Eye size={14} />
+                            <Info size={14} />
                             Chi tiết
                           </button>
                           {event.statusText === 'Chờ duyệt' ? (
@@ -967,10 +1155,9 @@ const ManagerReservationsPage = () => {
         <div className="table-footer">
           <p className="pagination-info">
             {(() => {
-              const totalFiltered = activeTab === 'regular' ? filteredRegularBookings.length : filteredEvents.length;
-              const itemsPerPage = 10;
-              const start = totalFiltered === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-              const end = Math.min(currentPage * itemsPerPage, totalFiltered);
+              const totalFiltered = activeList.length;
+              const start = totalFiltered === 0 ? 0 : (currentPageSafe - 1) * ITEMS_PER_PAGE + 1;
+              const end = Math.min(currentPageSafe * ITEMS_PER_PAGE, totalFiltered);
               if (activeTab === 'regular') {
                 return totalFiltered === 0
                   ? 'Không có lượt đặt bàn nào'
@@ -985,17 +1172,22 @@ const ManagerReservationsPage = () => {
             <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)} type="button">
               <ChevronLeft size={16} />
             </button>
-            {Array.from({ length: Math.ceil(filteredRegularBookings.length / 10) }, (_, idx) => (
+            {Array.from({ length: totalPages }, (_, idx) => (
               <button
                 key={idx + 1}
-                className={`pagination-btn${currentPage === idx + 1 ? ' active' : ''}`}
+                className={`pagination-btn${currentPageSafe === idx + 1 ? ' active' : ''}`}
                 onClick={() => setCurrentPage(idx + 1)}
                 type="button"
               >
                 {idx + 1}
               </button>
             ))}
-            <button className="pagination-btn" disabled={currentPage === Math.ceil(filteredRegularBookings.length / 10) || filteredRegularBookings.length === 0} onClick={() => setCurrentPage(currentPage + 1)} type="button">
+            <button
+              className="pagination-btn"
+              disabled={currentPageSafe === totalPages || activeList.length === 0}
+              onClick={() => setCurrentPage(currentPageSafe + 1)}
+              type="button"
+            >
               <ChevronRight size={16} />
             </button>
           </div>

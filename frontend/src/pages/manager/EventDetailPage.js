@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useRoleSectionBasePath } from '../../hooks/useRoleSectionBasePath';
-import { eventBookingAPI } from '../../api/managerApi';
+import { contractAPI, eventBookingAPI } from '../../api/managerApi';
 import { 
   Calendar, CheckCircle, FileText, 
   ChevronRight, DollarSign,
@@ -22,6 +22,7 @@ const createEmptyEventData = (eventId) => ({
   time: '--:--',
   tables: 0,
   status: 'pending',
+  operationStatus: 'pending',
   statusText: 'Chưa có hợp đồng',
   comboName: 'Chưa cập nhật',
   menu: [],
@@ -52,6 +53,10 @@ const EventDetailPage = () => {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [actionNotice, setActionNotice] = useState('');
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [loadingAwaitingPayment, setLoadingAwaitingPayment] = useState(false);
+  const [refreshSeed, setRefreshSeed] = useState(0);
   const [eventData, setEventData] = useState(() => createEmptyEventData(eventId));
 
   const statusLabelMap = {
@@ -60,6 +65,10 @@ const EventDetailPage = () => {
     rejected: 'Từ chối',
     confirmed: 'Đã xác nhận',
     active: 'Đang diễn ra',
+    inprogress: 'Đang diễn ra',
+    'in-progress': 'Đang diễn ra',
+    awaitingfinalpayment: 'Chờ tất toán',
+    'awaiting-final-payment': 'Chờ tất toán',
     cancelled: 'Đã hủy',
     canceled: 'Đã hủy',
     completed: 'Đã hoàn thành',
@@ -118,6 +127,12 @@ const EventDetailPage = () => {
   };
 
   useEffect(() => {
+    if (!actionNotice) return;
+    const t = setTimeout(() => setActionNotice(''), 3200);
+    return () => clearTimeout(t);
+  }, [actionNotice]);
+
+  useEffect(() => {
     const loadDetail = async () => {
       if (!eventId) {
         setLoading(false);
@@ -143,14 +158,31 @@ const EventDetailPage = () => {
         const contract = detail?.contract || {};
         const paymentData = detail?.payment || {};
 
+        // Trạng thái hiển thị tổng quát (ưu tiên BookEvent, fallback Contract).
         const statusRaw = String(
           pickField(
             {
+              bookEventStatus: detail?.bookEventStatus,
+              eventStatus: detail?.eventStatus,
+              status: detail?.status,
+              bookingStatus: detail?.bookingStatus,
               contractStatus: contract?.status,
+            },
+            ['bookEventStatus', 'eventStatus', 'status', 'bookingStatus', 'contractStatus'],
+            'pending'
+          )
+        ).toLowerCase();
+
+        // Trạng thái vận hành để quyết định nút hành động (CHỈ lấy từ BookEvent, không lấy contractStatus).
+        const operationStatusRaw = String(
+          pickField(
+            {
+              bookEventStatus: detail?.bookEventStatus,
+              eventStatus: detail?.eventStatus,
               status: detail?.status,
               bookingStatus: detail?.bookingStatus,
             },
-            ['contractStatus', 'status', 'bookingStatus'],
+            ['bookEventStatus', 'eventStatus', 'status', 'bookingStatus'],
             'pending'
           )
         ).toLowerCase();
@@ -331,6 +363,7 @@ const EventDetailPage = () => {
           time: dt.time,
           tables: quantity,
           status: statusRaw,
+          operationStatus: operationStatusRaw,
           statusText: statusLabelMap[statusRaw] || pickField(detail, ['status', 'contractStatus'], 'Chưa có hợp đồng'),
           comboName: pickField(detail, ['comboName', 'packageName', 'menuPackageName'], pickField(eventInfo, ['note'], 'Chưa cập nhật')),
           menu,
@@ -362,10 +395,78 @@ const EventDetailPage = () => {
     };
 
     loadDetail();
-  }, [eventId]);
+  }, [eventId, refreshSeed]);
+
+  const handleConfirmCheckout = async () => {
+    const idNum = Number(eventData?.id || eventId);
+    if (!Number.isFinite(idNum) || idNum <= 0) {
+      setActionNotice('Không tìm thấy mã sự kiện hợp lệ để xác nhận hoàn thành.');
+      return;
+    }
+    try {
+      setCheckingOut(true);
+      setActionNotice('');
+      const res = await eventBookingAPI.checkOut(idNum);
+      const msg = res?.data?.message || 'Checkout thành công.';
+      setActionNotice(msg);
+      setRefreshSeed((v) => v + 1);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể xác nhận hoàn thành sự kiện.';
+      setActionNotice(msg);
+    } finally {
+      setCheckingOut(false);
+    }
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+  };
+
+  const normalizedOperationStatus = String(eventData?.operationStatus || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '');
+  const canConfirmComplete = normalizedOperationStatus === 'inprogress';
+  const isAwaitingFinalPayment = normalizedOperationStatus === 'awaitingfinalpayment';
+  const isClosedEventStatus =
+    normalizedOperationStatus === 'completed' ||
+    normalizedOperationStatus === 'cancelled' ||
+    normalizedOperationStatus === 'canceled';
+  const canConfirmInProgress = !canConfirmComplete && !isAwaitingFinalPayment && !isClosedEventStatus;
+
+  const handleConfirmInProgress = () => {
+    const params = new URLSearchParams();
+    if (eventData?.bookingCode) params.set('bookingCode', String(eventData.bookingCode));
+    if (Number(eventData?.tables) > 0) params.set('requiredTables', String(eventData.tables));
+    const q = params.toString();
+    navigate(`${base}/reservations/${eventData.id}/table-selection${q ? `?${q}` : ''}`);
+  };
+
+  const handleLoadAwaitingFinalPayment = async () => {
+    const contractId = Number(eventData?.contractId || 0);
+    if (!Number.isFinite(contractId) || contractId <= 0) {
+      setActionNotice('Chưa có mã hợp đồng để lấy thông tin tất toán.');
+      return;
+    }
+    try {
+      setLoadingAwaitingPayment(true);
+      setActionNotice('');
+      const res = await contractAPI.getPaymentsByContractId(contractId);
+      const payload = res?.data?.data ?? res?.data ?? {};
+      const totalAmount = Number(payload?.totalAmount ?? payload?.contractTotal ?? 0);
+      const paidAmount = Number(payload?.paidAmount ?? payload?.paidTotal ?? 0);
+      const outstandingAmount = Number(
+        payload?.outstandingAmount ?? payload?.remainingAmount ?? Math.max(totalAmount - paidAmount, 0)
+      );
+      setActionNotice(
+        `Đã thu: ${formatCurrency(paidAmount)} / Tổng: ${formatCurrency(totalAmount)} / Còn lại: ${formatCurrency(Math.max(outstandingAmount, 0))}`
+      );
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể lấy thông tin chờ tất toán.';
+      setActionNotice(msg);
+    } finally {
+      setLoadingAwaitingPayment(false);
+    }
   };
 
   if (loading) {
@@ -579,9 +680,42 @@ const EventDetailPage = () => {
                 eventData.hasTransactions ||
                 eventData.hasContractLink) && (
                 <div className="payment-actions">
+                  {actionNotice && (
+                    <div style={{
+                      marginBottom: 8,
+                      borderRadius: 10,
+                      padding: '8px 10px',
+                      border: '1px solid #ffd8bf',
+                      background: '#fff7ed',
+                      color: '#9a3412',
+                      fontWeight: 600,
+                      fontSize: 13,
+                    }}>
+                      {actionNotice}
+                    </div>
+                  )}
                   {eventData.showConfirmPayment2 && (
-                    <button type="button" className="btn-confirm-payment">
-                      Xác nhận thanh toán đợt 2
+                    <button
+                      type="button"
+                      className="btn-confirm-payment"
+                      onClick={
+                        canConfirmComplete
+                          ? handleConfirmCheckout
+                          : isAwaitingFinalPayment
+                            ? handleLoadAwaitingFinalPayment
+                            : handleConfirmInProgress
+                      }
+                      disabled={checkingOut || loadingAwaitingPayment || isClosedEventStatus}
+                    >
+                      {checkingOut || loadingAwaitingPayment
+                        ? (checkingOut ? 'Đang xác nhận...' : 'Đang tải công nợ...')
+                        : canConfirmComplete
+                          ? 'Xác nhận hoàn thành'
+                          : canConfirmInProgress
+                            ? 'Xác nhận diễn ra'
+                            : isAwaitingFinalPayment
+                              ? 'Đang chờ tất toán'
+                              : 'Sự kiện đã hoàn tất'}
                     </button>
                   )}
                   {eventData.hasTransactions && (
