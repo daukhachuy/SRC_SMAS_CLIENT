@@ -147,10 +147,9 @@ const KitchenProfilePage = () => {
     setSalaryDetailNote('');
 
     try {
-      const [profileRes, monthDetailRes, sixMonthsRes, monthHoursRes, monthShiftsRes] =
+      const [profileRes, sixMonthsRes, monthHoursRes, monthShiftsRes] =
         await Promise.allSettled([
           staffApi.getProfile(),
-          salaryRecordAPI.getCurrentMonthDetail(),
           salaryRecordAPI.getLastSixMonths(),
           staffAPI.getSumTimeworkThisMonth(),
           staffAPI.getSumWorkshiftThisMonth(),
@@ -201,18 +200,6 @@ const KitchenProfilePage = () => {
         );
       }
 
-      let detail = {};
-      if (monthDetailRes.status === 'fulfilled') {
-        detail = monthDetailRes.value?.data?.data ?? monthDetailRes.value?.data ?? {};
-      } else {
-        const status = monthDetailRes.reason?.response?.status;
-        const msg = monthDetailRes.reason?.response?.data?.message;
-        if (status === 404 && msg) {
-          setSalaryDetailNote(String(msg));
-        } else if (msg) {
-          setSalaryDetailNote(String(msg));
-        }
-      }
       const totalHours =
         monthHoursRes.status === 'fulfilled'
           ? Number(monthHoursRes.value?.data?.data ?? monthHoursRes.value?.data ?? 0)
@@ -221,16 +208,6 @@ const KitchenProfilePage = () => {
         monthShiftsRes.status === 'fulfilled'
           ? Number(monthShiftsRes.value?.data?.data ?? monthShiftsRes.value?.data ?? 0)
           : 0;
-
-      const estimatedSalary = Number(
-        pick(detail, ['estimatedSalary', 'actualSalary', 'salary', 'totalSalary'], 0)
-      );
-
-      setSalaryStats({
-        estimatedSalary: Number.isFinite(estimatedSalary) ? estimatedSalary : 0,
-        totalHours: Number.isFinite(totalHours) ? totalHours : 0,
-        completedShifts: Number.isFinite(completedShifts) ? completedShifts : 0,
-      });
 
       const trendItemsRaw =
         sixMonthsRes.status === 'fulfilled' ? unwrapResponse(sixMonthsRes.value) : [];
@@ -243,6 +220,16 @@ const KitchenProfilePage = () => {
           value: Number.isFinite(salary) ? salary : 0,
         };
       });
+
+      const latestSalary = trend.length > 0 ? Number(trend[trend.length - 1]?.value || 0) : 0;
+      setSalaryStats({
+        estimatedSalary: Number.isFinite(latestSalary) ? latestSalary : 0,
+        totalHours: Number.isFinite(totalHours) ? totalHours : 0,
+        completedShifts: Number.isFinite(completedShifts) ? completedShifts : 0,
+      });
+      if (trend.length === 0) {
+        setSalaryDetailNote('Chưa có dữ liệu lương tháng hiện tại.');
+      }
 
       if (trend.length > 0) {
         setSalaryTrend(trend);

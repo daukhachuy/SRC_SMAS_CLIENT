@@ -16,7 +16,7 @@
 }
 
 .manager-chat-left {
-  width: 360px;
+  width: 330px;
   border-right: 1px solid #ebf0f6;
   background: #f8fafc;
   display: flex;
@@ -115,8 +115,10 @@
   flex: 1;
   overflow-y: auto;
   padding: 8px;
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
 }
 
 .manager-chat-conversation-empty {
@@ -131,7 +133,8 @@
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
-  padding: 9px;
+  padding: 8px 9px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -181,7 +184,7 @@
 
 .manager-chat-conversation-meta strong {
   display: block;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #0f172a;
   line-height: 1.3;
   white-space: nowrap;
@@ -193,7 +196,7 @@
 .manager-chat-conversation-meta small {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: #64748b;
   white-space: nowrap;
   overflow: hidden;
@@ -292,15 +295,15 @@
 }
 
 .manager-chat-bubble {
-  max-width: 78%;
-  border-radius: 16px;
-  padding: 9px 11px 8px;
+  max-width: 64%;
+  border-radius: 14px;
+  padding: 7px 10px 6px;
 }
 
 .manager-chat-bubble p {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -308,7 +311,7 @@
 .manager-chat-bubble span {
   display: block;
   margin-top: 3px;
-  font-size: 10px;
+  font-size: 9.5px;
   opacity: 0.75;
   text-align: right;
 }

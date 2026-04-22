@@ -1253,6 +1253,11 @@
   border-color: #ff6d1f;
 }
 
+.legend-box.event {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+}
+
 .table-picker-body {
   background: #fbf7f2;
   padding: 22px 24px;
@@ -1299,6 +1304,16 @@
   background: #fff1e8;
 }
 
+.table-event {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.table-event-selected {
+  border-color: #8b5cf6;
+  background: #ede9fe;
+}
+
 .table-occupied {
   border-color: #f4bcbc;
   background: #fef1f1;
@@ -1325,6 +1340,10 @@
 
 .table-badge.merged {
   background: #64748b;
+}
+
+.table-badge.event {
+  background: #8b5cf6;
 }
 
 .table-picker-summary {

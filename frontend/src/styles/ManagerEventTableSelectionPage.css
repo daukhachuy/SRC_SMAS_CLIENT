@@ -1,0 +1,306 @@
+.manager-event-table-page {
+  padding: 1.25rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.manager-event-table-header {
+  margin-bottom: 0.85rem;
+}
+
+.manager-event-table-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #1f2937;
+}
+
+.manager-event-table-header p {
+  margin: 0.3rem 0 0;
+  color: #6b7280;
+}
+
+.manager-event-table-shell {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.manager-event-table-notice {
+  margin-bottom: 0.8rem;
+  background: #ecfdf3;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  font-weight: 700;
+}
+
+.manager-event-table-loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #64748b;
+  padding: 1rem 0;
+}
+
+.manager-event-table-shell .modal-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid #e0dcd8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.manager-event-table-shell .modal-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manager-event-table-shell .modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 109, 31, 0.1);
+  color: #ff6d1f;
+  display: grid;
+  place-items: center;
+}
+
+.manager-event-table-shell .modal-title {
+  font-size: 20px;
+  font-weight: 900;
+  margin: 0;
+  color: #23160f;
+}
+
+.manager-event-table-shell .modal-subtitle {
+  margin: 4px 0 0;
+  color: #7a6f66;
+  font-size: 12px;
+}
+
+.manager-event-table-shell .table-legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  border-top: 1px solid #e0dcd8;
+  border-bottom: 1px solid #e0dcd8;
+  padding: 14px 24px;
+  background: #fff8f2;
+}
+
+.manager-event-table-shell .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6f6258;
+  font-weight: 600;
+}
+
+.manager-event-table-shell .legend-box {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 2px solid #ddd;
+}
+
+.manager-event-table-shell .legend-box.empty {
+  background: #fff;
+  border-color: #bbe6d3;
+}
+
+.manager-event-table-shell .legend-box.occupied {
+  background: #fef1f1;
+  border-color: #f4bcbc;
+}
+
+.manager-event-table-shell .legend-box.selected {
+  background: #fff1e8;
+  border-color: #ff6d1f;
+}
+
+.manager-event-table-shell .legend-box.event-locked {
+  background: #f3e8ff;
+  border-color: #a855f7;
+}
+
+.manager-event-table-shell .table-picker-body {
+  background: #fbf7f2;
+  padding: 22px 24px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.manager-event-table-shell .table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 14px;
+}
+
+.manager-event-table-shell .table-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  border: 2px solid #e3ddd7;
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  transition: all 0.18s ease;
+}
+
+.manager-event-table-shell .table-item strong {
+  font-size: 18px;
+  color: #4f4339;
+}
+
+.manager-event-table-shell .table-item span {
+  font-size: 11px;
+  color: #9a8f87;
+}
+
+.manager-event-table-shell .table-empty:hover {
+  border-color: #8dd1b1;
+}
+
+.manager-event-table-shell .table-selected {
+  border-color: #ff6d1f;
+  background: #fff1e8;
+}
+
+.manager-event-table-shell .table-occupied {
+  border-color: #f4bcbc;
+  background: #fef1f1;
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.manager-event-table-shell .table-event-locked {
+  border-color: #d8b4fe;
+  background: #f5ecff;
+  cursor: not-allowed;
+}
+
+.manager-event-table-shell .table-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  border-radius: 999px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  padding: 3px 8px;
+  color: #fff;
+}
+
+.manager-event-table-shell .table-badge.event {
+  background: #a855f7;
+}
+
+.manager-event-table-shell .table-picker-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  border-top: 1px solid #e0dcd8;
+  border-bottom: 1px solid #e0dcd8;
+  background: #fff;
+  font-size: 12px;
+  color: #6f6258;
+}
+
+.manager-event-table-shell .summary-left {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.manager-event-table-shell .summary-left strong {
+  margin-left: 6px;
+  color: #2d241f;
+}
+
+.manager-event-table-shell .table-picker-summary p {
+  margin: 0;
+}
+
+.manager-event-table-shell .modal-footer {
+  padding: 18px 24px;
+  border-top: 1px solid #e0dcd8;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #fff;
+}
+
+.manager-event-table-shell .btn-cancel,
+.manager-event-table-shell .btn-add-outline,
+.manager-event-table-shell .btn-continue {
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  transition: all 0.2s ease;
+}
+
+.manager-event-table-shell .btn-cancel {
+  flex: 1.15;
+  border: 1px solid #e0dcd8;
+  background: #fff;
+  color: #5a4d43;
+}
+
+.manager-event-table-shell .btn-add-outline {
+  flex: 1;
+  border: 2px solid rgba(255, 109, 31, 0.45);
+  background: #fff8f2;
+  color: #ff6d1f;
+}
+
+.manager-event-table-shell .btn-continue {
+  flex: 2;
+  border: 0;
+  background: linear-gradient(145deg, #ff6d1f, #ff8a4a);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 109, 31, 0.25);
+}
+
+.manager-event-table-shell .btn-continue:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(255, 109, 31, 0.35);
+}
+
+.manager-event-table-shell .btn-continue:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .manager-event-table-shell .table-picker-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .manager-event-table-shell .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .manager-event-table-shell .btn-cancel,
+  .manager-event-table-shell .btn-add-outline,
+  .manager-event-table-shell .btn-continue {
+    flex: 1 1 100%;
+  }
+}
+
