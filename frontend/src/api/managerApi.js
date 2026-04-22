@@ -172,13 +172,47 @@ export async function getAllStaffSchedule() {
     // GET /api/order/four-newest-orders
     getFourNewest: () => instance.get('/order/four-newest-orders'),
 
-    // POST /api/order/choose-staffid-delivery
-    // Body: { orderCode: string, staffId: number }
-    chooseStaffDelivery: (orderCode, staffId) =>
-      instance.post('/order/choose-staffid-delivery', {
-        orderCode: String(orderCode || '').trim(),
-        staffId: Number(staffId),
-      }),
+    // POST /api/order/choose-staffid-delivery (fallback theo nhiều contract BE)
+    // Body thường gặp: { orderCode, staffId } hoặc { orderCode, userId }
+    chooseStaffDelivery: async (orderCode, staffIdOrList) => {
+      const code = String(orderCode || '').trim();
+      const candidateIdsRaw = Array.isArray(staffIdOrList) ? staffIdOrList : [staffIdOrList];
+      const candidateIds = Array.from(
+        new Set(
+          candidateIdsRaw
+            .map((x) => Number(x))
+            .filter((x) => Number.isFinite(x) && x > 0)
+        )
+      );
+
+      if (!code) throw new Error('Thiếu mã đơn hàng.');
+      if (candidateIds.length === 0) throw new Error('Thiếu mã nhân viên giao hàng hợp lệ.');
+
+      let lastError = null;
+
+      for (const sid of candidateIds) {
+        const attempts = [
+          () => instance.post('/order/choose-staffid-delivery', { orderCode: code, staffId: sid }),
+          () => instance.post('/order/choose-staffid-delivery', { orderCode: code, userId: sid }),
+          () => instance.post('/order/choose-staff-delivery', { orderCode: code, staffId: sid }),
+          () => instance.post('/order/choose-staff-delivery', { orderCode: code, userId: sid }),
+        ];
+
+        for (const call of attempts) {
+          try {
+            return await call();
+          } catch (err) {
+            lastError = err;
+            const status = Number(err?.response?.status || 0);
+            // Thử contract kế tiếp nếu lỗi validate/route method.
+            if ([400, 404, 405, 422].includes(status)) continue;
+            throw err;
+          }
+        }
+      }
+
+      throw lastError || new Error('Không thể chọn nhân viên giao hàng.');
+    },
 
     // PATCH /api/order/change-status/{OrderCode}
     changeStatus: (orderCode) =>

@@ -57,16 +57,9 @@ const num = (v) => {
 
 const arrNum = (a) => (Array.isArray(a) ? a.map((x) => num(x)) : []);
 
-/** Định dạng số lớn → "1.2 tỷ VND" / "450tr VND" */
+/** Thống nhất hiển thị tiền tệ theo VND, không rút gọn triệu/tỷ. */
 export function formatVndDisplay(value) {
   const n = num(value);
-  if (n >= 1e9) {
-    const t = n / 1e9;
-    const s = t >= 10 ? t.toFixed(0) : t.toFixed(1).replace(/\.0$/, '');
-    return `${s} tỷ VND`;
-  }
-  if (n >= 1e6) return `${Math.round(n / 1e6)}tr VND`;
-  if (n >= 1e3) return `${n.toLocaleString('vi-VN')} đ`;
   return `${n.toLocaleString('vi-VN')} đ`;
 }
 

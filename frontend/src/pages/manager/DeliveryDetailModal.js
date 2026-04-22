@@ -43,8 +43,10 @@ const isWaiterStaff = (staff) => {
 };
 
 const mapDriver = (staff) => ({
-  id: staff?.staffId ?? staff?.userId ?? staff?.id ?? staff?.workStaffId,
-  staffId: staff?.staffId ?? staff?.userId ?? staff?.id ?? staff?.workStaffId,
+  id: staff?.userId ?? staff?.staffId ?? staff?.id ?? staff?.workStaffId,
+  userId: staff?.userId ?? null,
+  staffId: staff?.staffId ?? null,
+  workStaffId: staff?.workStaffId ?? null,
   name: staff?.name || staff?.fullname || staff?.fullName || staff?.staffName || 'Nhân viên',
   status: staff?.status || 'Đang làm việc',
 });
@@ -235,27 +237,36 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
     }
 
     const orderCode = String(orderDetail?.orderCode || deliveryData?.code || delivery?.orderId || '').trim();
+    const selectedDriverMeta = (delivery.drivers || []).find((d) => String(d.id) === String(selectedDriver));
     const assignedDriverId =
       delivery?.assignedDriver?.staffId ??
       delivery?.assignedDriver?.userId ??
       delivery?.assignedDriver?.id ??
       null;
-    const staffIdValue = selectedDriver || assignedDriverId;
-    const staffId = Number(staffIdValue);
+    const staffIdCandidates = [
+      selectedDriverMeta?.userId,
+      selectedDriverMeta?.staffId,
+      selectedDriverMeta?.workStaffId,
+      selectedDriver,
+      assignedDriverId,
+    ];
+    const normalizedCandidateIds = Array.from(
+      new Set(staffIdCandidates.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0))
+    );
 
     if (!orderCode) {
       notify('Không xác định được mã đơn hàng để giao.', 'error');
       return;
     }
 
-    if (!Number.isFinite(staffId) || staffId <= 0) {
+    if (normalizedCandidateIds.length === 0) {
       notify('Mã nhân viên giao hàng không hợp lệ.', 'error');
       return;
     }
 
     try {
       setSubmitting(true);
-      await orderAPI.chooseStaffDelivery(orderCode, staffId);
+      await orderAPI.chooseStaffDelivery(orderCode, normalizedCandidateIds);
       await orderAPI.changeStatus(orderCode);
       notify('Xác nhận giao hàng thành công.', 'success');
       if (typeof onUpdated === 'function') onUpdated();

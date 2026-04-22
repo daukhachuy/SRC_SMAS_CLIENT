@@ -742,7 +742,51 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
 }
 
-.Sum-Item { margin-bottom: 8px; font-size: 15px; }
+.Summary-Left {
+    flex: 1;
+    max-width: 760px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(110px, 1fr);
+    column-gap: 16px;
+    row-gap: 0;
+    align-items: start;
+}
+
+.Sum-Item {
+    margin-bottom: 0;
+    font-size: 15px;
+    line-height: 1.35;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.Sum-Label {
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.Sum-Value {
+    color: #1f2937;
+    font-weight: 800;
+}
+
+.Sum-Item-Discount .Sum-Label,
+.Sum-Item-Discount .Sum-Value {
+    color: #15803d;
+}
+
+.Sum-Item-Total .Sum-Label {
+    color: #111827;
+    font-size: 14px;
+}
+
+.Sum-Item-Total .Sum-Value {
+    font-size: 18px;
+}
+
 .text-orange { color: #ff6600; }
 
 .Btn-Order-Now {
@@ -785,4 +829,13 @@
   .Summary-Main-Layout { flex-direction: column; }
   .summary-modal-wide { width: 95%; padding: 20px; }
   .Payment-Grid { grid-template-columns: 1fr; }
+  .Summary-Left {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+    gap: 10px 12px;
+  }
+  .Sum-Item-Total {
+    grid-column: 1 / -1;
+  }
 }

@@ -1976,9 +1976,6 @@ const Services = () => {
                               {getServiceUnitMeta(servicePricingModal.service).label}
                               {getServiceUnitMeta(servicePricingModal.service).unitLabel}
                             </div>
-                            <div className="event-service-pricing-option-note">
-                              Đơn giá từ backend: {formatCurrency(servicePricingModal.service.price).replace('₫', '')} đ
-                            </div>
                             {isHourlyService(servicePricingModal.service) ? (
                               <div className="event-service-pricing-hours-wrap">
                                 <span className="event-service-pricing-hours-label">Số giờ:</span>
