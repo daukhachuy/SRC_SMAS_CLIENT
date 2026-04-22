@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  User, Calendar, Phone, Mail, Download, Edit, 
-  TrendingUp, Award, AlertCircle, Utensils, 
-  XCircle, Info, Camera, X, Lock, CreditCard 
+  User, Calendar, Phone, 
+  TrendingUp, Award, Utensils, 
+  XCircle, Camera, X, Lock, CreditCard 
 } from 'lucide-react';
-import { salaryRecordAPI } from '../../api/managerApi';
+import { salaryRecordAPI, staffAPI } from '../../api/managerApi';
+import { staffApi } from '../../api/staffApi';
 import '../../styles/ManagerSalaryPage.css';
 
 const asArray = (payload) => {
@@ -13,28 +14,14 @@ const asArray = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.data?.$values)) return payload.data.$values;
   if (Array.isArray(payload?.items)) return payload.items;
+  return null;
+};
+
+const pickFirstNonEmptyArray = (...candidates) => {
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) return candidate;
+  }
   return [];
-};
-
-const extractLastSixRows = (payload) => {
-  const root = payload?.data ?? payload;
-  return (
-    asArray(root) ||
-    asArray(root?.lastSixMonths) ||
-    asArray(root?.salaryRecords) ||
-    asArray(root?.records) ||
-    asArray(root?.result) ||
-    []
-  );
-};
-
-const extractCurrentDetail = (payload) => {
-  const root = payload?.data ?? payload;
-  if (Array.isArray(root)) return root[0] || {};
-  if (root?.currentMonthDetail && typeof root.currentMonthDetail === 'object') return root.currentMonthDetail;
-  if (root?.detail && typeof root.detail === 'object') return root.detail;
-  if (root?.result && typeof root.result === 'object') return root.result;
-  return root || {};
 };
 
 const pick = (obj, keys, fallback = undefined) => {
@@ -65,69 +52,66 @@ const toMonthLabel = (rawMonth, fallbackIndex = 0) => {
   return `T.${fallbackIndex + 1}`;
 };
 
-const DEFAULT_CHART = [
-  { month: 'T.3', amount: 14200000, height: 75, label: '14.2M' },
-  { month: 'T.4', amount: 14800000, height: 82, label: '14.8M' },
-  { month: 'T.5', amount: 15500000, height: 100, label: '15.5M', active: true },
-  { month: 'T.6', amount: 15100000, height: 88, label: '15.1M' },
-  { month: 'T.7', amount: 15400000, height: 92, label: '15.4M' },
-  { month: 'T.8', amount: 15500000, height: 100, label: '15.5M', current: true }
-];
+/** GET /Staff/sum-workshift-thismonth | sum-timework-thismonth — body có thể là number hoặc envelope */
+const parseStaffMonthSum = (axiosRes) => {
+  const d = axiosRes?.data;
+  if (typeof d === 'number') return d;
+  if (d != null && typeof d === 'object' && typeof d.data === 'number') return d.data;
+  const n = Number(d);
+  return Number.isFinite(n) ? n : 0;
+};
 
-const DEFAULT_BREAKDOWN = [
-  {
-    id: 1,
-    icon: <CreditCard />,
-    label: 'Lương cơ bản',
-    description: 'Bậc 4 - Ngạch đầu bếp',
-    amount: 12000000,
-    type: 'base',
-    color: 'slate'
-  },
-  {
-    id: 2,
-    icon: <Award />,
-    label: 'Thưởng KPI & Chuyên cần',
-    description: 'Hoàn thành 110% định mức',
-    amount: 3500000,
-    type: 'bonus',
-    color: 'green'
-  },
-  {
-    id: 3,
-    icon: <XCircle />,
-    label: 'Khấu trừ kỷ luật',
-    description: 'Đi muộn 2 lần (thẻ đỏ)',
-    amount: -200000,
-    type: 'deduction',
-    color: 'red'
-  },
-  {
-    id: 4,
-    icon: <Utensils />,
-    label: 'Phụ cấp ăn ca',
-    description: 'Hỗ trợ 1 bữa/ca trực',
-    amount: 200000,
-    type: 'allowance',
-    color: 'slate'
+/** GET /SalaryRecord/last-six-months — hỗ trợ nhiều shape payload */
+const unwrapLastSixMonths = (axiosRes) => {
+  const raw = axiosRes?.data;
+  if (!raw || typeof raw !== 'object') return { averageSalary: 0, months: [] };
+  const months =
+    asArray(raw.months) ||
+    asArray(raw.data?.months) ||
+    asArray(raw.lastSixMonths) ||
+    asArray(raw.data?.lastSixMonths) ||
+    asArray(raw.salaryRecords) ||
+    [];
+  const avg = Number(raw.averageSalary ?? raw.data?.averageSalary ?? 0);
+  return {
+    averageSalary: Number.isFinite(avg) ? avg : 0,
+    months,
+  };
+};
+
+const formatSalaryStatusVi = (rawStatus) => {
+  const key = String(rawStatus || '').trim().toLowerCase();
+  if (!key) return '';
+  const map = {
+    paid: 'Đã thanh toán',
+    completed: 'Đã quyết toán',
+    settled: 'Đã quyết toán',
+    pending: 'Đang chờ duyệt',
+    processing: 'Đang xử lý',
+  };
+  return map[key] || String(rawStatus);
+};
+
+const formatMonthTitle = (month, year) => {
+  const m = Number(month);
+  const y = Number(year);
+  if (Number.isFinite(m) && m >= 1 && m <= 12 && Number.isFinite(y) && y > 1900) {
+    return `${String(m).padStart(2, '0')}/${y}`;
   }
-];
-
-const DEFAULT_HISTORY = [
-  { month: 'Tháng 08/2023', amount: 15500000, date: '10/09/2023', status: 'Xong' },
-  { month: 'Tháng 07/2023', amount: 15400000, date: '10/08/2023', status: 'Xong' },
-  { month: 'Tháng 06/2023', amount: 15100000, date: '10/07/2023', status: 'Xong' },
-  { month: 'Tháng 05/2023', amount: 15500000, date: '10/06/2023', status: 'Xong' }
-];
+  if (Number.isFinite(m) && m >= 1 && m <= 12) {
+    return `${String(m).padStart(2, '0')}/${new Date().getFullYear()}`;
+  }
+  return '';
+};
 
 const ManagerSalaryPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
-  const [salaryChartData, setSalaryChartData] = useState(DEFAULT_CHART);
-  const [salaryBreakdown, setSalaryBreakdown] = useState(DEFAULT_BREAKDOWN);
-  const [salaryHistory, setSalaryHistory] = useState(DEFAULT_HISTORY);
-  const [salaryTitleMonth, setSalaryTitleMonth] = useState('08/2023');
-  const [salaryPeriodText, setSalaryPeriodText] = useState('01/08 - 31/08');
-  const [salaryStatusText, setSalaryStatusText] = useState('Đã quyết toán');
+  const [salaryChartData, setSalaryChartData] = useState([]);
+  const [salaryBreakdown, setSalaryBreakdown] = useState([]);
+  const [salaryHistory, setSalaryHistory] = useState([]);
+  const [salaryTitleMonth, setSalaryTitleMonth] = useState('');
+  const [salaryPeriodText, setSalaryPeriodText] = useState('');
+  const [salaryStatusText, setSalaryStatusText] = useState('');
   const [salaryApiNotice, setSalaryApiNotice] = useState('');
   const [profileData, setProfileData] = useState({
     fullName: 'Nguyễn Văn A',
@@ -149,21 +133,57 @@ const ManagerSalaryPage = () => {
   const averageSalary = salaryChartData.length
     ? salaryChartData.reduce((sum, item) => sum + item.amount, 0) / salaryChartData.length
     : 0;
+  const hasChartData = salaryChartData.length > 0;
+  const hasBreakdownData = salaryBreakdown.length > 0;
+  const hasHistoryData = salaryHistory.length > 0;
+  const hasAnySalaryData = hasChartData || hasBreakdownData || hasHistoryData;
 
   useEffect(() => {
     let mounted = true;
 
     const loadSalaryData = async () => {
       try {
-        let loadedFromApi = false;
-        const [lastSixRes, currentRes] = await Promise.allSettled([
+        const [profileRes, lastSixRes, monthHoursRes, monthShiftsRes] = await Promise.allSettled([
+          staffApi.getProfile(),
           salaryRecordAPI.getLastSixMonths(),
-          salaryRecordAPI.getCurrentMonthDetail(),
+          staffAPI.getSumTimeworkThisMonth(),
+          staffAPI.getSumWorkshiftThisMonth(),
         ]);
 
+        let loadedFromApi = false;
+
+        if (profileRes.status === 'fulfilled') {
+          const p = profileRes.value?.data?.data ?? profileRes.value?.data ?? {};
+          if (mounted && p && typeof p === 'object') {
+            setProfileData((prev) => ({
+              ...prev,
+              fullName: pick(p, ['fullname', 'fullName', 'name'], prev.fullName),
+              phone: pick(p, ['phone', 'phoneNumber'], prev.phone),
+              address: pick(p, ['address'], prev.address),
+              email: pick(p, ['email'], prev.email),
+              role: pick(p, ['position', 'role', 'positionName'], prev.role),
+              department: pick(p, ['department', 'departmentName'], prev.department),
+              joinDate: toDateText(pick(p, ['joinDate', 'startDate', 'createdAt'], prev.joinDate)) || prev.joinDate,
+              taxId: pick(p, ['taxId', 'taxCode'], prev.taxId),
+              bankName: pick(p, ['bankName'], prev.bankName),
+              bankAccount: pick(p, ['bankAccountNumber', 'bankAccount', 'accountNumber'], prev.bankAccount),
+            }));
+          }
+        }
+
+        const totalHours = monthHoursRes.status === 'fulfilled'
+          ? parseStaffMonthSum(monthHoursRes.value)
+          : 0;
+        const completedShifts = monthShiftsRes.status === 'fulfilled'
+          ? parseStaffMonthSum(monthShiftsRes.value)
+          : 0;
+
+        let latestAmount = 0;
+        let latestStatus = '';
+
         if (lastSixRes.status === 'fulfilled') {
-          const rawList = extractLastSixRows(lastSixRes.value?.data);
-          if (rawList.length > 0) {
+          const { months: rawList } = unwrapLastSixMonths(lastSixRes.value);
+          if (rawList.length > 0 && mounted) {
             const chartBase = rawList.map((row, idx) => {
               const amount = toNumber(pick(row, [
                 'netSalary', 'totalSalary', 'takeHome', 'actualSalary', 'salary', 'amount', 'totalAmount'
@@ -198,9 +218,14 @@ const ManagerSalaryPage = () => {
                 status: row.status || 'Xong',
               }));
 
-            if (mounted) {
-              setSalaryChartData(chartMapped);
-              setSalaryHistory(historyMapped);
+            setSalaryChartData(chartMapped);
+            setSalaryHistory(historyMapped);
+            const latest = chartMapped[chartMapped.length - 1];
+            latestAmount = toNumber(latest?.amount);
+            latestStatus = String(latest?.status || '');
+
+            if (latest?.month) {
+              setSalaryTitleMonth(String(latest.month).replace('T.', '').padStart(2, '0') + '/' + new Date().getFullYear());
             }
             loadedFromApi = true;
           }
@@ -208,69 +233,78 @@ const ManagerSalaryPage = () => {
           console.warn('Salary API last-six-months failed:', lastSixRes.reason);
         }
 
-        if (currentRes.status === 'fulfilled') {
-          const detail = extractCurrentDetail(currentRes.value?.data);
+        if (mounted) {
+          const baseSalary = latestAmount;
+          const bonus = 0;
+          const allowance = 0;
+          const deduction = 0;
+          const finalNetSalary = latestAmount;
 
-          const basic = toNumber(pick(detail, ['basicSalary', 'baseSalary', 'luongCoBan'], 0));
-          const bonus = toNumber(pick(detail, ['bonusAmount', 'bonus', 'kpiBonus'], 0));
-          const deductionRaw = toNumber(pick(detail, ['deductionAmount', 'deduction', 'penalty'], 0));
-          const allowance = toNumber(pick(detail, ['allowanceAmount', 'allowance', 'mealAllowance'], 0));
-          const deduction = deductionRaw > 0 ? -deductionRaw : deductionRaw;
+          setSalaryPeriodText('');
+          setSalaryStatusText(formatSalaryStatusVi(latestStatus));
 
-          const breakdown = [
-            { id: 1, icon: <CreditCard />, label: 'Lương cơ bản', description: 'Theo bảng lương hiện tại', amount: basic, type: 'base', color: 'slate' },
-            { id: 2, icon: <Award />, label: 'Thưởng', description: 'Thưởng KPI/hiệu suất', amount: bonus, type: 'bonus', color: 'green' },
-            { id: 3, icon: <XCircle />, label: 'Khấu trừ', description: 'Khấu trừ/vi phạm nếu có', amount: deduction, type: 'deduction', color: 'red' },
-            { id: 4, icon: <Utensils />, label: 'Phụ cấp', description: 'Phụ cấp cố định', amount: allowance, type: 'allowance', color: 'slate' },
-          ].filter((item) => item.amount !== 0);
+          const breakdownRows = [
+            {
+              id: 1,
+              icon: <CreditCard />,
+              label: 'Lương cơ bản',
+              description: 'Lấy từ tháng gần nhất trong API',
+              amount: baseSalary || finalNetSalary,
+              type: 'base',
+              color: 'slate',
+            },
+            {
+              id: 2,
+              icon: <Award />,
+              label: 'Số ca đã hoàn thành',
+              description: `${Number.isFinite(completedShifts) ? completedShifts : 0} ca hoàn thành`,
+              amount: bonus,
+              type: 'bonus',
+              color: 'green',
+            },
+            {
+              id: 3,
+              icon: <XCircle />,
+              label: 'Tổng giờ làm',
+              description: `${Number.isFinite(totalHours) ? totalHours : 0} giờ làm trong tháng`,
+              amount: deduction,
+              type: 'deduction',
+              color: 'red',
+            },
+            {
+              id: 4,
+              icon: <Utensils />,
+              label: 'Tham chiếu',
+              description: 'Đang dùng dữ liệu tháng gần nhất từ SalaryRecord',
+              amount: allowance,
+              type: 'allowance',
+              color: 'slate',
+            },
+          ];
 
-          if (mounted && breakdown.length > 0) {
-            setSalaryBreakdown(breakdown);
-          }
-
-          const month = pick(detail, ['month', 'salaryMonth'], '08');
-          const year = pick(detail, ['year', 'salaryYear'], '2023');
-          const periodStart = toDateText(pick(detail, ['periodStart', 'startDate', 'fromDate'], ''));
-          const periodEnd = toDateText(pick(detail, ['periodEnd', 'endDate', 'toDate'], ''));
-          const statusText = pick(detail, ['statusText', 'status', 'paymentStatus'], 'Đã quyết toán');
-
-          if (mounted) {
-            setSalaryTitleMonth(`${String(month).padStart(2, '0')}/${year}`);
-            setSalaryPeriodText(periodStart && periodEnd ? `${periodStart} - ${periodEnd}` : 'Kỳ thanh toán hiện tại');
-            setSalaryStatusText(statusText);
-          }
-
-          const profile = pick(detail, ['employee', 'staff', 'user'], null) || detail;
-          if (mounted) {
-            setProfileData((prev) => ({
-              ...prev,
-              fullName: pick(profile, ['fullName', 'fullname', 'name'], prev.fullName),
-              phone: pick(profile, ['phone', 'phoneNumber'], prev.phone),
-              email: pick(profile, ['email'], prev.email),
-              role: pick(profile, ['role', 'positionLabel', 'position'], prev.role),
-              department: pick(profile, ['department', 'departmentName'], prev.department),
-              joinDate: toDateText(pick(profile, ['joinDate', 'startDate', 'createdAt'], prev.joinDate)) || prev.joinDate,
-              taxId: pick(profile, ['taxId', 'taxCode'], prev.taxId),
-              bankName: pick(profile, ['bankName'], prev.bankName),
-              bankAccount: pick(profile, ['bankAccount', 'accountNumber'], prev.bankAccount),
-            }));
-          }
-          loadedFromApi = true;
-        } else {
-          console.warn('Salary API current-month-detail failed:', currentRes.reason);
+          const hasBreakdownData = latestAmount > 0 || totalHours > 0 || completedShifts > 0;
+          setSalaryBreakdown(hasBreakdownData ? breakdownRows : []);
         }
 
         if (mounted) {
           setSalaryApiNotice(
             loadedFromApi
               ? ''
-              : 'Chưa lấy được dữ liệu lương từ API, hiện đang hiển thị dữ liệu mẫu.'
+              : 'Chưa lấy được dữ liệu lương từ API.'
           );
+          if (!loadedFromApi) {
+            setSalaryTitleMonth('');
+            setSalaryPeriodText('');
+            setSalaryStatusText('');
+            setSalaryChartData([]);
+            setSalaryHistory([]);
+            setSalaryBreakdown([]);
+          }
         }
       } catch (error) {
         console.error('Không tải được dữ liệu lương:', error);
         if (mounted) {
-          setSalaryApiNotice('Chưa lấy được dữ liệu lương từ API, hiện đang hiển thị dữ liệu mẫu.');
+          setSalaryApiNotice('Chưa lấy được dữ liệu lương từ API.');
         }
       }
     };
@@ -335,18 +369,6 @@ const ManagerSalaryPage = () => {
               </div>
             </div>
           </div>
-          <div className="header-actions">
-            <button 
-              className="btn-secondary"
-              onClick={() => setShowEditModal(true)}
-            >
-              Sửa hồ sơ
-            </button>
-            <button className="btn-primary">
-              <Download size={20} />
-              Xuất PDF
-            </button>
-          </div>
         </div>
       </header>
 
@@ -355,111 +377,112 @@ const ManagerSalaryPage = () => {
         {/* Left Column - Charts and Details */}
         <div className="salary-main-column">
           {/* Salary Chart Section */}
-          <section className="salary-chart-section">
-            <div className="chart-header">
-              <div>
-                <h3 className="section-title">
-                  <TrendingUp className="title-icon" />
-                  Thu nhập 6 tháng gần nhất
-                </h3>
-                <p className="section-subtitle">Biểu đồ tổng hợp lương thực nhận</p>
-              </div>
-              <div className="average-display">
-                <p className="average-label">Trung bình</p>
-                <p className="average-amount">
-                  {formatCurrency(averageSalary)} <span className="currency">VNĐ</span>
-                </p>
-              </div>
-            </div>
-            <div className="salary-chart">
-              {salaryChartData.map((data, index) => (
-                <div key={index} className="chart-bar-wrapper">
-                  <div 
-                    className={`chart-bar ${data.active ? 'bar-active' : ''} ${data.current ? 'bar-current' : ''}`}
-                    style={{ height: `${data.height}%` }}
-                  >
-                    <div className="bar-tooltip">{data.label}</div>
-                  </div>
-                  <span className={`chart-label ${data.active ? 'label-active' : ''}`}>
-                    {data.month}
-                  </span>
+          {hasChartData && (
+            <section className="salary-chart-section">
+              <div className="chart-header">
+                <div>
+                  <h3 className="section-title">
+                    <TrendingUp className="title-icon" />
+                    Thu nhập 6 tháng gần nhất
+                  </h3>
+                  <p className="section-subtitle">Biểu đồ tổng hợp lương thực nhận</p>
                 </div>
-              ))}
-            </div>
-          </section>
+                <div className="average-display">
+                  <p className="average-label">Trung bình</p>
+                  <p className="average-amount">
+                    {formatCurrency(averageSalary)} <span className="currency">VNĐ</span>
+                  </p>
+                </div>
+              </div>
+              <div className="salary-chart">
+                {salaryChartData.map((data, index) => (
+                  <div key={index} className="chart-bar-wrapper">
+                    <div 
+                      className={`chart-bar ${data.active ? 'bar-active' : ''} ${data.current ? 'bar-current' : ''}`}
+                      style={{ height: `${data.height}%` }}
+                    >
+                      <div className="bar-tooltip">{data.label}</div>
+                    </div>
+                    <span className={`chart-label ${data.active ? 'label-active' : ''}`}>
+                      {data.month}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Salary Breakdown Section */}
-          <section className="salary-breakdown-section">
-            <div className="breakdown-header">
-              <div>
-                <h3 className="section-title">Chi tiết lương tháng {salaryTitleMonth}</h3>
-                <p className="section-subtitle">Kỳ thanh toán: {salaryPeriodText}</p>
-              </div>
-              <span className="status-badge status-completed">{salaryStatusText}</span>
-            </div>
-            <div className="breakdown-list">
-              {salaryBreakdown.map((item) => (
-                <div key={item.id} className={`breakdown-item item-${item.color}`}>
-                  <div className="item-left">
-                    <div className={`item-icon icon-${item.color}`}>
-                      {item.icon}
-                    </div>
-                    <div className="item-info">
-                      <p className={`item-label label-${item.color}`}>{item.label}</p>
-                      <p className="item-description">{item.description}</p>
-                    </div>
-                  </div>
-                  <span className={`item-amount amount-${item.color}`}>
-                    {item.amount > 0 ? '+' : ''} {formatCurrency(item.amount)} VNĐ
-                  </span>
+          {hasBreakdownData && (
+            <section className="salary-breakdown-section">
+              <div className="breakdown-header">
+                <div>
+                  <h3 className="section-title">Chi tiết lương tháng {salaryTitleMonth || '--/----'}</h3>
+                  {salaryPeriodText && <p className="section-subtitle">Kỳ thanh toán: {salaryPeriodText}</p>}
                 </div>
-              ))}
-            </div>
-            <div className="breakdown-total">
-              <span className="total-label">Tổng thực lĩnh</span>
-              <span className="total-amount">
-                {formatCurrency(totalSalary)} <span className="currency-sm">VNĐ</span>
-              </span>
-            </div>
-          </section>
+                {salaryStatusText && <span className="status-badge status-completed">{salaryStatusText}</span>}
+              </div>
+              <div className="breakdown-list">
+                {salaryBreakdown.map((item) => (
+                  <div key={item.id} className={`breakdown-item item-${item.color}`}>
+                    <div className="item-left">
+                      <div className={`item-icon icon-${item.color}`}>
+                        {item.icon}
+                      </div>
+                      <div className="item-info">
+                        <p className={`item-label label-${item.color}`}>{item.label}</p>
+                        <p className="item-description">{item.description}</p>
+                      </div>
+                    </div>
+                    <span className={`item-amount amount-${item.color}`}>
+                      {item.amount > 0 ? '+' : ''} {formatCurrency(item.amount)} VNĐ
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="breakdown-total">
+                <span className="total-label">Tổng thực lĩnh</span>
+                <span className="total-amount">
+                  {formatCurrency(totalSalary)} <span className="currency-sm">VNĐ</span>
+                </span>
+              </div>
+            </section>
+          )}
+          {!hasAnySalaryData && (
+            <section className="salary-chart-section">
+              <p className="section-subtitle">Chưa có dữ liệu lương từ API.</p>
+            </section>
+          )}
         </div>
 
         {/* Right Column - History Sidebar */}
-        <aside className="salary-sidebar">
-          <div className="sidebar-content">
-            <div className="sidebar-header">
-              <h3 className="sidebar-title">Lịch sử nhận lương</h3>
-              <button className="view-all-btn">Tất cả</button>
-            </div>
-            <div className="history-list">
-              {salaryHistory.map((record, index) => (
-                <div 
-                  key={index} 
-                  className={`history-card ${index === 0 ? 'card-highlight' : ''}`}
-                >
-                  <div className="history-card-header">
-                    <span className="history-month">{record.month}</span>
-                    <span className="history-status">{record.status}</span>
+        {hasHistoryData && (
+          <aside className="salary-sidebar">
+            <div className="sidebar-content">
+              <div className="sidebar-header">
+                <h3 className="sidebar-title">Lịch sử nhận lương</h3>
+                <button className="view-all-btn">Tất cả</button>
+              </div>
+              <div className="history-list">
+                {salaryHistory.map((record, index) => (
+                  <div 
+                    key={index} 
+                    className={`history-card ${index === 0 ? 'card-highlight' : ''}`}
+                  >
+                    <div className="history-card-header">
+                      <span className="history-month">{record.month}</span>
+                      <span className="history-status">{record.status}</span>
+                    </div>
+                    <div className="history-card-body">
+                      <p className="history-amount">{formatCurrency(record.amount)}</p>
+                      <span className="history-date">{record.date}</span>
+                    </div>
                   </div>
-                  <div className="history-card-body">
-                    <p className="history-amount">{formatCurrency(record.amount)}</p>
-                    <span className="history-date">{record.date}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="payment-note">
-              <Info className="note-icon" />
-              <div className="note-content">
-                <p className="note-title">Ghi chú thanh toán</p>
-                <p className="note-text">
-                  Lương được chuyển khoản vào ngày 10 hàng tháng qua ngân hàng Techcombank. 
-                  Vui lòng phản hồi trước ngày 05 nếu phát hiện sai lệch.
-                </p>
+                ))}
               </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
 
       {/* Edit Profile Modal */}

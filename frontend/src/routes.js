@@ -29,6 +29,7 @@ import DineInOrderDetailPage from './pages/manager/DineInOrderDetailPage';
 import TakeawayOrderDetailPage from './pages/manager/TakeawayOrderDetailPage';
 import ManagerReservationsPage from './pages/manager/ManagerReservationsPage';
 import EventDetailPage from './pages/manager/EventDetailPage';
+import ManagerEventTableSelectionPage from './pages/manager/ManagerEventTableSelectionPage';
 import ContractSigningPage from './pages/manager/ContractSigningPage';
 import ManagerStaffPage from './pages/manager/ManagerStaffPage';
 import StaffProfilePage from './pages/manager/StaffProfilePage';
@@ -203,6 +204,7 @@ const AppRoutes = () => {
           <Route path="takeaway" element={<TakeawayOrdersPage />} />
           <Route path="reservations" element={<ManagerReservationsPage />} />
           <Route path="reservations/:eventId" element={<EventDetailPage />} />
+          <Route path="reservations/:eventId/table-selection" element={<ManagerEventTableSelectionPage />} />
           <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
           <Route path="tables" element={<AdminTableMap />} />
           <Route path="menu" element={<AdminMenuManagement />} />
@@ -241,6 +243,7 @@ const AppRoutes = () => {
           <Route path="tables" element={<ManagerTablesPage />} />
           <Route path="reservations" element={<ManagerReservationsPage />} />
           <Route path="reservations/:eventId" element={<EventDetailPage />} />
+          <Route path="reservations/:eventId/table-selection" element={<ManagerEventTableSelectionPage />} />
           <Route path="reservations/:eventId/contract" element={<ContractSigningPage />} />
           <Route path="staff" element={<ManagerStaffPage />} />
           <Route path="staff/:staffId/profile" element={<StaffProfilePage />} />
