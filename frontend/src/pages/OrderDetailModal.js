@@ -255,7 +255,22 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
     }
   };
 
-  const statusLabel = order.orderStatus || order.status || order.displayStatus || 'Đang xử lý';
+  const toVietnameseOrderStatus = (rawStatus) => {
+    const s = String(rawStatus ?? '').trim().toLowerCase();
+    if (!s) return 'Đang xử lý';
+    if (s === 'pending') return 'Chờ xác nhận';
+    if (s === 'confirmed') return 'Đã xác nhận';
+    if (s === 'processing') return 'Đang xử lý';
+    if (s === 'shipping' || s === 'delivering') return 'Đang giao';
+    if (s === 'completed' || s === 'complete') return 'Hoàn thành';
+    if (s === 'cancelled' || s === 'canceled' || s === 'cancel') return 'Đã hủy';
+    if (s === 'seated') return 'Đã đến';
+    return String(rawStatus || 'Đang xử lý');
+  };
+
+  const statusLabel = toVietnameseOrderStatus(
+    order.orderStatus || order.status || order.displayStatus || 'Đang xử lý'
+  );
   /** Hiện nút đánh giá: đúng `order.status === 'Completed'` hoặc backend trả orderStatus/COMPLETED */
   const rawForCompleted = String(order.status ?? order.orderStatus ?? order.displayStatus ?? '').trim();
   const isCompleted =
@@ -304,10 +319,10 @@ const OrderDetailModal = ({ order: orderProp, onClose, loading: loadingProp = fa
 
   const getStatusClass = (status) => {
     const s = String(status ?? '').toLowerCase();
-    if (s === 'pending' || s === 'chờ') return 'od-status-orange';
-    if (s === 'shipping' || s === 'đang giao') return 'od-status-blue';
-    if (s === 'completed' || s === 'complete' || s === 'xong' || s === 'thành công') return 'od-status-green';
-    if (s === 'cancelled' || s === 'canceled' || s === 'cancel') return 'od-status-gray';
+    if (s === 'pending' || s.includes('chờ')) return 'od-status-orange';
+    if (s === 'shipping' || s === 'delivering' || s.includes('đang giao')) return 'od-status-blue';
+    if (s === 'completed' || s === 'complete' || s.includes('hoàn thành') || s.includes('thành công') || s.includes('đã xác nhận')) return 'od-status-green';
+    if (s === 'cancelled' || s === 'canceled' || s === 'cancel' || s.includes('đã hủy')) return 'od-status-gray';
     return 'od-status-gray';
   };
 

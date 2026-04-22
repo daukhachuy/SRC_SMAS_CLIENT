@@ -397,7 +397,6 @@ const Cart = () => {
                       <tr key={`cart-item-${actualIndex}`}>
                         <td>
                           <div className="Item-Info">
-                            <img src={item.image} alt={item.name} className="Item-Img" />
                             <div className="Item-Text">
                               <span className={`Item-Badge ${isActuallyCombo ? 'badge-combo' : 'badge-food'}`}>
                                 {isActuallyCombo ? 'Combo' : 'Món lẻ'}
@@ -467,22 +466,31 @@ const Cart = () => {
 
           <div className="Cart-Summary-Card">
             <div className="Summary-Left">
-              <div className="Sum-Item">Tất cả: <strong>{cartItems.length} Món</strong></div>
-              <div className="Sum-Item">Tạm tính: <strong>{totalPrice.toLocaleString()} đ</strong></div>
               <div className="Sum-Item">
-                VAT (10%): <strong>+{vatAmount.toLocaleString()} đ</strong>
+                <span className="Sum-Label">Tất cả:</span>
+                <strong className="Sum-Value">{cartItems.length} Món</strong>
               </div>
               <div className="Sum-Item">
-                Phí vận chuyển:{' '}
-                <strong>{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()} đ` : 'Miễn phí'}</strong>
+                <span className="Sum-Label">Tạm tính:</span>
+                <strong className="Sum-Value">{totalPrice.toLocaleString()} đ</strong>
+              </div>
+              <div className="Sum-Item">
+                <span className="Sum-Label">VAT (10%):</span>
+                <strong className="Sum-Value">+{vatAmount.toLocaleString()} đ</strong>
+              </div>
+              <div className="Sum-Item">
+                <span className="Sum-Label">Phí vận chuyển:</span>
+                <strong className="Sum-Value">{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()} đ` : 'Miễn phí'}</strong>
               </div>
               {appliedDiscount && (
-                <div className="Sum-Item" style={{ color: '#15803d' }}>
-                  Giảm giá: <strong>-{discountAmount.toLocaleString()} đ</strong>
+                <div className="Sum-Item Sum-Item-Discount">
+                  <span className="Sum-Label">Giảm giá:</span>
+                  <strong className="Sum-Value">-{discountAmount.toLocaleString()} đ</strong>
                 </div>
               )}
-              <div className="Sum-Item" style={{ fontSize: '16px', fontWeight: 'bold' }}>
-                Tổng cộng: <strong className="text-orange">{finalPrice.toLocaleString()} đ</strong>
+              <div className="Sum-Item Sum-Item-Total">
+                <span className="Sum-Label">Tổng cộng:</span>
+                <strong className="text-orange Sum-Value">{finalPrice.toLocaleString()} đ</strong>
               </div>
             </div>
             <div className="Summary-Right">
