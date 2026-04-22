@@ -5,7 +5,8 @@ import { contractAPI, eventBookingAPI } from '../../api/managerApi';
 import { 
   Calendar, CheckCircle, FileText, 
   ChevronRight, DollarSign,
-  UtensilsCrossed, Scale
+  UtensilsCrossed, Scale,
+  Banknote, QrCode, Wallet
 } from 'lucide-react';
 import '../../styles/EventDetailPage.css';
 import TransactionHistoryModal from '../../components/TransactionHistoryModal';
@@ -56,6 +57,14 @@ const EventDetailPage = () => {
   const [actionNotice, setActionNotice] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
   const [loadingAwaitingPayment, setLoadingAwaitingPayment] = useState(false);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [settlementAmount, setSettlementAmount] = useState('');
+  const [settlementMethod, setSettlementMethod] = useState('cash');
+  const [settlementInfo, setSettlementInfo] = useState({
+    totalAmount: 0,
+    paidAmount: 0,
+    outstandingAmount: 0,
+  });
   const [refreshSeed, setRefreshSeed] = useState(0);
   const [eventData, setEventData] = useState(() => createEmptyEventData(eventId));
 
@@ -433,6 +442,7 @@ const EventDetailPage = () => {
     normalizedOperationStatus === 'cancelled' ||
     normalizedOperationStatus === 'canceled';
   const canConfirmInProgress = !canConfirmComplete && !isAwaitingFinalPayment && !isClosedEventStatus;
+  const settlementAmountNumber = Number(String(settlementAmount || '').replace(/[^\d]/g, '')) || 0;
 
   const handleConfirmInProgress = () => {
     const params = new URLSearchParams();
@@ -443,29 +453,80 @@ const EventDetailPage = () => {
   };
 
   const handleLoadAwaitingFinalPayment = async () => {
-    const contractId = Number(eventData?.contractId || 0);
-    if (!Number.isFinite(contractId) || contractId <= 0) {
+    const contractCode = String(eventData?.contractCode || '').trim();
+    if (!contractCode) {
       setActionNotice('Chưa có mã hợp đồng để lấy thông tin tất toán.');
-      return;
+      return null;
     }
     try {
       setLoadingAwaitingPayment(true);
       setActionNotice('');
-      const res = await contractAPI.getPaymentsByContractId(contractId);
+      const res = await contractAPI.getPaymentsByCode(contractCode);
       const payload = res?.data?.data ?? res?.data ?? {};
       const totalAmount = Number(payload?.totalAmount ?? payload?.contractTotal ?? 0);
       const paidAmount = Number(payload?.paidAmount ?? payload?.paidTotal ?? 0);
       const outstandingAmount = Number(
         payload?.outstandingAmount ?? payload?.remainingAmount ?? Math.max(totalAmount - paidAmount, 0)
       );
+      const nextInfo = {
+        totalAmount: Math.max(totalAmount, 0),
+        paidAmount: Math.max(paidAmount, 0),
+        outstandingAmount: Math.max(outstandingAmount, 0),
+      };
+      setSettlementInfo(nextInfo);
       setActionNotice(
-        `Đã thu: ${formatCurrency(paidAmount)} / Tổng: ${formatCurrency(totalAmount)} / Còn lại: ${formatCurrency(Math.max(outstandingAmount, 0))}`
+        `Đã thu: ${formatCurrency(nextInfo.paidAmount)} / Tổng: ${formatCurrency(nextInfo.totalAmount)} / Còn lại: ${formatCurrency(nextInfo.outstandingAmount)}`
       );
+      return nextInfo;
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Không thể lấy thông tin chờ tất toán.';
       setActionNotice(msg);
+      return null;
     } finally {
       setLoadingAwaitingPayment(false);
+    }
+  };
+
+  const handleOpenSettlementModal = async () => {
+    const info = await handleLoadAwaitingFinalPayment();
+    if (!info) return;
+    const suggestedAmount = Math.max(Number(info.outstandingAmount || 0), 0);
+    setSettlementAmount(suggestedAmount > 0 ? String(Math.round(suggestedAmount)) : '');
+    setSettlementMethod('cash');
+    setShowSettlementModal(true);
+  };
+
+  const handleSubmitSettlement = async () => {
+    const amount = Number(String(settlementAmount || '').replace(/[^\d]/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setActionNotice('Vui lòng nhập số tiền thanh toán hợp lệ.');
+      return;
+    }
+    const outstanding = Number(settlementInfo?.outstandingAmount || 0);
+    if (outstanding > 0 && amount < outstanding) {
+      setActionNotice(`Số tiền nhập vào phải >= số còn lại (${formatCurrency(outstanding)}).`);
+      return;
+    }
+    try {
+      setCheckingOut(true);
+      setActionNotice('');
+      const contractCode = String(eventData?.contractCode || '').trim();
+      if (!contractCode) {
+        setActionNotice('Chưa có mã hợp đồng để xác nhận tất toán.');
+        return;
+      }
+      const res = await contractAPI.confirmFinalPaymentByCode(contractCode, {
+        note: settlementMethod === 'cash' ? 'Thu tiền mặt tại quầy' : 'Xác nhận thanh toán QR',
+      });
+      const msg = res?.data?.message || 'Xác nhận tất toán thành công.';
+      setActionNotice(`${msg} (${settlementMethod === 'cash' ? 'Tiền mặt' : 'QR'}: ${formatCurrency(amount)})`);
+      setShowSettlementModal(false);
+      setRefreshSeed((v) => v + 1);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể thanh toán tất toán sự kiện.';
+      setActionNotice(msg);
+    } finally {
+      setCheckingOut(false);
     }
   };
 
@@ -702,19 +763,19 @@ const EventDetailPage = () => {
                         canConfirmComplete
                           ? handleConfirmCheckout
                           : isAwaitingFinalPayment
-                            ? handleLoadAwaitingFinalPayment
+                            ? handleOpenSettlementModal
                             : handleConfirmInProgress
                       }
                       disabled={checkingOut || loadingAwaitingPayment || isClosedEventStatus}
                     >
                       {checkingOut || loadingAwaitingPayment
-                        ? (checkingOut ? 'Đang xác nhận...' : 'Đang tải công nợ...')
+                        ? (checkingOut ? 'Đang xử lý...' : 'Đang tải công nợ...')
                         : canConfirmComplete
                           ? 'Xác nhận hoàn thành'
                           : canConfirmInProgress
                             ? 'Xác nhận diễn ra'
                             : isAwaitingFinalPayment
-                              ? 'Đang chờ tất toán'
+                              ? 'Thanh toán tất toán'
                               : 'Sự kiện đã hoàn tất'}
                     </button>
                   )}
@@ -758,6 +819,77 @@ const EventDetailPage = () => {
           eventId={eventData.id}
           onClose={() => setShowTransactionModal(false)}
         />
+      )}
+
+      {showSettlementModal && (
+        <div className="event-settlement-overlay" onClick={() => setShowSettlementModal(false)}>
+          <div className="event-settlement-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="event-settlement-head">
+              <h3>Thanh toán tất toán sự kiện</h3>
+              <p>Xác nhận thu phần còn lại để hoàn tất sự kiện.</p>
+            </div>
+
+            <div className="event-settlement-kpis">
+              <div className="event-settlement-kpi">
+                <span className="event-settlement-kpi-label">Đã thu</span>
+                <strong>{formatCurrency(settlementInfo.paidAmount || 0)}</strong>
+              </div>
+              <div className="event-settlement-kpi event-settlement-kpi-highlight">
+                <span className="event-settlement-kpi-label">Còn lại</span>
+                <strong>{formatCurrency(settlementInfo.outstandingAmount || 0)}</strong>
+              </div>
+            </div>
+
+            <div className="event-settlement-methods">
+              <button
+                type="button"
+                className={settlementMethod === 'cash' ? 'active' : ''}
+                onClick={() => setSettlementMethod('cash')}
+              >
+                <Banknote size={16} />
+                Tiền mặt
+              </button>
+              <button
+                type="button"
+                className={settlementMethod === 'qr' ? 'active' : ''}
+                onClick={() => setSettlementMethod('qr')}
+              >
+                <QrCode size={16} />
+                QR
+              </button>
+            </div>
+
+            <label htmlFor="event-settlement-amount">Số tiền khách thanh toán</label>
+            <div className="event-settlement-input-wrap">
+              <input
+                id="event-settlement-amount"
+                type="text"
+                value={settlementAmount}
+                onChange={(e) => setSettlementAmount(e.target.value.replace(/[^\d]/g, ''))}
+                placeholder="Nhập số tiền..."
+              />
+              <span className="event-settlement-input-suffix">đ</span>
+            </div>
+            <p className="event-settlement-amount-preview">
+              <Wallet size={14} />
+              Tạm thu: <strong>{formatCurrency(settlementAmountNumber)}</strong>
+            </p>
+
+            <div className="event-settlement-actions">
+              <button type="button" className="btn-cancel-settlement" onClick={() => setShowSettlementModal(false)}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn-confirm-settlement"
+                onClick={handleSubmitSettlement}
+                disabled={checkingOut || loadingAwaitingPayment}
+              >
+                {checkingOut ? 'Đang thanh toán...' : 'Thanh toán'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import {
   createTable,
   updateTable,
   deleteTable,
+  toggleTableStatus,
   isTableRowInUse,
   parseTableApiError,
 } from '../../api/tableApi';
@@ -324,9 +325,24 @@ const AdminTableMap = () => {
                         {t.currentGuests} / {t.maxGuests} người
                       </td>
                       <td>
-                        <span className={`tablemap-status-pill ${isBusy(t) ? 'in-use' : 'empty'}`}>
-                          {isBusy(t) ? 'ĐANG DÙNG' : 'TRỐNG'}
-                        </span>
+                        <button
+                          type="button"
+                          className={`tablemap-toggle ${t.isActive ? 'active' : ''}`}
+                          role="switch"
+                          aria-checked={!!t.isActive}
+                          aria-label={t.isActive ? 'Đang mở – nhấn để đóng' : 'Đang đóng – nhấn để mở'}
+                          title={t.isActive ? 'Đóng bàn' : 'Mở bàn'}
+                          onClick={() => {
+                            const newStatus = !t.isActive;
+                            if (window.confirm(`${newStatus ? 'Mở' : 'Đóng'} bàn "${t.name}"?`)) {
+                              toggleTableStatus(t.id, newStatus)
+                                .then(() => loadTables())
+                                .catch((err) => alert(parseTableApiError(err, 'Không cập nhật được trạng thái bàn.')));
+                            }
+                          }}
+                        >
+                          <span className="tablemap-toggle-slider" />
+                        </button>
                       </td>
                       <td>
                         <div className="tablemap-actions-cell">
@@ -337,14 +353,6 @@ const AdminTableMap = () => {
                             onClick={() => openEditModal(t)}
                           >
                             <Pencil size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="tablemap-icon-btn"
-                            aria-label="Xóa"
-                            onClick={() => handleDeleteTable(t)}
-                          >
-                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>

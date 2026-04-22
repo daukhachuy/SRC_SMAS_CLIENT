@@ -1732,7 +1732,6 @@ const AdminRestaurantPage = () => {
                       </td>
                       <td>
                         <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditCode(row)}><Pencil size={16} /></button>
-                        <button type="button" className="rest-icon-btn" aria-label="Xóa" onClick={() => handleDeleteCode(row)}><Trash2 size={16} /></button>
                       </td>
                     </tr>
                   ))}

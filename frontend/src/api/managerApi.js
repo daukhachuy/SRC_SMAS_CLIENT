@@ -191,6 +191,7 @@ export async function getAllStaffSchedule() {
       if (candidateIds.length === 0) throw new Error('Thiếu mã nhân viên giao hàng hợp lệ.');
 
       let lastError = null;
+      let firstBusinessError = null;
 
       for (const sid of candidateIds) {
         const attempts = [
@@ -206,14 +207,19 @@ export async function getAllStaffSchedule() {
           } catch (err) {
             lastError = err;
             const status = Number(err?.response?.status || 0);
-            // Thử contract kế tiếp nếu lỗi validate/route method.
-            if ([400, 404, 405, 422].includes(status)) continue;
+            // Với fallback route: chỉ thử tiếp khi có khả năng lệch route/method.
+            if ([404, 405].includes(status)) continue;
+            // Lưu lỗi nghiệp vụ/validate để ưu tiên trả về thay vì lỗi fallback 405.
+            if ([400, 422].includes(status)) {
+              if (!firstBusinessError) firstBusinessError = err;
+              continue;
+            }
             throw err;
           }
         }
       }
 
-      throw lastError || new Error('Không thể chọn nhân viên giao hàng.');
+      throw firstBusinessError || lastError || new Error('Không thể chọn nhân viên giao hàng.');
     },
 
     // PATCH /api/order/change-status/{OrderCode}
@@ -495,6 +501,21 @@ export async function getAllStaffSchedule() {
         console.log('[contractAPI] getPaymentsByContractId response:', res.status, res.data);
         return res;
       }),
+
+    // GET /api/contract/by-code/{contractCode}/payments
+    getPaymentsByCode: (contractCode) => instance.get(`/contract/by-code/${encodeURIComponent(contractCode)}/payments`)
+      .then(res => {
+        console.log('[contractAPI] getPaymentsByCode response:', res.status, res.data);
+        return res;
+      }),
+
+    // POST /api/contract/by-code/{contractCode}/final-payment/confirm
+    confirmFinalPaymentByCode: (contractCode, payload = {}) =>
+      instance.post(`/contract/by-code/${encodeURIComponent(contractCode)}/final-payment/confirm`, payload)
+        .then(res => {
+          console.log('[contractAPI] confirmFinalPaymentByCode response:', res.status, res.data);
+          return res;
+        }),
   };
 
   export const contractTokenAPI = {
