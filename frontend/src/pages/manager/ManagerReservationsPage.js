@@ -30,6 +30,11 @@ import '../../styles/ManagerPages.css';
 import '../../styles/ManagerReservationsPage.css';
 import TableCheckModal from '../../components/TableCheckModal';
 
+const UPCOMING_ALERT_MINUTES = 180;
+const UPCOMING_ALERT_WINDOW_MS = UPCOMING_ALERT_MINUTES * 60 * 1000;
+const OVERDUE_STATUS_NEEDS_ACTION = new Set(['nosigned', 'unsigned']);
+const TERMINAL_EVENT_STATUSES = new Set(['completed', 'cancelled', 'rejected']);
+
 const ManagerReservationsPage = () => {
   const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
@@ -52,6 +57,8 @@ const ManagerReservationsPage = () => {
   const [upcomingBookEvents, setUpcomingBookEvents] = useState([]);
   const [upcomingDropdownOpen, setUpcomingDropdownOpen] = useState(false);
   const upcomingDropdownRef = useRef(null);
+  const upcomingAlertedKeysRef = useRef(new Set());
+  const overdueAlertedKeysRef = useRef(new Set());
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -107,7 +114,7 @@ const ManagerReservationsPage = () => {
 
   useEffect(() => {
     if (!uiNotice) return;
-    const timer = setTimeout(() => setUiNotice(''), 2800);
+    const timer = setTimeout(() => setUiNotice(''), 8000);
     return () => clearTimeout(timer);
   }, [uiNotice]);
 
@@ -325,6 +332,111 @@ const ManagerReservationsPage = () => {
     loadReservationData();
     loadEventsData();
   }, [loadReservationData, loadEventsData]);
+
+  useEffect(() => {
+    const pollId = window.setInterval(() => {
+      loadEventsData();
+    }, 60_000);
+    return () => window.clearInterval(pollId);
+  }, [loadEventsData]);
+
+  const getEventScheduledAt = useCallback((event) => {
+    const raw = event?.raw || {};
+    const rawDate = String(raw?.reservationDate || raw?.bookingDate || raw?.eventDate || '').trim();
+    const rawTime = String(raw?.reservationTime || raw?.eventTime || '00:00:00').trim();
+
+    if (rawDate) {
+      const fromRaw = new Date(`${rawDate}T${rawTime || '00:00:00'}`);
+      if (!Number.isNaN(fromRaw.getTime())) return fromRaw.getTime();
+    }
+
+    const dateText = String(event?.date || '').trim();
+    const timeText = String(event?.time || '').trim();
+    const dateMatch = dateText.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const timeMatch = timeText.match(/^(\d{2}):(\d{2})/);
+
+    if (!dateMatch) return null;
+    const [, dd, mm, yyyy] = dateMatch;
+    const hh = timeMatch?.[1] || '00';
+    const min = timeMatch?.[2] || '00';
+    const fallbackDate = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:00`);
+    if (Number.isNaN(fallbackDate.getTime())) return null;
+    return fallbackDate.getTime();
+  }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(eventsData) || eventsData.length === 0) return;
+
+    const activeKeys = new Set();
+    eventsData.forEach((event) => {
+      const key = String(event?.bookEventId || event?.bookingCode || event?.id || '').trim();
+      if (key) activeKeys.add(key);
+    });
+
+    for (const key of upcomingAlertedKeysRef.current) {
+      if (!activeKeys.has(key)) upcomingAlertedKeysRef.current.delete(key);
+    }
+    for (const key of overdueAlertedKeysRef.current) {
+      if (!activeKeys.has(key)) overdueAlertedKeysRef.current.delete(key);
+    }
+
+    const now = Date.now();
+    const upcomingHits = [];
+    const overdueHits = [];
+
+    eventsData.forEach((event) => {
+      const key = String(event?.bookEventId || event?.bookingCode || event?.id || '').trim();
+      if (!key) return;
+
+      const status = String(event?.status || '').toLowerCase();
+      if (TERMINAL_EVENT_STATUSES.has(status)) return;
+
+      const scheduledAt = getEventScheduledAt(event);
+      if (!scheduledAt) return;
+
+      const deltaMs = scheduledAt - now;
+      if (
+        deltaMs > 0 &&
+        deltaMs <= UPCOMING_ALERT_WINDOW_MS &&
+        !upcomingAlertedKeysRef.current.has(key)
+      ) {
+        upcomingAlertedKeysRef.current.add(key);
+        upcomingHits.push(event);
+      }
+
+      if (
+        deltaMs <= 0 &&
+        OVERDUE_STATUS_NEEDS_ACTION.has(status) &&
+        !overdueAlertedKeysRef.current.has(key)
+      ) {
+        overdueAlertedKeysRef.current.add(key);
+        overdueHits.push(event);
+      }
+    });
+
+    if (upcomingHits.length === 0 && overdueHits.length === 0) return;
+
+    const firstUpcomingCode = upcomingHits[0]?.bookingCode || upcomingHits[0]?.bookEventId;
+    const firstOverdueCode = overdueHits[0]?.bookingCode || overdueHits[0]?.bookEventId;
+    const alerts = [];
+
+    if (upcomingHits.length > 0) {
+      alerts.push(
+        upcomingHits.length === 1
+          ? `Nhắc lịch: Sự kiện ${firstUpcomingCode} sẽ diễn ra trong 3 tiếng tới.`
+          : `Nhắc lịch: Có ${upcomingHits.length} sự kiện sẽ diễn ra trong 3 tiếng tới.`
+      );
+    }
+    if (overdueHits.length > 0) {
+      alerts.push(
+        overdueHits.length === 1
+          ? `Quá giờ: Sự kiện ${firstOverdueCode} đã quá giờ nhưng trạng thái chưa phù hợp.`
+          : `Quá giờ: Có ${overdueHits.length} sự kiện đã quá giờ nhưng trạng thái chưa phù hợp.`
+      );
+    }
+
+    setUiNotice(alerts.join('\n'));
+  }, [eventsData, getEventScheduledAt]);
 
   useEffect(() => {
     if (autoOpenedTableCheck) return;
@@ -611,36 +723,61 @@ const ManagerReservationsPage = () => {
     );
   };
 
-  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|không/i.test(uiNotice);
+  const noticeLines = useMemo(
+    () => String(uiNotice || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+    [uiNotice]
+  );
+
+  const getNoticeTone = (line) => {
+    const normalized = String(line || '').toLowerCase();
+    if (normalized.startsWith('quá giờ')) return 'critical';
+    if (normalized.startsWith('nhắc lịch')) return 'warning';
+    if (/lỗi|thất bại|không thể|cần|chưa/.test(normalized)) return 'error';
+    return 'success';
+  };
+
+  const noticeHasCritical = noticeLines.some((line) => getNoticeTone(line) === 'critical');
+  const noticeHasWarning = noticeLines.some((line) => getNoticeTone(line) === 'warning');
+  const noticeHasError = noticeLines.some((line) => getNoticeTone(line) === 'error');
+  const noticeCardTone = noticeHasCritical || noticeHasError
+    ? 'danger'
+    : noticeHasWarning
+      ? 'warning'
+      : 'success';
 
   return (
     <div className="reservations-page-container">
       {uiNotice && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 14,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 9999,
-            background: noticeIsError ? 'rgba(255, 245, 240, 0.96)' : 'rgba(240, 253, 244, 0.96)',
-            border: noticeIsError ? '1px solid #ffd8bf' : '1px solid #bbf7d0',
-            color: noticeIsError ? '#9a3412' : '#166534',
-            borderRadius: 14,
-            padding: '11px 16px',
-            boxShadow: '0 12px 28px rgba(0,0,0,0.14)',
-            backdropFilter: 'blur(6px)',
-            maxWidth: 560,
-            whiteSpace: 'pre-line',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            animation: 'fadeIn 180ms ease-out',
-          }}
-        >
-          {noticeIsError ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
-          <span>{uiNotice}</span>
+        <div className={`manager-alert-toast manager-alert-toast--${noticeCardTone}`}>
+          <div className="manager-alert-toast__header">
+            <div className="manager-alert-toast__title-wrap">
+              {noticeCardTone === 'danger' ? <AlertCircle size={18} /> : <Info size={18} />}
+              <strong>Thông báo cảnh báo</strong>
+            </div>
+            <button
+              type="button"
+              className="manager-alert-toast__close"
+              onClick={() => setUiNotice('')}
+              aria-label="Đóng thông báo"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="manager-alert-toast__body">
+            {noticeLines.map((line, idx) => {
+              const tone = getNoticeTone(line);
+              return (
+                <div key={`${line}-${idx}`} className={`manager-alert-line manager-alert-line--${tone}`}>
+                  {tone === 'success' && <CheckCircle size={15} />}
+                  {(tone === 'warning' || tone === 'critical' || tone === 'error') && <AlertCircle size={15} />}
+                  <span>{line}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

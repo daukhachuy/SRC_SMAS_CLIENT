@@ -1442,6 +1442,18 @@ const mapApiOrderToWaiter = (order) => {
 
   const calculateOrderVat = (order) => getOrderBilling(order).vat;
 
+  const calculateOrderGrandByFormula = (order, discountOverride = null) => {
+    const billing = getOrderBilling(order);
+    const subtotal = Number(billing?.subtotal || 0);
+    const vat = Number(billing?.vat || 0);
+    const delivery = Number(billing?.delivery || 0);
+    const discount =
+      discountOverride == null
+        ? Number(billing?.discount || 0)
+        : Math.max(0, Number(discountOverride) || 0);
+    return roundOrderMoney(Math.max(0, subtotal + vat + delivery - discount));
+  };
+
   const handlePrintWaiterOrderInvoice = async () => {
     if (!selectedOrder) return;
     const o = selectedOrder;
@@ -1462,9 +1474,19 @@ const mapApiOrderToWaiter = (order) => {
     });
     const sub = calculateOrderSubtotal(o);
     const del = Number(o?.deliveryFee || 0) || 0;
-    const disc = Number(o?.discount ?? o?.discountAmount ?? 0) || 0;
+    const baseDiscount = resolveOrderDiscountDisplay(o, sub);
+    const currentOrderCode = resolveOrderCode(o);
+    const activeVoucherForThisOrder =
+      currentOrderCode &&
+      activePaymentOrderCode &&
+      currentOrderCode === activePaymentOrderCode &&
+      isVoucherMatchedWithAppliedCode &&
+      Number(voucherAppliedDiscountAmount) > 0;
+    const disc = activeVoucherForThisOrder
+      ? Number(voucherAppliedDiscountAmount)
+      : baseDiscount;
     const vat = calculateOrderVat(o);
-    const grand = calculateOrderTotal(o);
+    const grand = calculateOrderGrandByFormula(o, disc);
     const dine = isDineInOrder(o);
     const ot = String(o?.orderType || '').toLowerCase();
     let typeLbl = 'Giao hàng';
@@ -1488,10 +1510,6 @@ const mapApiOrderToWaiter = (order) => {
     });
   };
 
-  const paymentTotal = Number(calculateOrderTotal(selectedOrder || { items: [] }) || 0);
-  const receivedMoneyValue = Number(receivedMoney || 0);
-  const hasReceivedMoney = receivedMoney.trim() !== '';
-  const isCashAmountValid = hasReceivedMoney && receivedMoneyValue > 0;
   const normalizedVoucherCode = voucherCode.trim().toUpperCase();
   const normalizedAppliedVoucherCode = appliedVoucherCode.trim().toUpperCase();
   const isVoucherMatchedWithAppliedCode =
@@ -1500,10 +1518,16 @@ const mapApiOrderToWaiter = (order) => {
     selectedOrder,
     calculateOrderSubtotal(selectedOrder)
   );
-  const discountDisplayValue =
+  const effectiveDiscountAmount =
     isVoucherMatchedWithAppliedCode && Number(voucherAppliedDiscountAmount) > 0
       ? Number(voucherAppliedDiscountAmount)
       : currentResolvedDiscount;
+  const paymentTotal = Number(
+    calculateOrderGrandByFormula(selectedOrder || { items: [] }, effectiveDiscountAmount) || 0
+  );
+  const receivedMoneyValue = Number(receivedMoney || 0);
+  const hasReceivedMoney = receivedMoney.trim() !== '';
+  const isCashAmountValid = hasReceivedMoney && receivedMoneyValue > 0;
   const remainingAfterCash = hasReceivedMoney
     ? Math.max(0, paymentTotal - receivedMoneyValue)
     : paymentTotal;
@@ -3356,7 +3380,7 @@ const mapApiOrderToWaiter = (order) => {
                 )}
                 <div className="grand-total">
                   <span>Tổng cộng</span>
-                  <strong>{formatCurrency(calculateOrderTotal(selectedOrder))}</strong>
+                  <strong>{formatCurrency(calculateOrderGrandByFormula(selectedOrder))}</strong>
                 </div>
               </div>
             </div>
@@ -3574,15 +3598,15 @@ const mapApiOrderToWaiter = (order) => {
                     </div>
                   )}
                   {isVoucherMatchedWithAppliedCode &&
-                    discountDisplayValue > 0 && (
+                    effectiveDiscountAmount > 0 && (
                     <div>
                       <span>Giảm giá:</span>
-                      <strong>-{formatCurrency(discountDisplayValue)}</strong>
+                      <strong>-{formatCurrency(effectiveDiscountAmount)}</strong>
                     </div>
                   )}
                   <div className="grand-total-box">
                     <span>Tổng cộng:</span>
-                    <strong>{formatCurrency(calculateOrderTotal(selectedOrder))}</strong>
+                    <strong>{formatCurrency(paymentTotal)}</strong>
                   </div>
                 </div>
               </div>
