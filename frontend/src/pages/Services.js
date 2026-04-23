@@ -47,6 +47,7 @@ const COMBO_OPTIONS_FALLBACK = [
 ];
 
 const Services = () => {
+  const MAX_SERVICE_HOURS = 5;
   const navigate = useNavigate();
   const location = useLocation();
   const [showAuthRequired, setShowAuthRequired] = useState(false);
@@ -80,7 +81,7 @@ const Services = () => {
     fullName: '',
     email: '',
     phone: '',
-    numTables: '1',
+    numTables: '',
     note: ''
   });
   const [bookingForm, setBookingForm] = useState({
@@ -93,6 +94,8 @@ const Services = () => {
   });
   const [bookingError, setBookingError] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState('');
+  const [bookingSuccessMeta, setBookingSuccessMeta] = useState(null);
+  const [bookingStep, setBookingStep] = useState(1);
   const [bookingErrorField, setBookingErrorField] = useState('');
   const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(''); // tên hiển thị
@@ -100,12 +103,14 @@ const Services = () => {
   const [selectedEventSession, setSelectedEventSession] = useState(''); // buổi: morning | evening
   const [selectedEventTime, setSelectedEventTime] = useState(''); // giờ tổ chức HH:mm
   const [eventStepError, setEventStepError] = useState(''); // lỗi validation step 1
+  const [eventTablesError, setEventTablesError] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [servicePricingModal, setServicePricingModal] = useState({
     open: false,
     service: null,
     selectedHours: 1,
   });
+  const [servicePricingNotice, setServicePricingNotice] = useState('');
   const [menuDishes, setMenuDishes] = useState([]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
   const [showAllServicesModal, setShowAllServicesModal] = useState(false);
@@ -124,13 +129,14 @@ const Services = () => {
   const [eventError, setEventError] = useState('');
   const [eventSuccess, setEventSuccess] = useState('');
 
-  const clampNumberInput = (value, min, max) => {
-    if (value === '') return '';
-    const numeric = Number.parseInt(value, 10);
-    if (!Number.isFinite(numeric)) return String(min);
-    if (numeric < min) return String(min);
-    if (numeric > max) return String(max);
-    return String(numeric);
+  const validateEventTableCount = (rawValue) => {
+    const value = String(rawValue ?? '').trim();
+    if (!value) return 'Vui lòng chọn số lượng bàn (tối thiểu 4 bàn).';
+    const tables = Number.parseInt(value, 10);
+    if (!Number.isFinite(tables)) return 'Số lượng bàn không hợp lệ.';
+    if (tables < 4) return 'Số lượng bàn tối thiểu là 4.';
+    if (tables > 30) return 'Số lượng bàn tối đa là 30.';
+    return '';
   };
 
   const bookingAlertRef = useRef(null);
@@ -492,6 +498,7 @@ const Services = () => {
   const handleBookingSubmit = async () => {
     setBookingError('');
     setBookingSuccess('');
+    setBookingSuccessMeta(null);
     setBookingErrorField('');
 
     const validationError = validateBookingForm();
@@ -511,7 +518,17 @@ const Services = () => {
     try {
       setIsBookingSubmitting(true);
       await createReservation(requestPayload);
+      const bookedDate = selectedDate
+        ? selectedDate.toLocaleDateString('vi-VN')
+        : '--/--/----';
       setBookingSuccess('Đặt bàn thành công. Nhà hàng sẽ liên hệ xác nhận sớm nhất.');
+      setBookingSuccessMeta({
+        date: bookedDate,
+        time: selectedTime || '--:--',
+        guests: Number(bookingForm.numGuests) || 1,
+        location: bookingForm.location || 'Trong nhà (Máy lạnh)',
+      });
+      setBookingStep(2);
       setBookingForm((prev) => ({
         ...prev,
         numGuests: '1',
@@ -529,6 +546,14 @@ const Services = () => {
     } finally {
       setIsBookingSubmitting(false);
     }
+  };
+
+  const resetBookingSuccessView = () => {
+    setBookingStep(1);
+    setBookingSuccess('');
+    setBookingSuccessMeta(null);
+    setBookingError('');
+    setBookingErrorField('');
   };
 
   useEffect(() => {
@@ -637,10 +662,19 @@ const Services = () => {
     setAddDishNotes('');
   };
 
+  const getDishIdentity = (dish) => {
+    const type = String(dish?.type || '').toLowerCase();
+    if (type === 'combo') {
+      return `combo:${dish?.comboId ?? dish?.id ?? ''}`;
+    }
+    return `menu:${dish?.foodId ?? dish?.id ?? ''}`;
+  };
+
   // Thêm món vào danh sách (từ Modal B hoặc Modal C)
   const handleAddDishFromModal = (newDish) => {
     // Kiểm tra xem món đã tồn tại chưa
-    const existingIndex = menuDishes.findIndex(d => (d.foodId || d.id) === (newDish.foodId || newDish.id));
+    const newIdentity = getDishIdentity(newDish);
+    const existingIndex = menuDishes.findIndex((d) => getDishIdentity(d) === newIdentity);
     
     if (existingIndex >= 0) {
       // Tăng số lượng nếu đã tồn tại
@@ -658,14 +692,16 @@ const Services = () => {
   };
 
   // Xóa món khỏi danh sách (từ Modal B hoặc Modal C)
-  const handleRemoveDishFromModal = (dishId) => {
-    setMenuDishes(menuDishes.filter(d => (d.foodId || d.id) !== dishId));
+  const handleRemoveDishFromModal = (dishId, dishType) => {
+    const targetIdentity = getDishIdentity({ id: dishId, type: dishType, foodId: dishId, comboId: dishId });
+    setMenuDishes(menuDishes.filter((d) => getDishIdentity(d) !== targetIdentity));
   };
 
   // Cập nhật số lượng món (từ Modal A)
-  const handleUpdateDishQuantity = (dishId, newQuantity) => {
-    const updated = menuDishes.map(d => {
-      if ((d.foodId || d.id) === dishId) {
+  const handleUpdateDishQuantity = (dishId, newQuantity, dishType) => {
+    const targetIdentity = getDishIdentity({ id: dishId, type: dishType, foodId: dishId, comboId: dishId });
+    const updated = menuDishes.map((d) => {
+      if (getDishIdentity(d) === targetIdentity) {
         return {
           ...d,
           quantity: newQuantity,
@@ -678,8 +714,9 @@ const Services = () => {
   };
 
   // Xóa món (từ Modal A)
-  const handleRemoveDish = (dishId) => {
-    setMenuDishes(menuDishes.filter(d => (d.foodId || d.id) !== dishId));
+  const handleRemoveDish = (dishId, dishType) => {
+    const targetIdentity = getDishIdentity({ id: dishId, type: dishType, foodId: dishId, comboId: dishId });
+    setMenuDishes(menuDishes.filter((d) => getDishIdentity(d) !== targetIdentity));
   };
 
   // Xác nhận đơn hàng từ Modal A
@@ -757,10 +794,13 @@ const Services = () => {
 
   const isHourlyService = (service) => getServiceUnitMeta(service).mode === 'hourly';
 
+  const normalizeServiceHours = (value) =>
+    Math.min(MAX_SERVICE_HOURS, Math.max(1, Number(value) || 1));
+
   const buildServiceSelection = (service, selectedHours = 1) => {
     const unitMeta = getServiceUnitMeta(service);
     const basePrice = Number(service?.price) || 0;
-    const hours = unitMeta.mode === 'hourly' ? Math.max(1, Number(selectedHours) || 1) : 1;
+    const hours = unitMeta.mode === 'hourly' ? normalizeServiceHours(selectedHours) : 1;
     const quantity = unitMeta.mode === 'hourly' ? hours : 1;
     const totalPrice = basePrice * quantity;
     const hoursText = unitMeta.mode === 'hourly' ? ` - ${hours} giờ` : '';
@@ -792,12 +832,13 @@ const Services = () => {
 
   const openServicePricingPicker = (service) => {
     const currentSelection = getServiceSelection(service?.id);
-    const defaultHours = Math.max(1, Number(currentSelection?.hours) || 1);
+    const defaultHours = normalizeServiceHours(currentSelection?.hours || 1);
     setServicePricingModal({
       open: true,
       service,
       selectedHours: defaultHours,
     });
+    setServicePricingNotice('');
   };
 
   const closeServicePricingPicker = () => {
@@ -806,6 +847,7 @@ const Services = () => {
       service: null,
       selectedHours: 1,
     });
+    setServicePricingNotice('');
   };
 
   const handleConfirmServiceSelection = () => {
@@ -813,6 +855,27 @@ const Services = () => {
     if (!service?.id) return closeServicePricingPicker();
     upsertServiceSelection(buildServiceSelection(service, servicePricingModal.selectedHours));
     closeServicePricingPicker();
+  };
+
+  const increaseServicePricingHours = () => {
+    const current = normalizeServiceHours(servicePricingModal.selectedHours);
+    if (current >= MAX_SERVICE_HOURS) {
+      setServicePricingNotice(`Chỉ được chọn tối đa ${MAX_SERVICE_HOURS} giờ.`);
+      return;
+    }
+    setServicePricingNotice('');
+    setServicePricingModal((prev) => ({
+      ...prev,
+      selectedHours: normalizeServiceHours((Number(prev.selectedHours) || 1) + 1),
+    }));
+  };
+
+  const decreaseServicePricingHours = () => {
+    setServicePricingNotice('');
+    setServicePricingModal((prev) => ({
+      ...prev,
+      selectedHours: normalizeServiceHours((Number(prev.selectedHours) || 1) - 1),
+    }));
   };
 
   const handleServiceCardClick = (service) => {
@@ -831,6 +894,7 @@ const Services = () => {
   // Validate Step 1 trước khi chuyển bước
   const handleNextStep = () => {
     setEventStepError('');
+    setEventTablesError('');
 
     // 1) Chọn loại sự kiện
     const nextStepEventId = Number(selectedEventId);
@@ -844,13 +908,10 @@ const Services = () => {
       return;
     }
     // 3) Số bàn
-    const tables = parseInt(eventForm.numTables, 10);
-    if (!tables || tables < 1) {
-      setEventStepError('Vui lòng nhập số lượng bàn (≥1).');
-      return;
-    }
-    if (tables > 30) {
-      setEventStepError('Số lượng bàn tối đa là 30.');
+    const tablesErrorMsg = validateEventTableCount(eventForm.numTables);
+    if (tablesErrorMsg) {
+      setEventTablesError(tablesErrorMsg);
+      setEventStepError(tablesErrorMsg);
       return;
     }
     // 4) Họ tên
@@ -1054,6 +1115,14 @@ const Services = () => {
     { id: 3, title: 'Thanh toán', subtitle: 'tiện lợi', image: '/images/Pay.png' }
   ];
 
+  const bookingReference = useMemo(() => {
+    if (!bookingSuccessMeta) return 'BK-PENDING';
+    const datePart = String(bookingSuccessMeta.date || '').replace(/\D/g, '');
+    const timePart = String(bookingSuccessMeta.time || '').replace(/\D/g, '');
+    const guestPart = String(bookingSuccessMeta.guests || '').replace(/\D/g, '');
+    return `BK-${datePart || '00000000'}${timePart || '0000'}${guestPart || '00'}`;
+  }, [bookingSuccessMeta]);
+
   return (
     <div className="services-page-wrapper">
       <Header />
@@ -1090,7 +1159,8 @@ const Services = () => {
 
           {/* BOOKING FORM */}
           {bookingTab === 'booking' && (
-            <div className="glass-card booking-container">
+            bookingStep === 1 ? (
+              <div className="glass-card booking-container">
               <div className="booking-left">
                 <div className="calendar-ui">
                   <div className="calendar-month">
@@ -1216,9 +1286,24 @@ const Services = () => {
                   </div>
                 )}
                 {bookingSuccess && (
-                  <div className="form-alert form-alert-success" role="status" aria-live="polite">
-                    <CircleCheck size={18} />
-                    <span>{bookingSuccess}</span>
+                  <div className="booking-success-card" role="status" aria-live="polite">
+                    <div className="booking-success-card__head">
+                      <div className="booking-success-card__icon">
+                        <CircleCheck size={18} />
+                      </div>
+                      <div>
+                        <p className="booking-success-card__title">Đặt bàn thành công</p>
+                        <p className="booking-success-card__desc">{bookingSuccess}</p>
+                      </div>
+                    </div>
+                    {bookingSuccessMeta && (
+                      <div className="booking-success-card__meta">
+                        <span>Ngày: <strong>{bookingSuccessMeta.date}</strong></span>
+                        <span>Giờ: <strong>{bookingSuccessMeta.time}</strong></span>
+                        <span>Khách: <strong>{bookingSuccessMeta.guests}</strong></span>
+                        <span>Khu vực: <strong>{bookingSuccessMeta.location}</strong></span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <button
@@ -1229,7 +1314,57 @@ const Services = () => {
                   {isBookingSubmitting ? 'ĐANG GỬI...' : 'ĐẶT BÀN NGAY'}
                 </button>
               </div>
-            </div>
+              </div>
+            ) : (
+              <div className="event-success-step">
+                <div className="event-success-card event-success-card-premium booking-success-receipt">
+                  <div className="event-success-glow" aria-hidden />
+                  <div className="event-success-badge booking-success-receipt-badge">
+                    <Sparkles size={20} strokeWidth={2.2} />
+                    <span>Đã xác nhận yêu cầu</span>
+                  </div>
+                  <div className="event-success-icon event-success-icon-animated">
+                    <CircleCheck size={44} strokeWidth={2.8} />
+                  </div>
+                  <h2>Đặt bàn thành công</h2>
+                  <p className="event-success-lead">
+                    {bookingSuccess || 'Nhà hàng đã nhận yêu cầu đặt bàn của bạn và sẽ liên hệ xác nhận trong thời gian sớm nhất.'}
+                  </p>
+                  {bookingSuccessMeta && (
+                    <div className="booking-success-receipt-box">
+                      <div className="booking-success-receipt-code">
+                        <span>Mã tham chiếu</span>
+                        <strong>{bookingReference}</strong>
+                      </div>
+                      <div className="booking-success-full-meta">
+                        <span>Ngày: <strong>{bookingSuccessMeta.date}</strong></span>
+                        <span>Giờ: <strong>{bookingSuccessMeta.time}</strong></span>
+                        <span>Số khách: <strong>{bookingSuccessMeta.guests}</strong></span>
+                        <span>Khu vực: <strong>{bookingSuccessMeta.location}</strong></span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="booking-success-timeline">
+                    <span className="booking-success-timeline-item is-done">Đã nhận yêu cầu</span>
+                    <span className="booking-success-timeline-item is-active">Đang xác nhận</span>
+                    <span className="booking-success-timeline-item">Gọi xác nhận</span>
+                  </div>
+                  <div className="event-success-actions">
+                    <button type="button" className="event-btn-primary" onClick={resetBookingSuccessView}>
+                      Đặt bàn mới
+                    </button>
+                    <div className="event-success-actions-row">
+                      <button type="button" className="event-btn-secondary" onClick={() => navigate('/my-orders')}>
+                        Xem đơn của tôi
+                      </button>
+                      <button type="button" className="event-btn-secondary event-success-btn-ghost" onClick={() => navigate('/')}>
+                        Về trang chủ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
           )}
 
           {/* EVENT FORM - Theo thiết kế ảnh */}
@@ -1427,17 +1562,25 @@ const Services = () => {
                             </label>
                             <input
                               type="number"
-                              className={`event-step1-input ${String(eventStepError).toLowerCase().includes('số lượng bàn') ? 'input-invalid' : ''}`}
+                              className={`event-step1-input ${(eventTablesError || String(eventStepError).toLowerCase().includes('số lượng bàn')) ? 'input-invalid' : ''}`}
                               value={eventForm.numTables}
-                              min="1"
+                              min="4"
                               max="30"
                               ref={eventTablesRef}
                               onChange={(e) => {
-                                setEventForm({ ...eventForm, numTables: clampNumberInput(e.target.value, 1, 30) });
-                                setEventStepError('');
+                                const nextValue = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                setEventForm({ ...eventForm, numTables: nextValue });
+                                const nextError = validateEventTableCount(nextValue);
+                                setEventTablesError(nextError);
+                                if (!nextError) {
+                                  setEventStepError('');
+                                }
                               }}
-                              placeholder="1 - 30"
+                              placeholder="4 - 30"
                             />
+                            {eventTablesError && (
+                              <p className="event-field-error">{eventTablesError}</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1982,35 +2125,28 @@ const Services = () => {
                                 <div className="event-service-pricing-hours-control">
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setServicePricingModal((prev) => ({
-                                        ...prev,
-                                        selectedHours: Math.max(1, (Number(prev.selectedHours) || 1) - 1),
-                                      }))
-                                    }
+                                    onClick={decreaseServicePricingHours}
                                   >
                                     -
                                   </button>
-                                  <span>{Math.max(1, Number(servicePricingModal.selectedHours) || 1)}</span>
+                                  <span>{normalizeServiceHours(servicePricingModal.selectedHours)}</span>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setServicePricingModal((prev) => ({
-                                        ...prev,
-                                        selectedHours: Math.min(24, (Number(prev.selectedHours) || 1) + 1),
-                                      }))
-                                    }
+                                    onClick={increaseServicePricingHours}
                                   >
                                     +
                                   </button>
                                 </div>
                               </div>
                             ) : null}
+                            {isHourlyService(servicePricingModal.service) && servicePricingNotice ? (
+                              <p className="event-service-pricing-hours-notice">{servicePricingNotice}</p>
+                            ) : null}
                           </div>
                           <div className="event-service-pricing-option-price">
                             {formatCurrency(
                               isHourlyService(servicePricingModal.service)
-                                ? (Number(servicePricingModal.service.price) || 0) * Math.max(1, Number(servicePricingModal.selectedHours) || 1)
+                                ? (Number(servicePricingModal.service.price) || 0) * normalizeServiceHours(servicePricingModal.selectedHours)
                                 : Number(servicePricingModal.service.price) || 0
                             ).replace('₫', '')} đ
                           </div>
@@ -2020,7 +2156,7 @@ const Services = () => {
                     <div className="event-all-services-modal-footer">
                       <span>
                         {isHourlyService(servicePricingModal.service)
-                          ? 'Dịch vụ tính theo giờ: tổng tiền = đơn giá x số giờ.'
+                          ? `Dịch vụ tính theo giờ: tổng tiền = đơn giá x số giờ ).`
                           : 'Dịch vụ tính theo buổi: lấy đúng giá backend.'}
                       </span>
                       <div style={{ display: 'flex', gap: 8 }}>

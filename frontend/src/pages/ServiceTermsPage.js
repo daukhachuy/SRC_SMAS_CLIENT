@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ScrollText, Handshake, Wallet, CalendarClock, CircleCheck } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -98,14 +98,6 @@ const ServiceTermsPage = () => {
             Việc tiếp tục sử dụng và xác nhận đặt sự kiện đồng nghĩa với việc bạn đã đọc, hiểu và đồng ý với các
             điều khoản dịch vụ nêu trên.
           </p>
-          <div className="service-terms-actions">
-            <Link to="/services" className="service-terms-btn ghost">
-              Quay lại Dịch vụ
-            </Link>
-            <Link to="/services?step=4" className="service-terms-btn primary">
-              Tiếp tục đặt sự kiện
-            </Link>
-          </div>
         </section>
       </main>
 

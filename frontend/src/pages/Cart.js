@@ -15,6 +15,21 @@ function stripLegacyGpsSuffix(text) {
   return String(text || '').replace(/\|@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s*$/, '').trim();
 }
 
+const DELIVERY_ADDRESS_SUFFIX = 'Đà Nẵng, Việt Nam';
+
+function normalizeDeliveryAddress(text) {
+  const cleaned = stripLegacyGpsSuffix(text).replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+
+  const hasDaNang = /\b(đà nẵng|da nang)\b/i.test(cleaned);
+  const hasVietnam = /\b(việt nam|vietnam)\b/i.test(cleaned);
+  if (hasDaNang || hasVietnam) {
+    return cleaned.replace(/,\s*$/, '');
+  }
+
+  return `${cleaned.replace(/,\s*$/, '')}, ${DELIVERY_ADDRESS_SUFFIX}`;
+}
+
 const Cart = () => {
   const navigate = useNavigate();
   
@@ -53,7 +68,7 @@ const Cart = () => {
             recipientPhone: (profileData.phone && profileData.phone !== 'string') 
               ? profileData.phone.replace('+84', '0') 
               : prev.recipientPhone,
-            address: stripLegacyGpsSuffix(
+            address: normalizeDeliveryAddress(
               (profileData.address && profileData.address !== 'string') ? profileData.address : prev.address
             ),
           }));
@@ -75,8 +90,21 @@ const Cart = () => {
   const [paymentError, setPaymentError] = useState('');
   const [customerNotice, setCustomerNotice] = useState(null);
 
+  const handleAddressChange = (event) => {
+    setCustomerInfo((prev) => ({ ...prev, address: event.target.value }));
+  };
+
+  const handleAddressBlur = () => {
+    setCustomerInfo((prev) => ({ ...prev, address: normalizeDeliveryAddress(prev.address) }));
+  };
+
   // --- LOGIC VALIDATE SỐ ĐIỆN THOẠI ---
   const handleGoToStep2 = () => {
+    const normalizedAddress = normalizeDeliveryAddress(customerInfo.address);
+    if (normalizedAddress !== customerInfo.address) {
+      setCustomerInfo((prev) => ({ ...prev, address: normalizedAddress }));
+    }
+
     const phoneRegex = /^(0|84)(3|5|7|8|9)([0-9]{8})$/;
     if (!customerInfo.recipientPhone.trim()) {
       setCustomerNotice({
@@ -96,7 +124,7 @@ const Cart = () => {
       });
       return;
     }
-    if (!customerInfo.recipientName.trim() || !customerInfo.address.trim()) {
+    if (!customerInfo.recipientName.trim() || !normalizedAddress.trim()) {
       setCustomerNotice({
         kind: 'alert',
         title: 'Thiếu thông tin giao hàng',
@@ -257,7 +285,7 @@ const Cart = () => {
         deliveryInfo: {
           recipientName: customerInfo.recipientName,
           recipientPhone: customerInfo.recipientPhone,
-          address: stripLegacyGpsSuffix(customerInfo.address),
+          address: normalizeDeliveryAddress(customerInfo.address),
           note: customerInfo.note || null
         },
         taxAmount: vatSend,
@@ -551,10 +579,14 @@ const Cart = () => {
                     <label>Địa chỉ :</label>
                     <input 
                         type="text" 
-                        placeholder="Nhập địa chỉ giao hàng..." 
+                        placeholder="Ví dụ: 80 Nguyễn Phước Lan" 
                         value={customerInfo.address}
-                        onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
+                        onChange={handleAddressChange}
+                        onBlur={handleAddressBlur}
                     />
+                    <small className="Address-Auto-Hint">
+                      Địa chỉ hoàn chỉnh: {normalizeDeliveryAddress(customerInfo.address) || DELIVERY_ADDRESS_SUFFIX}
+                    </small>
                   </div>
                   <div className="Input-Group">
                     <label>Ghi chú đơn hàng :</label>

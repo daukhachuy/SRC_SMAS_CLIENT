@@ -103,21 +103,21 @@ const AddDishModal = ({
                       <div className="add-dish-qty-control">
                         <button
                           className="add-dish-qty-btn"
-                          onClick={() => onUpdateQuantity(dish.id, Math.max(1, dish.quantity - 1))}
+                          onClick={() => onUpdateQuantity(dish.id, Math.max(1, dish.quantity - 1), dish.type)}
                         >
                           <Minus size={14} />
                         </button>
                         <span className="add-dish-qty-value">{String(dish.quantity).padStart(2, '0')}</span>
                         <button
                           className="add-dish-qty-btn"
-                          onClick={() => onUpdateQuantity(dish.id, dish.quantity + 1)}
+                          onClick={() => onUpdateQuantity(dish.id, dish.quantity + 1, dish.type)}
                         >
                           <Plus size={14} />
                         </button>
                       </div>
                       <button
                         className="add-dish-remove-btn"
-                        onClick={() => onRemoveDish(dish.id)}
+                        onClick={() => onRemoveDish(dish.id, dish.type)}
                       >
                         <Trash2 size={18} />
                       </button>
