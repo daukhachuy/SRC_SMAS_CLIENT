@@ -24,13 +24,15 @@ const ComboListModal = ({
   };
 
   const isSelected = (comboId) => {
-    return selectedDishes.some(d => d.comboId === comboId || d.id === comboId);
+    return selectedDishes.some(
+      (d) => String(d?.type || '').toLowerCase() === 'combo' && (d.comboId === comboId || d.id === comboId)
+    );
   };
 
   const handleToggleCombo = (item) => {
     const itemId = item.comboId || item.id;
     if (isSelected(itemId)) {
-      onRemoveDish(itemId);
+      onRemoveDish(itemId, 'Combo');
     } else {
       onAddDish({
         ...item,
@@ -125,7 +127,7 @@ const ComboListModal = ({
           </button>
           <div className="combo-list-selected-info">
             <span>Đã chọn:</span>
-            <strong>{selectedDishes.filter(d => d.type === 'Combo').length} combo</strong>
+            <strong>{selectedDishes.filter((d) => String(d?.type || '').toLowerCase() === 'combo').length} combo</strong>
           </div>
           <button className="combo-list-confirm-btn" onClick={onClose}>
             Xong

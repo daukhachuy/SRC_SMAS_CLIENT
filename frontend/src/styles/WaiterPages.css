@@ -2575,6 +2575,11 @@
   color: #1f2937;
 }
 
+.detail-table .order-item-row-highlight td {
+  background: #fff7e8;
+  transition: background-color 0.35s ease;
+}
+
 .detail-table td:nth-child(n + 2),
 .detail-table th:nth-child(n + 2) {
   text-align: right;

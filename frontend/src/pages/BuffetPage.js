@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/BuffetPage.css';
-import { Search, MessageSquare, CheckCircle, ShoppingCart } from 'lucide-react';
+import { Search, MessageSquare, CheckCircle } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import AuthRequiredModal from '../components/AuthRequiredModal';
 import { getBuffetLists, getBuffetDetail } from '../api/foodApi'; // Đảm bảo import cả 2 hàm này
-import { isAuthenticated } from '../api/authApi';
 
 const BuffetPage = () => {
   const navigate = useNavigate();
   const [buffetItems, setBuffetItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [toast, setToast] = useState(null);
-  const [showAuthRequired, setShowAuthRequired] = useState(false);
-  const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
-
-  const showToast = (item) => {
-    setToast(item);
-    setTimeout(() => setToast(null), 3000);
-  };
 
   useEffect(() => {
     const loadBuffetData = async () => {
@@ -64,35 +54,6 @@ const BuffetPage = () => {
 
       return buffetName.includes(keyword) || foodNames.includes(keyword);
     });
-
-  const addBuffetToCart = (item) => {
-    if (item.isAvailable === false) return;
-    if (!isAuthenticated()) {
-      setShowAuthRequired(true);
-      return;
-    }
-
-    const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
-    const cartId = `buffet-${item.buffetId}`;
-    const itemIndex = existingCart.findIndex((cartItem) => cartItem.id === cartId && cartItem.isBuffet === true);
-
-    if (itemIndex > -1) {
-      existingCart[itemIndex].quantity += 1;
-    } else {
-      existingCart.push({
-        id: cartId,
-        name: item.name,
-        price: item.mainPrice,
-        image: item.image || FIXED_PRODUCT_IMAGE,
-        quantity: 1,
-        isBuffet: true,
-      });
-    }
-
-    localStorage.setItem('cart', JSON.stringify(existingCart));
-    window.dispatchEvent(new Event('storage'));
-    showToast({ name: item.name, image: item.image || FIXED_PRODUCT_IMAGE });
-  };
 
   return (
     <div className="app">
@@ -185,15 +146,6 @@ const BuffetPage = () => {
                         </div>
                       </div>
                       <button className="btn-order-now" onClick={() => navigate('/services')}>ĐẶT BÀN NGAY</button>
-                      <button
-                        type="button"
-                        className="btn-add-buffet-cart"
-                        disabled={item.isAvailable === false}
-                        onClick={() => addBuffetToCart(item)}
-                      >
-                        <ShoppingCart size={18} />
-                        <span>THÊM VÀO GIỎ</span>
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -202,29 +154,6 @@ const BuffetPage = () => {
           </main>
         </div>
       </div>
-
-      {toast && (
-        <div className="buffet-toast" role="status">
-          <img
-            src={toast.image || FIXED_PRODUCT_IMAGE}
-            alt={toast.name}
-            className="buffet-toast-img"
-            onError={(e) => {
-              e.target.src = FIXED_PRODUCT_IMAGE;
-            }}
-          />
-          <div className="buffet-toast-body">
-            <span className="buffet-toast-title">Đã thêm vào giỏ hàng ✅</span>
-            <span className="buffet-toast-name">{toast.name}</span>
-          </div>
-          <button className="buffet-toast-close" onClick={() => setToast(null)}>×</button>
-        </div>
-      )}
-
-      <AuthRequiredModal
-        isOpen={showAuthRequired}
-        onClose={() => setShowAuthRequired(false)}
-      />
       
       <div className="fixed-chat">
         <MessageSquare size={28} color="white" />

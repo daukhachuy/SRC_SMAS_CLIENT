@@ -72,9 +72,16 @@ const mergeConversations = (...groups) => {
 };
 
 const normalizeRole = (value) => String(value || '').trim().toLowerCase();
+const normalizeNameKey = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 const isGenericCustomerLabel = (value) => {
   const text = String(value || '').trim().toLowerCase();
-  return !text || text === 'khách hàng' || text === 'khach hang' || text === 'customer';
+  return !text || text === 'khách hàng' || text === 'khach hang' || text === 'customer' || text === 'string';
 };
 
 const getInitials = (name) => {
@@ -309,6 +316,18 @@ const ManagerConversationWidget = () => {
     });
   };
 
+  const syncConversationsFromServer = async (baseRows = conversations) => {
+    const [myRes, genericRes] = await Promise.allSettled([
+      conversationApi.getManagerConversationsMy(),
+      conversationApi.getConversations(),
+    ]);
+    const myRows = myRes.status === 'fulfilled' ? myRes.value : [];
+    const genericRows = genericRes.status === 'fulfilled' ? genericRes.value : [];
+    const merged = mergeConversations(myRows, genericRows, baseRows).map(enrichConversationFromStorage);
+    setConversations(merged);
+    return merged;
+  };
+
   const loadBootstrap = async (silent = false) => {
     if (!silent) setLoadingBootstrap(true);
     if (!silent) setErrorText('');
@@ -369,18 +388,22 @@ const ManagerConversationWidget = () => {
     const customerId = Number(rawId);
     if (!Number.isFinite(customerId) || customerId <= 0 || creatingConversation) return;
     setErrorText('');
-    const existing = conversations
-      .filter(
-        (c) =>
-          Number(c.customerId) === customerId &&
-          Number.isFinite(customerId) &&
-          customerId > 0 &&
-          c.conversationId != null
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime()
-      )[0];
+    const selectedCustomer = customers.find((c) => Number(c.id) === customerId);
+    const selectedNameKey = normalizeNameKey(selectedCustomer?.name || '');
+    const findExistingConversation = (rows) =>
+      rows
+        .filter((c) => c?.conversationId != null)
+        .filter((c) => {
+          if (Number(c.customerId) === customerId) return true;
+          if (!selectedNameKey) return false;
+          return normalizeNameKey(resolveCustomerName(c)) === selectedNameKey;
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime()
+        )[0];
+
+    const existing = findExistingConversation(conversations);
     if (existing) {
       const convId = Number(existing.conversationId);
       if (Number.isFinite(convId)) {
@@ -388,11 +411,24 @@ const ManagerConversationWidget = () => {
         return;
       }
     }
+
+    // Đồng bộ lại từ server trước khi gọi create để tránh tạo trùng do state cục bộ chưa mới.
+    try {
+      const merged = await syncConversationsFromServer(conversations);
+      const existedAfterSync = findExistingConversation(merged);
+      const convId = Number(existedAfterSync?.conversationId);
+      if (Number.isFinite(convId) && convId > 0) {
+        setActiveConversationId(convId);
+        return;
+      }
+    } catch {
+      // Nếu sync fail thì tiếp tục thử create như cũ.
+    }
+
     setCreatingConversation(true);
     try {
       const created = await conversationApi.managerCreateConversation({ customerId });
       if (!created?.conversationId) throw new Error('Không tạo được cuộc trò chuyện.');
-      const selectedCustomer = customers.find((c) => Number(c.id) === customerId);
       const displayName = isGenericCustomerLabel(created?.customerName)
         ? (selectedCustomer?.name || `Khách #${customerId}`)
         : created?.customerName;
@@ -419,7 +455,25 @@ const ManagerConversationWidget = () => {
       const newConvId = Number(created.conversationId);
       setActiveConversationId(Number.isFinite(newConvId) ? newConvId : created.conversationId);
     } catch (err) {
-      setErrorText(formatConversationApiError(err) || err?.message || 'Tạo cuộc trò chuyện thất bại.');
+      const apiErr = formatConversationApiError(err) || err?.message || '';
+      const alreadyExists = /da ton tai|đã tồn tại|already exists/i.test(String(apiErr));
+      if (alreadyExists) {
+        try {
+          const merged = await syncConversationsFromServer([]);
+          const existedAfterRefresh = findExistingConversation(merged);
+          const convId = Number(existedAfterRefresh?.conversationId);
+          if (Number.isFinite(convId) && convId > 0) {
+            setActiveConversationId(convId);
+            setErrorText('');
+            return;
+          }
+        } catch {
+          // fallback to user-facing error below
+        }
+        setErrorText('Khách này đã có cuộc hội thoại trước đó nhưng không thuộc danh sách chat bạn đang quản lý. Vui lòng liên hệ admin để phân quyền hoặc chuyển hội thoại.');
+        return;
+      }
+      setErrorText(apiErr || 'Tạo cuộc trò chuyện thất bại.');
     } finally {
       setCreatingConversation(false);
     }
