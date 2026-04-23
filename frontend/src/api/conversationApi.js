@@ -33,6 +33,16 @@ const pickDisplayName = (...values) => {
   return '';
 };
 
+const isPlaceholderText = (value) => {
+  const t = String(value || '').trim().toLowerCase();
+  return t === '' || t === 'string' || t === 'null' || t === 'undefined';
+};
+
+const sanitizeDisplayName = (value) => {
+  const text = String(value ?? '').trim();
+  return isPlaceholderText(text) ? '' : text;
+};
+
 /** API doi khi tra message/lastMessage la chuoi log (GET /api/...) — khong hien thi nhu tin nhan. */
 const isNoiseConversationPreview = (value) => {
   const s = String(value ?? '').trim();
@@ -75,7 +85,8 @@ export const normalizeConversationItem = (raw) => {
       manager?.id
     ),
     managerName:
-      pickDisplayName(
+      sanitizeDisplayName(
+        pickDisplayName(
         raw?.managerName,
         raw?.ManagerName,
         raw?.managerFullName,
@@ -89,10 +100,12 @@ export const normalizeConversationItem = (raw) => {
         manager?.username,
         manager?.name,
         userName
+        )
       ) || 'Quản lý',
     customerId: toNum(raw?.customerId ?? raw?.CustomerId ?? customer?.userId ?? customer?.id),
     customerName:
-      pickDisplayName(
+      sanitizeDisplayName(
+        pickDisplayName(
         raw?.customerName,
         raw?.CustomerName,
         raw?.customerFullName,
@@ -110,6 +123,7 @@ export const normalizeConversationItem = (raw) => {
         customer?.user?.displayName,
         customer?.account?.fullName,
         customer?.account?.fullname
+        )
       ) || 'Khách hàng',
     userId,
     userName,
@@ -355,7 +369,10 @@ export const conversationApi = {
     })).filter((x) => x.id != null).map((x) => ({
       ...x,
       name: x.name || x.email || x.phone || `Khách #${x.id}`,
-    }));
+    })).filter((x) => {
+      const onlyPlaceholderName = isPlaceholderText(x.name) && isPlaceholderText(x.email) && isPlaceholderText(x.phone);
+      return !onlyPlaceholderName;
+    });
   },
 };
 

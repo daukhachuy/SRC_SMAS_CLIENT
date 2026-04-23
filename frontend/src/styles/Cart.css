@@ -828,6 +828,12 @@
 .Input-With-Icon { position: relative; display: flex; align-items: center; }
 .Input-With-Icon input { padding-left: 45px; width: 100%; }
 .orange-icon { position: absolute; left: 15px; color: var(--Primary-Orange); }
+.Address-Auto-Hint {
+  margin-top: -2px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.45;
+}
 
 @media (max-width: 768px) {
   .Summary-Main-Layout { flex-direction: column; }

@@ -200,12 +200,12 @@ const FoodListModal = ({
   };
 
   const isSelected = (dishId) => {
-    return safeSelected.some((d) => (d.foodId || d.id) === dishId);
+    return safeSelected.some((d) => String(d?.type || '').toLowerCase() === 'menu' && (d.foodId || d.id) === dishId);
   };
 
   const handleToggleDish = (item) => {
     if (isSelected(item.foodId || item.id)) {
-      onRemoveDish(item.foodId || item.id);
+      onRemoveDish(item.foodId || item.id, 'Menu');
     } else {
       onAddDish({
         ...item,
@@ -317,7 +317,7 @@ const FoodListModal = ({
           </button>
           <div className="food-list-selected-info">
             <span>Đã chọn:</span>
-            <strong>{safeSelected.filter((d) => d.type === 'Menu').length} món</strong>
+            <strong>{safeSelected.filter((d) => String(d?.type || '').toLowerCase() === 'menu').length} món</strong>
           </div>
           <button type="button" className="food-list-confirm-btn" onClick={onClose}>
             Xong

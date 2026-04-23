@@ -480,28 +480,8 @@ const Profile = () => {
     fetchDistricts();
   }, [showAddAddressModal, newAddress.city, provinceOptions]);
 
-  const handleAddAddress = () => {
-    setEditingAddressId(null);
-    setNewAddress({
-      street: '',
-      district: '',
-      city: '',
-      addressType: 'Nhà riêng',
-      memorableName: '',
-      phone: userInfo.phone || '',
-      setAsDefault: false
-    });
-    setShowAddAddressModal(true);
-  };
-
-  const handleCloseAddAddressModal = () => {
-    setShowAddAddressModal(false);
-    setEditingAddressId(null);
-  };
-
-  const handleEditAddress = (id) => {
-    const target = addresses.find((a) => String(a.id) === String(id));
-    if (!target) return;
+  const openAddressEditor = (target) => {
+    if (!target) return false;
     const textClean = stripLegacyGpsSuffix(target.address);
     const parts = String(textClean || '')
       .split(',')
@@ -525,6 +505,34 @@ const Profile = () => {
       setAsDefault: !!target.isDefault
     });
     setShowAddAddressModal(true);
+    return true;
+  };
+
+  const handleAddAddress = () => {
+    const preferred = addresses.find((a) => a.isDefault) || addresses[0];
+    if (openAddressEditor(preferred)) return;
+    setEditingAddressId(null);
+    setNewAddress({
+      street: '',
+      district: '',
+      city: '',
+      addressType: 'Nhà riêng',
+      memorableName: '',
+      phone: userInfo.phone || '',
+      setAsDefault: false
+    });
+    setShowAddAddressModal(true);
+  };
+
+  const handleCloseAddAddressModal = () => {
+    setShowAddAddressModal(false);
+    setEditingAddressId(null);
+  };
+
+  const handleEditAddress = (id) => {
+    const target = addresses.find((a) => String(a.id) === String(id));
+    if (!target) return;
+    openAddressEditor(target);
   };
 
   const handleSaveNewAddress = async (e) => {
@@ -722,7 +730,7 @@ const Profile = () => {
             Địa chỉ giao hàng
           </h2>
           <button type="button" className="Profile-Link-Add" onClick={handleAddAddress}>
-            <i className="fa-solid fa-location-dot"></i> Thêm địa chỉ mới
+            <i className="fa-solid fa-location-dot"></i> Sửa đổi địa chỉ giao hàng
           </button>
         </div>
         <div className="Profile-Address-List">
@@ -748,7 +756,7 @@ const Profile = () => {
         </div>
       </section>
 
-      {/* Modal Thêm địa chỉ mới - layout rộng cho máy tính */}
+      {/* Modal địa chỉ giao hàng - layout rộng cho máy tính */}
       {showAddAddressModal && (
         <div className="AddressModal-Overlay" onClick={handleCloseAddAddressModal}>
           <div className="AddressModal-Box" onClick={(e) => e.stopPropagation()}>
@@ -756,7 +764,7 @@ const Profile = () => {
               <button type="button" className="AddressModal-Back" onClick={handleCloseAddAddressModal} aria-label="Đóng">
                 <i className="fa-solid fa-arrow-left"></i>
               </button>
-              <h2 className="AddressModal-Title">{editingAddressId != null ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}</h2>
+              <h2 className="AddressModal-Title">{editingAddressId != null ? 'Sửa đổi địa chỉ giao hàng' : 'Thêm địa chỉ mới'}</h2>
               <button type="button" className="AddressModal-Help">Trợ giúp</button>
             </div>
             <form onSubmit={handleSaveNewAddress}>

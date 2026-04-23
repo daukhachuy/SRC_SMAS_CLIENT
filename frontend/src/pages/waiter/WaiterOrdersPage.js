@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -58,6 +58,26 @@ const getOrderItemsSummary = (order) => {
   if (!order.items || !order.items.length) return 'Không có món';
   return order.items.map((item) => `${item.name} (${item.quantity})`).join(', ');
 }
+
+const normalizeDishName = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const getOrderItemMatchKey = (item) => {
+  const foodId = Number(item?.foodId || 0);
+  if (foodId > 0) return `food:${foodId}`;
+
+  const comboId = Number(item?.comboId || 0);
+  if (comboId > 0) return `combo:${comboId}`;
+
+  const buffetId = Number(item?.buffetId || 0);
+  if (buffetId > 0) return `buffet:${buffetId}`;
+
+  const nameKey = normalizeDishName(item?.name || item?.itemName || item?.foodName);
+  return nameKey ? `name:${nameKey}` : '';
+};
 
 const WaiterOrdersPage = () => {
 
@@ -402,6 +422,13 @@ const isBuffetPackageLine = (item) => {
   return (looksBuffetByName || looksBuffetByType || buffetId > 0) && foodId <= 0 && comboId <= 0;
 };
 
+const isBuffetChildLine = (item) => {
+  const buffetId = Number(item?.buffetId || item?.bufferId || item?.idBuffer || 0);
+  const foodId = Number(item?.foodId || 0);
+  const comboId = Number(item?.comboId || 0);
+  return buffetId > 0 && (foodId > 0 || comboId > 0);
+};
+
 const mergeDuplicateOrderItems = (items) => {
   const grouped = new Map();
 
@@ -449,7 +476,7 @@ const mapApiOrderToWaiter = (order) => {
     ? { status: deliveryFlow.status, statusLabel: deliveryFlow.statusLabel }
     : mapOrderStatus(order?.orderStatus || order?.status);
   // Map items đúng trường
-  const orderItems = Array.isArray(order?.items)
+  const rawOrderItems = Array.isArray(order?.items)
     ? order.items.map((item, idx) => ({
         name: item.itemName || item.foodName || item.name || `Món ${idx + 1}`,
         quantity: Number(item.quantity || 1),
@@ -465,8 +492,23 @@ const mapApiOrderToWaiter = (order) => {
         itemType: item.itemType || item.type,
         orderItemIds: [item.id, item.orderItemId, item.itemId].filter(Boolean),
       }))
-      .filter((item) => !isBuffetPackageLine(item))
     : [];
+
+  const buffetPackageLines = rawOrderItems.filter((item) => isBuffetPackageLine(item));
+  const buffetPackageTotal = buffetPackageLines.reduce((sum, item) => {
+    if (item?.dishStatus === 'cancelled') return sum;
+    return sum + Number(item?.price || 0) * Number(item?.quantity || 0);
+  }, 0);
+  const buffetPackageBuffetIds = Array.from(
+    new Set(
+      buffetPackageLines
+        .map((item) => Number(item?.buffetId || 0))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    )
+  );
+
+  // Buffet là gói dịch vụ, không hiển thị như món trong bảng chi tiết món ăn.
+  const orderItems = rawOrderItems.filter((item) => !isBuffetPackageLine(item));
   const mergedOrderItems = mergeDuplicateOrderItems(orderItems);
   const totalAmount = Number(order?.totalAmount || order?.total || 0);
   // Lấy tên bàn chính
@@ -550,6 +592,8 @@ const mapApiOrderToWaiter = (order) => {
     discount: isDelivery ? 0 : Number(order?.discountAmount || order?.discount || 0),
     discountCode: resolveOrderDiscountCode(order),
     totalAmount,
+    buffetPackageTotal: Number.isFinite(buffetPackageTotal) ? buffetPackageTotal : 0,
+    buffetPackageBuffetIds,
   };
 };
 
@@ -603,6 +647,9 @@ const mapApiOrderToWaiter = (order) => {
 
     try {
       setIsAddingItems(true);
+      pendingAddedItemKeysRef.current = cartItems
+        .map((item) => getOrderItemMatchKey(item))
+        .filter(Boolean);
       console.log('[AddItems] orderCode:', orderCode, 'payload:', payload);
       await addItemsToOrder(orderCode, payload);
       alert('Đã thêm món vào đơn hàng!');
@@ -621,18 +668,44 @@ const mapApiOrderToWaiter = (order) => {
       // Làm mới list đơn ở nền để giao diện không bị khựng.
       void fetchWaiterOrders({ silent: true });
     } catch (err) {
+      pendingAddedItemKeysRef.current = [];
       const data = err?.response?.data;
       const status = err?.response?.status;
+      const pickBackendMessage = (payload) => {
+        if (typeof payload === 'string' && payload.trim()) return payload.trim();
+        if (!payload || typeof payload !== 'object') return '';
+        const candidates = [
+          payload.message,
+          payload.Message,
+          payload.title,
+          payload.Title,
+          payload.detail,
+          payload.Detail,
+          payload.error,
+          payload.Error,
+          payload?.data?.message,
+          payload?.data?.Message,
+        ];
+        for (const entry of candidates) {
+          if (typeof entry === 'string' && entry.trim()) return entry.trim();
+        }
+        return '';
+      };
       const detail = data?.errors && typeof data.errors === 'object'
         ? Object.entries(data.errors)
             .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : String(msgs)}`)
             .join('\n')
         : '';
-      const raw = data && !detail
-        ? (typeof data === 'string' ? data : JSON.stringify(data))
-        : '';
-      const msg = data?.message || data?.title || err?.message || 'Lỗi khi thêm món vào đơn hàng!';
-      alert(detail ? `${msg}\n${detail}` : `${msg}${raw ? `\n${raw}` : ''} (HTTP ${status || 'N/A'})`);
+      const backendMsg = pickBackendMessage(data);
+      const rawErrMsg = String(err?.message || '').trim();
+      const isAxiosGenericMsg = /^Request failed with status code\s+\d+$/i.test(rawErrMsg);
+      const fallbackByStatus =
+        Number(status) === 400
+          ? 'Yêu cầu thêm món chưa hợp lệ. Vui lòng kiểm tra lại dữ liệu đơn hàng.'
+          : 'Lỗi khi thêm món vào đơn hàng.';
+      const msg = backendMsg || (!isAxiosGenericMsg && rawErrMsg) || fallbackByStatus;
+      const httpSuffix = status ? `\nMã lỗi HTTP: ${status}` : '';
+      alert(`${msg}${detail ? `\n${detail}` : ''}${httpSuffix}`);
       console.error(err);
     } finally {
       setIsAddingItems(false);
@@ -665,6 +738,10 @@ const mapApiOrderToWaiter = (order) => {
   const [activePaymentMethod, setActivePaymentMethod] = useState('cash');
   const [isPaying, setIsPaying] = useState(false);
   const [isAddingItems, setIsAddingItems] = useState(false);
+  const pendingAddedItemKeysRef = useRef([]);
+  const orderItemRowRefs = useRef([]);
+  const highlightTimeoutRef = useRef(null);
+  const [highlightedOrderItemKey, setHighlightedOrderItemKey] = useState('');
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [itemCancelIndex, setItemCancelIndex] = useState(null);
   const [itemCancelReason, setItemCancelReason] = useState('');
@@ -1390,11 +1467,64 @@ const mapApiOrderToWaiter = (order) => {
     return () => clearTimeout(timer);
   }, [uiNotice]);
 
+  useEffect(() => {
+    if (!showOrderDetailModal || !orderItemsState.length) return;
+    const pendingKeys = pendingAddedItemKeysRef.current;
+    if (!Array.isArray(pendingKeys) || pendingKeys.length === 0) return;
+
+    const pendingKeySet = new Set(pendingKeys);
+    const targetIndex = orderItemsState.findIndex((item) => pendingKeySet.has(getOrderItemMatchKey(item)));
+    if (targetIndex < 0) {
+      pendingAddedItemKeysRef.current = [];
+      return;
+    }
+
+    const targetKey = getOrderItemMatchKey(orderItemsState[targetIndex]);
+    const rowEl = orderItemRowRefs.current[targetIndex];
+    if (rowEl && typeof rowEl.scrollIntoView === 'function') {
+      rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+    setHighlightedOrderItemKey(targetKey);
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedOrderItemKey('');
+      highlightTimeoutRef.current = null;
+    }, 2200);
+
+    pendingAddedItemKeysRef.current = [];
+  }, [orderItemsState, showOrderDetailModal]);
+
+  useEffect(() => () => {
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+  }, []);
+
   const calculateOrderSubtotal = (order) => {
+    const buffetPackageTotal = Math.max(0, Number(order?.buffetPackageTotal || 0) || 0);
+    const buffetPackageIdSet = new Set(
+      (Array.isArray(order?.buffetPackageBuffetIds) ? order.buffetPackageBuffetIds : [])
+        .map((id) => Number(id || 0))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    );
+
     const itemsSubtotal = (order?.items || []).reduce((sum, item) => {
       if (item?.dishStatus === 'cancelled') return sum;
+
+      const buffetId = Number(item?.buffetId || 0);
+      if (
+        isBuffetChildLine(item) &&
+        buffetId > 0 &&
+        buffetPackageIdSet.has(buffetId)
+      ) {
+        // Khi đơn đã có dòng giá gói buffet, món con buffet không cộng tiền để tránh nhân đôi.
+        return sum;
+      }
+
       return sum + Number(item?.price || 0) * Number(item?.quantity || 0);
     }, 0);
+    const subtotalFromItems = itemsSubtotal + buffetPackageTotal;
 
     const backendSubtotalCandidates = [
       Number(order?.subTotal),
@@ -1405,7 +1535,7 @@ const mapApiOrderToWaiter = (order) => {
 
     const backendSubtotal = backendSubtotalCandidates.length > 0 ? backendSubtotalCandidates[0] : 0;
     // Tạm tính phải là tổng tiền món (chưa VAT). Chỉ fallback backend khi không có dữ liệu món.
-    return itemsSubtotal > 0 ? itemsSubtotal : Math.max(0, backendSubtotal);
+    return subtotalFromItems > 0 ? subtotalFromItems : Math.max(0, backendSubtotal);
   };
 
   const resolveOrderDiscountDisplay = (order, subtotalValue) => {
@@ -1805,6 +1935,8 @@ const mapApiOrderToWaiter = (order) => {
 
   const closeOrderDetailModal = () => {
     closeItemCancelModal();
+    pendingAddedItemKeysRef.current = [];
+    setHighlightedOrderItemKey('');
     setShowOrderDetailModal(false);
   };
 
@@ -3277,13 +3409,20 @@ const mapApiOrderToWaiter = (order) => {
                   <tbody>
                     {orderItemsState.map((item, idx) => {
                       const dishStatus = getDishStatus(item.dishStatus || 'pending');
+                      const itemMatchKey = getOrderItemMatchKey(item);
                       const itemRowIds = resolveOrderItemNumericIds(item);
                       const canCancelThisItem =
                         !isDeliveryOrder(selectedOrder) &&
                         item.dishStatus === 'pending' &&
                         itemRowIds.length > 0;
                       return (
-                        <tr key={item.name + idx}>
+                        <tr
+                          key={item.name + idx}
+                          ref={(el) => {
+                            orderItemRowRefs.current[idx] = el;
+                          }}
+                          className={itemMatchKey && itemMatchKey === highlightedOrderItemKey ? 'order-item-row-highlight' : ''}
+                        >
                           <td>
                             <p>{item.name}</p>
                             {item.note && <small>{item.note}</small>}
