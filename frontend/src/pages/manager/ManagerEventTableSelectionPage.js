@@ -142,7 +142,7 @@ const ManagerEventTableSelectionPage = () => {
               </h3>
               <p className="modal-subtitle">
                 {requiredTables > 0
-                  ? `Vui lòng chọn đúng ${requiredTables} bàn theo numberOfTable của sự kiện`
+                  ? `Vui lòng chọn đúng ${requiredTables} bàn theo sự kiện`
                   : 'Chọn các bàn cần phục vụ cho sự kiện'}
               </p>
             </div>
