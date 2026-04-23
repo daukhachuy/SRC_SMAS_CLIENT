@@ -607,7 +607,6 @@ const AdminRestaurantPage = () => {
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
   const [serviceImageFile, setServiceImageFile] = useState(null);
   const [serviceImagePreview, setServiceImagePreview] = useState('');
-  const [serviceDeletingId, setServiceDeletingId] = useState(null);
   const [serviceToggleBusyId, setServiceToggleBusyId] = useState(null);
 
   const loadServices = useCallback(async () => {
@@ -746,23 +745,6 @@ const AdminRestaurantPage = () => {
       setServiceSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
     } finally {
       setServiceSubmitting(false);
-    }
-  };
-
-  const handleDeleteService = async (row) => {
-    const sid = Number(row?.id);
-    if (!Number.isFinite(sid) || sid <= 0) return;
-    const name = (row.name || 'dịch vụ này').trim();
-    if (!window.confirm(`Xóa dịch vụ "${name}"? Thao tác không hoàn tác.`)) return;
-    setServiceDeletingId(sid);
-    try {
-      await serviceAPI.delete(sid);
-      await loadServices();
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Không xóa được dịch vụ.';
-      window.alert(typeof msg === 'string' ? msg : 'Lỗi xóa');
-    } finally {
-      setServiceDeletingId(null);
     }
   };
 
@@ -2063,7 +2045,7 @@ const AdminRestaurantPage = () => {
                             type="button"
                             className={`rest-toggle ${row.active ? 'active' : ''}`}
                             onClick={() => toggleServiceAvailable(row)}
-                            disabled={!!serviceDeletingId || serviceToggleBusyId === row.id}
+                            disabled={serviceToggleBusyId === row.id}
                             aria-busy={serviceToggleBusyId === row.id}
                             aria-label={row.active ? 'Tắt dịch vụ' : 'Bật dịch vụ'}
                           >
@@ -2075,20 +2057,11 @@ const AdminRestaurantPage = () => {
                         </div>
                       </td>
                       <td>
-                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openServiceDetail(row)} disabled={!!serviceDeletingId || serviceToggleBusyId === row.id}>
+                        <button type="button" className="rest-icon-btn" aria-label="Xem chi tiết" onClick={() => openServiceDetail(row)} disabled={serviceToggleBusyId === row.id}>
                           <Eye size={16} />
                         </button>
-                        <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditService(row)} disabled={!!serviceDeletingId || serviceToggleBusyId === row.id}>
+                        <button type="button" className="rest-icon-btn" aria-label="Sửa" onClick={() => openEditService(row)} disabled={serviceToggleBusyId === row.id}>
                           <Pencil size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="rest-icon-btn"
-                          aria-label="Xóa"
-                          onClick={() => handleDeleteService(row)}
-                          disabled={serviceDeletingId === row.id || serviceToggleBusyId === row.id}
-                        >
-                          <Trash2 size={16} />
                         </button>
                       </td>
                     </tr>
