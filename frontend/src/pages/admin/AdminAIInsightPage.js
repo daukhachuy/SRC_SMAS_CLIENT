@@ -302,6 +302,8 @@ function getReviewSectionData(obj) {
     'weaknesses',
     'Weaknesses',
     'issues',
+    'topIssues',
+    'TopIssues',
     'concerns',
     'gaps',
   ];
@@ -310,6 +312,8 @@ function getReviewSectionData(obj) {
     'ActionItems',
     'recommendations',
     'Recommendations',
+    'suggestions',
+    'Suggestions',
     'nextSteps',
     'NextSteps',
     'actions',
@@ -319,8 +323,12 @@ function getReviewSectionData(obj) {
   const strengths = mergeArraysFromKeys(obj, strengthKeys);
   const improvements = mergeArraysFromKeys(obj, improvementKeys);
   const actionItems = mergeArraysFromKeys(obj, actionKeys);
+  const sentimentStats =
+    (obj.sentimentStats && typeof obj.sentimentStats === 'object' ? obj.sentimentStats : null) ||
+    (obj.SentimentStats && typeof obj.SentimentStats === 'object' ? obj.SentimentStats : null);
 
   const hasReviewLists =
+    !!sentimentStats ||
     themes.length > 0 ||
     strengths.length > 0 ||
     improvements.length > 0 ||
@@ -333,6 +341,8 @@ function getReviewSectionData(obj) {
     ...strengthKeys,
     ...improvementKeys,
     ...actionKeys,
+    'sentimentStats',
+    'SentimentStats',
     'summary',
     'Summary',
   ]);
@@ -344,7 +354,7 @@ function getReviewSectionData(obj) {
     }
   }
 
-  return { themes, strengths, improvements, actionItems, scalarRows };
+  return { sentimentStats, themes, strengths, improvements, actionItems, scalarRows };
 }
 
 function themeEntryTitle(t, i) {
@@ -417,8 +427,21 @@ function formatListItem(s) {
   return JSON.stringify(s, null, 2);
 }
 
+function formatPercentValue(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return '0%';
+  return `${Math.round(num)}%`;
+}
+
 function ReviewInsightSection({ data }) {
-  const { themes, strengths, improvements, actionItems, scalarRows } = data;
+  const { sentimentStats, themes, strengths, improvements, actionItems, scalarRows } = data;
+  const positivePercent =
+    sentimentStats?.positivePercent ?? sentimentStats?.PositivePercent ?? 0;
+  const neutralPercent =
+    sentimentStats?.neutralPercent ?? sentimentStats?.NeutralPercent ?? 0;
+  const negativePercent =
+    sentimentStats?.negativePercent ?? sentimentStats?.NegativePercent ?? 0;
+
   return (
     <section className="aiinsight-section aiinsight-section--reviews">
       <h3 className="aiinsight-section-title">
@@ -427,6 +450,22 @@ function ReviewInsightSection({ data }) {
         </span>
         Đánh giá khách hàng
       </h3>
+      {sentimentStats && (
+        <div className="aiinsight-review-block">
+          <h4 className="aiinsight-review-subtitle">Tỷ lệ cảm xúc</h4>
+          <ul className="aiinsight-review-list">
+            <li className="aiinsight-review-list-item-pre">
+              Tích cực: {formatPercentValue(positivePercent)}
+            </li>
+            <li className="aiinsight-review-list-item-pre">
+              Trung lập: {formatPercentValue(neutralPercent)}
+            </li>
+            <li className="aiinsight-review-list-item-pre">
+              Tiêu cực: {formatPercentValue(negativePercent)}
+            </li>
+          </ul>
+        </div>
+      )}
       {scalarRows.length > 0 && (
         <dl className="aiinsight-review-scalars">
           {scalarRows.map(({ key, value }) => (
@@ -479,11 +518,29 @@ function ReviewInsightSection({ data }) {
       )}
       {improvements.length > 0 && (
         <div className="aiinsight-review-block">
-          <h4 className="aiinsight-review-subtitle">Cần cải thiện</h4>
+          <h4 className="aiinsight-review-subtitle">Vấn đề nổi bật / cần cải thiện</h4>
           <ul className="aiinsight-review-list">
             {improvements.map((s, i) => (
               <li key={i} className="aiinsight-review-list-item-pre">
-                {formatListItem(s)}
+                {typeof s === 'object' && s != null ? (
+                  <div>
+                    <strong>
+                      {s.issueName || s.IssueName || s.title || s.Title || `Vấn đề ${i + 1}`}
+                    </strong>
+                    {(s.category || s.Category || s.severity || s.Severity || s.percent != null || s.Percent != null) && (
+                      <div style={{ marginTop: 4, opacity: 0.9 }}>
+                        {[s.category || s.Category, s.severity || s.Severity, s.percent ?? s.Percent].filter((x) => x != null && String(x).trim() !== '').join(' • ')}
+                      </div>
+                    )}
+                    {(s.description || s.Description || s.detail || s.Detail) && (
+                      <p style={{ marginTop: 6 }}>
+                        {s.description || s.Description || s.detail || s.Detail}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  formatListItem(s)
+                )}
               </li>
             ))}
           </ul>
@@ -495,7 +552,23 @@ function ReviewInsightSection({ data }) {
           <ol className="aiinsight-review-list aiinsight-review-list--numbered">
             {actionItems.map((s, i) => (
               <li key={i} className="aiinsight-review-list-item-pre">
-                {formatListItem(s)}
+                {typeof s === 'object' && s != null ? (
+                  <div>
+                    <strong>{s.title || s.Title || s.name || s.Name || `Đề xuất ${i + 1}`}</strong>
+                    {(s.priority || s.Priority) && (
+                      <div style={{ marginTop: 4, opacity: 0.9 }}>
+                        Ưu tiên: {s.priority || s.Priority}
+                      </div>
+                    )}
+                    {(s.detail || s.Detail || s.description || s.Description) && (
+                      <p style={{ marginTop: 6 }}>
+                        {s.detail || s.Detail || s.description || s.Description}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  formatListItem(s)
+                )}
               </li>
             ))}
           </ol>

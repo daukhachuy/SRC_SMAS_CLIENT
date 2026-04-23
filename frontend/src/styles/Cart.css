@@ -68,14 +68,18 @@
     border: none;
     background: none;
     cursor: pointer;
-    font-size: 1.2rem;
-    padding: 8px;
-    border-radius: 50%;
+    font-size: 1rem;
+    padding: 8px 10px;
+    border-radius: 999px;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .Action-Btn.delete { color: #ff4d4f; }
 .Action-Btn.delete:hover { background: #fff1f0; transform: scale(1.1); }
+.Action-Label { font-size: 12px; font-weight: 700; }
 
 /* Điều khiển số lượng */
 .Quantity-Control {

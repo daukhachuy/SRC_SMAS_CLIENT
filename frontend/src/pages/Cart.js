@@ -6,6 +6,7 @@ import { getProfile } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
 import { discountAPI } from '../api/discountApi';
 import { useNavigate } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
 import CustomerNoticeModal from '../components/CustomerNoticeModal';
 import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
 import '../styles/Cart.css';
@@ -417,7 +418,16 @@ const Cart = () => {
                         </td>
                         <td>
                           <div className="Action-Icons">
-                            <i className="fa-regular fa-trash-can delete-icon" onClick={() => removeItem(actualIndex)}></i>
+                            <button
+                              type="button"
+                              className="Action-Btn delete"
+                              onClick={() => removeItem(actualIndex)}
+                              aria-label={`Xóa món ${item.name || ''}`}
+                              title="Xóa món"
+                            >
+                              <Trash2 size={16} />
+                              <span className="Action-Label">Xóa</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
