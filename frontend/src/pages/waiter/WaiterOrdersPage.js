@@ -2080,6 +2080,7 @@ const mapApiOrderToWaiter = (order) => {
         alert('Tiền khách đưa phải lớn hơn 0.');
         return;
       }
+      const fullyPaidByCashInput = remainingAfterCash <= 0;
 
       const orderId = Number(selectedOrder.orderId || selectedOrder.rawOrderId || 0);
       if (!Number.isFinite(orderId) || orderId <= 0) {
@@ -2109,8 +2110,12 @@ const mapApiOrderToWaiter = (order) => {
           // fallback: nếu chưa đọc được đơn mới thì vẫn refresh danh sách ngoài
         }
 
-        if (completedAfterCash) {
-          alert('Thanh toán thành công. Đơn đã hoàn tất.');
+        if (completedAfterCash || fullyPaidByCashInput) {
+          alert(
+            completedAfterCash
+              ? 'Thanh toán thành công. Đơn đã hoàn tất.'
+              : 'Đã thanh toán đủ. Hệ thống sẽ đồng bộ trạng thái đơn trong giây lát.'
+          );
           setShowPaymentModal(false);
           closeOrderDetailModal();
           await fetchWaiterOrders();
@@ -2200,8 +2205,13 @@ const mapApiOrderToWaiter = (order) => {
       setAppliedVoucherCode(normalizedAppliedCode);
       const successMessage = extractBackendMessage(applyRes);
       const backendDiscountAmount = extractBackendDiscountAmount(applyRes);
+      const normalizedSuccessMessage = String(successMessage || '').replace(/(\d[\d,]*)\.00\b/g, '$1').trim();
+      const displaySuccessMessage =
+        backendDiscountAmount > 0
+          ? `Áp dụng mã thành công giảm ${formatCurrency(backendDiscountAmount)}`
+          : (normalizedSuccessMessage || 'Áp dụng voucher thành công.');
       setVoucherAppliedDiscountAmount(backendDiscountAmount);
-      setVoucherApplyMessage(successMessage || 'Áp dụng voucher thành công.');
+      setVoucherApplyMessage(displaySuccessMessage);
       await refreshSelectedOrderDetail(orderCode);
       void fetchWaiterOrders({ silent: true });
     } catch (err) {
@@ -3496,7 +3506,7 @@ const mapApiOrderToWaiter = (order) => {
 
               <div className="total-summary soft">
                 <div>
-                  <span>Tạm tính</span>
+                  <span>Tạm tính (Món lẻ + Buffet)</span>
                   <strong>{formatCurrency(calculateOrderSubtotal(selectedOrder))}</strong>
                 </div>
                 {calculateOrderVat(selectedOrder) > 0 && (
@@ -3727,7 +3737,7 @@ const mapApiOrderToWaiter = (order) => {
                 </div>
                 <div className="payment-totals">
                   <div>
-                    <span>Tạm tính:</span>
+                    <span>Tạm tính (Món lẻ + Buffet):</span>
                     <strong>{formatCurrency(calculateOrderSubtotal(selectedOrder))}</strong>
                   </div>
                   {calculateOrderVat(selectedOrder) > 0 && (

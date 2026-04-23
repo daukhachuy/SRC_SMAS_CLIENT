@@ -3028,52 +3028,74 @@
   font-size: 11px;
 }
 
-.dish-status {
+.dish-status,
+.dish-status-pending,
+.dish-status-preparing,
+.dish-status-ready,
+.dish-status-served,
+.dish-status-cancelled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
 }
 
-.dish-status::before {
+.dish-status::before,
+.dish-status-pending::before,
+.dish-status-preparing::before,
+.dish-status-ready::before,
+.dish-status-served::before,
+.dish-status-cancelled::before {
   content: '';
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
 }
 
-.dish-status.pending {
-  color: #94a3b8;
+.dish-status-pending {
+  color: #b45309;
+  background: #fff7ed;
+  border-color: #fed7aa;
 }
 
-.dish-status.pending::before {
-  background: #cbd5e1;
+.dish-status-pending::before {
+  background: #f97316;
 }
 
-.dish-status.preparing {
-  color: #eab308;
+.dish-status-preparing {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
 }
 
-.dish-status.preparing::before {
-  background: #eab308;
+.dish-status-preparing::before {
+  background: #8b5cf6;
 }
 
-.dish-status.ready {
-  color: #22c55e;
+.dish-status-ready {
+  color: #0f766e;
+  background: #f0fdfa;
+  border-color: #99f6e4;
 }
 
-.dish-status.ready::before {
+.dish-status-ready::before {
+  background: #14b8a6;
+}
+
+.dish-status-served {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.dish-status-served::before {
   background: #22c55e;
-}
-
-.dish-status.served {
-  color: #3b82f6;
-}
-
-.dish-status.served::before {
-  background: #3b82f6;
 }
 
 .dish-action {
@@ -3128,21 +3150,13 @@
 }
 
 .dish-status-cancelled {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: #94a3b8;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .dish-status-cancelled::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #cbd5e1;
+  background: #ef4444;
 }
 
 .total-summary.soft {
