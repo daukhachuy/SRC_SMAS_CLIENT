@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Plus, Search, Pencil, X, Trash2, AlertCircle, CheckCircle, RefreshCw, Eye, Image as ImageIcon, Upload, Minus,
+  Plus, Search, Pencil, X, Trash2, AlertCircle, RefreshCw, Eye, Image as ImageIcon, Upload, Minus,
 } from 'lucide-react';
 import {
   getBuffetLists,
@@ -14,6 +14,8 @@ import {
   resolveFoodImageUrl,
 } from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
+import { getErrorMessage } from '../../../utils/errorHandler';
+import { useAdminToast } from '../../../context/AdminToastContext';
 
 const STATUS_FILTERS = ['Tất cả', 'Đang bán', 'Ngừng bán'];
 
@@ -93,6 +95,9 @@ function normalizeBuffetRow(raw) {
 }
 
 export default function AdminMenuBuffet() {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [buffetList, setBuffetList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -117,9 +122,6 @@ export default function AdminMenuBuffet() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [removingFoodId, setRemovingFoodId] = useState(null);
 
-  const [toastMsg, setToastMsg] = useState('');
-  const [toastType, setToastType] = useState('success');
-
   const loadData = useMemo(
     () => async ({ silent } = {}) => {
       if (!silent) setLoading(true);
@@ -129,7 +131,7 @@ export default function AdminMenuBuffet() {
         const normalized = (Array.isArray(raw) ? raw : []).map(normalizeBuffetRow).filter(Boolean);
         setBuffetList(normalized);
       } catch (e) {
-        setError(e?.message || 'Không tải được danh sách buffet.');
+        setError(getErrorMessage(e, 'Không tải được danh sách buffet.'));
       } finally {
         if (!silent) setLoading(false);
       }
@@ -138,12 +140,6 @@ export default function AdminMenuBuffet() {
   );
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  useEffect(() => {
-    if (!toastMsg) return;
-    const t = setTimeout(() => setToastMsg(''), 3500);
-    return () => clearTimeout(t);
-  }, [toastMsg]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -240,7 +236,7 @@ export default function AdminMenuBuffet() {
       const foods = normalizeFoodCategoryPayload(data);
       setAvailableFoods(foods);
     } catch (e) {
-      console.error('Không tải được danh sách món:', e);
+      console.error('Không tải được danh sách món:', getErrorMessage(e));
     } finally {
       setFoodsLoading(false);
     }
@@ -318,16 +314,15 @@ export default function AdminMenuBuffet() {
       const payload = buildPayload();
       if (editBuffetId) {
         await updateBuffet(editBuffetId, payload);
-        setToastMsg('Cập nhật buffet thành công!');
+        showToast('Cập nhật buffet thành công!', 'success');
       } else {
         await createBuffet(payload);
-        setToastMsg('Tạo buffet thành công!');
+        showToast('Tạo buffet thành công!', 'success');
       }
-      setToastType('success');
       closeBuffetModal();
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Thao tác thất bại.';
+      const msg = getErrorMessage(e, 'Thao tác thất bại. Vui lòng thử lại.');
       setFormErrors({ _api: msg });
     } finally {
       setFormLoading(false);
@@ -338,13 +333,12 @@ export default function AdminMenuBuffet() {
     setRemovingFoodId(foodId);
     try {
       await removeFoodFromBuffet(buffetId, foodId);
-      setToastMsg('Đã xóa món ăn khỏi gói Buffet.');
-      setToastType('success');
+      showToast('Đã xóa món ăn khỏi gói Buffet.', 'success');
       const raw = await getBuffetDetail(buffetId);
       setDetailBuffet(normalizeBuffetRow(raw));
     } catch (e) {
-      setToastMsg(e?.response?.data?.message || e?.message || 'Lỗi khi xóa món ăn.');
-      setToastType('error');
+      const msg = getErrorMessage(e, 'Lỗi khi xóa món ăn. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setRemovingFoodId(null);
     }
@@ -353,12 +347,11 @@ export default function AdminMenuBuffet() {
   const handleToggleStatus = async (row) => {
     try {
       await updateBuffetStatus(row.id);
-      setToastMsg('Cập nhật trạng thái thành công!');
-      setToastType('success');
+      showToast('Cập nhật trạng thái thành công!', 'success');
       await loadData({ silent: true });
     } catch (e) {
-      setToastMsg(e?.message || 'Không cập nhật được trạng thái.');
-      setToastType('error');
+      const msg = getErrorMessage(e, 'Không cập nhật được trạng thái.');
+      showToast(msg, 'error');
     }
   };
 
@@ -377,18 +370,6 @@ export default function AdminMenuBuffet() {
   };
 
   // ---- Render ----
-
-  const renderToast = () => {
-    if (!toastMsg) return null;
-    return (
-      <div className={`buffet-toast ${toastType === 'success' ? 'buffet-toast-success' : 'buffet-toast-error'}`}>
-        <span className="buffet-toast-icon">
-          {toastType === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-        </span>
-        <span>{toastMsg}</span>
-      </div>
-    );
-  };
 
   const renderFormModal = () => {
     if (!createBuffetOpen) return null;
@@ -759,7 +740,6 @@ export default function AdminMenuBuffet() {
         </button>
       </div>
 
-      {renderToast()}
       {renderFormModal()}
       {renderDetailModal()}
 

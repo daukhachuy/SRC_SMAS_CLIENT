@@ -10,6 +10,8 @@ import {
   parseTableApiError,
 } from '../../api/tableApi';
 import '../../styles/AdminTableMap.css';
+import { getErrorMessage } from '../../utils/errorHandler';
+import { useAdminToast } from '../../context/AdminToastContext';
 
 const TABLE_TYPES = [
   { value: 'standard', label: 'Tiêu chuẩn' },
@@ -51,6 +53,9 @@ const normalizeTableTypeForForm = (rawType) => {
 };
 
 const AdminTableMap = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,7 +84,8 @@ const AdminTableMap = () => {
         setTables(rows);
       }
     } catch (e) {
-      setError(parseTableApiError(e, 'Không tải được danh sách bàn.'));
+      const msg = getErrorMessage(e, 'Không tải được danh sách bàn.');
+      setError(msg);
       setTables([]);
     } finally {
       setLoading(false);
@@ -169,17 +175,20 @@ const AdminTableMap = () => {
           nameNorm &&
           tables.some((t) => String(t.name || '').trim().toLowerCase() === nameNorm)
         ) {
-          alert('Tên bàn đã tồn tại. Vui lòng chọn tên khác.');
+          showToast('Tên bàn đã tồn tại. Vui lòng chọn tên khác.', 'error');
           return;
         }
         await createTable(payload);
+        showToast('Thêm bàn mới thành công!', 'success');
       } else if (editingTable) {
         await updateTable(editingTable.id, payload);
+        showToast('Cập nhật bàn thành công!', 'success');
       }
       await loadTables();
       closeModal();
     } catch (err) {
-      alert(parseTableApiError(err));
+      const msg = getErrorMessage(err, 'Lưu bàn thất bại. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setSaving(false);
     }
@@ -189,9 +198,11 @@ const AdminTableMap = () => {
     if (!window.confirm(`Bạn có chắc muốn xóa ${table.name}?`)) return;
     try {
       await deleteTable(table.id);
+      showToast(`Đã xóa bàn "${table.name}".`, 'success');
       await loadTables();
     } catch (err) {
-      alert(parseTableApiError(err));
+      const msg = getErrorMessage(err, 'Xóa bàn thất bại. Vui lòng thử lại.');
+      showToast(msg, 'error');
     }
   };
 
@@ -336,8 +347,14 @@ const AdminTableMap = () => {
                             const newStatus = !t.isActive;
                             if (window.confirm(`${newStatus ? 'Mở' : 'Đóng'} bàn "${t.name}"?`)) {
                               toggleTableStatus(t.id, newStatus)
-                                .then(() => loadTables())
-                                .catch((err) => alert(parseTableApiError(err, 'Không cập nhật được trạng thái bàn.')));
+                                .then(() => {
+                                  showToast(`${newStatus ? 'Mở' : 'Đóng'} bàn "${t.name}" thành công.`, 'success');
+                                  loadTables();
+                                })
+                                .catch((err) => {
+                                  const msg = getErrorMessage(err, 'Không cập nhật được trạng thái bàn.');
+                                  showToast(msg, 'error');
+                                });
                             }
                           }}
                         >

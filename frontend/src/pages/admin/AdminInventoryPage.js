@@ -12,6 +12,8 @@ import {
   createInventory,
   getNewBatchCode
 } from '../../api/inventoryApi';
+import { getErrorMessage } from '../../utils/errorHandler';
+import { useAdminToast } from '../../context/AdminToastContext';
 
 const UNITS = [
   { value: 'kg', label: 'Kg' },
@@ -44,6 +46,9 @@ const MOCK_CATEGORY = [
 ];
 
 const AdminInventoryPage = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [mainTab, setMainTab] = useState('stock'); // 'stock' | 'category'
   const [searchStock, setSearchStock] = useState('');
   const [searchHistory, setSearchHistory] = useState('');
@@ -158,9 +163,8 @@ const AdminInventoryPage = () => {
       });
       setHistoryData(transformedHistory);
     } catch (err) {
-      console.error('Failed to fetch inventory data:', err);
-      setError(err.message || 'Failed to load inventory data');
-      // Không dùng mock - giữ data cũ hoặc rỗng, chỉ báo lỗi
+      console.error('Lỗi khi tải dữ liệu kho hàng:', getErrorMessage(err));
+      setError('Không tải được dữ liệu kho hàng. Vui lòng thử lại.');
       setStockData([]);
       setIngredients([]);
       setHistoryData([]);
@@ -215,12 +219,13 @@ const AdminInventoryPage = () => {
         warehouseLocation: warehouseLocation.trim() || null,
         note: note.trim() || null
       });
+      showToast('Tạo lô hàng thành công!', 'success');
       setShowImportModal(false);
       setImportForm({ ingredientId: '', batchCode: '', quantity: '', pricePerUnit: '', expiryDate: '', warehouseLocation: '', note: '' });
       await fetchAllData();
     } catch (err) {
-      console.error('Failed to create inventory:', err);
-      setError(err.message || 'Không thể tạo lô hàng');
+      const msg = getErrorMessage(err, 'Không thể tạo lô hàng. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setImportSubmitting(false);
     }
@@ -236,10 +241,8 @@ const AdminInventoryPage = () => {
         isActive: true
       };
 
-      // Call API to create material
       const created = await createMaterial(newItem);
 
-      // Add to local state with the created ID
       setIngredients((prev) => [...prev, {
         id: created.id || created.materialId || Math.max(...prev.map((i) => i.id), 0) + 1,
         name: form.name,
@@ -247,16 +250,10 @@ const AdminInventoryPage = () => {
         description: form.description,
         active: true
       }]);
+      showToast('Thêm nguyên liệu thành công!', 'success');
     } catch (err) {
-      console.error('Failed to create material:', err);
-      // Still add to local state even if API fails
-      setIngredients((prev) => [...prev, {
-        id: Math.max(...prev.map((i) => i.id), 0) + 1,
-        name: form.name,
-        unit: form.unit,
-        description: form.description,
-        active: true
-      }]);
+      const msg = getErrorMessage(err, 'Không thể thêm nguyên liệu. Vui lòng thử lại.');
+      showToast(msg, 'error');
     }
     setForm({ name: '', unit: '', smallestUnit: 'gram', warningLevel: 0, description: '' });
     setAddModalOpen(false);
@@ -267,13 +264,14 @@ const AdminInventoryPage = () => {
     if (!item) return;
 
     try {
-      // Call API to update material status
       await updateMaterial(id, { isActive: !item.active });
+      showToast(`Đã ${!item.active ? 'bật' : 'tắt'} nguyên liệu "${item.name}".`, 'success');
     } catch (err) {
-      console.error('Failed to update material status:', err);
+      const msg = getErrorMessage(err, 'Không cập nhật được trạng thái.');
+      showToast(msg, 'error');
+      return;
     }
 
-    // Update local state
     setIngredients((prev) =>
       prev.map((i) => (i.id === id ? { ...i, active: !i.active } : i))
     );
