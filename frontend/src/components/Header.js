@@ -4,7 +4,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import NotificationDropdown from './NotificationDropdown';
 import CustomerConversationWidget from './CustomerConversationWidget';
-import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../api/notificationApi';
+import {
+  getAllNotifications,
+  getUnreadNotifications,
+  normalizeNotificationList,
+  normalizeNotificationSeverity,
+} from '../api/notificationApi';
 import '../styles/Header.css';
 
 const MENU_ITEMS = [
@@ -61,6 +66,7 @@ const mapNotificationItem = (item, idx) => ({
   message: item?.message || item?.content || item?.description || 'Bạn có thông báo mới.',
   time: timeAgoVi(item?.createdAt || item?.time || item?.sentAt),
   isRead: Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false),
+  severity: normalizeNotificationSeverity(item?.severity ?? item?.Severity),
 });
 
 const Header = () => {

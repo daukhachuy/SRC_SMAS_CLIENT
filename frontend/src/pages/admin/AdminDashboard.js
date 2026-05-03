@@ -15,6 +15,7 @@ import {
 import { Chart, Line, Doughnut } from 'react-chartjs-2';
 import { fetchAdminDashboardAll, fetchTransactionHistory, ORDER_STRUCTURE_LABELS } from '../../api/adminDashboardApi';
 import '../../styles/AdminDashboard.css';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 ChartJS.register(
   BarController,
@@ -159,7 +160,10 @@ const AdminDashboard = () => {
           hasPreviousPage: txPage > 1,
         });
       })
-      .catch(() => setTxData({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false }))
+      .catch((err) => {
+        console.error('Lỗi khi tải lịch sử giao dịch:', getErrorMessage(err));
+        setTxData({ data: [], totalItems: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false });
+      })
       .finally(() => setTxLoading(false));
   }, [txFilters, txPage, txPageSize]);
 

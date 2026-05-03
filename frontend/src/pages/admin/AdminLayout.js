@@ -18,9 +18,16 @@ import {
   Bell
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { AdminToastProvider } from '../../context/AdminToastContext';
 import NotificationDropdown from '../../components/NotificationDropdown';
-import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../../api/notificationApi';
+import {
+  getAllNotifications,
+  getUnreadNotifications,
+  normalizeNotificationList,
+  normalizeNotificationSeverity,
+} from '../../api/notificationApi';
 import '../../styles/AdminLayout.css';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 const navItems = [
   { to: '/admin', end: true, label: 'Dashboard', icon: LayoutDashboard },
@@ -102,6 +109,7 @@ const AdminLayout = () => {
     message: item?.message || item?.content || item?.description || 'Bạn có thông báo mới.',
     time: timeAgoVi(item?.createdAt || item?.time || item?.sentAt),
     isRead: Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false),
+    severity: normalizeNotificationSeverity(item?.severity ?? item?.Severity),
   });
 
   useEffect(() => {
@@ -174,7 +182,7 @@ const AdminLayout = () => {
 
         if (mounted) setNotifications(mapped);
       } catch (error) {
-        console.error('Load admin notifications failed:', error);
+        console.error('Lỗi khi tải thông báo:', getErrorMessage(error));
         setAdminScreenError('Không tải được thông báo. Vui lòng thử lại.');
         if (mounted) setNotifications([]);
       }
@@ -272,7 +280,9 @@ const AdminLayout = () => {
 
       <main className="admin-main">
         <div className="admin-content">
-          <Outlet />
+          <AdminToastProvider>
+            <Outlet />
+          </AdminToastProvider>
         </div>
       </main>
 

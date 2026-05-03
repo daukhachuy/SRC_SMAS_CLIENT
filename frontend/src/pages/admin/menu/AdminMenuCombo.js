@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Plus, Search, Pencil, Eye, X, Calendar, Trash2, AlertCircle, CheckCircle, RefreshCw,
+  Plus, Search, Pencil, Eye, X, Calendar, Trash2, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import {
   getComboLists,
@@ -16,6 +16,8 @@ import {
   normalizeFoodCategoryPayload,
 } from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
+import { getErrorMessage } from '../../../utils/errorHandler';
+import { useAdminToast } from '../../../context/AdminToastContext';
 
 const STATUS_FILTERS = ['Tất cả trạng thái', 'Đang bán', 'Ngừng bán'];
 
@@ -120,11 +122,12 @@ function normalizeComboRow(raw) {
 }
 
 const AdminMenuCombo = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [combos, setCombos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [toastMsg, setToastMsg] = useState('');
-  const [toastType, setToastType] = useState('success');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tất cả trạng thái');
@@ -162,10 +165,7 @@ const AdminMenuCombo = () => {
       const list = normalizeComboListResponse(payload);
       setCombos(list.map(normalizeComboRow).filter(Boolean));
     } catch (e) {
-      const msg =
-        e?.message ||
-        e?.response?.data?.message ||
-        'Không tải được danh sách combo (GET /api/combo).';
+      const msg = getErrorMessage(e, 'Không tải được danh sách combo. Vui lòng thử lại.');
       setApiError(msg);
       setCombos([]);
     } finally {
@@ -176,12 +176,6 @@ const AdminMenuCombo = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    if (!toastMsg) return;
-    const t = setTimeout(() => setToastMsg(''), 3500);
-    return () => clearTimeout(t);
-  }, [toastMsg]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -261,7 +255,7 @@ const AdminMenuCombo = () => {
         setSelectedFoods(mapped);
       }
     } catch (e) {
-      console.error('Không tải được chi tiết combo:', e);
+      console.error('Không tải được chi tiết combo:', getErrorMessage(e));
     } finally {
       setFoodsLoading(false);
     }
@@ -283,7 +277,7 @@ const AdminMenuCombo = () => {
       const foods = normalizeFoodCategoryPayload(data);
       setAvailableFoods(foods);
     } catch (e) {
-      console.error('Không tải được danh sách món:', e);
+      console.error('Không tải được danh sách món:', getErrorMessage(e));
     } finally {
       setFoodsLoading(false);
     }
@@ -360,16 +354,15 @@ const AdminMenuCombo = () => {
 
       if (editComboId) {
         await updateCombo(editComboId, payload);
-        setToastMsg('Cập nhật combo thành công!');
+        showToast('Cập nhật combo thành công!', 'success');
       } else {
         await createCombo(payload);
-        setToastMsg('Tạo combo thành công!');
+        showToast('Tạo combo thành công!', 'success');
       }
-      setToastType('success');
       closeComboModal();
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Thao tác thất bại.';
+      const msg = getErrorMessage(e, 'Thao tác thất bại. Vui lòng thử lại.');
       setFormErrors({ _api: msg });
     } finally {
       setFormLoading(false);
@@ -381,15 +374,13 @@ const AdminMenuCombo = () => {
     setDeleteLoading(true);
     try {
       await deleteCombo(deletingCombo.id);
-      setToastMsg('Đã xóa combo.');
-      setToastType('success');
+      showToast('Đã xóa combo.', 'success');
       setDeleteModalOpen(false);
       setDeletingCombo(null);
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Xóa combo thất bại.';
-      setToastMsg(msg);
-      setToastType('error');
+      const msg = getErrorMessage(e, 'Xóa combo thất bại. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setDeleteLoading(false);
     }
@@ -418,13 +409,11 @@ const AdminMenuCombo = () => {
     setToggleBusyId(row.id);
     try {
       await patchComboStatus(row.id, !row.status);
-      setToastMsg(`Đã ${!row.status ? 'bật' : 'tắt'} bán combo "${row.name}".`);
-      setToastType('success');
+      showToast(`Đã ${!row.status ? 'bật' : 'tắt'} bán combo "${row.name}".`, 'success');
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Không cập nhật được trạng thái.';
-      setToastMsg(msg);
-      setToastType('error');
+      const msg = getErrorMessage(e, 'Không cập nhật được trạng thái. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setToggleBusyId(null);
     }
@@ -460,13 +449,6 @@ const AdminMenuCombo = () => {
           Thêm Combo mới
         </button>
       </div>
-
-      {toastMsg && (
-        <div className={`kds-toast-msg ${toastType === 'error' ? 'kds-toast-msg--error' : ''}`} role="status">
-          {toastType === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-          <span>{toastMsg}</span>
-        </div>
-      )}
 
       {apiError && (
         <div className="kds-api-error" role="alert">

@@ -166,7 +166,7 @@ const ManagerOrdersPage = () => {
       // Gọi song song, dùng allSettled để history lỗi không ảnh hưởng active
       const [activeResult, histResult, inProgressResult, awaitingFinalPaymentResult] = await Promise.allSettled([
         orderAPI.getActive(),
-        orderAPI.getHistory(),
+        eventBookingAPI.getHistory(),
         eventBookingAPI.getInProgress(),
         eventBookingAPI.getAwaitingFinalPayment(),
       ]);
@@ -202,27 +202,37 @@ const ManagerOrdersPage = () => {
         throw Object.assign(new Error(m), { response: { status: s, data: { message: m } } });
       }
 
-      // Xử lý history (có thể bị 403 với một số role)
+      // Xử lý history (book-event history)
       if (histResult.status === 'fulfilled') {
         const d = histResult.value.data;
-        const rawHistory = Array.isArray(d) ? d : d?.data ?? d?.items ?? d?.orders ?? [];
-        console.log('📦 History orders:', rawHistory.length);
+        const rawHistory = Array.isArray(d) ? d : d?.data ?? d?.items ?? d?.$values ?? [];
+        console.log('📦 Book Event History:', rawHistory.length, rawHistory[0]);
+
         const history = rawHistory.slice(0, 10).map((o) => {
-          const { label, css } = mapStatus(o.status);
+          // Book-event fields
+          const bookingCode = o.bookingCode || o.eventCode || `BE-${o.bookEventId || o.id || '---'}`;
+          const eventTitle = o.titleEvent || o.eventTitle || o.title || 'Sự kiện';
+          const totalAmount = o.totalAmount || o.grandTotal || o.contractTotal || o.estimatedRevenue || 0;
+          const statusRaw = o.bookEventStatus || o.eventStatus || o.status || 'pending';
+          const { label, css } = mapStatus(statusRaw);
+          const createdAtRaw = o.createdAt || o.createdDate || o.reservationDate;
+
           return {
-            code:        o.orderCode ?? `#${o.orderId}`,
-            time:        o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '--',
-            type:        mapOrderTypeLabel(o.orderType),
-            amount:      formatCurrency(o.totalAmount ?? o.total),
-            status:      label,
+            code: bookingCode,
+            title: eventTitle,
+            time: createdAtRaw ? new Date(createdAtRaw).toLocaleString('vi-VN') : '--',
+            type: 'Sự kiện',
+            amount: formatCurrency(totalAmount),
+            status: label,
             statusClass: css,
-            icon:        o.orderType === 'Delivery' ? 'delivery' : 'dine',
-            id:          o.orderId ?? o.id,
+            icon: 'event',
+            id: o.bookEventId || o.id,
+            raw: o,
           };
         });
         setHistoryOrders(history);
       } else {
-        console.warn('⚠️ History endpoint không khả dụng (có thể do phân quyền):', histResult.reason?.response?.status);
+        console.warn('⚠️ Book-event history endpoint không khả dụng:', histResult.reason?.response?.status);
         setHistoryOrders([]);
       }
 
@@ -603,8 +613,8 @@ const ManagerOrdersPage = () => {
             <thead>
               <tr>
                 <th>Mã đơn</th>
+                <th>Tên sự kiện</th>
                 <th>Thời gian</th>
-                <th>Loại hình</th>
                 <th>Tổng tiền</th>
                 <th>Trạng thái</th>
                 <th>Hành động</th>
@@ -625,20 +635,17 @@ const ManagerOrdersPage = () => {
                   ? (
                     <tr>
                       <td colSpan={6} style={{ textAlign: 'center', color: '#aaa', padding: '24px 0' }}>
-                        Chưa có lịch sử đơn hàng.
+                        Chưa có lịch sử sự kiện.
                       </td>
                     </tr>
                   )
                   : historyOrders.map((order) => (
                     <tr key={order.code}>
                       <td>{order.code}</td>
-                      <td>{order.time}</td>
-                      <td>
-                        <div className="orders-history-type">
-                          <ModeIcon mode={order.icon} />
-                          <span>{order.type}</span>
-                        </div>
+                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.title}>
+                        {order.title || '--'}
                       </td>
+                      <td>{order.time}</td>
                       <td>{order.amount}</td>
                       <td>
                         <span className={`orders-state ${order.statusClass}`}>{order.status}</span>

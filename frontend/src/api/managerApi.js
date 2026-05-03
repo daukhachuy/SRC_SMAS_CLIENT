@@ -1,22 +1,17 @@
+import instance from './axiosInstance';
+import { normalizeNotificationSeverity } from './notificationApi';
+
+// ===== BOOK EVENT API =====
 // Xác nhận duyệt sự kiện (review)
 export const reviewBookEvent = (id, data) =>
   instance.post(`/book-event/${id}/review`, data);
+
 // Tạo hợp đồng cho book-event
 export const createBookEventContract = (id, data) =>
   instance.post(`/book-event/${id}/contract`, data);
-import instance from './axiosInstance'; 
-// Export lại các hàm cho các file khác import trực tiếp (đặt sau staffAPI)
-export const getWorkingStaffToday = (...args) => staffAPI.getWorkingToday(...args);
-export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
 
-// ===== SCHEDULE API (QUAN TRỌNG) =====
-// ...existing code...
-// ...existing code...
-
-  // ...existing code...
-
-    // ===== SCHEDULE API (QUAN TRỌNG) =====
-   export const staffAPI = {
+// ===== STAFF API =====
+export const staffAPI = {
   filterByPosition: (positions = []) =>
     instance.post('/Staff/filter-by-position', positions),
 
@@ -95,6 +90,10 @@ export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
     return instance.get(`/Staff/${staffId}/work-history`, { params });
   },
 };
+
+// Export lại các hàm cho các file khác import trực tiếp
+export const getWorkingStaffToday = (...args) => staffAPI.getWorkingToday(...args);
+export const getAllStaff = (...args) => staffAPI.getStaffsList(...args);
 
 // ===== CALL API + MAP =====
 export async function getAllStaffSchedule() {
@@ -229,6 +228,10 @@ export async function getAllStaffSchedule() {
     // POST /api/order/delete-orderdelivery/{OrderCode}
     deleteOrderDelivery: (orderCode, payload) =>
       instance.post(`/order/delete-orderdelivery/${encodeURIComponent(orderCode)}`, payload ?? {}),
+
+    // DELETE /api/order/delete-order/{orderCode}
+    deleteOrder: (orderCode) =>
+      instance.delete(`/order/delete-order/${encodeURIComponent(orderCode)}`),
   };
 
   // ===== HELPERS: MAP API → UI =====
@@ -977,14 +980,84 @@ export async function getAllStaffSchedule() {
   };
 
   export function mapNotificationToUI(item, idx = 0) {
-    const title = pick(item, ['title', 'name', 'type', 'notificationType'], 'Thông báo hệ thống');
-    const message = pick(item, ['message', 'content', 'description', 'detail'], 'Bạn có thông báo mới.');
-    const createdAt = pick(item, ['createdAt', 'time', 'notificationTime', 'date'], null);
-    const isRead = Boolean(pick(item, ['isRead', 'read'], false));
-    const typeRaw = String(pick(item, ['type', 'category', 'notificationType'], 'info')).toLowerCase();
+    const title = pick(
+      item,
+      [
+        'title',
+        'Title',
+        'subject',
+        'Subject',
+        'name',
+        'Name',
+        'type',
+        'notificationType',
+        'NotificationType',
+      ],
+      'Thông báo hệ thống'
+    );
+    let message = pick(
+      item,
+      [
+        'message',
+        'Message',
+        'content',
+        'Content',
+        'body',
+        'Body',
+        'description',
+        'Description',
+        'detail',
+        'Detail',
+        'text',
+        'Text',
+        'notificationContent',
+        'NotificationContent',
+      ],
+      ''
+    );
+    if (!String(message || '').trim() && item?.data && typeof item.data === 'object') {
+      message = pick(item.data, ['message', 'Message', 'content', 'Content', 'body', 'Body'], '');
+    }
+    if (!String(message || '').trim()) {
+      message = 'Bạn có thông báo mới.';
+    }
+    const createdAt = pick(
+      item,
+      ['createdAt', 'CreatedAt', 'time', 'Time', 'notificationTime', 'NotificationTime', 'date', 'Date'],
+      null
+    );
+    const isRead = Boolean(pick(item, ['isRead', 'read', 'IsRead', 'Read'], false));
+    let severityRaw = pick(
+      item,
+      [
+        'severity',
+        'Severity',
+        'level',
+        'Level',
+        'notificationSeverity',
+        'NotificationSeverity',
+      ],
+      null
+    );
+    if (
+      (severityRaw == null || String(severityRaw).trim() === '') &&
+      item?.data &&
+      typeof item.data === 'object'
+    ) {
+      severityRaw = pick(item.data, ['severity', 'Severity', 'level', 'Level'], null);
+    }
+    const severity = normalizeNotificationSeverity(severityRaw);
+
+    const typeRaw = String(
+      pick(item, ['type', 'category', 'notificationType', 'Type', 'Category', 'NotificationType'], 'info') || ''
+    ).toLowerCase();
 
     let tone = 'info';
-    if (typeRaw.includes('success') || typeRaw.includes('approved') || typeRaw.includes('approve')) tone = 'success';
+    if (severity === 'Success') tone = 'success';
+    else if (severity === 'Warning') tone = 'warning';
+    else if (severity === 'Error') tone = 'warning';
+    else if (typeRaw.includes('success') || typeRaw.includes('approved') || typeRaw.includes('approve'))
+      tone = 'success';
     else if (typeRaw.includes('warning') || typeRaw.includes('alert') || typeRaw.includes('error')) tone = 'warning';
     else if (typeRaw.includes('update') || typeRaw.includes('shift') || typeRaw.includes('schedule')) tone = 'primary';
 
@@ -1000,6 +1073,7 @@ export async function getAllStaffSchedule() {
       time: timeText,
       isRead,
       tone,
+      severity,
       raw: item,
     };
   }

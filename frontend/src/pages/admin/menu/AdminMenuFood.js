@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Plus, Search, Pencil, Eye, Trash2, X, UploadCloud, AlertCircle,
-  CheckCircle, RefreshCw, Sparkles, Store,
+  RefreshCw, Sparkles, Store,
 } from 'lucide-react';
+import { getErrorMessage } from '../../../utils/errorHandler';
 
 const STATUS_FILTERS = ['Tất cả', 'Còn hàng', 'Hết hàng'];
 import {
@@ -15,6 +16,7 @@ import {
   getCategoryLists,
 } from '../../../api/foodApi';
 import '../../../styles/AdminMenuManagement.css';
+import { useAdminToast } from '../../../context/AdminToastContext';
 
 const FIXED_PRODUCT_IMAGE = 'https://res.cloudinary.com/dmzuier4p/image/upload/v1773138906/OIP_devlp6.jpg';
 const UNITS = ['Dĩa', 'Phần', 'Ly', 'Tô', 'Cái', 'Kg', 'Chai', 'Bình', 'Nắm'];
@@ -120,13 +122,14 @@ function findCategoryIdByName(name, categories) {
 
 /** Lấy categoryName từ categoryId */
 const AdminMenuFood = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   /* ── State dữ liệu ── */
   const [foods, setFoods] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [toastMsg, setToastMsg] = useState('');
-  const [toastType, setToastType] = useState('success'); // 'success' | 'error'
 
   /* ── Filter / Search ── */
   const [search, setSearch] = useState('');
@@ -193,12 +196,7 @@ const AdminMenuFood = () => {
         setCategories([]);
       }
     } catch (e) {
-      const msg =
-        (typeof e?.message === 'string' && e.message) ||
-        e?.response?.data?.message ||
-        e?.error?.response?.data?.message ||
-        e?.error?.message ||
-        'Không tải được danh sách món ăn (GET /api/food/category).';
+      const msg = getErrorMessage(e, 'Không tải được danh sách món ăn.');
       setApiError(msg);
       setFoods([]);
     } finally {
@@ -209,13 +207,6 @@ const AdminMenuFood = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  /* ── Toast auto-clear ── */
-  useEffect(() => {
-    if (!toastMsg) return;
-    const t = setTimeout(() => setToastMsg(''), 3500);
-    return () => clearTimeout(t);
-  }, [toastMsg]);
 
   /* ── Filtered list ── */
   const filtered = useMemo(() => {
@@ -373,12 +364,11 @@ const AdminMenuFood = () => {
         imageFile: form.imageFile,
       };
       await createFood(payload);
-      setToastMsg('Thêm món ăn thành công!');
-      setToastType('success');
+      showToast('Thêm món ăn thành công!', 'success');
       setAddModalOpen(false);
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Thêm món ăn thất bại.';
+      const msg = getErrorMessage(e, 'Thêm món ăn thất bại.');
       setFormErrors({ _api: msg });
     } finally {
       setFormLoading(false);
@@ -413,12 +403,11 @@ const AdminMenuFood = () => {
         imageFile: formE.imageFile,
       };
       await updateFood(editingFood.id, payload);
-      setToastMsg('Cập nhật món ăn thành công!');
-      setToastType('success');
+      showToast('Cập nhật món ăn thành công!', 'success');
       setEditModalOpen(false);
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Cập nhật món ăn thất bại.';
+      const msg = getErrorMessage(e, 'Cập nhật món ăn thất bại.');
       setFormEErrors({ _api: msg });
     } finally {
       setFormELoading(false);
@@ -431,15 +420,13 @@ const AdminMenuFood = () => {
     setDeleteLoading(true);
     try {
       await deleteFood(deletingFood.id);
-      setToastMsg('Xóa món ăn thành công!');
-      setToastType('success');
+      showToast('Xóa món ăn thành công!', 'success');
       setDeleteModalOpen(false);
       setDeletingFood(null);
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Xóa món ăn thất bại.';
-      setToastMsg(msg);
-      setToastType('error');
+      const msg = getErrorMessage(e, 'Xóa món ăn thất bại.');
+      showToast(msg, 'error');
     } finally {
       setDeleteLoading(false);
     }
@@ -450,13 +437,11 @@ const AdminMenuFood = () => {
     setToggleBusyId(row.id);
     try {
       await toggleFoodStatus(row.id, !row.status);
-      setToastMsg(`Đã ${!row.status ? 'bật' : 'tắt'} kinh doanh món "${row.name}".`);
-      setToastType('success');
+      showToast(`Đã ${!row.status ? 'bật' : 'tắt'} kinh doanh món "${row.name}".`, 'success');
       await loadData({ silent: true });
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Không cập nhật được trạng thái.';
-      setToastMsg(msg);
-      setToastType('error');
+      const msg = getErrorMessage(e, 'Không cập nhật được trạng thái.');
+      showToast(msg, 'error');
     } finally {
       setToggleBusyId(null);
     }
@@ -695,14 +680,6 @@ const AdminMenuFood = () => {
           Thêm món mới
         </button>
       </div>
-
-      {/* ── Toast ── */}
-      {toastMsg && (
-        <div className={`kds-toast-msg ${toastType === 'error' ? 'kds-toast-msg--error' : ''}`} role="status">
-          {toastType === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-          <span>{toastMsg}</span>
-        </div>
-      )}
 
       {/* ── API Error banner ── */}
       {apiError && (

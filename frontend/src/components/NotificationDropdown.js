@@ -19,6 +19,12 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
       return { Icon: notification.icon, iconBg: notification.iconBg };
     }
 
+    const sev = String(notification?.severity || '').trim();
+    if (sev === 'Error') return { Icon: AlertTriangle, iconBg: 'bg-red' };
+    if (sev === 'Warning') return { Icon: AlertTriangle, iconBg: 'bg-yellow' };
+    if (sev === 'Success') return { Icon: Check, iconBg: 'bg-green' };
+    if (sev === 'Information') return { Icon: Info, iconBg: 'bg-blue' };
+
     const raw = String(notification?.type || notification?.tone || '').toLowerCase();
     if (raw.includes('order')) return { Icon: ShoppingCart, iconBg: 'bg-orange' };
     if (raw.includes('book')) return { Icon: Calendar, iconBg: 'bg-orange' };
@@ -147,8 +153,17 @@ const NotificationDropdown = ({ isOpen, onClose, notifications: externalNotifica
                   <Icon size={20} />
                 </div>
                 <div className="notification-content">
-                  <p className="notification-item-title">{notification.title}</p>
-                  <p className="notification-message">{notification.message}</p>
+                  <p className="notification-item-title" title={notification.title}>
+                    {notification.title}
+                  </p>
+                  {notification.severity ? (
+                    <span className="notification-severity" title="Severity">
+                      {notification.severity}
+                    </span>
+                  ) : null}
+                  <p className="notification-message" title={notification.message}>
+                    {notification.message}
+                  </p>
                   <span className="notification-time">{notification.time}</span>
                 </div>
                 {!notification.isRead && (

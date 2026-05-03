@@ -112,6 +112,7 @@ const DEFAULT_NOTIFICATIONS = [
     time: 'Vừa xong',
     message: 'Bạn đã được phân công thêm ca làm mới.',
     tone: 'primary',
+    severity: 'Information',
     isRead: false,
   },
 ];

@@ -21,7 +21,7 @@ instance.interceptors.request.use(
     // Đảm bảo headers mặc định
     config.headers = config.headers || {};
     config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
-    config.headers['Accept'] = config.headers['Accept'] || 'application/json';
+    config.headers['Accept'] = config.headers['Accept'] || '*/*';
 
     const hasExplicitAuthHeader =
       typeof config.headers.Authorization === 'string' &&
@@ -47,11 +47,32 @@ instance.interceptors.request.use(
 instance.interceptors.response.use(
   (response) => {
     console.debug(`[API Response] ${response.status} - ${response.statusText}`);
+    // Backend có thể trả về text/plain thay vì JSON
+    // Nếu response không phải JSON, wrap lại thành object
+    const contentType = response.headers['content-type'] || '';
+    if (typeof response.data === 'string') {
+      if (contentType.includes('text/plain') || contentType.includes('text/html')) {
+        response.data = { message: response.data };
+      }
+    }
     return response;
   },
   (error) => {
     const status = error.response?.status;
-    const message = error.response?.data?.message || error.message;
+    // Backend có thể trả về text/plain hoặc text/html thay vì JSON
+    const rawData = error.response?.data;
+    let message = error.message;
+    if (typeof rawData === 'string') {
+      // Trích xuất message từ HTML nếu là error page
+      if (rawData.includes('<!DOCTYPE') || rawData.includes('<html')) {
+        const match = rawData.match(/<title>(.*?)<\/title>/i);
+        message = match ? match[1] : `Lỗi ${status}`;
+      } else {
+        message = rawData;
+      }
+    } else {
+      message = rawData?.message || rawData?.Message || error.message;
+    }
     const requestUrl = String(error?.config?.url || '').toLowerCase();
     const isContractSignRequest = requestUrl.includes('/contract/sign');
     
