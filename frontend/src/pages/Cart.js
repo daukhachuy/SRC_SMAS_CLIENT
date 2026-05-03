@@ -18,16 +18,30 @@ function stripLegacyGpsSuffix(text) {
 const DELIVERY_ADDRESS_SUFFIX = 'Đà Nẵng, Việt Nam';
 
 function normalizeDeliveryAddress(text) {
-  const cleaned = stripLegacyGpsSuffix(text).replace(/\s+/g, ' ').trim();
+  let cleaned = stripLegacyGpsSuffix(text).replace(/\s+/g, ' ').trim();
   if (!cleaned) return '';
 
-  const hasDaNang = /\b(đà nẵng|da nang)\b/i.test(cleaned);
-  const hasVietnam = /\b(việt nam|vietnam)\b/i.test(cleaned);
-  if (hasDaNang || hasVietnam) {
-    return cleaned.replace(/,\s*$/, '');
+  const parts = cleaned
+    .split(',')
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  // 👉 Gom toàn bộ địa chỉ thành 1 chuỗi để check
+  const fullText = parts.join(', ').toLowerCase();
+
+  const hasDaNang = fullText.includes('đà nẵng') || fullText.includes('da nang');
+  const hasVietnam = fullText.includes('việt nam') || fullText.includes('vietnam');
+
+  // 👉 Chỉ thêm khi thiếu
+  if (!hasDaNang) {
+    parts.push('Đà Nẵng');
   }
 
-  return `${cleaned.replace(/,\s*$/, '')}, ${DELIVERY_ADDRESS_SUFFIX}`;
+  if (!hasVietnam) {
+    parts.push('Việt Nam');
+  }
+
+  return parts.join(', ');
 }
 
 const Cart = () => {

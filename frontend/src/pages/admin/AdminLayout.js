@@ -19,7 +19,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationDropdown from '../../components/NotificationDropdown';
-import { getAllNotifications, getUnreadNotifications, normalizeNotificationList } from '../../api/notificationApi';
+import {
+  getAllNotifications,
+  getUnreadNotifications,
+  normalizeNotificationList,
+  normalizeNotificationSeverity,
+} from '../../api/notificationApi';
 import '../../styles/AdminLayout.css';
 
 const navItems = [
@@ -102,6 +107,7 @@ const AdminLayout = () => {
     message: item?.message || item?.content || item?.description || 'Bạn có thông báo mới.',
     time: timeAgoVi(item?.createdAt || item?.time || item?.sentAt),
     isRead: Boolean(item?.isRead ?? item?.read ?? item?.isSeen ?? false),
+    severity: normalizeNotificationSeverity(item?.severity ?? item?.Severity),
   });
 
   useEffect(() => {

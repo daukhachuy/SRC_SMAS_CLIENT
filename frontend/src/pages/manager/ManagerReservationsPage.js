@@ -26,6 +26,7 @@ import {
   reservationAPI,
   reviewBookEvent,
 } from '../../api/managerApi';
+import { getTables, isTableRowInUse } from '../../api/tableApi';
 import '../../styles/ManagerPages.css';
 import '../../styles/ManagerReservationsPage.css';
 import TableCheckModal from '../../components/TableCheckModal';
@@ -34,6 +35,46 @@ const UPCOMING_ALERT_MINUTES = 180;
 const UPCOMING_ALERT_WINDOW_MS = UPCOMING_ALERT_MINUTES * 60 * 1000;
 const OVERDUE_STATUS_NEEDS_ACTION = new Set(['nosigned', 'unsigned']);
 const TERMINAL_EVENT_STATUSES = new Set(['completed', 'cancelled', 'rejected']);
+
+/** yyyy-mm-dd (local) từ raw API hoặc chuỗi dd/mm/yyyy trên UI */
+function getLocalCalendarDayKeyFromBooking(booking) {
+  const raw = booking?.raw ?? {};
+  const iso = String(
+    raw.reservationDate ||
+      raw.bookingDate ||
+      raw.ReservationDate ||
+      raw.BookingDate ||
+      ''
+  ).trim();
+  const head = iso.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return head;
+
+  const uiDate = String(booking?.date || '').trim();
+  const m = uiDate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return '';
+}
+
+function getTodayLocalDayKey() {
+  const t = new Date();
+  const y = t.getFullYear();
+  const mo = String(t.getMonth() + 1).padStart(2, '0');
+  const d = String(t.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${d}`;
+}
+
+function countReservationsScheduledForToday(mappedReservations) {
+  const todayKey = getTodayLocalDayKey();
+  let n = 0;
+  for (const b of mappedReservations || []) {
+    const key = getLocalCalendarDayKeyFromBooking(b);
+    if (key && key === todayKey) n += 1;
+  }
+  return n;
+}
 
 const ManagerReservationsPage = () => {
   const { base } = useRoleSectionBasePath();
@@ -122,10 +163,10 @@ const ManagerReservationsPage = () => {
     setLoading(true);
     setError('');
     try {
-      const [listRes, sumTodayRes, waitConfirmRes] = await Promise.allSettled([
+      const [listRes, waitConfirmRes, tablesRes] = await Promise.allSettled([
         reservationAPI.getAllDescCreatedAt(),
-        reservationAPI.getSumToday(),
         reservationAPI.getWaitingConfirm(),
+        getTables(),
       ]);
 
       if (listRes.status !== 'fulfilled') {
@@ -156,20 +197,18 @@ const ManagerReservationsPage = () => {
         .sort((a, b) => getTimestamp(b) - getTimestamp(a));
       setRegularBookings([...pending, ...confirmed, ...others]);
 
-      const activeDiningCount = mappedReservations.filter(
+      const activeFromReservations = mappedReservations.filter(
         (booking) => booking.status === 'dining' || booking.status === 'seated'
       ).length;
-      setActiveTables(activeDiningCount);
-
-      if (sumTodayRes.status === 'fulfilled') {
-        const sumData = sumTodayRes.value.data;
-        const sumValue = typeof sumData === 'number'
-          ? sumData
-          : sumData?.count ?? sumData?.total ?? sumData?.value ?? 0;
-        setTotalTodayBookings(Number(sumValue) || mappedReservations.length);
+      if (tablesRes.status === 'fulfilled') {
+        const tableRows = Array.isArray(tablesRes.value) ? tablesRes.value : [];
+        setActiveTables(tableRows.filter(isTableRowInUse).length);
       } else {
-        setTotalTodayBookings(mappedReservations.length);
+        setActiveTables(activeFromReservations);
       }
+
+      // Tổng đặt bàn hôm nay = số lịch có ngày đặt (reservationDate) trùng calendar hôm nay — không dùng sum-today API (dễ lệch) và không fallback length toàn list
+      setTotalTodayBookings(countReservationsScheduledForToday(mappedReservations));
 
       if (waitConfirmRes.status === 'fulfilled') {
         const waitData = waitConfirmRes.value.data;
