@@ -7,6 +7,32 @@ import { eventBookingAPI } from '../../api/managerApi';
 import TableCheckModal from '../../components/TableCheckModal';
 import '../../styles/ManagerEventTableSelectionPage.css';
 
+/** Lấy text lỗi từ response ASP.NET / axios (message, Message, title, errors). */
+const pickBookEventCheckInMessage = (err, fallback) => {
+  const data = err?.response?.data;
+  if (typeof data === 'string' && data.trim()) return data.trim();
+  const direct =
+    (typeof data?.message === 'string' && data.message.trim()) ||
+    (typeof data?.Message === 'string' && data.Message.trim()) ||
+    (typeof data?.title === 'string' && data.title.trim());
+  if (direct) return direct;
+  if (data?.errors && typeof data.errors === 'object') {
+    const parts = [];
+    Object.values(data.errors).forEach((v) => {
+      if (Array.isArray(v)) parts.push(...v.map(String));
+      else if (v != null) parts.push(String(v));
+    });
+    const joined = parts.filter(Boolean).join(' ').trim();
+    if (joined) return joined;
+  }
+  const status = err?.response?.status;
+  const generic = err?.message;
+  if (typeof generic === 'string' && generic.trim() && !/^request failed with status code/i.test(generic)) {
+    return generic.trim();
+  }
+  return fallback + (status ? ` (${status})` : '');
+};
+
 const ManagerEventTableSelectionPage = () => {
   const { base } = useRoleSectionBasePath();
   const navigate = useNavigate();
@@ -18,7 +44,7 @@ const ManagerEventTableSelectionPage = () => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [uiNotice, setUiNotice] = useState('');
+  const [uiNotice, setUiNotice] = useState(null); // { text: string, variant: 'ok'|'err' }
   const [selectedTableIds, setSelectedTableIds] = useState([]);
 
   const [tableCheckModal, setTableCheckModal] = useState(false);
@@ -26,7 +52,9 @@ const ManagerEventTableSelectionPage = () => {
   const [tableCheckShift, setTableCheckShift] = useState('Tất cả');
 
   useEffect(() => {
-    const timer = setTimeout(() => setUiNotice(''), 2800);
+    if (!uiNotice?.text) return undefined;
+    const ms = uiNotice.variant === 'err' ? 12000 : 3200;
+    const timer = setTimeout(() => setUiNotice(null), ms);
     return () => clearTimeout(timer);
   }, [uiNotice]);
 
@@ -47,7 +75,7 @@ const ManagerEventTableSelectionPage = () => {
       setTables(mapped);
     } catch (err) {
       setTables([]);
-      setUiNotice('Không thể tải danh sách bàn.');
+      setUiNotice({ text: 'Không thể tải danh sách bàn.', variant: 'err' });
     } finally {
       setLoading(false);
     }
@@ -71,31 +99,37 @@ const ManagerEventTableSelectionPage = () => {
 
   const confirmSelection = async () => {
     if (!selectedTableIds.length) {
-      setUiNotice('Vui lòng chọn ít nhất 1 bàn cho sự kiện.');
+      setUiNotice({ text: 'Vui lòng chọn ít nhất 1 bàn cho sự kiện.', variant: 'err' });
       return;
     }
     if (requiredTables > 0 && selectedTableIds.length !== requiredTables) {
-      setUiNotice(`Vui lòng chọn đúng ${requiredTables} bàn theo số lượng bàn của sự kiện.`);
+      setUiNotice({
+        text: `Vui lòng chọn đúng ${requiredTables} bàn theo số lượng bàn của sự kiện.`,
+        variant: 'err',
+      });
       return;
     }
     const eventIdNumber = Number(eventId);
     if (!Number.isFinite(eventIdNumber) || eventIdNumber <= 0) {
-      setUiNotice('Mã sự kiện không hợp lệ.');
+      setUiNotice({ text: 'Mã sự kiện không hợp lệ.', variant: 'err' });
       return;
     }
     const tableIds = selectedTableIds
       .map((id) => Number(id))
       .filter((id) => Number.isFinite(id) && id > 0);
     if (!tableIds.length) {
-      setUiNotice('Danh sách bàn không hợp lệ.');
+      setUiNotice({ text: 'Danh sách bàn không hợp lệ.', variant: 'err' });
       return;
     }
 
     try {
       setSubmitting(true);
       const res = await eventBookingAPI.checkIn(eventIdNumber, { tableIds });
-      const successMsg = res?.data?.message || 'Check-in sự kiện thành công.';
-      setUiNotice(successMsg);
+      const successMsg =
+        (typeof res?.data?.message === 'string' && res.data.message.trim()) ||
+        (typeof res?.data?.Message === 'string' && res.data.Message.trim()) ||
+        'Check-in sự kiện thành công.';
+      setUiNotice({ text: successMsg, variant: 'ok' });
       sessionStorage.setItem(
         `manager:event-table-selection:${eventId}`,
         JSON.stringify({
@@ -108,8 +142,8 @@ const ManagerEventTableSelectionPage = () => {
         backToEventDetail();
       }, 550);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Không thể check-in sự kiện.';
-      setUiNotice(msg);
+      const msg = pickBookEventCheckInMessage(err, 'Không thể check-in sự kiện.');
+      setUiNotice({ text: msg, variant: 'err' });
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +151,16 @@ const ManagerEventTableSelectionPage = () => {
 
   return (
     <div className="manager-event-table-page">
-      {uiNotice && <div className="manager-event-table-notice">{uiNotice}</div>}
+      {uiNotice?.text && (
+        <div
+          className={`manager-event-table-notice ${
+            uiNotice.variant === 'err' ? 'manager-event-table-notice--err' : ''
+          }`}
+          role="alert"
+        >
+          {uiNotice.text}
+        </div>
+      )}
       <div className="manager-event-table-header">
         <h2>Chọn bàn phục vụ sự kiện</h2>
         <p>

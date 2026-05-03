@@ -104,6 +104,7 @@ const AdminMenuCategory = () => {
       setCategories((prev) =>
         prev.map((c) => (c.categoryId === id ? { ...c, isAvailable: !next } : c))
       );
+      console.error('[AdminMenuCategory] toggle error:', e);
       const msg = getErrorMessage(e, `Không thể ${action} trạng thái.`);
       showToast(msg, 'error');
     } finally {
@@ -372,7 +373,7 @@ const AdminMenuCategory = () => {
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f && f.size > 2 * 1024 * 1024) {
-                        window.alert('File tối đa 2MB.');
+                        emitAppToast('File tối đa 2MB.');
                         return;
                       }
                       if (f) {

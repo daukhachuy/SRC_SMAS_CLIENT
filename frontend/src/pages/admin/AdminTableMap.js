@@ -187,7 +187,7 @@ const AdminTableMap = () => {
       await loadTables();
       closeModal();
     } catch (err) {
-      const msg = getErrorMessage(err, 'Lưu bàn thất bại. Vui lòng thử lại.');
+      const msg = parseTableApiError(err, getErrorMessage(err, 'Lưu bàn thất bại. Vui lòng thử lại.'));
       showToast(msg, 'error');
     } finally {
       setSaving(false);
@@ -201,7 +201,7 @@ const AdminTableMap = () => {
       showToast(`Đã xóa bàn "${table.name}".`, 'success');
       await loadTables();
     } catch (err) {
-      const msg = getErrorMessage(err, 'Xóa bàn thất bại. Vui lòng thử lại.');
+      const msg = parseTableApiError(err, getErrorMessage(err, 'Xóa bàn thất bại. Vui lòng thử lại.'));
       showToast(msg, 'error');
     }
   };
@@ -352,7 +352,10 @@ const AdminTableMap = () => {
                                   loadTables();
                                 })
                                 .catch((err) => {
-                                  const msg = getErrorMessage(err, 'Không cập nhật được trạng thái bàn.');
+                                  const msg = parseTableApiError(
+                                    err,
+                                    getErrorMessage(err, 'Không cập nhật được trạng thái bàn.')
+                                  );
                                   showToast(msg, 'error');
                                 });
                             }

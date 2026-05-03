@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import CustomerNoticeModal from '../components/CustomerNoticeModal';
 import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
+import { resolveDeliveryFeeVnd } from '../utils/resolveDeliveryFee';
 import '../styles/Cart.css';
 
 function stripLegacyGpsSuffix(text) {
@@ -103,6 +104,35 @@ const Cart = () => {
   const [paymentMethod, setPaymentMethod] = useState('Tiền Mặt');
   const [paymentError, setPaymentError] = useState('');
   const [customerNotice, setCustomerNotice] = useState(null);
+
+  /** Phí ship: tính theo địa chỉ (API hoặc khoảng cách 15k/25k/40k), không cố định 25k */
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [deliveryFeeLoading, setDeliveryFeeLoading] = useState(false);
+
+  useEffect(() => {
+    if (modalStep !== 2 || !showInfoModal) return;
+    const addr = normalizeDeliveryAddress(customerInfo.address);
+    if (!addr.trim()) return;
+    let cancelled = false;
+    setDeliveryFeeLoading(true);
+    resolveDeliveryFeeVnd(addr)
+      .then((fee) => {
+        if (!cancelled) setDeliveryFee(Math.max(0, Number(fee) || 0));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const fb = process.env.REACT_APP_DELIVERY_FEE;
+          const n = fb !== undefined && fb !== '' ? Number(fb) : NaN;
+          setDeliveryFee(Number.isFinite(n) && n >= 0 ? n : 25000);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDeliveryFeeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modalStep, showInfoModal, customerInfo.address]);
 
   const handleAddressChange = (event) => {
     setCustomerInfo((prev) => ({ ...prev, address: event.target.value }));
@@ -203,18 +233,14 @@ const Cart = () => {
 
   const totalPrice = cartItems.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
 
-  const deliveryFeeRaw = process.env.REACT_APP_DELIVERY_FEE;
-  const deliveryFee =
-    deliveryFeeRaw === undefined || deliveryFeeRaw === ''
-      ? 25000
-      : Math.max(0, Number(deliveryFeeRaw) || 0);
-
   const handleCloseModal = () => {
     if (isOrdering) return; 
     setShowInfoModal(false);
     setModalStep(1);
     setPaymentError('');
     setDiscountError('');
+    setDeliveryFee(0);
+    setDeliveryFeeLoading(false);
   };
 
   // --- LOGIC APPLY DISCOUNT CODE ---
@@ -310,6 +336,13 @@ const Cart = () => {
 
       const orderRes = await instance.post('/order/create/delivery', orderPayload);
       const resBody = orderRes.data?.data ?? orderRes.data;
+
+      const serverDelivery = Number(
+        resBody?.deliveryPrice ?? resBody?.DeliveryPrice ?? resBody?.deliveryFee ?? resBody?.DeliveryFee
+      );
+      if (Number.isFinite(serverDelivery) && serverDelivery >= 0) {
+        setDeliveryFee(serverDelivery);
+      }
 
       // Lấy orderId / orderCode từ response
       const orderId = resBody?.orderId ?? orderRes.data.orderId ?? orderRes.data.id;
@@ -516,38 +549,8 @@ const Cart = () => {
               </div>
           </div>
 
-          <div className="Cart-Summary-Card">
-            <div className="Summary-Left">
-              <div className="Sum-Item">
-                <span className="Sum-Label">Tất cả:</span>
-                <strong className="Sum-Value">{cartItems.length} Món</strong>
-              </div>
-              <div className="Sum-Item">
-                <span className="Sum-Label">Tạm tính:</span>
-                <strong className="Sum-Value">{totalPrice.toLocaleString()} đ</strong>
-              </div>
-              <div className="Sum-Item">
-                <span className="Sum-Label">VAT (10%):</span>
-                <strong className="Sum-Value">+{vatAmount.toLocaleString()} đ</strong>
-              </div>
-              <div className="Sum-Item">
-                <span className="Sum-Label">Phí vận chuyển:</span>
-                <strong className="Sum-Value">{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()} đ` : 'Miễn phí'}</strong>
-              </div>
-              {appliedDiscount && (
-                <div className="Sum-Item Sum-Item-Discount">
-                  <span className="Sum-Label">Giảm giá:</span>
-                  <strong className="Sum-Value">-{discountAmount.toLocaleString()} đ</strong>
-                </div>
-              )}
-              <div className="Sum-Item Sum-Item-Total">
-                <span className="Sum-Label">Tổng cộng:</span>
-                <strong className="text-orange Sum-Value">{finalPrice.toLocaleString()} đ</strong>
-              </div>
-            </div>
-            <div className="Summary-Right">
-              <button className="Btn-Order-Now" disabled={cartItems.length === 0} onClick={() => setShowInfoModal(true)}>Đặt ngay</button>
-            </div>
+          <div className="Cart-Summary-Card Cart-Summary-Card--order-only">
+            <button className="Btn-Order-Now" type="button" disabled={cartItems.length === 0} onClick={() => setShowInfoModal(true)}>Đặt ngay</button>
           </div>
         </div>
       </main>
@@ -646,7 +649,13 @@ const Cart = () => {
                       </div>
                       <div className="Bill-Row">
                         <span>Phí vận chuyển</span>
-                        <span>{deliveryFee > 0 ? `+${deliveryFee.toLocaleString()}đ` : 'Miễn phí'}</span>
+                        <span>
+                          {deliveryFeeLoading
+                            ? 'Đang tính…'
+                            : deliveryFee > 0
+                              ? `+${deliveryFee.toLocaleString()}đ`
+                              : 'Miễn phí'}
+                        </span>
                       </div>
                       {appliedDiscount && (
                         <div className="Bill-Row" style={{ color: '#15803d' }}>
@@ -705,7 +714,11 @@ const Cart = () => {
                         </div>
                       ))}
                     </div>
-                    <button className="Btn-Final-Order" onClick={handleFinalOrder} disabled={isOrdering}>
+                    <button
+                      className="Btn-Final-Order"
+                      onClick={handleFinalOrder}
+                      disabled={isOrdering || deliveryFeeLoading}
+                    >
                         {isOrdering ? "Đang xử lý..." : paymentMethod === 'Tiền Mặt' ? "Xác nhận đặt hàng" : `Thanh toán qua ${paymentMethod}`}
                     </button>
                     <button className="Btn-Back-Step" onClick={() => setModalStep(1)} style={{marginTop: '10px', width: '100%', background: '#eee', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer'}}>

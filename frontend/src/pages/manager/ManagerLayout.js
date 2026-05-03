@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Boxes, Calendar, CalendarRange, CreditCard, LayoutDashboard, LogOut, Menu, ShoppingCart, Users, X, User, Camera, IdCard, MessageCircle } from 'lucide-react';
 import axios from 'axios';
@@ -11,6 +11,8 @@ import { conversationApi } from '../../api/conversationApi';
 import '../../styles/ManagerLayout.css';
 import '../../styles/ManagerPages.css';
 import { ManagerToastProvider, useManagerToast } from '../../context/ManagerToastContext';
+import { useUnreadNotificationSound } from '../../hooks/useUnreadNotificationSound';
+import { useNotificationPushReload } from '../../hooks/useNotificationPushReload';
 
 function ManagerLayoutInner() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ function ManagerLayoutInner() {
   const [chatUnread, setChatUnread] = useState(0);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const reloadNotificationsRef = useRef(() => Promise.resolve());
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -242,11 +245,18 @@ function ManagerLayoutInner() {
       }
     };
 
+    reloadNotificationsRef.current = loadNotifications;
     loadNotifications();
+    const poll = window.setInterval(() => {
+      void loadNotifications();
+    }, 45000);
     return () => {
       mounted = false;
+      window.clearInterval(poll);
     };
   }, []);
+
+  useNotificationPushReload(reloadNotificationsRef);
 
   useEffect(() => {
     let mounted = true;

@@ -135,3 +135,51 @@
   background: var(--primary); color: white;
   padding: 15px; border-radius: 50%; cursor: pointer;
 }
+
+/* —— Mobile (legacy Menu.css, dùng chung vài luồng menu) —— */
+@media (max-width: 768px) {
+  .nav-container {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+  }
+
+  .menu-tabs-container {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 0 12px;
+  }
+
+  .menu-main-container {
+    grid-template-columns: 1fr;
+    margin: 24px auto;
+    gap: 20px;
+    padding: 0 14px;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+  }
+
+  .floating-chat {
+    bottom: 16px;
+    right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-text {
+    font-size: 20px;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

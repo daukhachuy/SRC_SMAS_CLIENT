@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Calendar, ChefHat, ClipboardList, LogOut, Menu, User, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +7,8 @@ import { getProfile } from '../../api/userApi';
 import { mapNotificationToUI, notificationAPI } from '../../api/managerApi';
 import '../../styles/KitchenLayout.css';
 import '../../styles/KitchenPages.css';
+import { useUnreadNotificationSound } from '../../hooks/useUnreadNotificationSound';
+import { useNotificationPushReload } from '../../hooks/useNotificationPushReload';
 
 const KitchenLayout = () => {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const KitchenLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const reloadNotificationsRef = useRef(() => Promise.resolve());
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên bếp',
     email: 'kitchen@fptres.vn',
@@ -165,11 +168,18 @@ const KitchenLayout = () => {
       }
     };
 
+    reloadNotificationsRef.current = loadNotifications;
     loadNotifications();
+    const poll = window.setInterval(() => {
+      void loadNotifications();
+    }, 45000);
     return () => {
       mounted = false;
+      window.clearInterval(poll);
     };
   }, []);
+
+  useNotificationPushReload(reloadNotificationsRef);
 
   const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
 

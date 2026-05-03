@@ -7,6 +7,7 @@ import { serviceAPI } from '../../api/serviceApi';
 import { EVENT_TYPES_LIST } from '../../api/managerApi';
 import { eventsAPI } from '../../api/eventsApi';
 import '../../styles/AdminRestaurant.css';
+import { emitAppToast } from '../../utils/appToastBus';
 import { getErrorMessage } from '../../utils/errorHandler';
 import { useAdminToast } from '../../context/AdminToastContext';
 
@@ -370,12 +371,12 @@ function revokeBlogPreviewIfBlob(url) {
 function handleBlogImageChange(file, setBlogForm, setBlogImageFile, setBlogImagePreview) {
   if (!file) return;
   if (file.size > MAX_IMAGE_SIZE) {
-    window.alert('File tối đa 5MB. Vui lòng chọn ảnh nhẹ hơn.');
+    emitAppToast('File tối đa 5MB. Vui lòng chọn ảnh nhẹ hơn.');
     return;
   }
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   if (!allowed.includes(file.type)) {
-    window.alert('Chỉ chấp nhận ảnh JPG, PNG, WebP, GIF.');
+    emitAppToast('Chỉ chấp nhận ảnh JPG, PNG, WebP, GIF.');
     return;
   }
   const preview = URL.createObjectURL(file);

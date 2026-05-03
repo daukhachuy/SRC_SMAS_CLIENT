@@ -3,11 +3,13 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getProfile } from '../api/userApi';
+import { getProfile, updateProfile } from '../api/userApi';
+import { useAppToast } from '../context/AppToastContext';
 import '../styles/UserLayout.css';
 
 const UserLayout = () => {
   const navigate = useNavigate();
+  const { showToast } = useAppToast();
   
   // Khởi tạo avatar từ localStorage để lưu vĩnh viễn trên trình duyệt máy này
   const [avatar, setAvatar] = useState(
@@ -68,36 +70,23 @@ const UserLayout = () => {
       localStorage.setItem("userAvatar", imageUrlOnCloud);
       setAvatar(imageUrlOnCloud); 
 
-      // BƯỚC C: Gửi URL lên Backend C#
-      const token = localStorage.getItem("authToken") || localStorage.getItem("token"); 
-      
+      // BƯỚC C: Chỉ cập nhật avatar — không gửi fullname/SĐT/... demo (tránh ghi đè hồ sơ user khác)
       try {
-        await axios.put(
-          "https://smas-afbhfnduadasbuhr.southeastasia-01.azurewebsites.net/api/User/profile",
-          {
-            fullname: "Khánh Hồ",
-            avatar: imageUrlOnCloud,
-            gender: "Nam", 
-            dob: "2026-02-25",
-            phone: "0123456789",
-            address: "42 Trần Thủ Độ, Đà Nẵng"
-          },
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        alert("Cập nhật ảnh đại diện và lưu vào folder thành công!");
+        await updateProfile({ avatar: imageUrlOnCloud });
+        showToast('Cập nhật ảnh đại diện và lưu vào folder thành công!', 'success');
+        const profileData = await getProfile();
+        setUserProfile({
+          fullname: profileData.fullname || '',
+          email: profileData.email || '',
+        });
+        window.dispatchEvent(new Event('smas-user-profile-updated'));
       } catch (backendError) {
-        // Nếu Backend lỗi, ảnh vẫn đã được lưu ở LocalStorage và Cloudinary
-        console.warn("Backend lỗi nhưng ảnh đã được lưu ở máy và Cloud.");
+        console.warn('Backend lỗi khi lưu avatar (ảnh vẫn trên Cloudinary/localStorage):', backendError);
       }
 
     } catch (error) {
       console.error("Lỗi upload:", error);
-      alert("Không thể lưu ảnh. Hãy kiểm tra lại cấu hình Unsigned Preset!");
+      showToast('Không thể lưu ảnh. Hãy kiểm tra lại cấu hình Unsigned Preset!', 'error');
       // Trả lại ảnh cũ nếu upload thất bại
       setAvatar(localStorage.getItem("userAvatar") || "https://www.w3schools.com/howto/img_avatar.png");
     } finally {
