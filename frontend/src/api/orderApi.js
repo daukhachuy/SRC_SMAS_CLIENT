@@ -88,14 +88,36 @@ export const createOrderByContact = async (payload) => {
 };
 
 // Tra cứu thông tin đơn/khách theo keyword
+// Một số bản backend chỉ map POST /api/order/lookup (singular) — 405 nếu gọi /orders/lookup.
 export const lookupOrder = async (type, keyword) => {
-  try {
-    const response = await instance.post('/orders/lookup', { type, keyword });
-    return response.data;
-  } catch (error) {
-    console.error('Lỗi tra cứu orders/lookup:', error.response?.status, error.response?.data);
-    throw error;
+  const body = {
+    type: String(type || '').trim(),
+    keyword: String(keyword || '').trim(),
+  };
+  if (!body.keyword) {
+    throw new Error('keyword is required');
   }
+  const attempts = [
+    () => instance.post('/orders/lookup', body),
+    () => instance.post('/order/lookup', body),
+  ];
+  let lastError;
+  for (let i = 0; i < attempts.length; i += 1) {
+    try {
+      const response = await attempts[i]();
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+      if (status === 405 || status === 404) {
+        continue;
+      }
+      console.error('Lỗi tra cứu orders/lookup:', status, error.response?.data);
+      throw error;
+    }
+  }
+  console.error('Lỗi tra cứu lookup (cả /orders/lookup và /order/lookup):', lastError?.response?.status, lastError?.response?.data);
+  throw lastError;
 };
 
 // GET /api/reservation/check-availability-phoneoremail?request=...
@@ -213,6 +235,16 @@ export const getOrderItemsByCode = async (orderCode, token) => {
   const code = encodeURIComponent(String(orderCode || '').trim());
   if (!code) throw new Error('orderCode is required');
   const response = await instance.get(`/order/${code}/items`, {
+    headers: withOptionalBearer(token),
+  });
+  return response.data;
+};
+
+// Xóa / hủy đơn hàng theo mã đơn
+export const deleteOrder = async (orderCode, token) => {
+  const code = encodeURIComponent(String(orderCode || '').trim());
+  if (!code) throw new Error('orderCode is required');
+  const response = await instance.delete(`/order/delete-order/${code}`, {
     headers: withOptionalBearer(token),
   });
   return response.data;

@@ -46,6 +46,20 @@ const COMBO_OPTIONS_FALLBACK = [
   { type: 'Combo', id: -9103, comboId: -9103, name: 'Combo Family', price: 350000, categoryLabel: 'Món chính' }
 ];
 
+const BOOKING_OPENING_TIME = '10:00';
+const BOOKING_LAST_SEATING_TIME = '20:00';
+const BOOKING_MIN_LEAD_HOURS = 2;
+
+const BOOKING_SESSION_OPTIONS = [
+  { id: 'lunch', label: 'Ca trưa', icon: '🌤️' },
+  { id: 'dinner', label: 'Ca tối', icon: '🌙' },
+];
+
+const BOOKING_SESSION_TIME_MAP = {
+  lunch: { start: '10:30', end: '14:00' },
+  dinner: { start: '17:00', end: '20:00' },
+};
+
 const Services = () => {
   const MAX_SERVICE_HOURS = 5;
   const navigate = useNavigate();
@@ -53,12 +67,14 @@ const Services = () => {
   const [showAuthRequired, setShowAuthRequired] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState('');
+  const [selectedBookingSession, setSelectedBookingSession] = useState('');
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Reset selectedTime khi đổi ngày
+  // Reset khung giờ khi đổi ngày
   useEffect(() => {
-    setSelectedTime('');
+    setSelectedBookingSession('');
+    setSelectedTimeWindow('');
   }, [selectedDate]);
 
   // Lấy 7 ngày tiếp theo từ hôm nay (không hiển thị ngày quá khứ)
@@ -88,7 +104,7 @@ const Services = () => {
     fullName: '',
     phone: '',
     email: '',
-    numGuests: '1',
+    numGuests: '',
     location: 'Trong nhà (Máy lạnh)',
     note: ''
   });
@@ -382,79 +398,63 @@ const Services = () => {
     return date >= today;
   };
 
-  // Lấy các giờ có sẵn (Nhà hàng mở 09:00 - 22:00, nhận booking đến 21:00)
-  // - Từ giờ hiện tại + 1 tiếng
-  // - Trước 21:00 (kết thúc phục vụ 22:00 = 1 tiếng chuẩn bị đóng)
+  const timeToMinutes = (timeStr) => {
+    const [hours, minutes] = String(timeStr || '00:00').split(':').map(Number);
+    return (hours * 60) + minutes;
+  };
+
+  // Lấy các giờ có sẵn cho đặt bàn:
+  // - Ưu tiên khung phục vụ thực tế của nhà hàng
+  // - Khách cần đặt trước ít nhất 2 tiếng
+  // - Ngừng nhận lượt vào bàn mới từ 20:00 để phù hợp giờ phục vụ buổi tối
   const getAvailableTimes = (selectedDateParam) => {
     const now = new Date();
     const times = [];
-    const openingHour = 9;
+    const openingMinutes = timeToMinutes(BOOKING_OPENING_TIME);
+    const lastSeatingMinutes = timeToMinutes(BOOKING_LAST_SEATING_TIME);
     
     // Kiểm tra nếu ngày được chọn là hôm nay
     const isToday = selectedDateParam.toDateString() === now.toDateString();
     
-    // Bắt đầu từ 09:00
-    let startHour = 9;
-    let startMinute = 0;
+    let startMinutes = openingMinutes;
     
     if (isToday) {
-      // Nếu là hôm nay, bắt đầu từ giờ hiện tại + 1 tiếng
+      // Nếu là hôm nay, khách cần đặt trước tối thiểu BOOKING_MIN_LEAD_HOURS tiếng.
       let minEarliestTime = new Date(now);
-      minEarliestTime.setHours(minEarliestTime.getHours() + 1, 0, 0);
-      startHour = minEarliestTime.getHours();
-      startMinute = minEarliestTime.getMinutes();
-
-      // Không cho đặt trước giờ mở cửa.
-      if (startHour < openingHour) {
-        startHour = openingHour;
-        startMinute = 0;
-      }
+      minEarliestTime.setHours(minEarliestTime.getHours() + BOOKING_MIN_LEAD_HOURS, 0, 0, 0);
+      startMinutes = Math.max(
+        openingMinutes,
+        (minEarliestTime.getHours() * 60) + minEarliestTime.getMinutes()
+      );
     }
     
-    // Kết thúc trước 21:00 (Nhà hàng nhận booking đến 21:00)
-    const endHour = 21;
-    const endMinute = 0;
-    
-    // Generate thời gian mỗi 30 phút
-    for (let hour = startHour; hour < endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        // Skip nếu là thời gian đầu ngày và chưa đến startMinute
-        if (hour === startHour && minute < startMinute) {
-          continue;
-        }
-        
-        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        times.push(timeStr);
-      }
+    // Làm tròn về mốc nửa tiếng tiếp theo để lịch hiển thị gọn gàng.
+    if (startMinutes % 30 !== 0) {
+      startMinutes += 30 - (startMinutes % 30);
+    }
+
+    for (let minuteMark = startMinutes; minuteMark <= lastSeatingMinutes; minuteMark += 30) {
+      const hour = Math.floor(minuteMark / 60);
+      const minute = minuteMark % 60;
+      const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      times.push(timeStr);
     }
     
     return times;
   };
 
-  // Kiểm tra giờ có thể chọn được không
-  const isTimeSelectable = (time, selectedDateParam) => {
-    const now = new Date();
-    const isToday = selectedDateParam.toDateString() === now.toDateString();
-    const [hours, minutes] = time.split(':').map(Number);
+  const getAvailableBookingTimeSlots = (selectedDateParam, sessionId) => {
+    const availableTimes = getAvailableTimes(selectedDateParam);
+    const sessionConfig = BOOKING_SESSION_TIME_MAP[sessionId];
 
-    // Không cho chọn giờ ngoài khung mở cửa.
-    if (hours < 9 || (hours > 21 || (hours === 21 && minutes > 0))) {
-      return false;
-    }
-    
-    if (!isToday) {
-      return true; // Có thể chọn bất kỳ giờ nào ngoài hôm nay
-    }
-    
-    // Hôm nay: chỉ có thể chọn giờ từ hiện tại + 1 tiếng
-    const timeDate = new Date();
-    timeDate.setHours(hours, minutes, 0);
-    
-    let minAllowedTime = new Date(now);
-    minAllowedTime.setHours(minAllowedTime.getHours() + 1, 0, 0);
-    
-    return timeDate >= minAllowedTime;
+    if (!sessionConfig) return [];
+
+    return availableTimes.filter(
+      (time) => time >= sessionConfig.start && time <= sessionConfig.end
+    );
   };
+
+  const bookingTimeSlots = getAvailableBookingTimeSlots(selectedDate, selectedBookingSession);
 
   const formatReservationDate = (date) => {
     const year = date.getFullYear();
@@ -483,8 +483,12 @@ const Services = () => {
       return { field: 'phone', message: 'Vui lòng nhập số điện thoại.' };
     }
 
-    if (!selectedTime) {
-      return { field: 'time', message: 'Vui lòng chọn giờ đặt bàn.' };
+    if (!selectedBookingSession) {
+      return { field: 'time', message: 'Vui lòng chọn buổi đặt bàn.' };
+    }
+
+    if (!selectedTimeWindow) {
+      return { field: 'time', message: 'Vui lòng chọn khung giờ đặt bàn.' };
     }
 
     const guests = Number(bookingForm.numGuests);
@@ -508,11 +512,17 @@ const Services = () => {
       return;
     }
 
+    if (!bookingTimeSlots.includes(selectedTimeWindow)) {
+      setBookingError('Khung giờ bạn chọn hiện không còn trong ngày này. Vui lòng chọn khung giờ khác.');
+      setBookingErrorField('time');
+      return;
+    }
+
     const requestPayload = {
       reservationDate: formatReservationDate(selectedDate),
-      reservationTime: `${selectedTime}:00`,
+      reservationTime: `${selectedTimeWindow}:00`,
       numberOfGuests: Number(bookingForm.numGuests),
-      specialRequests: `Khu vuc: ${bookingForm.location}. Ghi chu: ${bookingForm.note || 'Khong co'}`
+      specialRequests: `Buoi uu tien: ${selectedBookingSession === 'lunch' ? 'Ca trua' : 'Ca toi'}. Gio uu tien: ${selectedTimeWindow}. Khu vuc: ${bookingForm.location}. Ghi chu: ${bookingForm.note || 'Khong co'}`
     };
 
     try {
@@ -524,17 +534,18 @@ const Services = () => {
       setBookingSuccess('Đặt bàn thành công. Nhà hàng sẽ liên hệ xác nhận sớm nhất.');
       setBookingSuccessMeta({
         date: bookedDate,
-        time: selectedTime || '--:--',
-        guests: Number(bookingForm.numGuests) || 1,
+        time: selectedTimeWindow || '--:--',
+        guests: Number(bookingForm.numGuests),
         location: bookingForm.location || 'Trong nhà (Máy lạnh)',
       });
       setBookingStep(2);
       setBookingForm((prev) => ({
         ...prev,
-        numGuests: '1',
+        numGuests: '',
         note: ''
       }));
-      setSelectedTime('');
+      setSelectedBookingSession('');
+      setSelectedTimeWindow('');
     } catch (error) {
       const status = error?.response?.status;
       if (status === 401) {
@@ -554,6 +565,8 @@ const Services = () => {
     setBookingSuccessMeta(null);
     setBookingError('');
     setBookingErrorField('');
+    setSelectedBookingSession('');
+    setSelectedTimeWindow('');
   };
 
   useEffect(() => {
@@ -1195,26 +1208,72 @@ const Services = () => {
                     })}
                   </div>
                 </div>
-                <div className="time-grid" ref={bookingTimeGridRef}>
-                  {getAvailableTimes(selectedDate).map((time) => {
-                    const isSelectable = isTimeSelectable(time, selectedDate);
-                    const isSelected = time === selectedTime;
-                    
-                    return (
-                      <button 
-                        key={time} 
-                        className={`time-slot-btn ${isSelected ? 'active' : ''} ${!isSelectable ? 'disabled' : ''}`}
-                        onClick={() => isSelectable && setSelectedTime(time)}
-                        disabled={!isSelectable}
-                        style={{
-                          opacity: isSelectable ? 1 : 0.4,
-                          cursor: isSelectable ? 'pointer' : 'not-allowed'
+                <div className="event-field-block booking-time-window-block">
+                  <label className="event-field-label">
+                    <CalendarClock size={14} className="icon-orange" />
+                    Khung giờ đặt bàn <span className="required-asterisk">*</span>
+                  </label>
+                  <p className="event-time-helper booking-time-window-helper">
+                    {!selectedBookingSession
+                      ? 'Chọn buổi trước để hiển thị giờ phù hợp.'
+                      : 'Chọn khung giờ phù hợp trong buổi bạn đã chọn.'}
+                  </p>
+                  <div className="event-session-grid booking-session-grid">
+                    {BOOKING_SESSION_OPTIONS.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        className={`event-session-btn ${selectedBookingSession === session.id ? 'active' : ''}`}
+                        onClick={() => {
+                          setSelectedBookingSession(session.id);
+                          setSelectedTimeWindow('');
+                          if (bookingErrorField === 'time') {
+                            setBookingErrorField('');
+                            setBookingError('');
+                          }
                         }}
                       >
-                        {time}
+                        <span className="event-session-icon">{session.icon}</span>
+                        <span>{session.label}</span>
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+                  <div
+                    className={`time-slots-grid booking-time-window-grid ${bookingErrorField === 'time' ? 'field-invalid' : ''}`}
+                    ref={bookingTimeGridRef}
+                  >
+                    {selectedBookingSession ? (
+                      <p className="booking-time-window-section-title">Chọn khung giờ</p>
+                    ) : null}
+                    {selectedBookingSession && bookingTimeSlots.length === 0 ? (
+                      <p className="event-time-helper">Không còn khung giờ phù hợp cho buổi này trong ngày đã chọn.</p>
+                    ) : null}
+                    {!selectedBookingSession ? (
+                      <p className="event-time-helper">Chọn buổi trước để hiển thị giờ phù hợp.</p>
+                    ) : null}
+                    {bookingTimeSlots.map((time) => {
+                      const isSelected = time === selectedTimeWindow;
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          className={`time-slot-btn ${isSelected ? 'active' : ''}`}
+                          onClick={() => {
+                            setSelectedTimeWindow(time);
+                            if (bookingErrorField === 'time') {
+                              setBookingErrorField('');
+                              setBookingError('');
+                            }
+                          }}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {bookingErrorField === 'time' && bookingError && (
+                    <p className="event-field-error">{bookingError}</p>
+                  )}
                 </div>
               </div>
               <div className="vertical-divider"></div>

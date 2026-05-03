@@ -1,5 +1,17 @@
 import instance from './axiosInstance';
 
+/** Chuẩn hóa cột Severity: chỉ Warning | Information | Error | Success, mặc định Information */
+export function normalizeNotificationSeverity(raw) {
+  if (raw == null) return 'Information';
+  const t = String(raw).trim().toLowerCase();
+  if (!t) return 'Information';
+  if (t === 'warning' || t === 'warn') return 'Warning';
+  if (t === 'information' || t === 'info') return 'Information';
+  if (t === 'error' || t === 'err' || t === 'fatal') return 'Error';
+  if (t === 'success' || t === 'ok' || t === 'succeeded') return 'Success';
+  return 'Information';
+}
+
 export const normalizeNotificationList = (payload) => {
   if (!payload) return [];
 

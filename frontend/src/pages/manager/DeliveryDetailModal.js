@@ -235,8 +235,7 @@ const DeliveryDetailModal = ({ isOpen, onClose, deliveryData, onUpdated, onNotif
 
     try {
       setSubmitting(true);
-      const payload = { cancellationReason: reason };
-      await orderAPI.deleteOrderDelivery(orderCode, payload);
+      await orderAPI.deleteOrder(orderCode);
       notify('Hủy đơn giao hàng thành công.', 'success');
       if (typeof onUpdated === 'function') onUpdated();
       onClose();

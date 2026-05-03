@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Home.css';
-import { FIXED_PRODUCT_IMAGE } from '../api/foodApi';
+import { FIXED_PRODUCT_IMAGE, resolveFoodImageUrl } from '../api/foodApi';
 import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Calendar, ShoppingCart } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AuthRequiredModal from '../components/AuthRequiredModal';
 import { isAuthenticated } from '../api/authApi';
 import { feedbackAPI } from '../api/feedbackApi';
+import { getFeaturedMenu } from '../api/homeApi';
 
 // Pool ảnh món ăn đa dạng cho design
 const FOOD_IMAGES = [
@@ -28,12 +29,94 @@ const REVIEWS_FALLBACK = [
   { id: 3, initials: 'TL', name: 'Lê Thùy Linh', role: 'Khách Hàng Thân Thiết', text: '"Mình rất thích các món hải sản ở đây. Tươi ngon và chế biến tinh tế. Chắc chắn sẽ quay lại."', stars: 5 },
 ];
 
-const MENU_HIGHLIGHTS = [
-  { id: 1, name: 'Lẩu Thái Hải Sản', price: '285.000đ', desc: 'Nước dùng chua cay đặc trưng kết hợp hải sản tươi sống từ biển.', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80', featured: true },
-  { id: 2, name: 'Tôm Hùm Nướng', price: '950k', img: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80' },
-  { id: 3, name: 'Cua Rang Muối', price: '450k', img: 'https://images.unsplash.com/photo-1567337710282-00832b415979?w=600&q=80' },
-  { id: 4, name: 'Set Gia Đình', price: '899k', img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80', wide: true },
+/** Chỉ dùng khi API chưa có đủ món hoặc lỗi mạng — layout bento vẫn cần đủ 4 ô */
+const SIGNATURE_MENU_FALLBACK = [
+  { id: 'fb-1', name: 'Lẩu Thái Hải Sản', price: '285.000đ', desc: 'Nước dùng chua cay đặc trưng kết hợp hải sản tươi sống từ biển.', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80' },
+  { id: 'fb-2', name: 'Tôm Hùm Nướng', price: '950k', img: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80' },
+  { id: 'fb-3', name: 'Cua Rang Muối', price: '450k', img: 'https://images.unsplash.com/photo-1567337710282-00832b415979?w=600&q=80' },
+  { id: 'fb-4', name: 'Set Gia Đình', price: '899k', img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80' },
 ];
+
+function formatSignaturePrice(price) {
+  if (price == null || price === '') return '';
+  if (typeof price === 'number' && Number.isFinite(price)) {
+    return `${Math.round(price).toLocaleString('vi-VN')}đ`;
+  }
+  return String(price).trim();
+}
+
+function normalizeFeaturedMenuPayload(data) {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.foods)) return data.foods;
+  if (Array.isArray(data.menuItems)) return data.menuItems;
+  if (Array.isArray(data.$values)) return data.$values;
+  return [];
+}
+
+/**
+ * Thứ tự nguồn: featured-menu (public API) → bán chạy → fallback tĩnh (đủ 4 ô bento).
+ */
+function buildSignatureBentoItems(featuredRows, bestSellers) {
+  const rawRows = [];
+  const seen = new Set();
+  const dedupeKey = (row) => {
+    const id = row?.id ?? row?.foodId ?? row?.FoodId;
+    if (id != null && id !== '') return `id:${id}`;
+    const n = String(row?.name ?? row?.foodName ?? row?.Name ?? '').trim();
+    return n ? `n:${n}` : null;
+  };
+  const pushRow = (row) => {
+    if (!row || rawRows.length >= 4) return;
+    const k = dedupeKey(row);
+    if (k && seen.has(k)) return;
+    if (k) seen.add(k);
+    rawRows.push(row);
+  };
+
+  for (const row of featuredRows || []) pushRow(row);
+  for (const row of bestSellers || []) {
+    if (rawRows.length >= 4) break;
+    pushRow(row);
+  }
+  for (const row of SIGNATURE_MENU_FALLBACK) {
+    if (rawRows.length >= 4) break;
+    pushRow({
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      img: row.img,
+      desc: row.desc || '',
+    });
+  }
+
+  const total = rawRows.length;
+  return rawRows.map((raw, idx) => {
+    const featured = idx === 0;
+    const wide = total >= 4 && idx === 3;
+    const name =
+      raw.name ||
+      raw.foodName ||
+      raw.Name ||
+      raw.title ||
+      'Món đặc sản';
+    const desc = String(raw.desc || raw.description || raw.Description || '').trim();
+    const img = resolveFoodImageUrl(raw.img ?? raw.image ?? raw.Image ?? raw.imageUrl);
+    const priceRaw =
+      raw.price ?? raw.promotionalPrice ?? raw.PromotionalPrice ?? raw.Price;
+    const priceDisplay = formatSignaturePrice(priceRaw);
+    return {
+      key: raw.id ?? raw.foodId ?? raw.FoodId ?? `sig-${idx}`,
+      name,
+      desc,
+      img,
+      priceDisplay,
+      featured,
+      wide,
+    };
+  });
+}
 
 export let BEST_SELLERS_DATA = [];
 
@@ -66,6 +149,21 @@ const Home = () => {
   const [bookingGuests, setBookingGuests] = useState(2);
   const [toast, setToast] = useState(null); // { name, img }
   const [showAuthRequired, setShowAuthRequired] = useState(false);
+  const [signatureFeaturedList, setSignatureFeaturedList] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFeaturedMenu()
+      .then((data) => {
+        if (!cancelled) setSignatureFeaturedList(normalizeFeaturedMenuPayload(data));
+      })
+      .catch(() => {
+        if (!cancelled) setSignatureFeaturedList([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const toInitials = (fullname) => {
@@ -198,6 +296,11 @@ const Home = () => {
     : 4.9;
   const reviewsAvgText = Number(reviewsAvg).toFixed(1);
   const reviewsCountText = `${effectiveReviews.length.toLocaleString('vi-VN')}+ ĐÁNH GIÁ THỰC TẾ`;
+
+  const signatureBentoItems = useMemo(
+    () => buildSignatureBentoItems(signatureFeaturedList, bestSellers),
+    [signatureFeaturedList, bestSellers]
+  );
   const HOT_VISIBLE_COUNT = 4;
   const canSlideHot = bestSellers.length > HOT_VISIBLE_COUNT;
 
@@ -559,17 +662,40 @@ const Home = () => {
             </button>
           </div>
           <div className="h-bento">
-            {MENU_HIGHLIGHTS.map(item => (
+            {signatureBentoItems.map((item) => (
               <div
-                key={item.id}
+                key={item.key}
+                role="button"
+                tabIndex={0}
                 className={`h-bento-item${item.featured ? ' h-bento-featured' : ''}${item.wide ? ' h-bento-wide' : ''}`}
+                onClick={() => navigate('/menu')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate('/menu');
+                  }
+                }}
               >
-                <img src={item.img} alt={item.name} className="h-bento-img" loading="lazy" />
-                {item.featured && <div className="h-chef-stamp" aria-label="Chef's Choice">Chef's<br/>Choice<br/>✨</div>}
+                <img
+                  src={item.img}
+                  alt={item.name}
+                  className="h-bento-img"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.src = FIXED_PRODUCT_IMAGE;
+                  }}
+                />
+                {item.featured && (
+                  <div className="h-chef-stamp" aria-label="Chef's Choice">
+                    Chef&apos;s<br />
+                    Choice<br />
+                    ✨
+                  </div>
+                )}
                 <div className="h-bento-overlay">
                   <h3 className="h-bento-name">{item.name}</h3>
-                  {item.desc && <p className="h-bento-desc">{item.desc}</p>}
-                  <span className="h-bento-price">{item.price}</span>
+                  {item.desc ? <p className="h-bento-desc">{item.desc}</p> : null}
+                  {item.priceDisplay ? <span className="h-bento-price">{item.priceDisplay}</span> : null}
                 </div>
               </div>
             ))}

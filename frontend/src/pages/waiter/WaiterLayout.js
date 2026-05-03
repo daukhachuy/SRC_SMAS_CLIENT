@@ -2,8 +2,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
-import { getProfile } from '../../api/userApi';
 import { notificationAPI, mapNotificationToUI } from '../../api/managerApi';
+import { staffApi } from '../../api/staffApi';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/WaiterLayout.css';
 import '../../styles/WaiterPages.css';
@@ -114,10 +114,11 @@ const WaiterLayout = () => {
       }
 
       try {
-        const profile = await getProfile();
-        const apiFullname = profile?.fullname || profile?.fullName || fallbackUser.fullname;
+        const profileRes = await staffApi.getProfile();
+        const profile = profileRes?.data?.data ?? profileRes?.data ?? {};
+        const apiFullname = profile?.fullname || profile?.fullName || profile?.name || fallbackUser.fullname;
         const apiEmail = profile?.email || fallbackUser.email;
-        const apiUserId = profile?.userId || fallbackUser.userId;
+        const apiUserId = profile?.userId || profile?.id || fallbackUser.userId;
 
         if (!isMounted) return;
 
