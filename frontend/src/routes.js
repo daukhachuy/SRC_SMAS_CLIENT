@@ -1,6 +1,3 @@
-import GuesQRorder from './pages/GuesQRorder';
-  {/* Trang đặt món QR cho khách */}
-  <Route path="/guest-qr-order" element={<GuesQRorder />} />
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -21,6 +18,7 @@ import OrderHistory from './pages/OrderHistory';
 import Cart from './pages/Cart'; 
 import ProtectedRoute from './components/ProtectedRoute';
 import DebugPage from './pages/DebugPage';
+import GuesQRorder from './pages/GuesQRorder';
 import AuthTestPage from './pages/AuthTestPage';
 import ManagerLayout from './pages/manager/ManagerLayout';
 import ManagerDashboardPage from './pages/manager/ManagerDashboardPage';

@@ -902,7 +902,7 @@ const mapApiOrderToWaiter = (order) => {
   const handleConfirmAddItems = async () => {
     const orderCode = resolveOrderCode(selectedOrder);
     if (!selectedOrder || !orderCode || cartItems.length === 0) {
-      alert('Chưa chọn đơn hàng hoặc chưa có món để thêm!');
+      showWaiterNotice('Chưa chọn đơn hàng hoặc chưa có món để thêm!');
       return;
     }
     const payload = cartItems
@@ -929,17 +929,17 @@ const mapApiOrderToWaiter = (order) => {
     );
 
     if (buffetIds.length > 1) {
-      alert('Mỗi đơn chỉ được chọn 1 loại buffet. Vui lòng giữ lại một gói buffet duy nhất.');
+      showWaiterNotice('Mỗi đơn chỉ được chọn 1 loại buffet. Vui lòng giữ lại một gói buffet duy nhất.');
       return;
     }
 
     if (lockedBuffetId && buffetIds.length > 0 && buffetIds[0] !== lockedBuffetId) {
-      alert('Đơn này đã có một loại buffet khác. Chỉ được thêm cùng loại buffet đã có.');
+      showWaiterNotice('Đơn này đã có một loại buffet khác. Chỉ được thêm cùng loại buffet đã có.');
       return;
     }
 
     if (payload.length === 0) {
-      alert('Giỏ hàng chưa có món hợp lệ để gửi API.');
+      showWaiterNotice('Giỏ hàng chưa có món hợp lệ để gửi API.');
       return;
     }
 
@@ -963,7 +963,7 @@ const mapApiOrderToWaiter = (order) => {
           : prev
       );
 
-      alert('Đã thêm món vào đơn hàng!');
+      showWaiterNotice('Đã thêm món vào đơn hàng!');
 
       if (buffetIds.length > 0) {
         setSelectedBuffetIds(buffetIds);
@@ -1019,7 +1019,7 @@ const mapApiOrderToWaiter = (order) => {
           : 'Lỗi khi thêm món vào đơn hàng.';
       const msg = backendMsg || (!isAxiosGenericMsg && rawErrMsg) || fallbackByStatus;
       const httpSuffix = status ? `\nMã lỗi HTTP: ${status}` : '';
-      alert(`${msg}${detail ? `\n${detail}` : ''}${httpSuffix}`);
+      showWaiterNotice(`${msg}${detail ? `\n${detail}` : ''}${httpSuffix}`);
       console.error(err);
     } finally {
       setIsAddingItems(false);
@@ -1120,7 +1120,7 @@ const mapApiOrderToWaiter = (order) => {
     return raw;
   };
 
-  const alert = (message) => {
+  const showWaiterNotice = (message) => {
     setUiNotice(normalizeNoticeMessage(message));
   };
 
@@ -1249,6 +1249,10 @@ const mapApiOrderToWaiter = (order) => {
         item?.ReservationCode ||
         item?.bookingCode ||
         item?.BookingCode ||
+        item?.bookReservationCode ||
+        item?.BookReservationCode ||
+        item?.code ||
+        item?.Code ||
         item?.orderCode ||
         item?.OrderCode ||
         ''
@@ -1342,22 +1346,47 @@ const mapApiOrderToWaiter = (order) => {
   };
 
   const normalizeReservationLookupRows = (data) => {
+    const asArray = (d) => {
+      if (!d || typeof d !== 'object') return null;
+      if (Array.isArray(d)) return d;
+      const nested = [
+        d.data,
+        d.Data,
+        d.items,
+        d.Items,
+        d.$values,
+        d.result,
+        d.Result,
+        d.records,
+        d.Records,
+        d.reservations,
+        d.Reservations,
+        d.value,
+        d.Value,
+      ];
+      for (const x of nested) {
+        if (Array.isArray(x)) return x;
+        if (x && typeof x === 'object' && Array.isArray(x.$values)) return x.$values;
+      }
+      return null;
+    };
+
     const rows =
-      Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.data?.items)
-            ? data.data.items
-            : Array.isArray(data?.data?.$values)
-              ? data.data.$values
-              : Array.isArray(data?.items)
-                ? data.items
-                : Array.isArray(data?.$values)
-                  ? data.$values
-                  : (data && typeof data === 'object')
-                    ? [data]
-                    : [];
+      asArray(data) ||
+      (data && typeof data === 'object' && !Array.isArray(data) ? asArray(data.data ?? data.Data) : null) ||
+      (Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.data?.items)
+          ? data.data.items
+          : Array.isArray(data?.data?.$values)
+            ? data.data.$values
+            : Array.isArray(data?.items)
+              ? data.items
+              : Array.isArray(data?.$values)
+                ? data.$values
+                : (data && typeof data === 'object')
+                  ? [data]
+                  : []);
     const uniqueByCode = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       const code = getReservationCode(row);
@@ -1562,7 +1591,7 @@ const mapApiOrderToWaiter = (order) => {
   const handleReservationLookup = async () => {
     const keyword = reservationContactInput.trim();
     if (!keyword) {
-      alert('Vui lòng nhập số điện thoại hoặc email để tra cứu mã đặt bàn.');
+      showWaiterNotice('Vui lòng nhập SĐT, email hoặc mã đặt bàn, rồi bấm tra cứu (🔍) hoặc Enter.');
       return;
     }
     setReservationLookupLoading(true);
@@ -1593,7 +1622,7 @@ const mapApiOrderToWaiter = (order) => {
       setReservationLookupRows(rows);
       if (rows.length === 0) {
         setSelectedReservationCode('');
-        alert(
+        showWaiterNotice(
           rawRows.length > 0
             ? 'Các mã đặt bàn tìm được đều đã qua ngày. Chỉ hiển thị đặt chỗ từ hôm nay trở đi.'
             : 'Không tìm thấy mã đặt bàn theo thông tin vừa nhập.'
@@ -1609,7 +1638,7 @@ const mapApiOrderToWaiter = (order) => {
     } catch (err) {
       const status = err?.response?.status;
       const message = err?.response?.data?.message || err?.message || 'Không thể tra cứu mã đặt bàn lúc này.';
-      alert(`Tra cứu thất bại (${status || 'N/A'}): ${message}`);
+      showWaiterNotice(`Tra cứu thất bại (${status || 'N/A'}): ${message}`);
       setReservationLookupRows([]);
       setSelectedReservationCode('');
     } finally {
@@ -2512,7 +2541,7 @@ const mapApiOrderToWaiter = (order) => {
   const handleCancelOrder = async () => {
     const order = orderToCancel;
     if (!order) {
-      alert('Không tìm thấy đơn hàng để hủy.');
+      showWaiterNotice('Không tìm thấy đơn hàng để hủy.');
       return;
     }
     const reason = String(cancelReason || '').trim();
@@ -2531,7 +2560,7 @@ const mapApiOrderToWaiter = (order) => {
         // không phải POST /order/cancel/{numericId} — id số từ list dễ 404 nếu không trùng PK.
         if (emptyDineIn) {
           if (!orderCode) {
-            alert('Không tìm thấy mã đơn để hủy.');
+            showWaiterNotice('Không tìm thấy mã đơn để hủy.');
             return;
           }
           const res = await orderAPI.deleteOrder(orderCode);
@@ -2543,7 +2572,7 @@ const mapApiOrderToWaiter = (order) => {
           const orderId = Number(rawId ?? 0);
           console.log('[DEBUG] orderId (DineIn, có món):', orderId, '| orderCode:', orderCode);
           if (!Number.isFinite(orderId) || orderId <= 0) {
-            alert('Không tìm thấy mã đơn để hủy.');
+            showWaiterNotice('Không tìm thấy mã đơn để hủy.');
             return;
           }
           const res = await myOrderAPI.cancelOrder(orderId);
@@ -2557,7 +2586,7 @@ const mapApiOrderToWaiter = (order) => {
         const orderCode = String(order?.orderCode || order?.id || order?.code || '').replace(/^#/, '').trim();
         console.log('[DEBUG] orderCode (non-DineIn):', orderCode, '| order.id:', order?.id);
         if (!orderCode) {
-          alert('Không tìm thấy mã đơn để hủy.');
+          showWaiterNotice('Không tìm thấy mã đơn để hủy.');
           return;
         }
         const res = await orderAPI.deleteOrder(orderCode);
@@ -2587,7 +2616,7 @@ const mapApiOrderToWaiter = (order) => {
         rawText ||
         err?.message ||
         'Không thể hủy đơn giao hàng.';
-      alert(detail ? `${msg}\n${detail}` : msg);
+      showWaiterNotice(detail ? `${msg}\n${detail}` : msg);
     } finally {
       setIsCancellingOrder(false);
     }
@@ -2661,7 +2690,7 @@ const mapApiOrderToWaiter = (order) => {
   const handleConfirmCancelItem = async () => {
     const reason = String(itemCancelReason || '').trim();
     if (itemCancelIndex == null || reason === '') {
-      alert('Vui lòng chọn hoặc nhập lý do hủy món.');
+      showWaiterNotice('Vui lòng chọn hoặc nhập lý do hủy món.');
       return;
     }
     const item = orderItemsState[itemCancelIndex];
@@ -2670,7 +2699,7 @@ const mapApiOrderToWaiter = (order) => {
       return;
     }
     if (isDeliveryOrder(selectedOrder)) {
-      alert('Đơn giao hàng không cho phép hủy món từ phần phục vụ.');
+      showWaiterNotice('Đơn giao hàng không cho phép hủy món từ phần phục vụ.');
       closeItemCancelModal();
       return;
     }
@@ -2689,7 +2718,7 @@ const mapApiOrderToWaiter = (order) => {
 
     const ids = resolveOrderItemCancelIds(item);
     if (ids.length === 0) {
-      alert('Không tìm thấy mã dòng món (orderItemId) để hủy.');
+      showWaiterNotice('Không tìm thấy mã dòng món (orderItemId) để hủy.');
       return;
     }
     try {
@@ -2712,7 +2741,7 @@ const mapApiOrderToWaiter = (order) => {
         (typeof data === 'string' ? data : '') ||
         err?.message ||
         'Không thể hủy món.';
-      alert(msg);
+      showWaiterNotice(msg);
     } finally {
       setIsCancellingItem(false);
     }
@@ -2726,7 +2755,7 @@ const mapApiOrderToWaiter = (order) => {
   const handleAdvanceDeliveryStatus = async (order) => {
     const orderCode = resolveOrderCode(order);
     if (!orderCode) {
-      alert('Không tìm thấy mã đơn giao hàng.');
+      showWaiterNotice('Không tìm thấy mã đơn giao hàng.');
       return;
     }
 
@@ -2757,7 +2786,7 @@ const mapApiOrderToWaiter = (order) => {
       await fetchWaiterOrders();
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || err?.message || 'Không cập nhật được trạng thái giao hàng.';
-      alert(msg);
+      showWaiterNotice(msg);
     } finally {
       setChangingDeliveryOrderCode('');
     }
@@ -2766,13 +2795,13 @@ const mapApiOrderToWaiter = (order) => {
   const handleProceedPayment = async () => {
     if (!selectedOrder) return;
     if (!canProceedToPayment) {
-      alert('Cần phục vụ xong tất cả món trước khi thanh toán.');
+      showWaiterNotice('Cần phục vụ xong tất cả món trước khi thanh toán.');
       return;
     }
 
     const orderCode = resolveOrderCode(selectedOrder);
     if (!orderCode) {
-      alert('Không xác định được mã đơn để thanh toán.');
+      showWaiterNotice('Không xác định được mã đơn để thanh toán.');
       return;
     }
 
@@ -2799,23 +2828,23 @@ const mapApiOrderToWaiter = (order) => {
         return true;
       }
       if (qrCode) {
-        alert(`Đã tạo QR thanh toán phần còn thiếu.\nMã QR: ${qrCode}`);
+        showWaiterNotice(`Đã tạo QR thanh toán phần còn thiếu.\nMã QR: ${qrCode}`);
         return true;
       }
-      alert('Không tạo được QR thanh toán phần còn thiếu.');
+      showWaiterNotice('Không tạo được QR thanh toán phần còn thiếu.');
       return false;
     };
 
     if (activePaymentMethod === 'cash') {
       if (!isCashAmountValid) {
-        alert('Tiền khách đưa phải lớn hơn 0.');
+        showWaiterNotice('Tiền khách đưa phải lớn hơn 0.');
         return;
       }
       const fullyPaidByCashInput = amountDueNow > 0 && receivedMoneyValue >= amountDueNow;
 
       const orderId = Number(selectedOrder.orderId || selectedOrder.rawOrderId || 0);
       if (!Number.isFinite(orderId) || orderId <= 0) {
-        alert('Không xác định được orderId để thanh toán tiền mặt.');
+        showWaiterNotice('Không xác định được orderId để thanh toán tiền mặt.');
         return;
       }
 
@@ -2847,7 +2876,7 @@ const mapApiOrderToWaiter = (order) => {
         }
 
         if (completedAfterCash || fullyPaidByCashInput) {
-          alert(
+          showWaiterNotice(
             completedAfterCash
               ? 'Thanh toán thành công. Đơn đã hoàn tất.'
               : 'Đã thanh toán đủ. Hệ thống sẽ đồng bộ trạng thái đơn trong giây lát.'
@@ -2859,14 +2888,14 @@ const mapApiOrderToWaiter = (order) => {
         }
 
         setReceivedMoney('');
-        alert(
+        showWaiterNotice(
           `Đã ghi nhận thanh toán tiền mặt ${formatCurrency(amount)}. ` +
             `Còn phải thu: ${formatCurrency(stillDueAfterRefresh)}. ` +
             'Chọn QR Code và xác nhận nếu khách thanh toán phần còn lại bằng QR.'
         );
         await fetchWaiterOrders();
       } catch (err) {
-        alert(pickApiMessage(err, 'Lỗi thanh toán tiền mặt.'));
+        showWaiterNotice(pickApiMessage(err, 'Lỗi thanh toán tiền mặt.'));
       } finally {
         setIsPaying(false);
       }
@@ -2877,7 +2906,7 @@ const mapApiOrderToWaiter = (order) => {
       setIsPaying(true);
       await openRemainingQr();
     } catch (err) {
-      alert(pickApiMessage(err, 'Lỗi kết nối API thanh toán.'));
+      showWaiterNotice(pickApiMessage(err, 'Lỗi kết nối API thanh toán.'));
     } finally {
       setIsPaying(false);
     }
@@ -3072,7 +3101,7 @@ const mapApiOrderToWaiter = (order) => {
           return;
         }
         if (timingSubmit === 'warn' && !reservationSoftTimingAck) {
-          alert('Vui lòng đọc cảnh báo thời gian và nhấn Tiếp tục hai lần ở bước chọn mã đặt bàn trước khi hoàn tất.');
+          showWaiterNotice('Vui lòng đọc cảnh báo thời gian và nhấn Tiếp tục hai lần ở bước chọn mã đặt bàn trước khi hoàn tất.');
           return;
         }
       }
@@ -3094,7 +3123,7 @@ const mapApiOrderToWaiter = (order) => {
       const contactPhone = isEmail ? String(orderForm.phone || '').trim() : keyword;
 
       if (!contactEmail && !contactPhone) {
-        alert('Vui lòng nhập SĐT hoặc Email hợp lệ cho khách thành viên.');
+        showWaiterNotice('Vui lòng nhập SĐT hoặc Email hợp lệ cho khách thành viên.');
         return;
       }
 
@@ -3110,7 +3139,7 @@ const mapApiOrderToWaiter = (order) => {
     }
     try {
       await apiFunc(payload);
-      alert('Đã tạo đơn thành công!');
+      showWaiterNotice('Đã tạo đơn thành công!');
       setReservationSoftTimingAck(false);
       setShowOrderInfoModal(false);
       setShowTablePickerModal(false);
@@ -3133,7 +3162,7 @@ const mapApiOrderToWaiter = (order) => {
           .join('\n');
         if (detail) msg = `${msg}\n${detail}`;
       }
-      alert(msg);
+      showWaiterNotice(msg);
     }
   };
 
@@ -3190,7 +3219,11 @@ const mapApiOrderToWaiter = (order) => {
   // DEBUG: Log currentOrders để kiểm tra dữ liệu thực tế
   console.log('[DEBUG][UI] currentOrders:', currentOrders);
 
-  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|error|failed|cannot|missing|forbidden|unauthorized|bad request/i.test(uiNotice);
+  // Không dùng màu “thành công” cho thông báo tra cứu trống / không xác định / chỉ còn lịch quá khứ
+  const noticeIsError =
+    /lỗi|thất bại|không thể|chưa|cần|error|failed|cannot|missing|forbidden|unauthorized|bad request|không tìm thấy|không xác định|đã qua ngày/i.test(
+      uiNotice
+    );
 
   return (
     <div className="waiter-orders-container">
@@ -3394,10 +3427,10 @@ const mapApiOrderToWaiter = (order) => {
                         return;
                       }
                       if (!canPayThisOrder) {
-                        alert('Không thể thanh toán: còn món chưa được phục vụ.');
+                        showWaiterNotice('Không thể thanh toán: còn món chưa được phục vụ.');
                         return;
                       }
-                      alert('Đang mở màn hình thanh toán...');
+                      showWaiterNotice('Đang mở màn hình thanh toán...');
                       setSelectedOrder(order);
                       setShowPaymentModal(true);
                     }}
@@ -3569,6 +3602,12 @@ const mapApiOrderToWaiter = (order) => {
                             placeholder="Ví dụ: 0901xxxxxx, email@domain.com hoặc mã như 20UXPEXL"
                             value={reservationContactInput}
                             onChange={(e) => setReservationContactInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (!reservationLookupLoading) void handleReservationLookup();
+                              }
+                            }}
                           />
                           <button
                             type="button"
@@ -3671,7 +3710,7 @@ const mapApiOrderToWaiter = (order) => {
                 className="btn-continue"
                 onClick={async () => {
                   if (createOrderType === 'member' && !searchInput.trim()) {
-                    alert('Vui lòng nhập thông tin tra cứu!');
+                    showWaiterNotice('Vui lòng nhập thông tin tra cứu!');
                     return;
                   }
                   if (
@@ -3680,7 +3719,7 @@ const mapApiOrderToWaiter = (order) => {
                     !searchInput.trim() &&
                     !selectedReservation
                   ) {
-                    alert('Vui lòng nhập SĐT/Email hoặc mã đặt bàn, hoặc tra cứu rồi chọn mã.');
+                    showWaiterNotice('Vui lòng nhập SĐT/Email hoặc mã đặt bàn, hoặc tra cứu rồi chọn mã.');
                     return;
                   }
                   // Tự động fill thông tin cá nhân nếu là thành viên/đặt chỗ
@@ -3695,11 +3734,11 @@ const mapApiOrderToWaiter = (order) => {
                         const body = res?.data?.data ?? res?.data ?? res;
                         const row = Array.isArray(body) ? body[0] : body;
                         if (!row || !getReservationCode(row)) {
-                          alert('Không tìm thấy đặt chỗ với mã vừa nhập.');
+                          showWaiterNotice('Không tìm thấy đặt chỗ với mã vừa nhập.');
                           return;
                         }
                         if (!isReservationTodayOrFuture(row)) {
-                          alert('Mã đặt bàn này không còn trong phạm vi hôm nay hoặc tương lai.');
+                          showWaiterNotice('Mã đặt bàn này không còn trong phạm vi hôm nay hoặc tương lai.');
                           return;
                         }
                         setReservationLookupRows([row]);
@@ -3721,7 +3760,7 @@ const mapApiOrderToWaiter = (order) => {
                           const rows = filterReservationRowsTodayOrFuture(normalizeReservationLookupRows(data));
                           setReservationLookupRows(rows);
                           if (rows.length === 0) {
-                            alert(
+                            showWaiterNotice(
                               normalizeReservationLookupRows(data).length > 0
                                 ? 'Các mã đặt bàn tìm được đều đã qua ngày. Chỉ hiển thị đặt chỗ từ hôm nay trở đi.'
                                 : 'Không tìm thấy mã đặt bàn theo thông tin vừa nhập.'
@@ -3740,7 +3779,7 @@ const mapApiOrderToWaiter = (order) => {
                       }
 
                       if (!found) {
-                        alert(
+                        showWaiterNotice(
                           'Không xác định được mã đặt bàn. Tra cứu SĐT/Email rồi chọn một dòng trong danh sách, hoặc nhập đúng mã đặt bàn.'
                         );
                         return;
@@ -3749,7 +3788,7 @@ const mapApiOrderToWaiter = (order) => {
                       if (!keyword) keyword = getReservationCode(found) || '';
                       const finalCode = await fillOrderFormFromReservation(found, keyword);
                       if (!finalCode) {
-                        alert('Không lấy được mã đặt bàn hợp lệ. Vui lòng chọn lại.');
+                        showWaiterNotice('Không lấy được mã đặt bàn hợp lệ. Vui lòng chọn lại.');
                         return;
                       }
                       const timingStep = validateReservationArrivalWindow(found);
@@ -3767,7 +3806,7 @@ const mapApiOrderToWaiter = (order) => {
                     } catch (err) {
                       const status = err?.response?.status;
                       const message = err?.response?.data?.message || err?.message || 'Không thể tra cứu mã đặt bàn lúc này.';
-                      alert(`Tra cứu thất bại (${status || 'N/A'}): ${message}`);
+                      showWaiterNotice(`Tra cứu thất bại (${status || 'N/A'}): ${message}`);
                       return;
                     }
                   } else if (createOrderType === 'member') {
@@ -4185,7 +4224,7 @@ const mapApiOrderToWaiter = (order) => {
                 className="btn-continue"
                 onClick={async () => {
                   if (!tableSelection.mainTableId) {
-                    alert('Vui lòng chọn bàn chính!');
+                    showWaiterNotice('Vui lòng chọn bàn chính!');
                     return;
                   }
                   const tableIds = [tableSelection.mainTableId, ...tableSelection.mergedTableIds]
@@ -4204,7 +4243,7 @@ const mapApiOrderToWaiter = (order) => {
                     return !['empty', 'available'].includes(status);
                   });
                   if (invalidTables.length > 0) {
-                    alert('Bạn chỉ được chọn bàn trống!');
+                    showWaiterNotice('Bạn chỉ được chọn bàn trống!');
                     return;
                   }
                   if (isSelectingTableForCreateFlow) {
@@ -4384,14 +4423,14 @@ const mapApiOrderToWaiter = (order) => {
                                     );
 
                                     if (ids.length === 0) {
-                                      alert('Không tìm thấy ID món ăn!');
+                                      showWaiterNotice('Không tìm thấy ID món ăn!');
                                       return;
                                     }
 
                                     await Promise.all(ids.map((id) => patchOrderItemServed(id)));
                                     setOrderItemsState(prev => prev.map((it, i) => i === idx ? { ...it, dishStatus: 'completed' } : it));
                                   } catch (err) {
-                                    alert('Lỗi cập nhật trạng thái món ăn!');
+                                    showWaiterNotice('Lỗi cập nhật trạng thái món ăn!');
                                   }
                                 }}
                               >
@@ -4466,10 +4505,10 @@ const mapApiOrderToWaiter = (order) => {
                     className="btn-continue"
                     onClick={() => {
                       if (!canProceedToPayment) {
-                        alert('Không thể thanh toán: còn món chưa được phục vụ.');
+                        showWaiterNotice('Không thể thanh toán: còn món chưa được phục vụ.');
                         return;
                       }
-                      alert('Đang mở màn hình thanh toán...');
+                      showWaiterNotice('Đang mở màn hình thanh toán...');
                       setShowPaymentModal(true);
                     }}
                     aria-disabled={!canProceedToPayment}
@@ -5086,11 +5125,11 @@ const mapApiOrderToWaiter = (order) => {
                                 setCartItems((prev) => {
                                   const pickedBuffet = prev.find((x) => x.type === 'buffet');
                                   if (lockedBuffetId && Number(lockedBuffetId) !== buffetId) {
-                                    alert('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.');
+                                    showWaiterNotice('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.');
                                     return prev;
                                   }
                                   if (pickedBuffet && Number(pickedBuffet.buffetId) !== buffetId) {
-                                    alert('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.');
+                                    showWaiterNotice('Đơn này đã có một loại buffet khác. Bạn chỉ có thể thêm cùng loại buffet đó.');
                                     return prev;
                                   }
 

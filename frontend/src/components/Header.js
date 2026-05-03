@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Bell, ShoppingBag, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,6 +11,8 @@ import {
   normalizeNotificationSeverity,
 } from '../api/notificationApi';
 import '../styles/Header.css';
+import { useUnreadNotificationSound } from '../hooks/useUnreadNotificationSound';
+import { useNotificationPushReload } from '../hooks/useNotificationPushReload';
 
 const MENU_ITEMS = [
   { label: 'THỰC ĐƠN', path: '/menu', id: 'menu' },
@@ -77,7 +79,9 @@ const Header = () => {
   const [shrink, setShrink] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  
+  const reloadNotificationsRef = useRef(() => Promise.resolve());
+  useUnreadNotificationSound(notifications);
+
   // --- THÊM STATE ĐỂ LƯU TỔNG SỐ LƯỢNG GIỎ HÀNG ---
   const [cartCount, setCartCount] = useState(0);
 
@@ -155,11 +159,18 @@ const Header = () => {
       }
     };
 
+    reloadNotificationsRef.current = loadNotifications;
     loadNotifications();
+    const poll = window.setInterval(() => {
+      void loadNotifications();
+    }, 45000);
     return () => {
       mounted = false;
+      window.clearInterval(poll);
     };
   }, []);
+
+  useNotificationPushReload(reloadNotificationsRef);
 
   const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
   const shouldShowCustomerConversation = useMemo(() => {

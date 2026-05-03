@@ -505,12 +505,12 @@ const KitchenOrdersPage = () => {
 
   const handleConfirmCancel = async () => {
     if (!cancelReason.trim()) {
-      alert('Vui lòng nhập lý do hủy món');
+      setToastMsg('Vui lòng nhập lý do hủy món');
       return;
     }
     const oid = selectedItem?.orderItemId ?? selectedItem?.id;
     if (oid == null) {
-      alert('Không xác định được món cần hủy.');
+      setToastMsg('Không xác định được món cần hủy.');
       return;
     }
     setCancelSubmitting(true);
@@ -545,7 +545,7 @@ const KitchenOrdersPage = () => {
     } catch (e) {
       const msg =
         e?.response?.data?.message || e?.message || 'Hủy món thất bại.';
-      alert(msg);
+      setToastMsg(msg);
     } finally {
       setCancelSubmitting(false);
     }

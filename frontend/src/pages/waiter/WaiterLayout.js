@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Calendar, ClipboardList, LogOut, Menu, User, X } from 'lucide-react';
 import NotificationDropdown from '../../components/NotificationDropdown';
@@ -7,6 +7,8 @@ import { staffApi } from '../../api/staffApi';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/WaiterLayout.css';
 import '../../styles/WaiterPages.css';
+import { useUnreadNotificationSound } from '../../hooks/useUnreadNotificationSound';
+import { useNotificationPushReload } from '../../hooks/useNotificationPushReload';
 
 const WaiterLayout = () => {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const WaiterLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const reloadNotificationsRef = useRef(() => Promise.resolve());
   const [userInfo, setUserInfo] = useState({
     fullname: 'Nhân viên',
     email: 'waiter@fptres.vn',
@@ -203,11 +206,18 @@ const WaiterLayout = () => {
       }
     };
 
+    reloadNotificationsRef.current = loadNotifications;
     loadNotifications();
+    const poll = window.setInterval(() => {
+      void loadNotifications();
+    }, 45000);
     return () => {
       mounted = false;
+      window.clearInterval(poll);
     };
   }, []);
+
+  useNotificationPushReload(reloadNotificationsRef);
 
   const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
 
