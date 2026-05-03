@@ -1790,6 +1790,17 @@
   flex-shrink: 0;
 }
 
+.dish-form-inline-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.dish-form-inline-row .dish-form-group--inline {
+  margin-bottom: 0;
+}
+
 /* Upload zone */
 .dish-upload-zone {
   display: block;
@@ -1940,6 +1951,10 @@
 
 @media (max-width: 768px) {
   .dish-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dish-form-inline-row {
     grid-template-columns: 1fr;
   }
 }

@@ -130,6 +130,8 @@ const normalizeDishName = (value) =>
     .replace(/\s+/g, ' ');
 
 const getOrderItemMatchKey = (item) => {
+  if (item?.__optimisticKey) return String(item.__optimisticKey);
+
   const foodId = Number(item?.foodId || 0);
   if (foodId > 0) return `food:${foodId}`;
 
@@ -141,6 +143,50 @@ const getOrderItemMatchKey = (item) => {
 
   const nameKey = normalizeDishName(item?.name || item?.itemName || item?.foodName);
   return nameKey ? `name:${nameKey}` : '';
+};
+
+/** Hiện ngay trong bảng chi tiết sau POST thêm món (trước khi GET kịp đồng bộ). */
+const cartLineToOptimisticWaiterItem = (cartItem, idx) => {
+  const qty = Math.max(1, Number(cartItem.quantity) || 1);
+  const price = Number(cartItem.price ?? cartItem.unitPrice ?? 0);
+  const name =
+    String(cartItem.name || cartItem.itemName || cartItem.foodName || cartItem.label || '').trim() ||
+    'Món mới';
+  const optimisticKey = `__opt_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 9)}`;
+  const foodId = Number(cartItem.foodId || 0);
+  const comboId = Number(cartItem.comboId || 0);
+  const buffetId = Number(cartItem.buffetId || cartItem.bufferId || 0);
+  return {
+    name,
+    quantity: qty,
+    price,
+    dishStatus: 'pending',
+    note: String(cartItem.note || '').trim(),
+    id: optimisticKey,
+    orderItemId: null,
+    // Không gán foodId vào itemId — tránh nhầm với orderItemId và ẩn nút hủy; hủy dòng optimistic xử lý riêng.
+    itemId: null,
+    foodId,
+    comboId,
+    buffetId,
+    itemType: cartItem.type || cartItem.itemType,
+    orderItemIds: [],
+    __optimisticKey: optimisticKey,
+    _optimistic: true,
+  };
+};
+
+/** Khi GET chi tiết trả items cũ (ngắn hạn), giữ các dòng _optimistic đã append. */
+const mergeDetailItemsPreserveOptimistic = (prevList, mappedItemsFromApi) => {
+  const fromApi = (mappedItemsFromApi || []).map((item) => ({ ...item }));
+  const prev = prevList || [];
+  const prevNonOpt = prev.filter((p) => !p._optimistic);
+  const prevLen = prevNonOpt.length;
+  const hadOptimistic = prev.some((p) => p._optimistic);
+  if (fromApi.length > prevLen) return fromApi;
+  if (!hadOptimistic) return fromApi;
+  const optim = prev.filter((p) => p._optimistic);
+  return [...fromApi, ...optim];
 };
 
 const WaiterOrdersPage = () => {
@@ -183,6 +229,39 @@ const asArray = (payload) => {
   if (Array.isArray(payload?.history)) return payload.history;
   return [];
 };
+
+/** Sau khi thêm món, GET chi tiết đôi khi trả items cũ; ưu tiên danh sách từ /order/{code}/items nếu dài hơn. */
+async function mergeOrderDetailPayloadWithFreshItems(orderCode, detailPayload) {
+  const code = String(orderCode || '').trim();
+  if (!code || !detailPayload || typeof detailPayload !== 'object') return detailPayload;
+
+  const fromDetail = asArray(detailPayload.items);
+  let best = fromDetail;
+
+  const consider = (raw) => {
+    const arr = asArray(raw);
+    if (arr.length > best.length) best = arr;
+  };
+
+  try {
+    const itemsRes = await orderAPI.getItems(code);
+    consider(itemsRes?.data?.data ?? itemsRes?.data ?? itemsRes);
+  } catch {
+    // ignore
+  }
+
+  const numericId = Number(detailPayload?.orderId ?? detailPayload?.id ?? 0);
+  if (numericId > 0) {
+    try {
+      const itemsResById = await orderAPI.getItems(numericId);
+      consider(itemsResById?.data?.data ?? itemsResById?.data ?? itemsResById);
+    } catch {
+      // ignore
+    }
+  }
+
+  return best.length > fromDetail.length ? { ...detailPayload, items: best } : detailPayload;
+}
 
 const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
 
@@ -327,6 +406,48 @@ const resolveOrderItemNumericIds = (item) => {
     item?.itemId,
   ];
   return Array.from(new Set(raw.map((x) => Number(x || 0)).filter((x) => Number.isFinite(x) && x > 0)));
+};
+
+const isOptimisticPlaceholderId = (v) => String(v ?? '').trim().startsWith('__opt_');
+
+/** ID dòng để POST /order-items/{id}/cancel — số hoặc chuỗi UUID/mã số (BE đôi khi không trả number thuần). */
+const resolveOrderItemCancelIds = (item) => {
+  if (item?._optimistic) return [];
+  const raw = [
+    ...(Array.isArray(item?.orderItemIds) ? item.orderItemIds : []),
+    item?.orderItemId,
+    item?.itemId,
+    item?.id,
+  ];
+  const out = [];
+  const seen = new Set();
+  for (const x of raw) {
+    if (x == null || x === '') continue;
+    if (isOptimisticPlaceholderId(x)) continue;
+    const n = Number(x);
+    if (Number.isFinite(n) && n > 0) {
+      const key = `n:${n}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(n);
+      }
+      continue;
+    }
+    if (typeof x === 'string') {
+      const s = x.trim();
+      if (!s || isOptimisticPlaceholderId(s)) continue;
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+      const digitsOnly = /^\d+$/.test(s);
+      if (uuidLike || digitsOnly) {
+        const key = `s:${s}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push(s);
+        }
+      }
+    }
+  }
+  return out;
 };
 
 const WAITER_CANCEL_ITEM_QUICK_REASONS = [
@@ -779,12 +900,11 @@ const mapApiOrderToWaiter = (order) => {
 
   // Hàm xác nhận thêm món vào đơn hàng (bản chuẩn)
   const handleConfirmAddItems = async () => {
-    if (!selectedOrder || !selectedOrder.id || cartItems.length === 0) {
+    const orderCode = resolveOrderCode(selectedOrder);
+    if (!selectedOrder || !orderCode || cartItems.length === 0) {
       alert('Chưa chọn đơn hàng hoặc chưa có món để thêm!');
       return;
     }
-
-    const orderCode = String(selectedOrder.id).replace(/^#/, '').trim();
     const payload = cartItems
       .map((item) => {
         const base = {
@@ -829,7 +949,20 @@ const mapApiOrderToWaiter = (order) => {
         .map((item) => getOrderItemMatchKey(item))
         .filter(Boolean);
       console.log('[AddItems] orderCode:', orderCode, 'payload:', payload);
+      const cartSnapshot = cartItems.map((row) => ({ ...row }));
       await addItemsToOrder(orderCode, payload);
+
+      const optimisticRows = cartSnapshot.map((c, i) => cartLineToOptimisticWaiterItem(c, i));
+      setOrderItemsState((prev) => [...(prev || []), ...optimisticRows]);
+      setSelectedOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: [...(prev.items || []), ...optimisticRows.map((r) => ({ ...r }))],
+            }
+          : prev
+      );
+
       alert('Đã thêm món vào đơn hàng!');
 
       if (buffetIds.length > 0) {
@@ -842,6 +975,9 @@ const mapApiOrderToWaiter = (order) => {
         setShowAddItemsModal(false);
       }
 
+      await refreshSelectedOrderDetail(orderCode);
+      // BE đôi khi trả chi tiết chậm sau POST thêm món — làm mới lần 2 sau ngắn delay.
+      await new Promise((r) => setTimeout(r, 450));
       await refreshSelectedOrderDetail(orderCode);
       // Làm mới list đơn ở nền để giao diện không bị khựng.
       void fetchWaiterOrders({ silent: true });
@@ -900,6 +1036,11 @@ const mapApiOrderToWaiter = (order) => {
   const [orderToCancel, setOrderToCancel] = useState(null); // Lưu riêng để tránh bị thay đổi bởi selectedOrder
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  /** Chỉ đổi khi đổi đơn / đóng mở modal — không đổi sau mỗi lần merge API (tránh reconnect hub & reset poll). */
+  const openDetailOrderCodeKey = useMemo(() => {
+    if (!showOrderDetailModal || !selectedOrder) return '';
+    return resolveOrderCode(selectedOrder);
+  }, [showOrderDetailModal, selectedOrder?.orderCode, selectedOrder?.id]);
   const [cartItems, setCartItems] = useState([]);
   const [orderItemsState, setOrderItemsState] = useState([]);
   const [addItemCategory, setAddItemCategory] = useState('dish');
@@ -921,6 +1062,7 @@ const mapApiOrderToWaiter = (order) => {
   const pendingAddedItemKeysRef = useRef([]);
   const orderItemRowRefs = useRef([]);
   const highlightTimeoutRef = useRef(null);
+  const prevShowAddItemsModalRef = useRef(false);
   const [highlightedOrderItemKey, setHighlightedOrderItemKey] = useState('');
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [itemCancelIndex, setItemCancelIndex] = useState(null);
@@ -1663,6 +1805,40 @@ const mapApiOrderToWaiter = (order) => {
 
   // Danh sách bàn thực tế từ API
   const [tables, setTables] = useState([]);
+  /** Lọc lưới chọn bàn: all | empty | occupied | selected | event */
+  const [tablePickerFilter, setTablePickerFilter] = useState('all');
+
+  const tablesFilteredForPicker = useMemo(() => {
+    if (tablePickerFilter === 'all') return tables;
+    return tables.filter((table) => {
+      const status = String(table.status || '').trim().toUpperCase();
+      const tableTypeRaw = String(table.type || table.tableType || '').trim().toLowerCase();
+      const isEventType =
+        tableTypeRaw === 'event' ||
+        tableTypeRaw === 'even' ||
+        tableTypeRaw.includes('sự kiện') ||
+        tableTypeRaw.includes('su kien') ||
+        status === 'EVENT' ||
+        status === 'EVEN';
+      const isAvailable =
+        status === 'AVAILABLE' ||
+        status === 'EMPTY' ||
+        status === 'FREE' ||
+        status === 'VACANT' ||
+        status === 'TRONG';
+      const isOpen = status === 'OPEN';
+      const isOccupied = isOpen || status === 'OCCUPIED';
+      const isMain = table.id === tableSelection.mainTableId;
+      const isMerged = tableSelection.mergedTableIds.includes(table.id);
+      const isSelected = isMain || isMerged;
+
+      if (tablePickerFilter === 'empty') return isAvailable;
+      if (tablePickerFilter === 'occupied') return isOccupied;
+      if (tablePickerFilter === 'selected') return isSelected;
+      if (tablePickerFilter === 'event') return isEventType;
+      return true;
+    });
+  }, [tables, tablePickerFilter, tableSelection.mainTableId, tableSelection.mergedTableIds]);
 
   useEffect(() => {
     if (!hasSelectedTable) return;
@@ -1697,6 +1873,7 @@ const mapApiOrderToWaiter = (order) => {
   // Lấy danh sách bàn khi mở modal chọn bàn hoặc khi trang load
   useEffect(() => {
     if (!showTablePickerModal) return;
+    setTablePickerFilter('all');
     reloadTables();
     // Đảm bảo orders được load để hiển thị thời gian khách ngồi
     if (dineInOrders.length === 0) {
@@ -1777,9 +1954,19 @@ const mapApiOrderToWaiter = (order) => {
     try {
       const detailRes = await orderAPI.getByCode(code);
       const detailPayload = detailRes?.data?.data || detailRes?.data || {};
-      const mappedDetail = mapApiOrderToWaiter(detailPayload);
-      setSelectedOrder((prev) => (prev ? { ...prev, ...mappedDetail } : mappedDetail));
-      setOrderItemsState((mappedDetail?.items || []).map((item) => ({ ...item })));
+      const mergedPayload = await mergeOrderDetailPayloadWithFreshItems(code, detailPayload);
+      const mappedDetail = mapApiOrderToWaiter(mergedPayload);
+      let mergedItemRows = [];
+      setOrderItemsState((prev) => {
+        mergedItemRows = mergeDetailItemsPreserveOptimistic(prev, mappedDetail.items || []).map((item) => ({
+          ...item,
+        }));
+        return mergedItemRows;
+      });
+      setSelectedOrder((prev) => {
+        const base = prev ? { ...prev, ...mappedDetail } : mappedDetail;
+        return { ...base, items: mergedItemRows.map((x) => ({ ...x })) };
+      });
       // Cập nhật orderForm với thông tin khách hàng từ chi tiết đơn hàng
       const deliveryInfo = mappedDetail?.delivery || mappedDetail?.deliveryInfo || {};
       const customerName =
@@ -1843,9 +2030,9 @@ const mapApiOrderToWaiter = (order) => {
     const conn = createHubConnection(KITCHEN_HUB);
     const refresh = async () => {
       await fetchWaiterOrders({ silent: true });
-      if (showOrderDetailModal && selectedOrder) {
-        const orderCode = resolveOrderCode(selectedOrder);
-        await refreshSelectedOrderDetail(orderCode);
+      const code = openDetailOrderCodeKey;
+      if (code) {
+        await refreshSelectedOrderDetail(code);
       }
     };
     conn.on('OrderItemStatusChanged', refresh);
@@ -1856,7 +2043,25 @@ const mapApiOrderToWaiter = (order) => {
     return () => {
       void conn.stop();
     };
-  }, [fetchWaiterOrders, refreshSelectedOrderDetail, selectedOrder, showOrderDetailModal]);
+  }, [fetchWaiterOrders, refreshSelectedOrderDetail, openDetailOrderCodeKey]);
+
+  // Polling nhẹ khi đang xem chi tiết — BE đôi khi không bắn hub sau POST thêm món; list vẫn cập nhật liên tục.
+  useEffect(() => {
+    if (!openDetailOrderCodeKey) return undefined;
+    const code = openDetailOrderCodeKey;
+    void refreshSelectedOrderDetail(code);
+    const id = setInterval(() => {
+      void refreshSelectedOrderDetail(code);
+    }, 2200);
+    return () => clearInterval(id);
+  }, [openDetailOrderCodeKey, refreshSelectedOrderDetail]);
+
+  useEffect(() => {
+    if (prevShowAddItemsModalRef.current && !showAddItemsModal && openDetailOrderCodeKey) {
+      void refreshSelectedOrderDetail(openDetailOrderCodeKey);
+    }
+    prevShowAddItemsModalRef.current = showAddItemsModal;
+  }, [showAddItemsModal, openDetailOrderCodeKey, refreshSelectedOrderDetail]);
 
   const activePaymentOrderCode = resolveOrderCode(selectedOrder);
   useEffect(() => {
@@ -2469,7 +2674,20 @@ const mapApiOrderToWaiter = (order) => {
       closeItemCancelModal();
       return;
     }
-    const ids = resolveOrderItemNumericIds(item);
+    if (item._optimistic) {
+      const code = resolveOrderCode(selectedOrder);
+      setOrderItemsState((prev) => prev.filter((_, i) => i !== itemCancelIndex));
+      setSelectedOrder((prev) =>
+        prev ? { ...prev, items: (prev.items || []).filter((_, i) => i !== itemCancelIndex) } : prev
+      );
+      setUiNotice('Đã gỡ món (đang đồng bộ với hệ thống).');
+      closeItemCancelModal();
+      if (code) void refreshSelectedOrderDetail(code);
+      void fetchWaiterOrders({ silent: true });
+      return;
+    }
+
+    const ids = resolveOrderItemCancelIds(item);
     if (ids.length === 0) {
       alert('Không tìm thấy mã dòng món (orderItemId) để hủy.');
       return;
@@ -2796,6 +3014,7 @@ const mapApiOrderToWaiter = (order) => {
 
   const closeTablePickerModal = () => {
     setShowTablePickerModal(false);
+    setTablePickerFilter('all');
     if (isSelectingTableForCreateFlow) {
       setShowOrderInfoModal(true);
       setIsSelectingTableForCreateFlow(false);
@@ -3787,23 +4006,42 @@ const mapApiOrderToWaiter = (order) => {
             </div>
 
             <div className="table-legend">
-              <div className="legend-item">
+              <button
+                type="button"
+                className={`legend-item legend-filter-btn${tablePickerFilter === 'empty' ? ' is-active' : ''}`}
+                onClick={() => setTablePickerFilter((f) => (f === 'empty' ? 'all' : 'empty'))}
+              >
                 <span className="legend-box empty" /> Bàn trống
-              </div>
-              <div className="legend-item">
+              </button>
+              <button
+                type="button"
+                className={`legend-item legend-filter-btn${tablePickerFilter === 'occupied' ? ' is-active' : ''}`}
+                onClick={() => setTablePickerFilter((f) => (f === 'occupied' ? 'all' : 'occupied'))}
+              >
                 <span className="legend-box occupied" /> Đang có khách
-              </div>
-              <div className="legend-item">
+              </button>
+              <button
+                type="button"
+                className={`legend-item legend-filter-btn${tablePickerFilter === 'selected' ? ' is-active' : ''}`}
+                onClick={() => setTablePickerFilter((f) => (f === 'selected' ? 'all' : 'selected'))}
+              >
                 <span className="legend-box selected" /> Đang được chọn
-              </div>
-              <div className="legend-item">
+              </button>
+              <button
+                type="button"
+                className={`legend-item legend-filter-btn${tablePickerFilter === 'event' ? ' is-active' : ''}`}
+                onClick={() => setTablePickerFilter((f) => (f === 'event' ? 'all' : 'event'))}
+              >
                 <span className="legend-box event" /> Bàn sự kiện
-              </div>
+              </button>
             </div>
 
             <div className="table-picker-body">
+              {tablesFilteredForPicker.length === 0 ? (
+                <p className="table-picker-empty-filter">Không có bàn phù hợp bộ lọc.</p>
+              ) : (
               <div className="table-grid">
-                {tables.map((table) => {
+                {tablesFilteredForPicker.map((table) => {
                   const isMain = table.id === tableSelection.mainTableId;
                   const isMerged = tableSelection.mergedTableIds.includes(table.id);
                   const isSelected = isMain || isMerged;
@@ -3818,7 +4056,12 @@ const mapApiOrderToWaiter = (order) => {
                     status === 'EVENT' ||
                     status === 'EVEN';
                   const tableTypeLabel = isEventType ? 'Sự kiện' : (table.type || table.tableType || '-');
-                  const isAvailable = status === 'AVAILABLE';
+                  const isAvailable =
+                    status === 'AVAILABLE' ||
+                    status === 'EMPTY' ||
+                    status === 'FREE' ||
+                    status === 'VACANT' ||
+                    status === 'TRONG';
                   const isOpen = status === 'OPEN';
                   const isOccupied = isOpen || status === 'OCCUPIED';
                   // Phân loại màu sắc
@@ -3857,7 +4100,9 @@ const mapApiOrderToWaiter = (order) => {
                       <strong>{table.name || table.id}</strong>
                       <span>{table.seats} ghế</span>
                       <span style={{fontSize:'12px',color:'#888'}}>{tableTypeLabel}</span>
-                      <span style={{fontSize:'12px',color:'#888'}}>{status === 'AVAILABLE' ? 'Bàn trống' : status === 'OPEN' ? 'Đang có khách' : status}</span>
+                      <span style={{fontSize:'12px',color:'#888'}}>
+                        {isAvailable ? 'Bàn trống' : status === 'OPEN' ? 'Đang có khách' : status}
+                      </span>
                       {isOccupied && (() => {
                         // Tìm đơn hàng của bàn này - thử nhiều cách match
                         const tableIdStr = String(table.id || table.tableId || table.code || table.tableCode || '').trim();
@@ -3907,6 +4152,7 @@ const mapApiOrderToWaiter = (order) => {
                   );
                 })}
               </div>
+              )}
             </div>
 
             <div className="table-picker-summary">
@@ -4080,10 +4326,11 @@ const mapApiOrderToWaiter = (order) => {
                       const dishStatus = getDishStatus(item.dishStatus || 'pending');
                       const itemMatchKey = getOrderItemMatchKey(item);
                       const itemRowIds = resolveOrderItemNumericIds(item);
+                      const cancelIds = resolveOrderItemCancelIds(item);
                       const canCancelThisItem =
                         !isDeliveryOrder(selectedOrder) &&
                         item.dishStatus === 'pending' &&
-                        itemRowIds.length > 0;
+                        (cancelIds.length > 0 || item._optimistic === true);
                       return (
                         <tr
                           key={item.name + idx}
