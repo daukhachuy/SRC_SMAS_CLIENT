@@ -10,6 +10,22 @@
   background: var(--kitchen-bg);
 }
 
+/* Vùng nội dung chính - luôn chiếm không gian còn lại */
+.kds-orders-grid {
+  display: grid;
+  /* Chia 3 cột đều nhau */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Khoảng cách giữa các card (quan trọng) */
+  gap: 24px;
+  /* Đẩy các card lên trên cùng, không cho chúng tự co giãn chiều cao bằng nhau */
+  align-items: start;
+  padding: 24px;
+  /* Chiếm không gian còn lại, không collapse */
+  flex: 1;
+  min-height: 300px;
+  overflow-y: auto;
+}
+
 /* KDS Header */
 .kds-header {
   height: 64px;
@@ -604,18 +620,6 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-/* KDS Orders Grid — Material Design 3 style */
-.kds-orders-grid {
-  display: grid;
-    /* Chia 3 cột đều nhau */
-    grid-template-columns: repeat(3, minmax(0, 1fr)); 
-    /* Khoảng cách giữa các card (quan trọng) */
-    gap: 24px; 
-    /* Đẩy các card lên trên cùng, không cho chúng tự co giãn chiều cao bằng nhau */
-    align-items: start; 
-    padding: 24px;
 }
 
 /* Desktop: 3 columns */
