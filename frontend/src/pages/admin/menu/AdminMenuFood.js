@@ -99,6 +99,7 @@ function normalizeFood(raw) {
     isDirectSale: raw.isDirectSale === true,
     isFeatured: raw.isFeatured === true,
     preparationTime: raw.preparationTime != null ? Number(raw.preparationTime) : null,
+    calories: raw.calories != null ? Number(raw.calories) : null,
     notes: raw.notes ?? raw.note ?? '',
     promotionalPrice: Number.isFinite(promo) ? promo : 0,
     /** Chuỗi hiển thị cột phân loại: "A, B, C" */
@@ -324,7 +325,12 @@ const AdminMenuFood = () => {
       isFeatured: row.isFeatured === true,
       preparationTime: row.preparationTime != null ? String(row.preparationTime) : '',
       calories: row.calories != null ? String(row.calories) : '',
-      promotionalPrice: row.promotionalPrice != null ? String(row.promotionalPrice) : '0',
+      promotionalPrice: (() => {
+        const v = row.promotionalPrice;
+        if (v == null || v === '') return '';
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? String(n) : '';
+      })(),
     };
     setFormE(initForm);
     setFormEErrors({});
@@ -354,6 +360,14 @@ const AdminMenuFood = () => {
     try {
       const cleanPrice = Number(String(form.price).replace(/[.,]/g, '')) || 0;
       const cleanPrepTime = form.preparationTime !== '' ? Number(String(form.preparationTime).replace(/\D/g, '')) : 0;
+      const cleanPromo =
+        form.promotionalPrice !== '' && form.promotionalPrice != null
+          ? Number(String(form.promotionalPrice).replace(/[.,]/g, '')) || 0
+          : 0;
+      const cleanCal =
+        form.calories !== '' && form.calories != null
+          ? Number(String(form.calories).replace(/\D/g, '')) || 0
+          : 0;
 
       const categoryIds = form.categories
         .map(name => findCategoryIdByName(name, categories))
@@ -363,12 +377,15 @@ const AdminMenuFood = () => {
         name: form.name.trim(),
         description: form.description ? form.description.trim() : '',
         image: form.image || '',
+        unit: form.unit || 'Dĩa',
         price: cleanPrice,
+        promotionalPrice: cleanPromo,
         isAvailable: Boolean(form.isAvailable),
-        inStockable: true,
+        isDirectSale: Boolean(form.isDirectSale),
+        isFeatured: Boolean(form.isFeatured),
         preparationTime: cleanPrepTime,
-        note: form.note ? form.note.trim() : '',
-        colors: [],
+        calories: cleanCal,
+        note: (form.note || form.notes || '').trim(),
         categoryIds,
         imageFile: form.imageFile,
       };
@@ -394,6 +411,14 @@ const AdminMenuFood = () => {
     try {
       const cleanPrice = Number(String(formE.price).replace(/[.,]/g, '')) || 0;
       const cleanPrepTime = formE.preparationTime !== '' ? Number(String(formE.preparationTime).replace(/\D/g, '')) : 0;
+      const cleanPromo =
+        formE.promotionalPrice !== '' && formE.promotionalPrice != null
+          ? Number(String(formE.promotionalPrice).replace(/[.,]/g, '')) || 0
+          : 0;
+      const cleanCal =
+        formE.calories !== '' && formE.calories != null
+          ? Number(String(formE.calories).replace(/\D/g, '')) || 0
+          : 0;
 
       const categoryIds = formE.categories
         .map(name => findCategoryIdByName(name, categories))
@@ -403,12 +428,15 @@ const AdminMenuFood = () => {
         name: formE.name.trim(),
         description: formE.description ? formE.description.trim() : '',
         image: formE.image || '',
+        unit: formE.unit || 'Dĩa',
         price: cleanPrice,
-        isAvailable: Boolean(formE.isAvailable),
-        inStockable: true,
+        promotionalPrice: cleanPromo,
+        isAvailable: Boolean(formE.status),
+        isDirectSale: Boolean(formE.isDirectSale),
+        isFeatured: Boolean(formE.isFeatured),
         preparationTime: cleanPrepTime,
-        note: formE.note ? formE.note.trim() : '',
-        colors: [],
+        calories: cleanCal,
+        note: (formE.note || formE.notes || '').trim(),
         categoryIds,
         imageFile: formE.imageFile,
       };
@@ -582,6 +610,19 @@ const AdminMenuFood = () => {
                   {formErrorsState.price && <span className="dish-field-error">{formErrorsState.price}</span>}
                 </div>
                 <div className="dish-form-group">
+                  <label htmlFor={`${isEdit ? 'edit' : 'add'}-promo`}>Giá khuyến mãi (VNĐ)</label>
+                  <div className="dish-price-wrap">
+                    <input
+                      id={`${isEdit ? 'edit' : 'add'}-promo`}
+                      type="text"
+                      value={formState.promotionalPrice}
+                      onChange={(e) => setFormState((p) => ({ ...p, promotionalPrice: e.target.value }))}
+                      placeholder="Để trống nếu không khuyến mãi"
+                    />
+                    <span className="dish-currency">đ</span>
+                  </div>
+                </div>
+                <div className="dish-form-group">
                   <label htmlFor={`${isEdit ? 'edit' : 'add'}-unit`}>Đơn vị tính</label>
                   <select
                     id={`${isEdit ? 'edit' : 'add'}-unit`}
@@ -590,6 +631,52 @@ const AdminMenuFood = () => {
                   >
                     {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                   </select>
+                </div>
+                <div className="dish-form-inline-row">
+                  <div className="dish-form-group dish-form-group--inline">
+                    <label htmlFor={`${isEdit ? 'edit' : 'add'}-prep`}>Thời gian chuẩn bị (phút)</label>
+                    <input
+                      id={`${isEdit ? 'edit' : 'add'}-prep`}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formState.preparationTime}
+                      onChange={(e) => setFormState((p) => ({ ...p, preparationTime: e.target.value }))}
+                    />
+                  </div>
+                  <div className="dish-form-group dish-form-group--inline">
+                    <label htmlFor={`${isEdit ? 'edit' : 'add'}-cal`}>Lượng calo (kcal)</label>
+                    <input
+                      id={`${isEdit ? 'edit' : 'add'}-cal`}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formState.calories}
+                      onChange={(e) => setFormState((p) => ({ ...p, calories: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="dish-form-group dish-toggle-wrap">
+                  <label className="dish-toggle-label">Bán trực tiếp</label>
+                  <button
+                    type="button"
+                    className={`menu-toggle ${formState.isDirectSale ? 'active' : ''}`}
+                    onClick={() => setFormState((p) => ({ ...p, isDirectSale: !p.isDirectSale }))}
+                    aria-label="Bán trực tiếp"
+                  >
+                    <span className="menu-toggle-thumb" />
+                  </button>
+                </div>
+                <div className="dish-form-group dish-toggle-wrap">
+                  <label className="dish-toggle-label">Món nổi bật</label>
+                  <button
+                    type="button"
+                    className={`menu-toggle ${formState.isFeatured ? 'active' : ''}`}
+                    onClick={() => setFormState((p) => ({ ...p, isFeatured: !p.isFeatured }))}
+                    aria-label="Món nổi bật"
+                  >
+                    <span className="menu-toggle-thumb" />
+                  </button>
                 </div>
                 <div className="dish-form-group">
                   <label>Danh mục <span className="dish-required">*</span></label>
@@ -615,7 +702,9 @@ const AdminMenuFood = () => {
                     <button
                       type="button"
                       className={`menu-toggle ${formState.status ? 'active' : ''}`}
-                      onClick={() => setFormState((p) => ({ ...p, status: !p.status }))}
+                      onClick={() =>
+                        setFormState((p) => ({ ...p, status: !p.status, isAvailable: !p.status }))
+                      }
                       aria-label="Trạng thái"
                     >
                       <span className="menu-toggle-thumb" />
