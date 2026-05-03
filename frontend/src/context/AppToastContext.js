@@ -7,17 +7,12 @@ import React, {
   useState,
 } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { emitAppToast } from '../utils/appToastBus';
-import '../styles/ManagerToast.css';
+import { registerAppToast, unregisterAppToast, emitAppToast } from '../utils/appToastBus';
+import '../styles/AppToast.css';
 
-const ManagerToastContext = createContext(null);
+const AppToastContext = createContext(null);
 
-/**
- * Toast góc phải — dùng trong khu /manager (theme --manager-*).
- * @param {string} message
- * @param {'success'|'error'|'info'} [type='info']
- */
-export function ManagerToastProvider({ children }) {
+export function AppToastProvider({ children }) {
   const [toast, setToast] = useState(null);
 
   const hideToast = useCallback(() => setToast(null), []);
@@ -33,6 +28,11 @@ export function ManagerToastProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    registerAppToast(showToast);
+    return () => unregisterAppToast();
+  }, [showToast]);
+
+  useEffect(() => {
     if (!toast) return;
     const ms = toast.type === 'error' ? 5600 : 4200;
     const timer = setTimeout(hideToast, ms);
@@ -45,23 +45,23 @@ export function ManagerToastProvider({ children }) {
   );
 
   return (
-    <ManagerToastContext.Provider value={value}>
+    <AppToastContext.Provider value={value}>
       {children}
       {toast && (
         <div
-          className={`mgr-toast mgr-toast--${toast.type}`}
+          className={`app-toast app-toast--${toast.type}`}
           role="alert"
           aria-live="polite"
         >
-          <span className="mgr-toast-icon" aria-hidden>
+          <span className="app-toast-icon" aria-hidden>
             {toast.type === 'success' && <CheckCircle size={20} strokeWidth={2.2} />}
             {toast.type === 'error' && <AlertCircle size={20} strokeWidth={2.2} />}
             {toast.type === 'info' && <Info size={20} strokeWidth={2.2} />}
           </span>
-          <p className="mgr-toast-text">{toast.message}</p>
+          <p className="app-toast-text">{toast.message}</p>
           <button
             type="button"
-            className="mgr-toast-close"
+            className="app-toast-close"
             onClick={hideToast}
             aria-label="Đóng thông báo"
           >
@@ -69,21 +69,15 @@ export function ManagerToastProvider({ children }) {
           </button>
         </div>
       )}
-    </ManagerToastContext.Provider>
+    </AppToastContext.Provider>
   );
 }
 
-export function useManagerToast() {
-  const ctx = useContext(ManagerToastContext);
+export function useAppToast() {
+  const ctx = useContext(AppToastContext);
   if (!ctx) {
     return {
-      showToast: (message, type = 'info') => {
-        const text =
-          typeof message === 'string'
-            ? message
-            : String(message?.message ?? message ?? '');
-        emitAppToast(text, type);
-      },
+      showToast: emitAppToast,
       hideToast: () => {},
     };
   }

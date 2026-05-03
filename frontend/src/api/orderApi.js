@@ -240,6 +240,54 @@ export const getOrderItemsByCode = async (orderCode, token) => {
   return response.data;
 };
 
+/**
+ * Ước tính phí ship (nếu backend có endpoint).
+ * POST /api/order/delivery-fee-estimate — body: { address }
+ * Response: { deliveryFee } | { data: { deliveryFee, deliveryPrice } }
+ */
+function pickFeeFromPayload(payload) {
+  const d = payload?.data ?? payload;
+  const n = Number(
+    d?.deliveryFee ??
+      d?.DeliveryFee ??
+      d?.deliveryPrice ??
+      d?.DeliveryPrice ??
+      d?.fee ??
+      d?.shippingFee
+  );
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * Ước tính phí ship từ backend — thử vài contract route/body (BE có thể đặt tên khác).
+ */
+export async function getDeliveryFeeEstimateFromApi(address) {
+  const a = String(address || '').trim();
+  if (!a) return null;
+
+  const attempts = [
+    () => instance.post('/order/delivery-fee-estimate', { address: a }),
+    () => instance.post('/order/delivery-fee-estimate', { deliveryAddress: a }),
+    () => instance.post('/order/shipping-fee-estimate', { address: a }),
+    () => instance.get('/order/delivery-fee-estimate', { params: { address: a } }),
+    () => instance.get('/order/shipping-fee', { params: { address: a } }),
+  ];
+
+  for (const run of attempts) {
+    try {
+      const res = await run();
+      const fee = pickFeeFromPayload(res.data);
+      if (fee != null) return fee;
+    } catch (e) {
+      const st = e?.response?.status;
+      if (st && ![404, 405].includes(st)) {
+        console.warn('[order] delivery-fee estimate attempt:', st, e?.response?.data);
+      }
+    }
+  }
+  return null;
+}
+
 // Xóa / hủy đơn hàng theo mã đơn
 export const deleteOrder = async (orderCode, token) => {
   const code = encodeURIComponent(String(orderCode || '').trim());

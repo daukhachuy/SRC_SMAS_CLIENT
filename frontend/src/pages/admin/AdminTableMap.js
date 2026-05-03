@@ -10,6 +10,7 @@ import {
   parseTableApiError,
 } from '../../api/tableApi';
 import '../../styles/AdminTableMap.css';
+import { emitAppToast } from '../../utils/appToastBus';
 
 const TABLE_TYPES = [
   { value: 'standard', label: 'Tiêu chuẩn' },
@@ -169,7 +170,7 @@ const AdminTableMap = () => {
           nameNorm &&
           tables.some((t) => String(t.name || '').trim().toLowerCase() === nameNorm)
         ) {
-          alert('Tên bàn đã tồn tại. Vui lòng chọn tên khác.');
+          emitAppToast('Tên bàn đã tồn tại. Vui lòng chọn tên khác.');
           return;
         }
         await createTable(payload);
@@ -179,7 +180,7 @@ const AdminTableMap = () => {
       await loadTables();
       closeModal();
     } catch (err) {
-      alert(parseTableApiError(err));
+      emitAppToast(parseTableApiError(err));
     } finally {
       setSaving(false);
     }
@@ -191,7 +192,7 @@ const AdminTableMap = () => {
       await deleteTable(table.id);
       await loadTables();
     } catch (err) {
-      alert(parseTableApiError(err));
+      emitAppToast(parseTableApiError(err));
     }
   };
 
@@ -337,7 +338,7 @@ const AdminTableMap = () => {
                             if (window.confirm(`${newStatus ? 'Mở' : 'Đóng'} bàn "${t.name}"?`)) {
                               toggleTableStatus(t.id, newStatus)
                                 .then(() => loadTables())
-                                .catch((err) => alert(parseTableApiError(err, 'Không cập nhật được trạng thái bàn.')));
+                                .catch((err) => emitAppToast(parseTableApiError(err, 'Không cập nhật được trạng thái bàn.')));
                             }
                           }}
                         >

@@ -10,6 +10,7 @@ import {
   createStaffByUserId,
   createStaffNew,
 } from '../../api/userApi';
+import { emitAppToast } from '../../utils/appToastBus';
 
 const formatCustomerCreatedAt = (iso) => {
   if (!iso) return '—';
@@ -178,7 +179,7 @@ const AdminStaffPage = () => {
       await patchUserStatus(id);
       await loadCustomers({ silent: true, syncSelectedUserId: id });
     } catch (err) {
-      window.alert(err?.message || 'Không cập nhật được trạng thái tài khoản.');
+      emitAppToast(err?.message || 'Không cập nhật được trạng thái tài khoản.');
     } finally {
       setCustomerToggleBusyId(null);
     }
@@ -234,7 +235,7 @@ const AdminStaffPage = () => {
       await patchStaffStatus(id);
       await loadStaffs({ silent: true, syncSelectedId: id });
     } catch (err) {
-      window.alert(err?.message || 'Không cập nhật được trạng thái nhân viên.');
+      emitAppToast(err?.message || 'Không cập nhật được trạng thái nhân viên.');
     } finally {
       setStaffToggleBusyId(null);
     }
@@ -277,7 +278,7 @@ const AdminStaffPage = () => {
       setSelectedStaff(null);
       setEditStaffForm(null);
     } catch (err) {
-      window.alert(err?.message || 'Không cập nhật được thông tin nhân viên.');
+      emitAppToast(err?.message || 'Không cập nhật được thông tin nhân viên.');
     }
   };
 
@@ -292,21 +293,21 @@ const AdminStaffPage = () => {
     const bankAccountNumber = (addStaffForm.bankAccount || '').trim() || null;
 
     if (!position) {
-      window.alert('Vui lòng chọn vị trí / vai trò.');
+      emitAppToast('Vui lòng chọn vị trí / vai trò.');
       return;
     }
 
     if (addStaffMode === 'from_customer') {
       if (addStaffSelectedUserId == null) {
-        window.alert('Vui lòng chọn một khách hàng trong danh sách.');
+        emitAppToast('Vui lòng chọn một khách hàng trong danh sách.');
         return;
       }
       if (!Number.isFinite(salaryNum) || salaryNum < 1) {
-        window.alert('Mức lương phải là số và tối thiểu 1 (theo API).');
+        emitAppToast('Mức lương phải là số và tối thiểu 1 (theo API).');
         return;
       }
       if (!taxId) {
-        window.alert('Vui lòng nhập mã số thuế.');
+        emitAppToast('Vui lòng nhập mã số thuế.');
         return;
       }
       setAddStaffSubmitting(true);
@@ -320,10 +321,10 @@ const AdminStaffPage = () => {
           taxId,
         });
         await loadStaffs({ silent: true });
-        window.alert('Đã thêm nhân viên từ tài khoản khách hàng.');
+        emitAppToast('Đã thêm nhân viên từ tài khoản khách hàng.');
         closeAddStaffModal();
       } catch (err) {
-        window.alert(err?.message || 'Không thêm được nhân viên.');
+        emitAppToast(err?.message || 'Không thêm được nhân viên.');
       } finally {
         setAddStaffSubmitting(false);
       }
@@ -337,27 +338,27 @@ const AdminStaffPage = () => {
     const pwd = addStaffForm.password || '';
 
     if (!fullname) {
-      window.alert('Vui lòng nhập họ tên.');
+      emitAppToast('Vui lòng nhập họ tên.');
       return;
     }
     if (!email) {
-      window.alert('Vui lòng nhập email.');
+      emitAppToast('Vui lòng nhập email.');
       return;
     }
     if (!phone) {
-      window.alert('Vui lòng nhập số điện thoại.');
+      emitAppToast('Vui lòng nhập số điện thoại.');
       return;
     }
     if (pwd.length < 6) {
-      window.alert('Mật khẩu phải có ít nhất 6 ký tự (theo API passwordHash).');
+      emitAppToast('Mật khẩu phải có ít nhất 6 ký tự (theo API passwordHash).');
       return;
     }
     if (!Number.isFinite(salaryNum) || salaryNum < 0) {
-      window.alert('Mức lương phải là số hợp lệ (≥ 0).');
+      emitAppToast('Mức lương phải là số hợp lệ (≥ 0).');
       return;
     }
     if (!taxId) {
-      window.alert('Vui lòng nhập mã số thuế.');
+      emitAppToast('Vui lòng nhập mã số thuế.');
       return;
     }
 
@@ -379,10 +380,10 @@ const AdminStaffPage = () => {
         taxId,
       });
       await loadStaffs({ silent: true });
-      window.alert('Đã tạo nhân viên mới thành công.');
+      emitAppToast('Đã tạo nhân viên mới thành công.');
       closeAddStaffModal();
     } catch (err) {
-      window.alert(err?.message || 'Không tạo được nhân viên.');
+      emitAppToast(err?.message || 'Không tạo được nhân viên.');
     } finally {
       setAddStaffSubmitting(false);
     }
@@ -856,7 +857,7 @@ const AdminStaffPage = () => {
               <span className="staff-reset-label">ĐANG CẬP NHẬT CHO</span>
               <span className="staff-reset-name">{selectedCustomer.name}</span>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); if (newPassword && newPassword === confirmPassword) { window.alert('Đã cập nhật mật khẩu (mock).'); setResetPasswordOpen(false); setNewPassword(''); setConfirmPassword(''); } else { window.alert('Mật khẩu không khớp hoặc chưa nhập.'); } }}>
+            <form onSubmit={(e) => { e.preventDefault(); if (newPassword && newPassword === confirmPassword) { emitAppToast('Đã cập nhật mật khẩu (mock).'); setResetPasswordOpen(false); setNewPassword(''); setConfirmPassword(''); } else { emitAppToast('Mật khẩu không khớp hoặc chưa nhập.'); } }}>
               <div className="staff-form-group">
                 <label>Mật khẩu mới</label>
                 <div className="staff-password-wrap">

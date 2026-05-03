@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/AuthTestPage.css';
+import { emitAppToast } from '../utils/appToastBus';
 
 /**
  * Auth Test Page
@@ -17,7 +18,7 @@ const AuthTestPage = () => {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
-    alert('✅ Logged out!');
+    emitAppToast('✅ Logged out!', 'success');
   };
 
   const handleTestProtectedRoute = (route) => {

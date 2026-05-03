@@ -240,6 +240,17 @@
   border: 1px solid #f0f0f0;
 }
 
+.Cart-Summary-Card--order-only {
+  justify-content: center;
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.Cart-Summary-Card--order-only .Btn-Order-Now {
+  min-width: 220px;
+  padding: 14px 36px;
+}
+
 .Summary-Left {
   display: flex;
   gap: 40px;
@@ -744,6 +755,17 @@
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.Cart-Summary-Card--order-only {
+    justify-content: center;
+    padding-top: 22px;
+    padding-bottom: 22px;
+}
+
+.Cart-Summary-Card--order-only .Btn-Order-Now {
+    min-width: 220px;
+    padding: 14px 36px;
 }
 
 .Summary-Left {

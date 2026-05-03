@@ -11,6 +11,7 @@ import {
 import { fetchScheduleWeekKitchenWaiter, staffApi } from '../../api/staffApi';
 import { notificationAPI, staffAPI } from '../../api/managerApi';
 import { getProfile } from '../../api/userApi';
+import { emitAppToast } from '../../utils/appToastBus';
 
 function resolveSenderIdFromUser(user) {
   if (!user || typeof user !== 'object') return null;
@@ -392,7 +393,7 @@ const KitchenSchedulePage = () => {
       setSelectedShift('');
       setSwapReason('');
       setSelectedManager('');
-      alert('Đã gửi yêu cầu đổi ca. Quản lý sẽ xem xét qua thông báo.');
+      emitAppToast('Đã gửi yêu cầu đổi ca. Quản lý sẽ xem xét qua thông báo.', 'success');
     } catch (e) {
       console.error('[change-workshift]', e);
       const msg =

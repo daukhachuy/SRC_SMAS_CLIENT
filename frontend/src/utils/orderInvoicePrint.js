@@ -2,6 +2,8 @@
  * In / xuất hóa đơn (cửa sổ mới + window.print — có thể lưu PDF).
  */
 
+import { emitAppToast } from './appToastBus';
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)
@@ -24,7 +26,7 @@ const DEFAULT_RESTAURANT =
 function openPrintWindow(title, innerHtml) {
   const w = window.open('', '_blank', 'noopener,noreferrer,width=820,height=960');
   if (!w) {
-    window.alert('Trình duyệt đã chặn cửa sổ mới. Vui lòng cho phép popup để in hóa đơn.');
+    emitAppToast('Trình duyệt đã chặn cửa sổ mới. Vui lòng cho phép popup để in hóa đơn.', 'info');
     return;
   }
   const doc = `<!DOCTYPE html>

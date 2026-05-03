@@ -11,6 +11,7 @@ import useTableSession from '../hooks/useTableSession';
 import { ShoppingCart, LogOut, Loader, AlertCircle } from 'lucide-react';
 import { ORDER_VAT_RATE, roundOrderMoney } from '../constants/orderPricing';
 import '../styles/TableSessionPage.css';
+import { emitAppToast } from '../utils/appToastBus';
 
 /**
  * TableSessionPage - Trang gọi món tại bàn cho khách
@@ -163,7 +164,7 @@ const TableSessionPage = () => {
   // Gọi món
   const handlePlaceOrder = async () => {
     if (cart.length === 0) {
-      alert('Vui lòng chọn món ăn');
+      emitAppToast('Vui lòng chọn món ăn');
       return;
     }
 
@@ -182,11 +183,11 @@ const TableSessionPage = () => {
 
       // TODO: Implement orderAPI.create() endpoint
       // await orderAPI.create(orderData);
-      alert('Đã gửi yêu cầu gọi món. Waiter sẽ xác nhận.');
+      emitAppToast('Đã gửi yêu cầu gọi món. Waiter sẽ xác nhận.');
       setCart([]);
       await loadOrders();
     } catch (err) {
-      alert('Lỗi khi gọi món: ' + err.message);
+      emitAppToast('Lỗi khi gọi món: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -223,14 +224,14 @@ const TableSessionPage = () => {
         }
 
         // Redirect tới trang cảm ơn hoặc order history
-        alert('Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!');
+        emitAppToast('Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!');
         navigate('/', { replace: true });
       } else {
         const errorData = await response.json();
-        alert('Lỗi thanh toán: ' + (errorData.message || 'Vui lòng thử lại'));
+        emitAppToast('Lỗi thanh toán: ' + (errorData.message || 'Vui lòng thử lại'));
       }
     } catch (err) {
-      alert('Lỗi khi thanh toán: ' + err.message);
+      emitAppToast('Lỗi khi thanh toán: ' + err.message);
     } finally {
       setLoading(false);
     }

@@ -7,6 +7,7 @@ import {
   toggleCategoryStatus,
 } from '../../../api/categoryApi';
 import '../../../styles/AdminMenuManagement.css';
+import { emitAppToast } from '../../../utils/appToastBus';
 
 const defaultCategoryForm = () => ({
   name: '',
@@ -102,9 +103,9 @@ const AdminMenuCategory = () => {
       console.error('[AdminMenuCategory] toggle error:', e);
       const serverMsg = e?.response?.data?.message;
       if (serverMsg) {
-        alert(`❌ Lỗi: ${serverMsg}`);
+        emitAppToast(`❌ Lỗi: ${serverMsg}`);
       } else {
-        alert(`❌ Không thể ${action} trạng thái.\nVui lòng thử lại.`);
+        emitAppToast(`❌ Không thể ${action} trạng thái.\nVui lòng thử lại.`);
       }
     } finally {
       setTogglingId(null);
@@ -163,12 +164,12 @@ const AdminMenuCategory = () => {
         setCategories((prev) =>
           prev.map((c) => c.categoryId === editingCategory.categoryId ? norm : c)
         );
-        alert('✅ Cập nhật danh mục thành công!');
+        emitAppToast('✅ Cập nhật danh mục thành công!');
       } else {
         const created = await createCategory(payload);
         const norm = normalize(created);
         setCategories((prev) => [norm, ...prev]);
-        alert('✅ Thêm danh mục mới thành công!');
+        emitAppToast('✅ Thêm danh mục mới thành công!');
       }
       setCategoryModalOpen(false);
       setEditingCategory(null);
@@ -177,9 +178,9 @@ const AdminMenuCategory = () => {
       console.error('[AdminMenuCategory] save error:', err);
       const serverMsg = err?.response?.data?.message;
       if (serverMsg) {
-        alert(`❌ Lỗi: ${serverMsg}`);
+        emitAppToast(`❌ Lỗi: ${serverMsg}`);
       } else {
-        alert('❌ Lưu thất bại. Vui lòng thử lại.');
+        emitAppToast('❌ Lưu thất bại. Vui lòng thử lại.');
       }
     } finally {
       setSaving(false);
@@ -376,7 +377,7 @@ const AdminMenuCategory = () => {
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f && f.size > 2 * 1024 * 1024) {
-                        window.alert('File tối đa 2MB.');
+                        emitAppToast('File tối đa 2MB.');
                         return;
                       }
                       if (f) {

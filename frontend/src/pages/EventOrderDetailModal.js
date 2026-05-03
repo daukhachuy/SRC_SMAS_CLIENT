@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { myOrderAPI } from '../api/myOrderApi';
 import { downloadContractPdf, getPdfErrorMessage } from '../api/pdfExportApi';
+import { emitAppToast } from '../utils/appToastBus';
 
 const EVENT_TYPE_MAP = {
   1: { name: 'Tiệc Cưới', color: '#f43f5e' },
@@ -269,14 +270,14 @@ const EventOrderDetailModal = ({ eventData, onClose }) => {
   const handleDownloadEventContractPdf = async () => {
     const cc = String(contractCode || '').trim();
     if (!cc) {
-      window.alert('Chưa có mã hợp đồng để tải PDF.');
+      emitAppToast('Chưa có mã hợp đồng để tải PDF.');
       return;
     }
     setPdfExporting(true);
     try {
       await downloadContractPdf(cc);
     } catch (e) {
-      window.alert((await getPdfErrorMessage(e)) || 'Tải PDF hợp đồng thất bại.');
+      emitAppToast((await getPdfErrorMessage(e)) || 'Tải PDF hợp đồng thất bại.');
     } finally {
       setPdfExporting(false);
     }

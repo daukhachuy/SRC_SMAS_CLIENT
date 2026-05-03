@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/Profile.css';
 import { getProfile, updateProfile, changePassword } from '../api/userApi';
 import { myOrderAPI } from '../api/myOrderApi';
@@ -116,45 +116,54 @@ const Profile = () => {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const profileData = await getProfile();
-        const fullname = (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '';
-        const phone = (profileData.phone && profileData.phone !== 'string') ? (profileData.phone || '').replace('+84', '0') : '';
-        const address = (profileData.address && profileData.address !== 'string') ? profileData.address : '';
-        const addressDisplay = stripLegacyGpsSuffix(address);
-        const dob = normalizeDobFromApi(profileData.dob);
-        const gender = (profileData.gender && profileData.gender !== 'string') ? profileData.gender : 'Nam';
+  const fetchProfile = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const profileData = await getProfile();
+      const fullname = (profileData.fullname && profileData.fullname !== 'string') ? profileData.fullname : '';
+      const phone = (profileData.phone && profileData.phone !== 'string') ? (profileData.phone || '').replace('+84', '0') : '';
+      const address = (profileData.address && profileData.address !== 'string') ? profileData.address : '';
+      const addressDisplay = stripLegacyGpsSuffix(address);
+      const dob = normalizeDobFromApi(profileData.dob);
+      const gender = (profileData.gender && profileData.gender !== 'string') ? profileData.gender : 'Nam';
 
-        setUserInfo({
-          fullname,
-          gender: gender === 'Nữ' ? 'Nữ' : 'Nam',
-          phone,
-          email: profileData.email || '',
-          address: addressDisplay,
-          dob
-        });
-        setDobInput(isoToDdMmYyyy(dob));
+      setUserInfo({
+        fullname,
+        gender: gender === 'Nữ' ? 'Nữ' : 'Nam',
+        phone,
+        email: profileData.email || '',
+        address: addressDisplay,
+        dob
+      });
+      setDobInput(isoToDdMmYyyy(dob));
 
-        if (address || phone) {
-          setAddresses([
-            { id: 'default', label: 'Nhà riêng', address: address || '—', phone: phone || '—', isDefault: true }
-          ]);
-        } else {
-          setAddresses([]);
-        }
-      } catch (err) {
-        console.error('Error fetching profile:', err);
-        setError('Không thể tải thông tin cá nhân. Vui lòng thử lại.');
-      } finally {
-        setLoading(false);
+      if (address || phone) {
+        setAddresses([
+          { id: 'default', label: 'Nhà riêng', address: address || '—', phone: phone || '—', isDefault: true }
+        ]);
+      } else {
+        setAddresses([]);
       }
-    };
-    fetchProfile();
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError('Không thể tải thông tin cá nhân. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    const onProfileSynced = () => {
+      void fetchProfile();
+    };
+    window.addEventListener('smas-user-profile-updated', onProfileSynced);
+    return () => window.removeEventListener('smas-user-profile-updated', onProfileSynced);
+  }, [fetchProfile]);
 
   // Lấy lịch sử đặt sự kiện từ GET /api/book-event/history
   useEffect(() => {
@@ -462,23 +471,29 @@ const Profile = () => {
       return;
     }
 
+    const savedDistrict = (newAddress.district || '').trim();
+
     const fetchDistricts = async () => {
       try {
         const res = await fetch(`https://provinces.open-api.vn/api/p/${province.code}?depth=2`);
         const data = await res.json();
         const districts = Array.isArray(data?.districts) ? data.districts : [];
-        const mapped = districts
+        let mapped = districts
           .map((d) => String(d?.name || '').trim())
           .filter(Boolean);
+        // Địa chỉ đã lưu có thể là đường/phường tự do, không trùng tên quận từ API → vẫn hiển thị đúng trong form
+        if (savedDistrict && !mapped.includes(savedDistrict)) {
+          mapped = [...mapped, savedDistrict];
+        }
         setDistrictOptions(mapped);
       } catch (err) {
         console.warn('Không tải được danh sách quận/huyện:', err);
-        setDistrictOptions([]);
+        setDistrictOptions(savedDistrict ? [savedDistrict] : []);
       }
     };
 
     fetchDistricts();
-  }, [showAddAddressModal, newAddress.city, provinceOptions]);
+  }, [showAddAddressModal, newAddress.city, newAddress.district, provinceOptions]);
 
   const openAddressEditor = (target) => {
     if (!target) return false;
@@ -487,10 +502,26 @@ const Profile = () => {
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean);
-    const cityRaw = parts.length > 0 ? parts[parts.length - 1] : '';
-    const cityNormalized = getMatchedProvinceName(cityRaw);
-    const district = parts.length > 1 ? parts[parts.length - 2] : '';
-    const street = parts.length > 2 ? parts.slice(0, -2).join(', ') : (parts[0] || '');
+
+    let cityNormalized = '';
+    let district = '';
+    let street = '';
+
+    if (parts.length === 1) {
+      street = parts[0];
+    } else if (parts.length >= 2) {
+      const cityRaw = parts[parts.length - 1];
+      cityNormalized = getMatchedProvinceName(cityRaw) || cityRaw;
+      if (parts.length === 2) {
+        // "Đường..., Thành phố" — không ép phần đầu là quận/huyện
+        street = parts[0];
+        district = '';
+      } else {
+        district = parts[parts.length - 2];
+        street = parts.slice(0, -2).join(', ');
+      }
+    }
+
     setEditingAddressId(target.id);
     setNewAddress({
       street,

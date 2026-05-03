@@ -19,6 +19,7 @@ import {
 import '../../styles/WaiterPages.css';
 import { salaryRecordAPI, staffAPI } from '../../api/managerApi';
 import { staffApi } from '../../api/staffApi';
+import { emitAppToast } from '../../utils/appToastBus';
 
 function pick(obj, keys, fallback = null) {
   for (const key of keys) {
@@ -130,7 +131,7 @@ const WaiterProfilePage = () => {
         setEditForm((prev) => ({ ...prev, avatarUrl: data.secure_url }));
       }
     } catch (err) {
-      alert('Lỗi upload ảnh đại diện!');
+      emitAppToast('Lỗi upload ảnh đại diện!', 'error');
     }
   }, []);
 

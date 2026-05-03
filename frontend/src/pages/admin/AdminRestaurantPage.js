@@ -7,6 +7,7 @@ import { serviceAPI } from '../../api/serviceApi';
 import { EVENT_TYPES_LIST } from '../../api/managerApi';
 import { eventsAPI } from '../../api/eventsApi';
 import '../../styles/AdminRestaurant.css';
+import { emitAppToast } from '../../utils/appToastBus';
 
 /** API BlogResponse dùng `fullname` (Swagger); hỗ trợ fullName, author lồng nhau */
 function pickBlogAuthorName(b) {
@@ -368,12 +369,12 @@ function revokeBlogPreviewIfBlob(url) {
 function handleBlogImageChange(file, setBlogForm, setBlogImageFile, setBlogImagePreview) {
   if (!file) return;
   if (file.size > MAX_IMAGE_SIZE) {
-    window.alert('File tối đa 5MB. Vui lòng chọn ảnh nhẹ hơn.');
+    emitAppToast('File tối đa 5MB. Vui lòng chọn ảnh nhẹ hơn.');
     return;
   }
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   if (!allowed.includes(file.type)) {
-    window.alert('Chỉ chấp nhận ảnh JPG, PNG, WebP, GIF.');
+    emitAppToast('Chỉ chấp nhận ảnh JPG, PNG, WebP, GIF.');
     return;
   }
   const preview = URL.createObjectURL(file);
@@ -770,7 +771,7 @@ const AdminRestaurantPage = () => {
         prev.map((r) => (r.id === sid ? { ...r, active: !next } : r))
       );
       const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái dịch vụ.';
-      window.alert(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
+      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
     } finally {
       setServiceToggleBusyId(null);
     }
@@ -989,7 +990,7 @@ const AdminRestaurantPage = () => {
       if (!err.response && (err.code === 'ERR_NETWORK' || String(err.message || '').includes('Network'))) {
         msg = 'Không kết nối được máy chủ khi xóa. Kiểm tra mạng hoặc đăng nhập.';
       }
-      window.alert(typeof msg === 'string' ? msg : 'Lỗi xóa');
+      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi xóa');
     } finally {
       setEventDeletingId(null);
     }
@@ -1007,7 +1008,7 @@ const AdminRestaurantPage = () => {
       await loadEvents();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái sự kiện.';
-      window.alert(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
+      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
     } finally {
       setEventToggleBusyId(null);
     }
@@ -1450,7 +1451,7 @@ const AdminRestaurantPage = () => {
       await loadDiscounts();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái';
-      alert(msg);
+      emitAppToast(msg);
     }
   };
 
@@ -1599,7 +1600,7 @@ const AdminRestaurantPage = () => {
       );
     } catch (e) {
       const msg = e.response?.data?.message || e.message || 'Không cập nhật được trạng thái blog.';
-      window.alert(typeof msg === 'string' ? msg : 'Lỗi');
+      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi');
     } finally {
       setBlogStatusPatchingId(null);
     }
