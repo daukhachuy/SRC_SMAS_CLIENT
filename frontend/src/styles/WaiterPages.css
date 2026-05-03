@@ -1244,6 +1244,37 @@
   font-weight: 600;
 }
 
+.legend-filter-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 10px;
+  margin: -6px -6px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.legend-filter-btn:hover {
+  background: rgba(255, 109, 31, 0.08);
+  color: #2b221d;
+}
+
+.legend-filter-btn.is-active {
+  background: rgba(255, 109, 31, 0.16);
+  color: #23160f;
+  box-shadow: inset 0 0 0 1px rgba(255, 109, 31, 0.35);
+}
+
+.table-picker-empty-filter {
+  margin: 0;
+  padding: 28px 16px;
+  text-align: center;
+  color: #8b7e73;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .legend-box {
   width: 14px;
   height: 14px;
@@ -1798,6 +1829,8 @@
   border: 1px solid #e0dcd8;
   border-radius: 14px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  /* Cho phép khối con (.waiter-notification-list) co lại và scroll trong layout flex/grid cha */
+  min-height: 0;
 }
 
 .waiter-schedule-card-head {
@@ -1834,6 +1867,25 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: min(420px, 55vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d4cbc4 transparent;
+}
+
+.waiter-notification-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.waiter-notification-list::-webkit-scrollbar-thumb {
+  background: #d4cbc4;
+  border-radius: 999px;
+}
+
+.waiter-notification-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .waiter-notification-item {

@@ -346,9 +346,54 @@ export async function getAllFoods(foodId) {
 }
 
 /**
+ * Body JSON đúng Swagger Food create/update: đủ name, price, unit, categoryIds, flags, ...
+ * @param {object} payload — từ Admin (đã gộp image URL sau upload nếu có)
+ * @param {string} imageUrl — URL ảnh cuối (Cloudinary hoặc giữ ảnh cũ)
+ */
+export function buildFoodWritePayload(payload, imageUrl) {
+  const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
+  const cleanPromo =
+    payload.promotionalPrice !== undefined &&
+    payload.promotionalPrice !== null &&
+    String(payload.promotionalPrice).trim() !== ''
+      ? Number(String(payload.promotionalPrice).replace(/[.,]/g, '')) || 0
+      : 0;
+  const cleanPrep =
+    payload.preparationTime !== undefined &&
+    payload.preparationTime !== null &&
+    String(payload.preparationTime).trim() !== ''
+      ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0
+      : 0;
+  const cleanCal =
+    payload.calories !== undefined &&
+    payload.calories !== null &&
+    String(payload.calories).trim() !== ''
+      ? Number(String(payload.calories).replace(/\D/g, '')) || 0
+      : 0;
+  const categoryIds = Array.isArray(payload.categoryIds)
+    ? payload.categoryIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+    : [];
+
+  return {
+    name: String(payload.name ?? '').trim(),
+    description: String(payload.description ?? '').trim(),
+    price: cleanPrice,
+    promotionalPrice: cleanPromo,
+    image: String(imageUrl ?? payload.image ?? '').trim(),
+    unit: String(payload.unit ?? 'Dĩa').trim() || 'Dĩa',
+    isAvailable: payload.isAvailable !== false && payload.isAvailable !== 0,
+    isDirectSale: Boolean(payload.isDirectSale),
+    isFeatured: Boolean(payload.isFeatured),
+    preparationTime: cleanPrep,
+    calories: cleanCal,
+    note: String(payload.note ?? payload.notes ?? '').trim(),
+    categoryIds,
+  };
+}
+
+/**
  * POST /api/food — tạo món ăn mới
- * payload: FoodCreateDto
- * Backend .NET thường dùng IFormFile cho ảnh → dùng FormData
+ * payload: FoodCreateDto (Swagger) + imageFile?: File
  */
 export async function createFood(payload) {
   try {
@@ -359,21 +404,13 @@ export async function createFood(payload) {
       console.log('[createFood] Ảnh đã upload:', imageUrl);
     }
 
-    const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
-    const cleanPrepTime = payload.preparationTime != null ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0 : 0;
-
-    const jsonData = {
-      name: payload.name ?? '',
-      description: payload.description ?? '',
-      image: imageUrl,
-      price: cleanPrice,
-      isAvailable: payload.isAvailable !== false,
-      inStockable: payload.inStockable !== false,
-      preparationTime: cleanPrepTime,
-      colors: payload.colors ?? [],
-      note: payload.note ?? '',
-      categoryIds: payload.categoryIds ?? [],
-    };
+    const jsonData = buildFoodWritePayload(payload, imageUrl);
+    if (Array.isArray(payload.colors) && payload.colors.length > 0) {
+      jsonData.colors = payload.colors;
+    }
+    if (payload.inStockable !== undefined) {
+      jsonData.inStockable = payload.inStockable !== false;
+    }
     console.log('[createFood] Payload gửi đi:', jsonData);
 
     const resp = await instance.post('/food', jsonData);
@@ -385,7 +422,7 @@ export async function createFood(payload) {
 }
 
 /**
- * PUT /api/food/{id} — cập nhật món ăn
+ * PUT /api/food/{id} — cập nhật món ăn (Swagger body đầy đủ)
  */
 export async function updateFood(id, payload) {
   try {
@@ -396,24 +433,18 @@ export async function updateFood(id, payload) {
       console.log('[updateFood] Ảnh đã upload:', imageUrl);
     }
 
-    const cleanPrice = Number(String(payload.price ?? 0).replace(/[.,]/g, '')) || 0;
-    const cleanPrepTime = payload.preparationTime != null ? Number(String(payload.preparationTime).replace(/\D/g, '')) || 0 : 0;
-
-    const jsonData = {
-      name: payload.name ?? '',
-      description: payload.description ?? '',
-      image: imageUrl,
-      price: cleanPrice,
-      isAvailable: payload.isAvailable !== false,
-      inStockable: payload.inStockable !== false,
-      preparationTime: cleanPrepTime,
-      colors: payload.colors ?? [],
-      note: payload.note ?? '',
-      categoryIds: payload.categoryIds ?? [],
-    };
+    const jsonData = buildFoodWritePayload(payload, imageUrl);
+    if (Array.isArray(payload.colors) && payload.colors.length > 0) {
+      jsonData.colors = payload.colors;
+    }
+    if (payload.inStockable !== undefined) {
+      jsonData.inStockable = payload.inStockable !== false;
+    }
     console.log('[updateFood] Payload gửi đi:', jsonData);
 
-    const resp = await instance.put(`/food/${id}`, jsonData);
+    const idNum = Number(id);
+    const pathId = Number.isFinite(idNum) && idNum > 0 ? idNum : id;
+    const resp = await instance.put(`/food/${pathId}`, jsonData);
     return resp.data;
   } catch (err) {
     console.error('[foodApi] updateFood error:', err.response?.data || err.message);
