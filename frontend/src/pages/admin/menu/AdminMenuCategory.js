@@ -7,7 +7,8 @@ import {
   toggleCategoryStatus,
 } from '../../../api/categoryApi';
 import '../../../styles/AdminMenuManagement.css';
-import { emitAppToast } from '../../../utils/appToastBus';
+import { getErrorMessage } from '../../../utils/errorHandler';
+import { useAdminToast } from '../../../context/AdminToastContext';
 
 const defaultCategoryForm = () => ({
   name: '',
@@ -29,6 +30,9 @@ const normalize = (raw) => ({
 });
 
 const AdminMenuCategory = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [categories, setCategories]   = useState([]);
   const [search, setSearch]          = useState('');
   const [loading, setLoading]        = useState(true);
@@ -54,7 +58,7 @@ const AdminMenuCategory = () => {
       const data = await getAllCategories();
       setCategories(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error('[AdminMenuCategory] load error:', e);
+      console.error('Lỗi khi tải danh mục:', getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -94,19 +98,15 @@ const AdminMenuCategory = () => {
 
     try {
       await toggleCategoryStatus(id, next);
+      showToast(`Đã ${action} danh mục "${row.name}".`, 'success');
       console.info(`[AdminMenuCategory] Toggle OK — id:${id} → isAvailable:${next}`);
     } catch (e) {
-      // Revert optimistic update
       setCategories((prev) =>
         prev.map((c) => (c.categoryId === id ? { ...c, isAvailable: !next } : c))
       );
       console.error('[AdminMenuCategory] toggle error:', e);
-      const serverMsg = e?.response?.data?.message;
-      if (serverMsg) {
-        emitAppToast(`❌ Lỗi: ${serverMsg}`);
-      } else {
-        emitAppToast(`❌ Không thể ${action} trạng thái.\nVui lòng thử lại.`);
-      }
+      const msg = getErrorMessage(e, `Không thể ${action} trạng thái.`);
+      showToast(msg, 'error');
     } finally {
       setTogglingId(null);
     }
@@ -164,24 +164,20 @@ const AdminMenuCategory = () => {
         setCategories((prev) =>
           prev.map((c) => c.categoryId === editingCategory.categoryId ? norm : c)
         );
-        emitAppToast('✅ Cập nhật danh mục thành công!');
+        showToast('Cập nhật danh mục thành công!', 'success');
       } else {
         const created = await createCategory(payload);
         const norm = normalize(created);
         setCategories((prev) => [norm, ...prev]);
-        emitAppToast('✅ Thêm danh mục mới thành công!');
+        showToast('Thêm danh mục mới thành công!', 'success');
       }
       setCategoryModalOpen(false);
       setEditingCategory(null);
       setCategoryForm(defaultCategoryForm());
     } catch (err) {
-      console.error('[AdminMenuCategory] save error:', err);
-      const serverMsg = err?.response?.data?.message;
-      if (serverMsg) {
-        emitAppToast(`❌ Lỗi: ${serverMsg}`);
-      } else {
-        emitAppToast('❌ Lưu thất bại. Vui lòng thử lại.');
-      }
+      console.error('Lỗi khi lưu danh mục:', getErrorMessage(err));
+      const msg = getErrorMessage(err, 'Lưu thất bại. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setSaving(false);
     }

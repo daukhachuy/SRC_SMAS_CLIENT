@@ -8,6 +8,8 @@ import { EVENT_TYPES_LIST } from '../../api/managerApi';
 import { eventsAPI } from '../../api/eventsApi';
 import '../../styles/AdminRestaurant.css';
 import { emitAppToast } from '../../utils/appToastBus';
+import { getErrorMessage } from '../../utils/errorHandler';
+import { useAdminToast } from '../../context/AdminToastContext';
 
 /** API BlogResponse dùng `fullname` (Swagger); hỗ trợ fullName, author lồng nhau */
 function pickBlogAuthorName(b) {
@@ -441,6 +443,9 @@ function mapApiDiscountToRow(d) {
 }
 
 const AdminRestaurantPage = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [tab, setTab] = useState('codes');
   const [codeSearch, setCodeSearch] = useState('');
   const [codePage, setCodePage] = useState(1);
@@ -543,7 +548,7 @@ const AdminRestaurantPage = () => {
       const arr = Array.isArray(list) ? list : [];
       setCodes(arr.map(mapApiDiscountToRow));
     } catch (e) {
-      const msg = e.response?.data?.message || e.message || 'Không tải được danh sách mã';
+      const msg = getErrorMessage(e, 'Không tải được danh sách mã giảm giá.');
       setCodesLoadError(typeof msg === 'string' ? msg : 'Lỗi tải danh sách');
       setCodes([]);
     } finally {
@@ -559,7 +564,7 @@ const AdminRestaurantPage = () => {
       const arr = Array.isArray(list) ? list : [];
       setPosts(arr.map(mapApiBlogToRow));
     } catch (e) {
-      const msg = e.response?.data?.message || e.message || 'Không tải được danh sách blog';
+      const msg = getErrorMessage(e, 'Không tải được danh sách bài viết.');
       setBlogsLoadError(typeof msg === 'string' ? msg : 'Lỗi tải danh sách');
       setPosts([]);
     } finally {
@@ -575,7 +580,7 @@ const AdminRestaurantPage = () => {
       const arr = Array.isArray(list) ? list : [];
       setFeedbackRows(arr.map(mapApiFeedbackToRow));
     } catch (e) {
-      const msg = e.response?.data?.message || e.message || 'Không tải được phản hồi';
+      const msg = getErrorMessage(e, 'Không tải được danh sách phản hồi.');
       setFeedbackLoadError(typeof msg === 'string' ? msg : 'Lỗi tải phản hồi');
       setFeedbackRows([]);
     } finally {
@@ -732,18 +737,16 @@ const AdminRestaurantPage = () => {
           return;
         }
         await serviceAPI.update(sid, payload);
+        showToast('Cập nhật dịch vụ thành công!', 'success');
       } else {
         await serviceAPI.create(payload);
+        showToast('Thêm dịch vụ mới thành công!', 'success');
       }
       await loadServices();
       closeServiceModal();
     } catch (err) {
-      const msg =
-        (typeof err.message === 'string' && err.message) ||
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        'Không lưu được dịch vụ.';
-      setServiceSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
+      const msg = getErrorMessage(err, 'Không lưu được dịch vụ. Vui lòng thử lại.');
+      showToast(msg, 'error');
     } finally {
       setServiceSubmitting(false);
     }
@@ -764,16 +767,32 @@ const AdminRestaurantPage = () => {
 
     try {
       await serviceAPI.toggleStatus(sid, next);
+      showToast(`Đã ${next ? 'bật' : 'tắt'} dịch vụ "${row.name}".`, 'success');
       console.info(`[AdminRestaurant] Toggle service OK — id:${sid} → isAvailable:${next}`);
     } catch (err) {
-      // Revert optimistic update
       setServices((prev) =>
         prev.map((r) => (r.id === sid ? { ...r, active: !next } : r))
       );
-      const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái dịch vụ.';
-      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
+      const msg = getErrorMessage(err, 'Không cập nhật được trạng thái dịch vụ.');
+      showToast(msg, 'error');
     } finally {
       setServiceToggleBusyId(null);
+    }
+  };
+
+  /** DELETE /api/services/{id} */
+  const handleDeleteService = async (row) => {
+    if (!window.confirm(`Xóa dịch vụ "${row.name}"?`)) return;
+    setServiceDeleteLoading(true);
+    try {
+      await serviceAPI.delete(row.id);
+      showToast(`Đã xóa dịch vụ "${row.name}".`, 'success');
+      await loadServices();
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Xóa dịch vụ thất bại.');
+      showToast(msg, 'error');
+    } finally {
+      setServiceDeleteLoading(false);
     }
   };
 
@@ -942,34 +961,26 @@ const AdminRestaurantPage = () => {
       if (editingEvent?.id != null) {
         const eid = Number(editingEvent.id);
         if (!Number.isFinite(eid) || eid <= 0) {
-          setEventSubmitError('ID sự kiện không hợp lệ');
+          showToast('ID sự kiện không hợp lệ.', 'error');
           setEventSubmitting(false);
           return;
         }
         const payload = buildEventUpdatePayload(imagePath);
         await eventsAPI.update(eid, payload);
+        showToast('Cập nhật sự kiện thành công!', 'success');
       } else {
         const payload = buildEventCreatePayload(imagePath);
         await eventsAPI.create(payload);
+        showToast('Thêm sự kiện mới thành công!', 'success');
       }
       await loadEvents();
       closeEventModal();
     } catch (err) {
       if (!err.response && (err.code === 'ERR_NETWORK' || String(err.message || '').includes('Network'))) {
-        setEventSubmitError('Không kết nối được máy chủ (Network Error). Kiểm tra mạng, URL API hoặc CORS.');
+        showToast('Không kết nối được máy chủ. Vui lòng kiểm tra mạng.', 'error');
       } else {
-        const d = err.response?.data;
-        let msg =
-          (typeof err.message === 'string' && err.message) ||
-          (typeof d?.message === 'string' && d.message) ||
-          (typeof d?.title === 'string' && d.title) ||
-          '';
-        if (!msg && d?.errors && typeof d.errors === 'object') {
-          msg = Object.entries(d.errors)
-            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-            .join('; ');
-        }
-        setEventSubmitError(msg || 'Không lưu được sự kiện.');
+        const msg = getErrorMessage(err, 'Không lưu được sự kiện.');
+        showToast(msg, 'error');
       }
     } finally {
       setEventSubmitting(false);
@@ -980,17 +991,18 @@ const AdminRestaurantPage = () => {
     const eid = Number(row?.id);
     if (!Number.isFinite(eid) || eid <= 0) return;
     const name = (row.title || 'sự kiện này').trim();
-    if (!window.confirm(`Xóa sự kiện "${name}" khỏi hệ thống (API)? Thao tác không hoàn tác.`)) return;
+    if (!window.confirm(`Xóa sự kiện "${name}" khỏi hệ thống? Thao tác không hoàn tác.`)) return;
     setEventDeletingId(eid);
     try {
       await eventsAPI.delete(eid);
+      showToast(`Đã xóa sự kiện "${name}".`, 'success');
       await loadEvents();
     } catch (err) {
-      let msg = err.response?.data?.message || err.message || 'Không xóa được sự kiện.';
+      let msg = getErrorMessage(err, 'Không xóa được sự kiện.');
       if (!err.response && (err.code === 'ERR_NETWORK' || String(err.message || '').includes('Network'))) {
-        msg = 'Không kết nối được máy chủ khi xóa. Kiểm tra mạng hoặc đăng nhập.';
+        msg = 'Không kết nối được máy chủ khi xóa. Kiểm tra mạng.';
       }
-      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi xóa');
+      showToast(msg, 'error');
     } finally {
       setEventDeletingId(null);
     }
@@ -1005,27 +1017,18 @@ const AdminRestaurantPage = () => {
     setEventToggleBusyId(eid);
     try {
       await eventsAPI.patchStatus(eid, next);
+      showToast(`${next ? 'Bật' : 'Tắt'} sự kiện "${row.title}" thành công.`, 'success');
       await loadEvents();
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái sự kiện.';
-      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi cập nhật');
+      const msg = getErrorMessage(err, 'Không cập nhật được trạng thái sự kiện.');
+      showToast(msg, 'error');
     } finally {
       setEventToggleBusyId(null);
     }
   };
 
   const extractApiErrorMessage = (err, fallback) => {
-    const data = err?.response?.data;
-    if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim();
-    if (typeof data?.title === 'string' && data.title.trim()) return data.title.trim();
-    if (data?.errors && typeof data.errors === 'object') {
-      const firstFieldError = Object.values(data.errors)
-        .flat()
-        .find((x) => typeof x === 'string' && x.trim());
-      if (firstFieldError) return firstFieldError.trim();
-    }
-    if (typeof err?.message === 'string' && err.message.trim()) return err.message.trim();
-    return fallback;
+    return getErrorMessage(err, fallback);
   };
 
   const scrollToCodeError = useCallback(() => {
@@ -1161,7 +1164,7 @@ const AdminRestaurantPage = () => {
     if (editingCode) {
       const discountId = editingCode.id;
       if (discountId == null || !Number.isFinite(Number(discountId)) || Number(discountId) <= 0) {
-        setCodeSubmitError('Không xác định được ID mã giảm giá để cập nhật.');
+        showToast('ID mã giảm giá không hợp lệ.', 'error');
         return;
       }
       setCodeSubmitting(true);
@@ -1170,6 +1173,7 @@ const AdminRestaurantPage = () => {
         const payload = buildDiscountUpdatePayload(raw);
         console.debug('[DEBUG] Discount update payload:', JSON.stringify(payload, null, 2));
         await discountAPI.updateDiscount(discountId, payload);
+        showToast('Cập nhật mã giảm giá thành công!', 'success');
         await loadDiscounts();
         setCodePage(1);
         setEditingCode(null);
@@ -1177,11 +1181,11 @@ const AdminRestaurantPage = () => {
         setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
         setCodeModalOpen(false);
       } catch (err) {
-        const msg = extractApiErrorMessage(err, 'Không cập nhật được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.');
+        const msg = extractApiErrorMessage(err, 'Không cập nhật được mã.');
+        showToast(msg, 'error');
         if (/mã|code/i.test(msg)) {
           setCodeFieldErrors((prev) => ({ ...prev, code: msg }));
         }
-        setCodeSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
       } finally {
         setCodeSubmitting(false);
       }
@@ -1193,17 +1197,18 @@ const AdminRestaurantPage = () => {
       const payload = buildDiscountPayload();
       console.log('[DEBUG] Discount payload:', JSON.stringify(payload, null, 2));
       await discountAPI.createDiscount(payload);
+      showToast('Tạo mã giảm giá thành công!', 'success');
       await loadDiscounts();
       setCodePage(1);
       setCodeFieldErrors({});
       setCodeForm({ code: '', type: 'percent', description: '', value: '', minOrder: '', maxDiscount: '', startDate: '', endDate: '', quantity: '', applicableFor: 'All', status: 'Active' });
       setCodeModalOpen(false);
     } catch (err) {
-      const msg = extractApiErrorMessage(err, 'Không tạo được mã. Kiểm tra dữ liệu hoặc quyền đăng nhập.');
+      const msg = extractApiErrorMessage(err, 'Không tạo được mã.');
+      showToast(msg, 'error');
       if (/mã|code/i.test(msg)) {
         setCodeFieldErrors((prev) => ({ ...prev, code: msg }));
       }
-      setCodeSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
     } finally {
       setCodeSubmitting(false);
     }
@@ -1266,7 +1271,7 @@ const AdminRestaurantPage = () => {
     if (editingBlog) {
       const blogId = editingBlog.id;
       if (blogId == null || !Number.isFinite(Number(blogId)) || Number(blogId) <= 0) {
-        setBlogSubmitError('Không xác định được ID blog để cập nhật.');
+        showToast('ID blog không hợp lệ.', 'error');
         return;
       }
       setBlogSubmitting(true);
@@ -1276,7 +1281,7 @@ const AdminRestaurantPage = () => {
           try {
             imagePath = await uploadBlogImageToCloudinary(blogImageFile);
           } catch (upErr) {
-            setBlogSubmitError('Upload ảnh thất bại. Vui lòng thử lại.');
+            showToast('Upload ảnh thất bại. Vui lòng thử lại.', 'error');
             setBlogSubmitting(false);
             return;
           }
@@ -1284,20 +1289,17 @@ const AdminRestaurantPage = () => {
         const raw = editingBlog.raw || {};
         const payload = buildBlogUpdatePayload(imagePath, raw);
         await blogAPI.updateBlog(blogId, payload);
+        showToast('Cập nhật bài viết thành công!', 'success');
         await loadBlogs();
-      setEditingBlog(null);
+        setEditingBlog(null);
         setBlogForm(emptyBlogForm());
         setBlogImageFile(null);
         revokeBlogPreviewIfBlob(blogImagePreview);
         setBlogImagePreview('');
         setBlogModalOpen(false);
       } catch (err) {
-        const msg =
-          (typeof err.message === 'string' && err.message) ||
-          err.response?.data?.message ||
-          err.response?.data?.title ||
-          'Không cập nhật được bài. Kiểm tra dữ liệu hoặc quyền đăng nhập.';
-        setBlogSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
+        const msg = getErrorMessage(err, 'Không cập nhật được bài.');
+        showToast(msg, 'error');
       } finally {
         setBlogSubmitting(false);
       }
@@ -1306,39 +1308,33 @@ const AdminRestaurantPage = () => {
 
     setBlogSubmitting(true);
     try {
-      // 1. Upload ảnh lên Cloudinary trước (nếu có file mới)
       let imagePath = (blogForm.image || '').trim();
       if (blogImageFile) {
         try {
           imagePath = await uploadBlogImageToCloudinary(blogImageFile);
         } catch (upErr) {
-          setBlogSubmitError('Upload ảnh thất bại. Vui lòng thử lại.');
+          showToast('Upload ảnh thất bại. Vui lòng thử lại.', 'error');
           setBlogSubmitting(false);
           return;
         }
       }
 
-      // 2. Tạo blog với image URL đã upload
       const payload = {
         ...buildBlogCreatePayload(),
         image: imagePath,
       };
       await blogAPI.createBlog(payload);
+      showToast('Tạo bài viết mới thành công!', 'success');
       await loadBlogs();
 
-      // 3. Dọn blob preview
       revokeBlogPreviewIfBlob(blogImagePreview);
       setBlogImageFile(null);
       setBlogImagePreview('');
       setBlogForm(emptyBlogForm());
-    setBlogModalOpen(false);
+      setBlogModalOpen(false);
     } catch (err) {
-      const msg =
-        (typeof err.message === 'string' && err.message) ||
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        'Không đăng được bài. Kiểm tra dữ liệu hoặc quyền đăng nhập.';
-      setBlogSubmitError(typeof msg === 'string' ? msg : 'Lỗi không xác định');
+      const msg = getErrorMessage(err, 'Không đăng được bài.');
+      showToast(msg, 'error');
     } finally {
       setBlogSubmitting(false);
     }
@@ -1375,7 +1371,7 @@ const AdminRestaurantPage = () => {
         if (fresh && typeof fresh === 'object') d = fresh;
       } catch (e) {
         if (!d) {
-          const msg = e.response?.data?.message || e.message || 'Không tải được chi tiết mã';
+          const msg = getErrorMessage(e, 'Không tải được chi tiết mã giảm giá.');
           setCodeSubmitError(typeof msg === 'string' ? msg : 'Lỗi tải chi tiết');
           return;
         }
@@ -1448,10 +1444,11 @@ const AdminRestaurantPage = () => {
     if (!ok) return;
     try {
       await discountAPI.updateDiscountStatus(id, newStatus);
+      showToast(`${newStatus === 'Active' ? 'Bật' : 'Tắt'} mã "${row.code}" thành công.`, 'success');
       await loadDiscounts();
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Không cập nhật được trạng thái';
-      emitAppToast(msg);
+      const msg = getErrorMessage(err, 'Không cập nhật được trạng thái mã giảm giá.');
+      showToast(msg, 'error');
     }
   };
 
@@ -1465,10 +1462,11 @@ const AdminRestaurantPage = () => {
     setCodesLoadError('');
     try {
       await discountAPI.deleteDiscount(id);
+      showToast(`Đã xóa mã giảm giá "${row.code}".`, 'success');
       await loadDiscounts();
     } catch (e) {
-      const msg = e.response?.data?.message || e.message || 'Không xóa được mã';
-      setCodesLoadError(typeof msg === 'string' ? msg : 'Lỗi xóa mã');
+      const msg = getErrorMessage(e, 'Không xóa được mã giảm giá.');
+      showToast(msg, 'error');
     }
   };
 
@@ -1491,21 +1489,19 @@ const AdminRestaurantPage = () => {
     const ok = window.confirm(`Xóa bài viết "${row.title}"? Hành động này không hoàn tác.`);
     if (!ok) return;
 
-    // 1. Lập tức xóa khỏi UI (optimistic)
     setBlogDeletingId(id);
     setPosts((prev) => prev.filter((p) => p.id !== id));
 
     try {
       await blogAPI.deleteBlog(id);
-      // Thành công → danh sách đã đồng bộ ở trên
+      showToast(`Đã xóa bài viết "${row.title}".`, 'success');
     } catch (e) {
-      // Thất bại → khôi phục lại vào danh sách
       setPosts((prev) => {
-        if (prev.find((p) => p.id === id)) return prev; // đã có thì giữ nguyên
+        if (prev.find((p) => p.id === id)) return prev;
         return [...prev, row];
       });
-      const msg = e.response?.data?.message || e.message || 'Không xóa được bài viết';
-      setBlogsLoadError(typeof msg === 'string' ? msg : 'Lỗi xóa bài');
+      const msg = getErrorMessage(e, 'Không xóa được bài viết.');
+      showToast(msg, 'error');
     } finally {
       setBlogDeletingId(null);
     }
@@ -1540,7 +1536,7 @@ const AdminRestaurantPage = () => {
         setBlogDetailError('Dữ liệu blog không hợp lệ.');
       }
     } catch (e) {
-      const msg = e.response?.data?.message || e.message || 'Không tải được chi tiết blog';
+      const msg = getErrorMessage(e, 'Không tải được chi tiết blog.');
       setBlogDetailError(typeof msg === 'string' ? msg : 'Lỗi tải chi tiết');
     } finally {
       setBlogDetailLoading(false);
@@ -1599,8 +1595,8 @@ const AdminRestaurantPage = () => {
         ),
       );
     } catch (e) {
-      const msg = e.response?.data?.message || e.message || 'Không cập nhật được trạng thái blog.';
-      emitAppToast(typeof msg === 'string' ? msg : 'Lỗi');
+      const msg = getErrorMessage(e, 'Không cập nhật được trạng thái blog.');
+      showToast(msg, 'error');
     } finally {
       setBlogStatusPatchingId(null);
     }
@@ -2745,7 +2741,7 @@ const AdminRestaurantPage = () => {
                       onChange={(e) => setBlogForm((f) => ({ ...f, publishedAt: e.target.value }))}
                     />
                     <small style={{ display: 'block', marginTop: 6, color: '#6b7280', fontSize: 12 }}>
-                      API không chấp nhận thời điểm trong quá khứ — khi lưu sẽ tự điều chỉnh về thời điểm hiện tại nếu cần.
+                      
                     </small>
                   </div>
               )}

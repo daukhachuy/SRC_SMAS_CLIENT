@@ -10,7 +10,7 @@ import {
   createStaffByUserId,
   createStaffNew,
 } from '../../api/userApi';
-import { emitAppToast } from '../../utils/appToastBus';
+import { useAdminToast } from '../../context/AdminToastContext';
 
 const formatCustomerCreatedAt = (iso) => {
   if (!iso) return '—';
@@ -107,6 +107,9 @@ const parseSalaryNumber = (s) => {
 };
 
 const AdminStaffPage = () => {
+  /* ── Toast notification ── */
+  const { showToast } = useAdminToast();
+
   const [tab, setTab] = useState('customers');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -177,9 +180,10 @@ const AdminStaffPage = () => {
     setCustomerToggleBusyId(id);
     try {
       await patchUserStatus(id);
+      showToast('Cập nhật trạng thái tài khoản thành công.', 'success');
       await loadCustomers({ silent: true, syncSelectedUserId: id });
     } catch (err) {
-      emitAppToast(err?.message || 'Không cập nhật được trạng thái tài khoản.');
+      showToast(err?.message || 'Không cập nhật được trạng thái tài khoản.', 'error');
     } finally {
       setCustomerToggleBusyId(null);
     }
@@ -233,9 +237,10 @@ const AdminStaffPage = () => {
     setStaffToggleBusyId(id);
     try {
       await patchStaffStatus(id);
+      showToast('Cập nhật trạng thái nhân viên thành công.', 'success');
       await loadStaffs({ silent: true, syncSelectedId: id });
     } catch (err) {
-      emitAppToast(err?.message || 'Không cập nhật được trạng thái nhân viên.');
+      showToast(err?.message || 'Không cập nhật được trạng thái nhân viên.', 'error');
     } finally {
       setStaffToggleBusyId(null);
     }
@@ -274,11 +279,12 @@ const AdminStaffPage = () => {
         bankName: editStaffForm.bankName,
         bankAccountNumber: editStaffForm.bankAccount,
       });
+      showToast('Cập nhật thông tin nhân viên thành công!', 'success');
       await loadStaffs({ silent: true, syncSelectedId: selectedStaff.id });
       setSelectedStaff(null);
       setEditStaffForm(null);
     } catch (err) {
-      emitAppToast(err?.message || 'Không cập nhật được thông tin nhân viên.');
+      showToast(err?.message || 'Không cập nhật được thông tin nhân viên.', 'error');
     }
   };
 
@@ -293,21 +299,21 @@ const AdminStaffPage = () => {
     const bankAccountNumber = (addStaffForm.bankAccount || '').trim() || null;
 
     if (!position) {
-      emitAppToast('Vui lòng chọn vị trí / vai trò.');
+      showToast('Vui lòng chọn vị trí / vai trò.', 'error');
       return;
     }
 
     if (addStaffMode === 'from_customer') {
       if (addStaffSelectedUserId == null) {
-        emitAppToast('Vui lòng chọn một khách hàng trong danh sách.');
+        showToast('Vui lòng chọn một khách hàng trong danh sách.', 'error');
         return;
       }
       if (!Number.isFinite(salaryNum) || salaryNum < 1) {
-        emitAppToast('Mức lương phải là số và tối thiểu 1 (theo API).');
+        showToast('Mức lương phải là số và tối thiểu 1.', 'error');
         return;
       }
       if (!taxId) {
-        emitAppToast('Vui lòng nhập mã số thuế.');
+        showToast('Vui lòng nhập mã số thuế.', 'error');
         return;
       }
       setAddStaffSubmitting(true);
@@ -320,11 +326,11 @@ const AdminStaffPage = () => {
           bankName,
           taxId,
         });
+        showToast('Thêm nhân viên thành công!', 'success');
         await loadStaffs({ silent: true });
-        emitAppToast('Đã thêm nhân viên từ tài khoản khách hàng.');
         closeAddStaffModal();
       } catch (err) {
-        emitAppToast(err?.message || 'Không thêm được nhân viên.');
+        showToast(err?.message || 'Không thêm được nhân viên.', 'error');
       } finally {
         setAddStaffSubmitting(false);
       }
@@ -338,27 +344,27 @@ const AdminStaffPage = () => {
     const pwd = addStaffForm.password || '';
 
     if (!fullname) {
-      emitAppToast('Vui lòng nhập họ tên.');
+      showToast('Vui lòng nhập họ tên.', 'error');
       return;
     }
     if (!email) {
-      emitAppToast('Vui lòng nhập email.');
+      showToast('Vui lòng nhập email.', 'error');
       return;
     }
     if (!phone) {
-      emitAppToast('Vui lòng nhập số điện thoại.');
+      showToast('Vui lòng nhập số điện thoại.', 'error');
       return;
     }
     if (pwd.length < 6) {
-      emitAppToast('Mật khẩu phải có ít nhất 6 ký tự (theo API passwordHash).');
+      showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
       return;
     }
     if (!Number.isFinite(salaryNum) || salaryNum < 0) {
-      emitAppToast('Mức lương phải là số hợp lệ (≥ 0).');
+      showToast('Mức lương phải là số hợp lệ (>= 0).', 'error');
       return;
     }
     if (!taxId) {
-      emitAppToast('Vui lòng nhập mã số thuế.');
+      showToast('Vui lòng nhập mã số thuế.', 'error');
       return;
     }
 
@@ -379,11 +385,11 @@ const AdminStaffPage = () => {
         bankName,
         taxId,
       });
+      showToast('Tạo nhân viên mới thành công!', 'success');
       await loadStaffs({ silent: true });
-      emitAppToast('Đã tạo nhân viên mới thành công.');
       closeAddStaffModal();
     } catch (err) {
-      emitAppToast(err?.message || 'Không tạo được nhân viên.');
+      showToast(err?.message || 'Không tạo được nhân viên.', 'error');
     } finally {
       setAddStaffSubmitting(false);
     }
@@ -857,7 +863,17 @@ const AdminStaffPage = () => {
               <span className="staff-reset-label">ĐANG CẬP NHẬT CHO</span>
               <span className="staff-reset-name">{selectedCustomer.name}</span>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); if (newPassword && newPassword === confirmPassword) { emitAppToast('Đã cập nhật mật khẩu (mock).'); setResetPasswordOpen(false); setNewPassword(''); setConfirmPassword(''); } else { emitAppToast('Mật khẩu không khớp hoặc chưa nhập.'); } }}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (newPassword && newPassword === confirmPassword) {
+                showToast('Đã cập nhật mật khẩu thành công!', 'success');
+                setResetPasswordOpen(false);
+                setNewPassword('');
+                setConfirmPassword('');
+              } else {
+                showToast('Mật khẩu không khớp hoặc chưa nhập.', 'error');
+              }
+            }}>
               <div className="staff-form-group">
                 <label>Mật khẩu mới</label>
                 <div className="staff-password-wrap">

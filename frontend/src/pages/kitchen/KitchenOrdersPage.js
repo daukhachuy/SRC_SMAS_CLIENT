@@ -416,12 +416,14 @@ const KitchenOrdersPage = () => {
             preparingQty: 0,
             maxWaitMinutes: 0,
             orderIds: [],
+            orderItemIds: [], // Thêm để track từng orderItem cụ thể
             noteParts: new Set()
           });
         }
         const g = map.get(key);
         g.totalQty += item.quantity;
         g.orderIds.push(order.orderId ?? order.id);
+        g.orderItemIds.push(item.orderItemId ?? item.id); // Track individual item ID
         if (item.status === 'pending') {
           g.pendingQty += item.quantity;
           g.maxWaitMinutes = Math.max(g.maxWaitMinutes, order.waitTime);
@@ -443,7 +445,8 @@ const KitchenOrdersPage = () => {
         pendingQty: g.pendingQty,
         preparingQty: g.preparingQty,
         maxWaitMinutes: g.maxWaitMinutes,
-        orderIds: g.orderIds,
+        orderIds: [...new Set(g.orderIds)],
+        orderItemIds: [...new Set(g.orderItemIds)], // Loại bỏ trùng lặp
         modifiers: g.noteParts.size ? [...g.noteParts].join(' · ') : ''
       }))
       .sort((a, b) => b.maxWaitMinutes - a.maxWaitMinutes);
@@ -648,14 +651,28 @@ const KitchenOrdersPage = () => {
     return '';
   };
 
-  /** Bắt đầu tất cả món trong group (pending → preparing) — gọi batch trên mỗi order */
+  /** Bắt đầu từng món một trong group (pending → preparing) */
   const handleGroupStartAll = async (group) => {
-    const uniqueOrderIds = [...new Set(group.orderIds)];
+    // Lấy tất cả orderItemIds của các món pending trong group này
+    const itemsToStart = [];
+    allOrders.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const key = item.foodId ?? item.name ?? `__${item.id}`;
+        if (key === group.key && item.status === 'pending') {
+          itemsToStart.push(item.orderItemId ?? item.id);
+        }
+      });
+    });
+
+    if (itemsToStart.length === 0) return;
+
     setOrderBusyId(group.key);
     setError('');
     try {
-      await Promise.all(uniqueOrderIds.map((oid) => patchOrderAllPreparing(oid)));
+      // Chỉ bắt đầu các món pending, từng cái một
+      await Promise.all(itemsToStart.map((id) => patchOrderItemPreparing(id)));
       await loadOrders({ silent: true });
+      setToastMsg(`Đã bắt đầu ${itemsToStart.length} món.`);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Không bắt đầu nhóm món.');
     } finally {
@@ -699,14 +716,28 @@ const KitchenOrdersPage = () => {
     }
   };
 
-  /** Hoàn thành tất cả món trong group → load lại full */
+  /** Hoàn thành từng món đang nấu trong group → load lại full */
   const handleGroupCompleteAll = async (group) => {
-    const uniqueOrderIds = [...new Set(group.orderIds)];
+    // Lấy tất cả orderItemIds của các món đang nấu trong group này
+    const itemsToComplete = [];
+    allOrders.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const key = item.foodId ?? item.name ?? `__${item.id}`;
+        if (key === group.key && (item.status === 'preparing' || item.status === 'cooking')) {
+          itemsToComplete.push(item.orderItemId ?? item.id);
+        }
+      });
+    });
+
+    if (itemsToComplete.length === 0) return;
+
     setOrderBusyId(group.key);
     setError('');
     try {
-      await Promise.all(uniqueOrderIds.map((oid) => patchOrderAllReady(oid)));
+      // Chỉ hoàn thành các món đang nấu, từng cái một
+      await Promise.all(itemsToComplete.map((id) => patchOrderItemReady(id)));
       await loadOrders({ silent: true });
+      setToastMsg(`Đã hoàn thành ${itemsToComplete.length} món.`);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Không hoàn thành nhóm món.');
     } finally {
