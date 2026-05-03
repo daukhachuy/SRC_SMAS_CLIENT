@@ -1,5 +1,34 @@
 import instance from './axiosInstance';
 
+/**
+ * Chuẩn hóa SĐT VN cho tra cứu đặt bàn: 0782088535 → +84782088535 (BE đang khớp dạng +84).
+ * Email / chuỗi có chữ (mã đặt bàn) giữ nguyên.
+ */
+const normalizeReservationPhoneOrEmailQuery = (raw) => {
+  const s = String(raw || '').trim();
+  if (!s || s.includes('@')) return s;
+  const tight = s.replace(/\s/g, '');
+  if (/[a-zA-Z]/.test(tight)) return s;
+  const compact = tight.replace(/[.\u2013\u2014-]/g, '');
+  if (!/^\+?\d+$/.test(compact)) return s;
+  let d = compact.startsWith('+') ? compact.slice(1) : compact;
+  d = d.replace(/\D/g, '');
+  if (d.length < 9 || d.length > 15) return s;
+  if (d.startsWith('84')) {
+    let rest = d.slice(2);
+    if (rest.startsWith('0') && rest.length >= 9) rest = rest.slice(1);
+    if (rest.length >= 8) return `+84${rest}`;
+    return s;
+  }
+  if (d.startsWith('0') && d.length >= 10) {
+    return `+84${d.slice(1)}`;
+  }
+  if (!d.startsWith('0') && d.length === 9 && /^[35789]/.test(d)) {
+    return `+84${d}`;
+  }
+  return s;
+};
+
 const withOptionalBearer = (token) => {
   const raw = String(token || '').trim();
   if (!raw) return undefined;
@@ -120,23 +149,37 @@ export const lookupOrder = async (type, keyword) => {
   throw lastError;
 };
 
-// GET /api/reservation/check-availability-phoneoremail?request=...
+// GET /api/reservation/check-availability-phoneoremail — BE có thể đặt tên query khác nhau
 export const checkReservationAvailabilityByPhoneOrEmail = async (request) => {
-  const keyword = String(request || '').trim();
+  const keyword = normalizeReservationPhoneOrEmailQuery(String(request || '').trim());
   if (!keyword) return [];
-  try {
-    const response = await instance.get('/reservation/check-availability-phoneoremail', {
-      params: { request: keyword },
-    });
-    return response.data;
-  } catch (error) {
-    console.error(
-      'Lỗi tra cứu reservation/check-availability-phoneoremail:',
-      error.response?.status,
-      error.response?.data
-    );
-    throw error;
+  const path = '/reservation/check-availability-phoneoremail';
+  const paramVariants = [
+    { request: keyword },
+    { phoneOrEmail: keyword },
+    { contact: keyword },
+    { phone: keyword },
+    { email: keyword },
+    { keyword },
+    { q: keyword },
+  ];
+  let lastError;
+  for (const params of paramVariants) {
+    try {
+      const response = await instance.get(path, { params });
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      const st = error?.response?.status;
+      if (st !== 400 && st !== 404 && st !== 405) break;
+    }
   }
+  console.error(
+    'Lỗi tra cứu reservation/check-availability-phoneoremail:',
+    lastError?.response?.status,
+    lastError?.response?.data
+  );
+  throw lastError;
 };
 /** @deprecated dùng trực tiếp từ ./kitchenOrderApi — giữ để tương thích import cũ */
 export { apiGetPending as fetchPendingOrderItems } from './kitchenOrderApi';

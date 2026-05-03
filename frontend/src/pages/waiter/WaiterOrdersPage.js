@@ -1249,6 +1249,10 @@ const mapApiOrderToWaiter = (order) => {
         item?.ReservationCode ||
         item?.bookingCode ||
         item?.BookingCode ||
+        item?.bookReservationCode ||
+        item?.BookReservationCode ||
+        item?.code ||
+        item?.Code ||
         item?.orderCode ||
         item?.OrderCode ||
         ''
@@ -1342,22 +1346,47 @@ const mapApiOrderToWaiter = (order) => {
   };
 
   const normalizeReservationLookupRows = (data) => {
+    const asArray = (d) => {
+      if (!d || typeof d !== 'object') return null;
+      if (Array.isArray(d)) return d;
+      const nested = [
+        d.data,
+        d.Data,
+        d.items,
+        d.Items,
+        d.$values,
+        d.result,
+        d.Result,
+        d.records,
+        d.Records,
+        d.reservations,
+        d.Reservations,
+        d.value,
+        d.Value,
+      ];
+      for (const x of nested) {
+        if (Array.isArray(x)) return x;
+        if (x && typeof x === 'object' && Array.isArray(x.$values)) return x.$values;
+      }
+      return null;
+    };
+
     const rows =
-      Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.data?.items)
-            ? data.data.items
-            : Array.isArray(data?.data?.$values)
-              ? data.data.$values
-              : Array.isArray(data?.items)
-                ? data.items
-                : Array.isArray(data?.$values)
-                  ? data.$values
-                  : (data && typeof data === 'object')
-                    ? [data]
-                    : [];
+      asArray(data) ||
+      (data && typeof data === 'object' && !Array.isArray(data) ? asArray(data.data ?? data.Data) : null) ||
+      (Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.data?.items)
+          ? data.data.items
+          : Array.isArray(data?.data?.$values)
+            ? data.data.$values
+            : Array.isArray(data?.items)
+              ? data.items
+              : Array.isArray(data?.$values)
+                ? data.$values
+                : (data && typeof data === 'object')
+                  ? [data]
+                  : []);
     const uniqueByCode = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       const code = getReservationCode(row);
@@ -1562,7 +1591,7 @@ const mapApiOrderToWaiter = (order) => {
   const handleReservationLookup = async () => {
     const keyword = reservationContactInput.trim();
     if (!keyword) {
-      showWaiterNotice('Vui lòng nhập số điện thoại hoặc email để tra cứu mã đặt bàn.');
+      showWaiterNotice('Vui lòng nhập SĐT, email hoặc mã đặt bàn, rồi bấm tra cứu (🔍) hoặc Enter.');
       return;
     }
     setReservationLookupLoading(true);
@@ -3190,7 +3219,11 @@ const mapApiOrderToWaiter = (order) => {
   // DEBUG: Log currentOrders để kiểm tra dữ liệu thực tế
   console.log('[DEBUG][UI] currentOrders:', currentOrders);
 
-  const noticeIsError = /lỗi|thất bại|không thể|chưa|cần|error|failed|cannot|missing|forbidden|unauthorized|bad request/i.test(uiNotice);
+  // Không dùng màu “thành công” cho thông báo tra cứu trống / không xác định / chỉ còn lịch quá khứ
+  const noticeIsError =
+    /lỗi|thất bại|không thể|chưa|cần|error|failed|cannot|missing|forbidden|unauthorized|bad request|không tìm thấy|không xác định|đã qua ngày/i.test(
+      uiNotice
+    );
 
   return (
     <div className="waiter-orders-container">
@@ -3569,6 +3602,12 @@ const mapApiOrderToWaiter = (order) => {
                             placeholder="Ví dụ: 0901xxxxxx, email@domain.com hoặc mã như 20UXPEXL"
                             value={reservationContactInput}
                             onChange={(e) => setReservationContactInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (!reservationLookupLoading) void handleReservationLookup();
+                              }
+                            }}
                           />
                           <button
                             type="button"
