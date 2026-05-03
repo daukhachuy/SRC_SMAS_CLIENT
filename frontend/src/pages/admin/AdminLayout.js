@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -28,6 +28,8 @@ import {
 } from '../../api/notificationApi';
 import '../../styles/AdminLayout.css';
 import { getErrorMessage } from '../../utils/errorHandler';
+import { useUnreadNotificationSound } from '../../hooks/useUnreadNotificationSound';
+import { useNotificationPushReload } from '../../hooks/useNotificationPushReload';
 
 const navItems = [
   { to: '/admin', end: true, label: 'Dashboard', icon: LayoutDashboard },
@@ -56,6 +58,8 @@ const AdminLayout = () => {
   const [adminProfileOpen, setAdminProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const reloadNotificationsRef = useRef(() => Promise.resolve());
+  useUnreadNotificationSound(notifications);
   const [adminScreenError, setAdminScreenError] = useState('');
   const [adminProfileForm, setAdminProfileForm] = useState({
     fullname: '',
@@ -188,11 +192,18 @@ const AdminLayout = () => {
       }
     };
 
+    reloadNotificationsRef.current = loadNotifications;
     loadNotifications();
+    const poll = window.setInterval(() => {
+      void loadNotifications();
+    }, 45000);
     return () => {
       mounted = false;
+      window.clearInterval(poll);
     };
   }, []);
+
+  useNotificationPushReload(reloadNotificationsRef);
 
   const handleSaveAdminProfile = (e) => {
     e.preventDefault();

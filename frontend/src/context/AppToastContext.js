@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { registerAppToast, unregisterAppToast, emitAppToast } from '../utils/appToastBus';
+import { playIncomingNotificationSound } from '../utils/uiClickSound';
 import '../styles/AppToast.css';
 
 const AppToastContext = createContext(null);
@@ -25,6 +26,9 @@ export function AppToastProvider({ children }) {
     const text = raw.trim() || '—';
     const t = ['success', 'error', 'info'].includes(type) ? type : 'info';
     setToast({ id: Date.now(), message: text, type: t });
+    if (t === 'success' || t === 'info') {
+      void playIncomingNotificationSound();
+    }
   }, []);
 
   useEffect(() => {

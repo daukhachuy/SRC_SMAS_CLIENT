@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { playIncomingNotificationSound } from '../utils/uiClickSound';
 
 const AdminToastContext = createContext(null);
 
@@ -28,6 +29,9 @@ export function AdminToastProvider({ children }) {
     const text = raw.trim() || '—';
     const t = ['success', 'error', 'info'].includes(type) ? type : 'info';
     setToast({ id: Date.now(), message: text, type: t });
+    if (t === 'success' || t === 'info') {
+      void playIncomingNotificationSound();
+    }
   }, []);
 
   useEffect(() => {

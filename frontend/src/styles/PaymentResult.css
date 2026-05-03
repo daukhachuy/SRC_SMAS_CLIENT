@@ -41,3 +41,29 @@
 }
 .Btn-Home { background: #ff6600; color: white; }
 .Btn-History { background: #eee; color: #333; }
+
+@media (max-width: 768px) {
+  .Result-Container {
+    min-height: 50vh;
+    padding: 16px 12px;
+  }
+
+  .Result-Card {
+    padding: 28px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .Result-Card {
+    padding: 22px 16px;
+  }
+
+  .Action-Btns {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .Action-Btns button {
+    width: 100%;
+  }
+}

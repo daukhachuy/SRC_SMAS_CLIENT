@@ -602,3 +602,50 @@
   color: #b91c1c;
   border: 1px solid #fecaca;
 }
+
+@media (max-width: 768px) {
+  .od-modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .od-modal-container {
+    max-height: min(95dvh, 100%);
+    border-radius: 0.85rem 0.85rem 0 0;
+    max-width: 100%;
+  }
+
+  .od-modal-header {
+    padding: 1rem 1.15rem;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .od-modal-title {
+    font-size: 1.15rem;
+  }
+
+  .od-modal-body {
+    padding: 1.15rem;
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .od-modal-overlay {
+    padding: 0;
+  }
+
+  .od-modal-container {
+    border-radius: 1rem 1rem 0 0;
+    max-height: 100dvh;
+  }
+
+  .od-modal-header {
+    padding: 0.85rem 1rem;
+  }
+
+  .od-modal-body {
+    padding: 1rem;
+  }
+}
